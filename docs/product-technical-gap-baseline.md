@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-03T02:07Z
+**Snapshot:** 2026-09-03T03:04Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -44,7 +44,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main` | Validation / Analysis Run landing vehicle; availability cutoff precedes duplicate-identity admission. |
-| #310 | `b14eb6e863cce1b94b36e787ada2ec32c129cadf` | true | `main` | Longitudinal Modeling vehicle; CWC and occasion means preserve representable binary64 subnormal ties-to-even behavior. Hosted exact-head verification remains non-passing. |
+| #310 | `dd53eff6ed939ae06b51d70959c06b2a36fade08` | true | `main` | Longitudinal Modeling vehicle; CWC and occasion means share one Longitudinal-local stable-mean authority with exact power-of-two normalization. Hosted exact-head verification remains non-passing. |
 
 Exact-head evidence becomes stale after any source push.
 
@@ -66,7 +66,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - Occasion-mean deviations `p_it = x_it - μ_t` are not CWC residuals, sample-wide grand-mean residuals, or RI-CLPM within-person effects. Numeric event time defines occasion identity, so `-0.0` and `+0.0` are one occasion.
 - Row arrival order is not scientific evidence. Fixed admitted observations must produce bit-identical means/centered results under permutation wherever the contract claims deterministic f64 reference behavior.
 - A representable final scientific estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. False exact 0/1/non-finite endpoints remain fail-closed when the mathematical estimand is interior/nonzero.
-- Binary64 minimum-subnormal means follow IEEE ties-to-even at the public composition boundary; deterministic averaging must not introduce a second rounding that changes centered residual identity.
+- Binary64 minimum-subnormal means follow IEEE ties-to-even at the public composition boundary; deterministic averaging must not introduce a second rounding that changes centered residual identity. Normalization used for overflow safety must itself be exact enough not to introduce a non-power-of-two pre-rounding step.
 - Observed Allen support classes are data, not required design strata. A historical prediction census may truthfully have zero covered, partial-overlap, adjacent, or contradictory rows; absent classes remain explicit zero counts rather than invalidating the run.
 - Historical-cutoff admission occurs before duplicate-identity checks. Future-unavailable evidence cannot change an earlier run's conflicts, counts, or terminal state.
 - Supported temporal estimators require state/trajectory and claimed-structure recovery, bias/RMSE, interval coverage, convergence, uncertainty calibration, and leakage-safe rolling-origin evidence.
@@ -81,11 +81,11 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 The #486 occasion-mean fold is owner-correct on #310: RED `75b0184d...`, owner repair `7fe9aaf2...`, export/test repairs `b900e213...` / `30771ff2...`, determinism RED `8a59019e...`, same-sign ordering repair `465d139d...`, same-panel/sparse successor regressions `b9e952bb...` / `aad56b50...`, ADR `04b3c26e...`, PRD `a221f494...`, research trace `27aa78ee...`, subnormal RED `9aff817f...`, source repair `40e057b8...`, and trace `a2e6ace7...`.
 
-Fresh review then found the same binary64 double-rounding class in the CWC/irregular-residual mean primitive. `same_sign_mean` still used sorted incremental averaging. For scores `[from_bits(1), from_bits(2)]`, the exact mean is 1.5 minimum-subnormal ULPs and ties-to-even requires `from_bits(2)`; the predecessor returned `from_bits(1)`, changing centered residuals. RED `23476f45c506504babf16f33e6d61fdddef23b67` pins the public CWC contract. Causal repair `b14eb6e863cce1b94b36e787ada2ec32c129cadf` uses deterministic max-magnitude normalization plus compensated summation and one final scale-back in the existing Longitudinal mean primitive.
+The earlier CWC RED `23476f45c506504babf16f33e6d61fdddef23b67` / repair `b14eb6e863cce1b94b36e787ada2ec32c129cadf` closed the sorted-incremental `[from_bits(1), from_bits(2)]` ties-to-even defect but still normalized same-sign values by an arbitrary maximum magnitude. Fresh review found the stricter `[from_bits(1), from_bits(14)]` case: the exact mean is 7.5 minimum-subnormal ULPs and must round to the even 8-ULP neighbour, while dividing first by a 14-ULP scale double-rounds to 7 ULPs. RED `b073f03f5e28c94226e7dcaa72e11b25233ccc65` pins both public CWC and occasion-mean composition paths. Repair `350b8d4e0fdb3f5d68cd22bdfffb3b879cea62f2` uses an exact power-of-two scale derived from the maximum magnitude before deterministic compensated summation. Consolidation `dd53eff6ed939ae06b51d70959c06b2a36fade08` removes the duplicate occasion-mean floating-point implementation and reuses the same Longitudinal-local `scaled_compensated_mean` authority while preserving the occasion API's payload-error mapping.
 
-At `b14eb6e...`, CodeQL PR run `33706246475` is `startup_failure`. Rust Foundation CI, Documentation Quality, Security Scan, SAST Semgrep, OSV-Scanner PR, and Scorecard PR are queued. CodeRabbit status alone is not protected-branch GREEN; REST review history contains no `APPROVED` submission. #310 remains Draft and non-passing.
+At `dd53eff6...`, CodeQL PR run `33709968354` is `startup_failure` with zero materialized jobs. Rust Foundation CI, OSV-Scanner PR, and Security Scan are queued; Documentation Quality, SAST Semgrep, and Scorecard PR are pending. CodeRabbit status alone is not protected-branch GREEN; fresh review history contains no `APPROVED` submission. #310 remains Draft and non-passing.
 
-#486 remains open Draft beneath #310. It can close only after its remaining valid CHANGELOG/operational wording is either inherited owner-correctly or verified redundant; wrong-owner source and mixed `Z KST` provenance are intentionally rejected rather than copied.
+#486 remains open Draft beneath the #310 branch. It can close only after its remaining valid CHANGELOG/operational wording is either inherited owner-correctly or verified redundant; wrong-owner source and mixed `Z KST` provenance are intentionally rejected rather than copied.
 
 ### #416 — Validation / Analysis Run consolidation
 
@@ -143,6 +143,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-030 | Prediction-contradiction Analysis Run treated four observed relation classes as mandatory design strata | `active-fold` | RED `a2892b6...` + repair `a6402015...` + predecessor-test correction `6b0c8de6...`; fold unique evidence into #416; exact-survivor GREEN/review/main integration |
 | GAP-031 | Occasion-mean same-sign averaging double-rounded a representable minimum-subnormal ties-to-even mean | `verification-pending` | RED `9aff817f...` + repair `40e057b8...` + trace `a2e6ace7...`; exact-head GREEN and protected-main integration |
 | GAP-032 | CWC/irregular-residual same-sign averaging retained the same minimum-subnormal double-rounding defect | `verification-pending` | RED `23476f45...` + repair `b14eb6e8...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-033 | Arbitrary max-magnitude normalization introduced a second rounding and misrounded a 7.5-ULP subnormal mean to 7 ULPs | `verification-pending` | RED `b073f03f...` + exact-power-of-two repair `350b8d4e...` + Longitudinal mean-authority consolidation `dd53eff6...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 
 ## Release gate
 
