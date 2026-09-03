@@ -36,6 +36,18 @@ pub fn interval_coverage(
     Ok(covered as f64 / truth.len() as f64)
 }
 
+fn rationalized_wilson_positive_lower(n: f64, p: f64, z2: f64) -> f64 {
+    // Rationalize the lower root and divide through by z²:
+    //   2 n p² / (z² + 2 n p + z sqrt(z² + 4 n p (1-p))).
+    // This form avoids subtracting nearly equal O(z²) terms and avoids
+    // materializing the O(z²) denominator sum directly.
+    let normalized_numerator = 2.0 * n * p * p / z2;
+    let normalized_denominator = 1.0
+        + 2.0 * n * p / z2
+        + (1.0 + 4.0 * n * p * (1.0 - p) / z2).sqrt();
+    (normalized_numerator / normalized_denominator).clamp(0.0, 1.0)
+}
+
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
 ///
 /// Returns `(lower, upper)` for the empirical coverage rate at the stated
@@ -43,7 +55,10 @@ pub fn interval_coverage(
 /// all-covered sample, the exact Wilson lower endpoint is evaluated as
 /// `n / (n + z²)`. For strict-interior coverage, a rationalized equivalent is
 /// used when the generic `center - margin` subtraction collapses a positive,
-/// representable lower endpoint to exact zero at extreme finite `z`.
+/// representable lower endpoint to exact zero at extreme finite `z`. The same
+/// positive-lower representation is applied to the complementary uncovered
+/// proportion when `center + margin` falsely rounds an upper endpoint to exact
+/// one even though the represented Wilson endpoint remains below one.
 ///
 /// # Errors
 ///
@@ -75,20 +90,17 @@ pub fn wilson_coverage_interval(
     // radical and z are finite and non-negative; margin/bounds stay finite in [0,1].
     let direct_low = ((center - margin) / denominator).clamp(0.0, 1.0);
     let low = if direct_low == 0.0 && p > 0.0 && z2 > 0.0 {
-        // Rationalize the lower root and divide through by z²:
-        //   2 n p² / (z² + 2 n p + z sqrt(z² + 4 n p (1-p))).
-        // This is algebraically the same Wilson endpoint but avoids subtracting
-        // nearly equal O(z²) terms. It also avoids forming the O(z²) denominator
-        // sum directly, which can overflow even while the lower bound is finite.
-        let normalized_numerator = 2.0 * n * p * p / z2;
-        let normalized_denominator = 1.0
-            + 2.0 * n * p / z2
-            + (1.0 + 4.0 * n * p * (1.0 - p) / z2).sqrt();
-        (normalized_numerator / normalized_denominator).clamp(0.0, 1.0)
+        rationalized_wilson_positive_lower(n, p, z2)
     } else {
         direct_low
     };
-    let high = ((center + margin) / denominator).clamp(0.0, 1.0);
+    let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
+    let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
+        let uncovered_lower = rationalized_wilson_positive_lower(n, 1.0 - p, z2);
+        (1.0 - uncovered_lower).clamp(0.0, 1.0)
+    } else {
+        direct_high
+    };
     Ok((low, high))
 }
 
