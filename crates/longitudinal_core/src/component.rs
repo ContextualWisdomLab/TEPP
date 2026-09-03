@@ -139,7 +139,7 @@ pub fn component_root_mean_square_error(
         return Ok(0.0);
     }
     let rmse = scale * (scaled_sum_squares / truth.len() as f64).sqrt();
-    if rmse.is_finite() {
+    if rmse.is_finite() && rmse != 0.0 {
         Ok(rmse)
     } else {
         Err(LongitudinalError::InvalidComponentPayload)
