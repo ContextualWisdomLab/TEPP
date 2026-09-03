@@ -36,16 +36,26 @@ pub fn interval_coverage(
     Ok(covered as f64 / truth.len() as f64)
 }
 
-fn rationalized_wilson_positive_lower(n: f64, p: f64, z2: f64) -> f64 {
-    // Rationalize the lower root and divide through by z²:
-    //   2 n p² / (z² + 2 n p + z sqrt(z² + 4 n p (1-p))).
-    // This form avoids subtracting nearly equal O(z²) terms and avoids
-    // materializing the O(z²) denominator sum directly.
-    let normalized_numerator = 2.0 * n * p * p / z2;
-    let normalized_denominator = 1.0
-        + 2.0 * n * p / z2
-        + (1.0 + 4.0 * n * p * (1.0 - p) / z2).sqrt();
-    (normalized_numerator / normalized_denominator).clamp(0.0, 1.0)
+fn rationalized_wilson_positive_lower(n: f64, p: f64, z: f64, z2: f64) -> f64 {
+    if z2 >= 1.0 {
+        // Rationalize the lower root and divide through by z²:
+        //   2 n p² / (z² + 2 n p + z sqrt(z² + 4 n p (1-p))).
+        // This form avoids subtracting nearly equal O(z²) terms and avoids
+        // materializing the O(z²) denominator sum directly.
+        let normalized_numerator = 2.0 * n * p * p / z2;
+        let normalized_denominator = 1.0
+            + 2.0 * n * p / z2
+            + (1.0 + 4.0 * n * p * (1.0 - p) / z2).sqrt();
+        return (normalized_numerator / normalized_denominator).clamp(0.0, 1.0);
+    }
+
+    // For z² < 1, dividing through by z² can overflow even though the Wilson
+    // endpoint is ordinary and representable. Evaluate the same rationalized
+    // root on its natural scale instead.
+    let numerator = 2.0 * n * p * p;
+    let denominator =
+        z2 + 2.0 * n * p + z * (z2 + 4.0 * n * p * (1.0 - p)).sqrt();
+    (numerator / denominator).clamp(0.0, 1.0)
 }
 
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
@@ -53,12 +63,14 @@ fn rationalized_wilson_positive_lower(n: f64, p: f64, z2: f64) -> f64 {
 /// Returns `(lower, upper)` for the empirical coverage rate at the stated
 /// normal critical value `z` (for example `1.96` for nominal 95%). For an
 /// all-covered sample, the exact Wilson lower endpoint is evaluated as
-/// `n / (n + z²)`. For strict-interior coverage, a rationalized equivalent is
-/// used when the generic `center - margin` subtraction collapses a positive,
-/// representable lower endpoint to exact zero at extreme finite `z`. The same
-/// positive-lower representation is applied to the complementary uncovered
-/// proportion when `center + margin` falsely rounds an upper endpoint to exact
-/// one even though the represented Wilson endpoint remains below one.
+/// `n / (n + z²)`. For nonzero strict-interior coverage, the lower endpoint is
+/// evaluated through the algebraically rationalized positive root rather than
+/// `center - margin`; the implementation switches scale at `z² = 1` so the
+/// stable form neither suffers large-z cancellation nor small-z division
+/// overflow. The same positive-lower representation is applied to the
+/// complementary uncovered proportion when `center + margin` falsely rounds an
+/// upper endpoint to exact one even though the represented Wilson endpoint
+/// remains below one.
 ///
 /// # Errors
 ///
@@ -82,21 +94,21 @@ pub fn wilson_coverage_interval(
     if p == 1.0 {
         return Ok((n / (n + z2), 1.0));
     }
+
+    let low = if p > 0.0 {
+        rationalized_wilson_positive_lower(n, p, z, z2)
+    } else {
+        0.0
+    };
+
     let denominator = 1.0 + z2 / n;
     let center = p + z2 / (2.0 * n);
     let radical = (p * (1.0 - p) / n) + z2 / (4.0 * n * n);
     // With finite z² and coverage p in [0,1], Wilson terms remain finite.
     let margin = z * radical.sqrt();
-    // radical and z are finite and non-negative; margin/bounds stay finite in [0,1].
-    let direct_low = ((center - margin) / denominator).clamp(0.0, 1.0);
-    let low = if direct_low == 0.0 && p > 0.0 && z2 > 0.0 {
-        rationalized_wilson_positive_lower(n, p, z2)
-    } else {
-        direct_low
-    };
     let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
     let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
-        let uncovered_lower = rationalized_wilson_positive_lower(n, 1.0 - p, z2);
+        let uncovered_lower = rationalized_wilson_positive_lower(n, 1.0 - p, z, z2);
         (1.0 - uncovered_lower).clamp(0.0, 1.0)
     } else {
         direct_high
