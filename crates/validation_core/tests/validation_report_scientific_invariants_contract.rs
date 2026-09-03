@@ -1,4 +1,4 @@
-use validation_core::{ValidationError, ValidationReport};
+use validation_core::{MonteCarloSummary, ValidationError, ValidationReport};
 
 fn valid_report() -> ValidationReport {
     ValidationReport {
@@ -86,4 +86,18 @@ fn serialization_and_deserialization_cannot_bypass_report_validation() {
         "monte_carlo_rmse":null
     }"#;
     assert!(serde_json::from_str::<ValidationReport>(impossible).is_err());
+}
+
+#[test]
+fn monte_carlo_summary_direct_serialization_preserves_its_validation_contract() {
+    let impossible = MonteCarloSummary {
+        replication_count: 2,
+        mean: 0.0,
+        standard_deviation: -0.1,
+        standard_error: 0.0,
+        percentile_lower: 0.0,
+        percentile_upper: 1.0,
+    };
+    assert_eq!(impossible.validate(), Err(ValidationError::InvalidInput));
+    assert!(serde_json::to_string(&impossible).is_err());
 }
