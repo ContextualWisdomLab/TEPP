@@ -1,3 +1,3 @@
 ### Fixed
 
-- Validation Evidence now rejects `MonteCarloSummary` payloads whose standard error is impossible for the represented sample spread/count: nonzero sample SD with exact-zero SE, SE larger than SD, or nonzero singleton spread/SE. This prevents finite serialized evidence from claiming less or more Monte Carlo uncertainty than the summary contract can represent.
+- Validation Evidence now rejects `MonteCarloSummary` payloads whose `standard_error` is incoherent with the represented `standard_deviation` and `replication_count`. Positive spread must agree with `SD / sqrt(n)` within a small binary64 relative tolerance, zero spread requires zero SE, and singleton summaries require zero spread/SE. This prevents finite serialized evidence from materially understating or overstating Monte Carlo uncertainty without imposing cross-language bit-for-bit equality.
