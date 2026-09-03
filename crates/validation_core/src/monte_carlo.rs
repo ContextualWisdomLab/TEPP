@@ -179,7 +179,9 @@ pub fn summarize_replications(
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
 ///
 /// Comparison scales all terms by a shared finite magnitude so opposite-sign
-/// extremes do not overflow both sides of the inequality to infinity.
+/// extremes do not overflow both sides of the inequality to infinity. A zero
+/// standard error or zero multiplier is an exact-recovery gate and is compared
+/// before scale reduction so a huge SE cannot erase a nonzero residual.
 ///
 /// # Errors
 ///
@@ -200,8 +202,8 @@ pub fn accept_within_standard_errors(
     if k < 0.0 || standard_error < 0.0 {
         return Err(ValidationError::InvalidConfiguration);
     }
-    if standard_error == 0.0 {
-        // Exact recovery only: zero SE admits no estimation residual.
+    if standard_error == 0.0 || k == 0.0 {
+        // Exact recovery only: a zero SE or zero multiplier admits no residual.
         return Ok(estimate.total_cmp(&target).is_eq());
     }
     let scale = estimate
