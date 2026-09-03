@@ -41,8 +41,9 @@ pub fn interval_coverage(
 /// Returns `(lower, upper)` for the empirical coverage rate at the stated
 /// normal critical value `z` (for example `1.96` for nominal 95%). For an
 /// all-covered sample, the exact Wilson lower endpoint is evaluated as
-/// `n / (n + z²)` rather than subtracting two nearly equal `O(z²)` terms. This
-/// preserves a representable positive lower endpoint at large finite `z`.
+/// `n / (n + z²)`. For strict-interior coverage, a rationalized equivalent is
+/// used when the generic `center - margin` subtraction collapses a positive,
+/// representable lower endpoint to exact zero at extreme finite `z`.
 ///
 /// # Errors
 ///
@@ -72,7 +73,21 @@ pub fn wilson_coverage_interval(
     // With finite z² and coverage p in [0,1], Wilson terms remain finite.
     let margin = z * radical.sqrt();
     // radical and z are finite and non-negative; margin/bounds stay finite in [0,1].
-    let low = ((center - margin) / denominator).clamp(0.0, 1.0);
+    let direct_low = ((center - margin) / denominator).clamp(0.0, 1.0);
+    let low = if direct_low == 0.0 && p > 0.0 && z2 > 0.0 {
+        // Rationalize the lower root and divide through by z²:
+        //   2 n p² / (z² + 2 n p + z sqrt(z² + 4 n p (1-p))).
+        // This is algebraically the same Wilson endpoint but avoids subtracting
+        // nearly equal O(z²) terms. It also avoids forming the O(z²) denominator
+        // sum directly, which can overflow even while the lower bound is finite.
+        let normalized_numerator = 2.0 * n * p * p / z2;
+        let normalized_denominator = 1.0
+            + 2.0 * n * p / z2
+            + (1.0 + 4.0 * n * p * (1.0 - p) / z2).sqrt();
+        (normalized_numerator / normalized_denominator).clamp(0.0, 1.0)
+    } else {
+        direct_low
+    };
     let high = ((center + margin) / denominator).clamp(0.0, 1.0);
     Ok((low, high))
 }
