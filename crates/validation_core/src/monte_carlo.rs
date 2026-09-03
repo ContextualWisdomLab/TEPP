@@ -4,6 +4,8 @@ use crate::ValidationError;
 use crate::input::require_finite;
 use crate::numeric::{deterministic_compensated_sum, deterministic_representable_mean};
 
+const STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+
 /// Summary of Monte Carlo replications for a scalar metric.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MonteCarloSummary {
@@ -24,19 +26,18 @@ pub struct MonteCarloSummary {
 impl MonteCarloSummary {
     /// Validate structural and uncertainty-domain invariants for a Monte Carlo summary payload.
     ///
-    /// A standard error of the mean from more than one replication is strictly
-    /// smaller than a nonzero sample standard deviation. A nonzero sample
-    /// standard deviation cannot carry exact-zero standard error, because a
-    /// finite replication count cannot erase all uncertainty. A singleton
-    /// summary uses the canonical zero-spread/zero-SE convention produced by
-    /// [`summarize_replications`]. These admission checks prevent finite but
-    /// impossible uncertainty evidence from becoming durable.
+    /// `standard_error` is the standard error of the retained-replication mean,
+    /// so a positive sample SD must agree numerically with `SD / sqrt(n)`.
+    /// Admission allows a small relative binary64 tolerance rather than requiring
+    /// cross-language bit-for-bit equality, but rejects materially understated or
+    /// overstated uncertainty. Zero spread requires zero SE, and the canonical
+    /// singleton summary has zero spread and zero SE.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when counts or numeric fields
-    /// violate the summary contract or the standard-error field is impossible
-    /// for the represented sample spread/count.
+    /// violate the summary contract or the standard-error field is incoherent
+    /// with the represented sample spread/count.
     pub fn validate(self) -> Result<Self, ValidationError> {
         if self.replication_count == 0 {
             return Err(ValidationError::InvalidInput);
@@ -58,14 +59,24 @@ impl MonteCarloSummary {
         if self.percentile_lower > self.percentile_upper {
             return Err(ValidationError::InvalidInput);
         }
-        if (self.standard_error == 0.0 && self.standard_deviation != 0.0)
-            || (self.replication_count > 1
-                && self.standard_deviation != 0.0
-                && self.standard_error >= self.standard_deviation)
-            || (self.replication_count == 1
-                && (self.standard_deviation != 0.0 || self.standard_error != 0.0))
-        {
-            return Err(ValidationError::InvalidInput);
+        if self.standard_deviation == 0.0 {
+            if self.standard_error != 0.0 {
+                return Err(ValidationError::InvalidInput);
+            }
+        } else {
+            if self.replication_count == 1 || self.standard_error == 0.0 {
+                return Err(ValidationError::InvalidInput);
+            }
+            let expected_standard_error =
+                self.standard_deviation / (self.replication_count as f64).sqrt();
+            if expected_standard_error == 0.0 {
+                return Err(ValidationError::InvalidInput);
+            }
+            let relative_error =
+                (self.standard_error / expected_standard_error - 1.0).abs();
+            if !relative_error.is_finite() || relative_error > STANDARD_ERROR_RELATIVE_TOLERANCE {
+                return Err(ValidationError::InvalidInput);
+            }
         }
         Ok(self)
     }
