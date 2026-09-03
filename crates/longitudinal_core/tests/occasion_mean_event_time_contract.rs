@@ -94,6 +94,28 @@ fn representable_occasion_mean_is_not_rejected_for_intermediate_sum_overflow() {
 }
 
 #[test]
+fn representable_subnormal_occasion_mean_preserves_round_to_even() {
+    let minimum_subnormal = f64::from_bits(1);
+    let two_subnormals = f64::from_bits(2);
+    let rows = [
+        observation(1, 0.0, minimum_subnormal),
+        observation(1, 1.0, 0.0),
+        observation(2, 0.0, two_subnormals),
+        observation(2, 1.0, 0.0),
+    ];
+
+    let pairs = center_occasion_mean_event_lags(&rows)
+        .expect("subnormal occasion mean must remain representable");
+    assert_eq!(pairs.len(), 2);
+    assert_eq!(
+        pairs[0].earlier_residual().to_bits(),
+        (-minimum_subnormal).to_bits(),
+        "mean([1 ulp, 2 ulp]) is 1.5 ulp and rounds ties-to-even to 2 ulp"
+    );
+    assert_eq!(pairs[1].earlier_residual().to_bits(), 0.0_f64.to_bits());
+}
+
+#[test]
 fn occasion_mean_is_bit_stable_under_row_permutation() {
     let large = f64::MAX * 0.5;
     let next_one = f64::from_bits(1.0_f64.to_bits() + 1);
