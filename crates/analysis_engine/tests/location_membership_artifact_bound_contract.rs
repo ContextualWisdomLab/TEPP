@@ -1,8 +1,8 @@
 //! Serialization bound for the location-membership analysis artifact.
 
 use analysis_engine::{
-    AnalysisEngineError, LocationMembershipArtifact, MAX_EVIDENCE_UNITS,
-    LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
+    AnalysisEngineError, LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION, LocationMembershipArtifact,
+    MAX_EVIDENCE_UNITS,
 };
 
 #[test]
