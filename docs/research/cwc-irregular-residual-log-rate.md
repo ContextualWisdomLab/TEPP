@@ -15,19 +15,45 @@ raw-process autoregressive drift.
 
 1. `center_within_unit_event_lags` subtracts the unit mean (CWC) and emits
    consecutive [`LaggedWithinResidual`] pairs on admitted event intervals.
-   Singleton units are skipped.
-2. `recover_within_unit_irregular_residual_log_rate` is the pairwise mean of
-   the Driver, Oud, and Voelkle (2017, Eq. 3) scalar inverse
+   Singleton units are skipped and at least two units must contribute lags.
+2. `recover_within_unit_irregular_residual_log_rate` is the mean of the
+   Driver, Oud, and Voelkle (2017, Eq. 3) scalar inverse
    `a = ln(|later| / |earlier|) / Δt` on nonzero same-sign residuals. When
    the absolute residual ratio is finite and positive the finite-ratio
    logarithm is used; overflowed or underflowed ratios fall back to
-   `ln|later| − ln|earlier|`. The pairwise mean is incremental so two finite
-   rates whose raw sum overflows stay representable.
+   `ln|later| − ln|earlier|`.
 3. `recover_centered_irregular_residual_log_rate` is the already-centered
-   path. It does **not** re-center. The signed residual ratio must be
-   strictly positive. Known-truth pairs `(1, 0.5)` over unit event time
-   recover `ln(0.5)`.
+   path. It does **not** re-center. Residuals must be nonzero and have equal
+   sign. Known-truth pairs `(1, 0.5)` with `Δt = 1` recover `ln(0.5)`; for a
+   general admitted interval the scalar result is `ln(0.5) / Δt`.
 4. `refuse_cwc_residual_log_rate_as_raw_process_drift` always fails closed.
+
+## Numerical mean contract
+
+CWC means, occasion means, and admitted irregular-rate means share
+`irregular_residual::scaled_compensated_mean`. Same-sign finite terms use an
+exact power-of-two scale, deterministic ordering, and compensated summation so
+an avoidable raw partial-sum overflow does not reject a representable mean and
+non-power-of-two normalization does not add an earlier rounding step.
+
+Mixed-sign inputs cancel opposite signs from the largest magnitudes first.
+The surviving one-sign residuals are then normalized and compensated, but the
+division uses the **original sample count directly** before scaling back. The
+implementation must not first round a mean over only the surviving residuals
+and then weight that rounded intermediate. For the minimum-subnormal ULP `u`,
+`[-20u, -20u, 9u]` has exact mean `-31u/3`, which rounds once to `-10u` in
+binary64; the retired retained-mean-then-weight path produced `-11u`.
+
+RED `ae5e61f9a829adbfed2ea13c5705d4b85d80b0d6` pins this through the public
+CWC API. Causal repair `39469067aca2fa93e2fa4c914848f7cec8031811`
+applies the original denominator inside the shared normalized sum. Contract
+`mixed_sign_mean_rounding_contract.rs` also exercises the public occasion-mean
+path so the shared numerical authority cannot silently split again.
+
+This arithmetic remains a Longitudinal composition primitive in this stack.
+It is not a new reusable static psychometric kernel. A fast-mlsirm handoff
+requires semantic-equivalence evidence and an immutable released owner
+contract rather than source copying.
 
 ## Identification and admissibility
 
@@ -56,12 +82,19 @@ ctsem estimation.
 
 ## Recovery evidence
 
-Already-centered irregular pairs recover known `a` at machine precision,
-including `ln(0.5)`. CWC of a raw AR path with a stable between-unit
-offset does **not** recover that `a`. Fail-closed cases cover empty and
-singleton-only rows, one unit, non-positive intervals, non-finite scores,
-overflowed unit means, overflowing CWC residuals after a finite mean,
-tiny intervals with huge log-ratios, and the Curran refusal.
+Already-centered irregular pairs recover known `a` at machine precision.
+CWC of a raw AR path with a stable between-unit offset does **not** recover
+that `a`. Fail-closed cases cover empty and singleton-only rows, fewer than
+two lag-contributing units, non-positive intervals, non-finite scores,
+non-representable means, overflowing CWC residuals after a finite mean,
+tiny intervals with huge log-ratios, underflowed nonzero final rates, and the
+Curran refusal.
+
+The current public numerical regressions include same-sign raw-sum overflow,
+full-exponent mixed-sign cancellation, minimum-subnormal cancellation,
+halfway ties-to-even for same-sign means, and the mixed-sign `-31u/3` case
+above. Hosted exact-head CI and independent review remain delivery gates; these
+source contracts do not by themselves establish release readiness.
 
 ## Traceability
 
