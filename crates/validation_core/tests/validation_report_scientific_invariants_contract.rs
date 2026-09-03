@@ -71,6 +71,7 @@ fn serialization_and_deserialization_cannot_bypass_report_validation() {
     let mut report = valid_report();
     report.interval_coverage = 1.5;
     assert_eq!(report.to_json(), Err(ValidationError::InvalidInput));
+    assert!(serde_json::to_string(&report).is_err());
 
     let impossible = r#"{
         "study_label":"invalid-wire-report",
