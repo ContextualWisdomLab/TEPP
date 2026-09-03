@@ -11,7 +11,13 @@
 //! contracts and preserves their artifact meaning.
 
 mod case_deletion_refit;
+mod copy_identity_artifact;
+mod episode_membership_artifact;
+mod inferred_status_artifact;
 mod lineage_criterion;
+mod location_membership_artifact;
+mod membership_target_artifact;
+mod subevent_containment_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -41,10 +47,50 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Copy-identity artifact and execution contracts from this engine.
+pub use copy_identity_artifact::{
+    COPY_IDENTITY_ARTIFACT_BYTE_LIMIT, COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION,
+    COPY_IDENTITY_MODEL_CONTRACT_VERSION, COPY_IDENTITY_OUTPUT_PROFILE, CopyIdentityArtifact,
+    CopyIdentityDocument, CopyIdentityExecution, execute_copy_identity_run,
+};
+/// Episode-membership artifact and execution contracts from this engine.
+pub use episode_membership_artifact::{
+    EPISODE_MEMBERSHIP_ARTIFACT_BYTE_LIMIT, EPISODE_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
+    EPISODE_MEMBERSHIP_MODEL_CONTRACT_VERSION, EPISODE_MEMBERSHIP_OUTPUT_PROFILE,
+    EpisodeMembershipArtifact, EpisodeMembershipAssignment, EpisodeMembershipExecution,
+    execute_episode_membership_run,
+};
+/// Inferred-status artifact and execution contracts from this engine.
+pub use inferred_status_artifact::{
+    INFERRED_STATUS_ARTIFACT_BYTE_LIMIT, INFERRED_STATUS_ARTIFACT_SCHEMA_VERSION,
+    INFERRED_STATUS_MODEL_CONTRACT_VERSION, INFERRED_STATUS_OUTPUT_PROFILE, InferredStatusArtifact,
+    InferredStatusEvidence, InferredStatusExecution, execute_inferred_status_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Location-membership artifact and execution contracts from this engine.
+pub use location_membership_artifact::{
+    LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT, LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
+    LOCATION_MEMBERSHIP_MODEL_CONTRACT_VERSION, LOCATION_MEMBERSHIP_OUTPUT_PROFILE,
+    LocationMembershipArtifact, LocationMembershipDocument, LocationMembershipExecution,
+    execute_location_membership_run,
+};
+/// Membership-target artifact and execution contracts from this engine.
+pub use membership_target_artifact::{
+    MEMBERSHIP_TARGET_ARTIFACT_BYTE_LIMIT, MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION,
+    MEMBERSHIP_TARGET_MODEL_CONTRACT_VERSION, MEMBERSHIP_TARGET_OUTPUT_PROFILE,
+    MembershipTargetArtifact, MembershipTargetDocument, MembershipTargetExecution,
+    execute_membership_target_run,
+};
+/// Subevent-containment artifact and execution contracts from this engine.
+pub use subevent_containment_artifact::{
+    SUBEVENT_CONTAINMENT_ARTIFACT_BYTE_LIMIT, SUBEVENT_CONTAINMENT_ARTIFACT_SCHEMA_VERSION,
+    SUBEVENT_CONTAINMENT_MODEL_CONTRACT_VERSION, SUBEVENT_CONTAINMENT_OUTPUT_PROFILE,
+    SubeventContainmentArtifact, SubeventContainmentAssignment, SubeventContainmentExecution,
+    execute_subevent_containment_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +294,18 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A copy-identity artifact violated its bounded schema or count invariants.
+    InvalidCopyIdentityArtifact,
+    /// An episode-membership artifact violated its bounded schema or count invariants.
+    InvalidEpisodeMembershipArtifact,
+    /// An inferred-status artifact violated its bounded schema or count invariants.
+    InvalidInferredStatusArtifact,
+    /// A location-membership artifact violated its bounded schema or count invariants.
+    InvalidLocationMembershipArtifact,
+    /// A membership-target artifact violated its bounded schema or count invariants.
+    InvalidMembershipTargetArtifact,
+    /// A subevent-containment artifact violated its bounded schema or count invariants.
+    InvalidSubeventContainmentArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +320,12 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidCopyIdentityArtifact => "invalid copy-identity artifact",
+            Self::InvalidEpisodeMembershipArtifact => "invalid episode-membership artifact",
+            Self::InvalidInferredStatusArtifact => "invalid inferred-status artifact",
+            Self::InvalidLocationMembershipArtifact => "invalid location-membership artifact",
+            Self::InvalidMembershipTargetArtifact => "invalid membership-target artifact",
+            Self::InvalidSubeventContainmentArtifact => "invalid subevent-containment artifact",
         };
         formatter.write_str(message)
     }
@@ -310,12 +374,13 @@ pub fn execute_analysis_run(
     let mut identities = BTreeSet::new();
     let mut eligible = Vec::new();
     for unit in &corpus.evidence_units {
+        if unit.available_time.instant() > cutoff.instant() {
+            continue;
+        }
         if !identities.insert(unit.evidence_id.clone()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
-        if unit.available_time.instant() <= cutoff.instant() {
-            eligible.push(unit);
-        }
+        eligible.push(unit);
     }
 
     let completed_at = completed_at.into();
@@ -681,6 +746,30 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::InvalidCopyIdentityArtifact,
+                "invalid copy-identity artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidEpisodeMembershipArtifact,
+                "invalid episode-membership artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidInferredStatusArtifact,
+                "invalid inferred-status artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidLocationMembershipArtifact,
+                "invalid location-membership artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidMembershipTargetArtifact,
+                "invalid membership-target artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidSubeventContainmentArtifact,
+                "invalid subevent-containment artifact",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -749,7 +838,6 @@ mod tests {
             execute_analysis_run(&request(), &accepted(), &corpus, "not-a-time"),
             Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
         );
-
         let no_evidence = AnalysisCorpus::new(
             "snapshot-1",
             vec![unit(
