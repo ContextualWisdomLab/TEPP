@@ -4,7 +4,9 @@
 
 `validation_core::ValidationReport` previously treated finiteness as sufficient payload validity. That allowed finite but impossible Validation Evidence to be serialized or deserialized: negative RMSE or standard errors, empirical coverage and temporal-order accuracy outside `[0, 1]`, Wilson endpoints outside the probability domain, inverted Wilson intervals, or an empirical coverage value outside the Wilson interval stored beside it.
 
-The defect is an evidence-admission problem rather than a new estimator. `ValidationReport` is a durable boundary over already-computed recovery metrics, so its responsibility is to preserve the metric domains and cross-field relationships established by the producing functions. Mean signed bias is intentionally not sign-restricted.
+The same boundary review found that `MonteCarloSummary` already rejected impossible values on explicit validation and serde ingress, but its direct serde serializer wrote public fields without applying that contract. A caller could therefore serialize a negative standard deviation or otherwise invalid summary directly even though the same payload would be rejected on re-ingress.
+
+These defects are evidence-admission/projection problems rather than new estimators. The report and Monte Carlo summary are durable boundaries over already-computed recovery metrics, so their responsibility is to preserve the metric domains and cross-field relationships established by the producing functions. Mean signed bias is intentionally not sign-restricted.
 
 ## Decision
 
@@ -16,7 +18,7 @@ The report boundary now enforces the following invariants on explicit validation
 - `coverage_wilson_lower <= interval_coverage <= coverage_wilson_upper`;
 - all numeric fields remain finite and an embedded Monte Carlo summary must satisfy its existing validation contract.
 
-Custom `Serialize` and `Deserialize` implementations validate `ValidationReport` at both wire boundaries. This prevents callers from bypassing the durable evidence contract by calling serde directly instead of `validate()` or `to_json()`.
+Custom `Serialize` and `Deserialize` implementations validate `ValidationReport` at both wire boundaries. `MonteCarloSummary` direct serialization now also invokes its existing validator before writing fields. This prevents callers from bypassing durable evidence contracts by choosing a different serde path instead of the explicit validation helpers.
 
 ## RED -> repair trace
 
@@ -24,9 +26,11 @@ Custom `Serialize` and `Deserialize` implementations validate `ValidationReport`
 - First causal repair `28924b0d82bc2d4663f5ba1317cc0c3d94a4833b`: enforce metric-domain and Wilson coherence invariants on the report object.
 - Ingress RED `6d190cd783a00f8ce917e37b63ae87053a929ae1`: serde deserialization must not bypass the same scientific contract.
 - Ingress repair `f70a6fc0e58c2ae419c3b3bac322db5f35efe538`: custom `Deserialize` constructs then validates the report before admission.
-- Direct-egress RED `fb28f959297a50cf50e26ea14dc9bfb5ee10ea89`: `serde_json::to_string(&report)` must not bypass report validation.
-- Direct-egress repair `f7e58ccdb1864ce775ef6797f7fd88596dff1269`: custom `Serialize` validates before writing any report field.
-- Changelog trace `5339d53974d747854ba6cdd6ee05b2c1093bad20`.
+- Direct-report-egress RED `fb28f959297a50cf50e26ea14dc9bfb5ee10ea89`: `serde_json::to_string(&report)` must not bypass report validation.
+- Direct-report-egress repair `f7e58ccdb1864ce775ef6797f7fd88596dff1269`: custom `Serialize` validates before writing any report field.
+- Direct-Monte-Carlo-egress RED `b5a8ae1fbd1344b09a9fbb3c65a3c6d0cdc38c28`: an invalid `MonteCarloSummary` must not serialize directly despite its public fields.
+- Direct-Monte-Carlo-egress repair `18374c35061fb0b98bfe09079d4967baef7697b4`: the existing summary validator is applied before serde writes fields.
+- Changelog trace `0d03efa1474e6ce605db32980c3f65e97e0dc66b`.
 
 Owned module/API/tests:
 
@@ -34,6 +38,7 @@ Owned module/API/tests:
 - `validation_core::ValidationReport::validate`
 - `validation_core::ValidationReport::to_json`
 - `serde::Serialize` / `serde::Deserialize` for `ValidationReport`
+- `serde::Serialize` / existing `serde::Deserialize` for `MonteCarloSummary`
 - `crates/validation_core/tests/validation_report_scientific_invariants_contract.rs`
 
 ## Methodological basis
