@@ -26,3 +26,20 @@ fn duplicate_component_identity_cannot_reweight_known_truth_rmse() {
         Err(LongitudinalError::InvalidComponentPayload)
     );
 }
+
+#[test]
+fn duplicate_truth_identity_fails_even_when_recovered_identities_are_unique() {
+    let truth = [
+        ComponentValue::new(0, 0, ComponentLevel::Between, 1.0),
+        ComponentValue::new(0, 0, ComponentLevel::Between, 1.0),
+    ];
+    let decided = [
+        ComponentValue::new(0, 0, ComponentLevel::Between, 1.0),
+        ComponentValue::new(1, 0, ComponentLevel::Between, 1.0),
+    ];
+
+    assert_eq!(
+        component_root_mean_square_error(&truth, &decided),
+        Err(LongitudinalError::InvalidComponentPayload)
+    );
+}
