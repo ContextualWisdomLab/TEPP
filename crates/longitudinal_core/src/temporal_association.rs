@@ -9,11 +9,16 @@ use crate::{EventTimeInterval, LongitudinalError, association};
 /// explicit; assertion-, document-, system-, availability-, or method-occasion
 /// intervals cannot enter this API as bare numeric durations.
 ///
+/// Exact binary64 Cauchy–Schwarz comparison authorizes both admissibility and
+/// the scientific ±1 endpoint. Rounded square-root/division arithmetic may not
+/// promote a strict interior covariance to a perfect-correlation claim.
+///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalAssociationInput`] for invalid
-/// covariance or marginal inputs, or when a nonzero exact correlation is too
-/// small to be represented as binary64,
+/// covariance or marginal inputs, when a nonzero exact correlation is too
+/// small to be represented as binary64, or when a strict interior covariance
+/// would round to a false exact ±1 correlation,
 /// [`LongitudinalError::NonPositiveMarginalVariance`] when either marginal
 /// variance is non-positive, and [`LongitudinalError::CovarianceBoundViolation`]
 /// when the covariance exceeds the exact binary64 Cauchy–Schwarz bound.
