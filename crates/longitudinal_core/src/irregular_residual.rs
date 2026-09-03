@@ -295,7 +295,9 @@ fn pairwise_same_sign_log_rate(lagged: &[LaggedWithinResidual]) -> Result<f64, L
 /// The remaining terms have one sign and are normalized and summed before the
 /// original sample-count denominator is applied. This avoids rounding a
 /// retained-only mean and then weighting that rounded intermediate, which can
-/// move a representable mixed-sign subnormal result by one ULP.
+/// move a representable mixed-sign subnormal result by one ULP. A nonzero
+/// same-sign residual mass whose final real mean is below binary64's positive
+/// range fails closed instead of being reported as exact zero.
 pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     if values.is_empty() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
@@ -392,6 +394,9 @@ fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, 
         sum = next;
     }
     let mean = (sum / total_count as f64) * scale;
+    if mean == 0.0 {
+        return Err(LongitudinalError::InvalidTemporalTransformInput);
+    }
     require_finite(mean)
 }
 
