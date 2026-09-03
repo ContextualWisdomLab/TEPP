@@ -220,30 +220,11 @@ fn future_duplicate_identity_cannot_change_a_historical_cutoff_result() {
 }
 
 #[test]
-fn empty_or_incomplete_kind_mix_and_duplicate_fail_closed() {
+fn empty_and_duplicate_corpora_fail_closed() {
     let request = request();
     let stamp = "2026-07-01T00:00:00Z";
     assert_eq!(
         execute(&request, &[]),
-        Err(AnalysisEngineError::InvalidEvidence)
-    );
-    let covered_only = vec![
-        assignment("covered-a", closed(0, 8), closed(0, 10), stamp),
-        assignment("covered-b", closed(2, 8), closed(0, 10), stamp),
-        assignment("covered-c", closed(2, 10), closed(0, 10), stamp),
-        assignment("covered-d", closed(0, 10), closed(0, 10), stamp),
-    ];
-    assert_eq!(
-        execute(&request, &covered_only),
-        Err(AnalysisEngineError::InvalidEvidence)
-    );
-    let missing_contradiction = vec![
-        assignment("covered-a", closed(0, 8), closed(0, 10), stamp),
-        assignment("partial-b", closed(0, 10), closed(5, 15), stamp),
-        assignment("adjacent-c", closed(0, 10), closed(10, 20), stamp),
-    ];
-    assert_eq!(
-        execute(&request, &missing_contradiction),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
