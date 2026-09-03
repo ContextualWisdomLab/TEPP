@@ -39,7 +39,10 @@ pub fn interval_coverage(
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
 ///
 /// Returns `(lower, upper)` for the empirical coverage rate at the stated
-/// normal critical value `z` (for example `1.96` for nominal 95%).
+/// normal critical value `z` (for example `1.96` for nominal 95%). For an
+/// all-covered sample, the exact Wilson lower endpoint is evaluated as
+/// `n / (n + z²)` rather than subtracting two nearly equal `O(z²)` terms. This
+/// preserves a representable positive lower endpoint at large finite `z`.
 ///
 /// # Errors
 ///
@@ -59,6 +62,9 @@ pub fn wilson_coverage_interval(
     let z2 = z * z;
     if !z2.is_finite() {
         return Err(ValidationError::InvalidConfiguration);
+    }
+    if p == 1.0 {
+        return Ok((n / (n + z2), 1.0));
     }
     let denominator = 1.0 + z2 / n;
     let center = p + z2 / (2.0 * n);
