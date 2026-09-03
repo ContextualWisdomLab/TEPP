@@ -31,15 +31,17 @@ The unmerged implementation that introduced a public `expected_autocorrelation` 
 
 `longitudinal_core::recover_event_time_lagged_correlation` accepts a lagged covariance, the earlier marginal variance, the later marginal variance, and an admitted `EventTimeInterval`. The typed value object is carried through the public boundary into the internal association implementation rather than being erased back to a bare duration. The operation performs only temporal association standardization and does not infer state variance, process noise, or a psychometric response kernel.
 
-Admissibility and perfect-correlation endpoint claims both use the exact binary64 covariance relation. The implementation decomposes the covariance and marginal variances into integer significands and powers of two, compares `Cov²` with `Var_t Var_{t+Δ}` without a rounded square-root product, and records whether the relation is strict or exact. Rounded `sqrt`/division arithmetic is then used only to form an interior representable coefficient or to render an already-authorized exact endpoint.
+Admissibility and perfect-correlation endpoint claims both use the exact binary64 covariance relation. The implementation decomposes the covariance and marginal variances into integer significands and powers of two, compares `Cov²` with `Var_t Var_{t+Δ}` without a rounded square-root product, and records whether the relation is strict or exact. Rounded `sqrt`/division arithmetic is then used only to form an interior representable coefficient. Exact binary64 equality at the covariance boundary is itself authoritative for the `±1` endpoint, so floating-point square-root rounding may neither invent nor weaken perfect association.
 
-This distinction is necessary. For the exact binary64 inputs
+This distinction is necessary in both directions. For the exact binary64 inputs
 
 - earlier variance `f64::from_bits(4_607_182_418_800_016_408)`,
 - later variance `f64::from_bits(4_607_182_418_800_016_427)`, and
 - covariance magnitude `f64::from_bits(4_607_182_418_800_016_417)`,
 
-`Cov²` is strictly smaller than the exact product of the two supplied marginal variances, yet the rounded square roots followed by the two divisions produce `1.0`. Returning that endpoint would convert an interior association into a scientifically stronger perfect-correlation claim. RED `683b28eeeda3ad72ac11f5317c5aea54f34e0692` fixes both covariance signs through the public API in `crates/longitudinal_core/tests/correlation_false_perfect_contract.rs`; causal repair `9eeb373df2cd333fe7543df2197ea0cc0c492780` permits rounded `±1` only when the exact integer relation is on the Cauchy–Schwarz boundary. Public rustdoc is synchronized in `d21c0a2db681df5d9c0fbf2e64f4d2feec73a9e6`.
+`Cov²` is strictly smaller than the exact product of the two supplied marginal variances, yet the rounded square roots followed by the two divisions produce `1.0`. Returning that endpoint would convert an interior association into a scientifically stronger perfect-correlation claim. RED `683b28eeeda3ad72ac11f5317c5aea54f34e0692` fixes both covariance signs through the public API in `crates/longitudinal_core/tests/correlation_false_perfect_contract.rs`; causal repair `9eeb373df2cd333fe7543df2197ea0cc0c492780` prevents a rounded strict-interior endpoint from being promoted.
+
+The inverse rounding failure also occurs on an exact boundary. With represented inputs `Var_t = 2`, `Var_{t+Δ} = 8`, and `|Cov| = 4`, exact binary arithmetic gives `Cov² = Var_t Var_{t+Δ}` and therefore `|ρ| = 1`. The predecessor square-root/division path evaluates the positive coefficient as `0x1.fffffffffffffp-1`, one ULP below one, which would weaken an exactly perfect represented association. RED `c25000901eb429a43817552f8b76cf4aae04e522` adds positive and negative public-API cases; causal repair `d06259ec1e036558d8d2f775c266b2b9db4e42c4` returns the exact sign endpoint directly when the exact integer covariance relation is on the boundary and reserves floating-point standardization for strict-interior coefficients.
 
 This preserves the DDD ownership boundary:
 
@@ -52,7 +54,7 @@ The function fails closed when either marginal is non-positive, covariance or ma
 
 ## Regression evidence
 
-The regression suite includes a nonstationary case with earlier variance `1`, later variance `4`, and lagged covariance `1.5`. The retired one-sided ratio would be `1.5`; correct standardization yields `0.75`. It also verifies exact `±1` boundaries at ordinary, `f64::MAX`, and minimum-subnormal scales; rejects one-ULP over-bound covariance for both signs; rejects strict-interior covariances whose rounded standardization would otherwise become false exact `±1`; classifies gross subnormal violations before division; rejects invalid event-time value construction; and avoids forming `Var_t * Var_{t+Δ}` directly.
+The regression suite includes a nonstationary case with earlier variance `1`, later variance `4`, and lagged covariance `1.5`. The retired one-sided ratio would be `1.5`; correct standardization yields `0.75`. It also verifies exact `±1` boundaries at ordinary, unequal-marginal (`2`, `8`, `4`), `f64::MAX`, and minimum-subnormal scales; rejects one-ULP over-bound covariance for both signs; rejects strict-interior covariances whose rounded standardization would otherwise become false exact `±1`; classifies gross subnormal violations before division; rejects invalid event-time value construction; and avoids forming `Var_t * Var_{t+Δ}` directly.
 
 The scalar `discreteDRIFTstd` regressions separately require monotone temporal ordering for stable negative drift and fail closed when a finite negative drift multiplied by a positive admitted event interval underflows to signed zero. That case must not silently become `exp(-0.0) == 1.0`.
 
