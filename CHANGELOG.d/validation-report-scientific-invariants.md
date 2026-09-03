@@ -1,5 +1,5 @@
 ### Fixed
 
-- `validation_core::ValidationReport` now rejects finite but scientifically impossible metric payloads: negative RMSE/standard errors, coverage or temporal-order accuracy outside `[0, 1]`, invalid Wilson endpoints, and Wilson intervals that do not contain the empirical coverage recorded in the same report.
+- `validation_core::ValidationReport` now rejects finite but scientifically impossible metric payloads: negative RMSE/standard errors, coverage or temporal-order accuracy outside `[0, 1]`, invalid Wilson endpoints, Wilson intervals that do not contain the empirical coverage recorded in the same report, and negative mean/percentile values when a generic Monte Carlo summary is specifically embedded as RMSE evidence.
 - Explicit validation, canonical JSON helpers, direct serde serialization/deserialization, and human-readable summary projection now enforce the same report invariants, so alternate ingress or egress paths cannot bypass the durable Validation Evidence contract.
-- Direct serde serialization of `MonteCarloSummary` now applies its existing count/finiteness/nonnegative-uncertainty/percentile-order invariants before writing fields, matching its fail-closed deserialization contract.
+- Direct serde serialization of `MonteCarloSummary` now applies its existing count/finiteness/nonnegative-uncertainty/percentile-order invariants before writing fields, matching its fail-closed deserialization contract; the generic summary remains sign-neutral so it can still represent signed metrics such as bias.
