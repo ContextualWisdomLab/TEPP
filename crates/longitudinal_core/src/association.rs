@@ -46,16 +46,19 @@ fn scaled_integer_leq(
     left_significand <= (right_significand << shift)
 }
 
-/// Test the Cauchy–Schwarz covariance bound exactly for the supplied binary64
-/// inputs rather than using a rounded floating-point square-root product.
-fn covariance_within_binary_bound(
+/// Return whether the supplied covariance is within and exactly on the
+/// Cauchy–Schwarz boundary for the supplied binary64 marginals.
+///
+/// Both answers are derived from exact integer significands and powers of two;
+/// rounded square roots are not authoritative for scientific endpoint claims.
+fn covariance_binary_bound_relation(
     lagged_covariance: f64,
     earlier_total_variance: f64,
     later_total_variance: f64,
-) -> bool {
+) -> (bool, bool) {
     let covariance_magnitude = lagged_covariance.abs();
     if covariance_magnitude == 0.0 {
-        return true;
+        return (true, false);
     }
     let (covariance_significand, covariance_exponent) =
         positive_binary_components(covariance_magnitude);
@@ -68,12 +71,22 @@ fn covariance_within_binary_bound(
         u128::from(covariance_significand) * u128::from(covariance_significand);
     let variance_product =
         u128::from(earlier_significand) * u128::from(later_significand);
-    scaled_integer_leq(
+    let covariance_square_exponent = covariance_exponent * 2;
+    let variance_product_exponent = earlier_exponent + later_exponent;
+    let within = scaled_integer_leq(
         covariance_square,
-        covariance_exponent * 2,
+        covariance_square_exponent,
         variance_product,
-        earlier_exponent + later_exponent,
-    )
+        variance_product_exponent,
+    );
+    let boundary = within
+        && scaled_integer_leq(
+            variance_product,
+            variance_product_exponent,
+            covariance_square,
+            covariance_square_exponent,
+        );
+    (within, boundary)
 }
 
 /// Recover a Pearson correlation for an event-time lag from its covariance and
@@ -96,8 +109,9 @@ fn covariance_within_binary_bound(
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalAssociationInput`] for
-/// non-finite covariance or marginal inputs, or when a nonzero exact
-/// correlation is too small to be represented as binary64,
+/// non-finite covariance or marginal inputs, when a nonzero exact correlation
+/// is too small to be represented as binary64, or when a strict interior
+/// covariance is rounded to a false exact ±1 correlation,
 /// [`LongitudinalError::NonPositiveMarginalVariance`] when either marginal
 /// variance is not strictly positive, and
 /// [`LongitudinalError::CovarianceBoundViolation`] when the supplied covariance
@@ -117,11 +131,12 @@ pub(crate) fn recover_event_time_lagged_correlation(
     if earlier_total_variance <= 0.0 || later_total_variance <= 0.0 {
         return Err(LongitudinalError::NonPositiveMarginalVariance);
     }
-    if !covariance_within_binary_bound(
+    let (within_bound, on_exact_bound) = covariance_binary_bound_relation(
         lagged_covariance,
         earlier_total_variance,
         later_total_variance,
-    ) {
+    );
+    if !within_bound {
         return Err(LongitudinalError::CovarianceBoundViolation);
     }
 
@@ -145,10 +160,15 @@ pub(crate) fn recover_event_time_lagged_correlation(
         return Err(LongitudinalError::InvalidTemporalAssociationInput);
     }
 
-    // Finite positive marginals plus the exact covariance-bound gate guarantee
-    // that both divisions stay finite. Clamping only absorbs final
-    // square-root/division rounding at a valid ±1 boundary; it cannot admit an
-    // over-bound covariance.
+    // Rounded square roots/divisions can also strengthen a strict interior
+    // covariance into an exact ±1 endpoint. Only the exact integer relation
+    // above may authorize a perfect-correlation claim.
+    if correlation.abs() >= 1.0 && !on_exact_bound {
+        return Err(LongitudinalError::InvalidTemporalAssociationInput);
+    }
+
+    // On the exact boundary, clamping absorbs only final square-root/division
+    // rounding; it cannot turn an interior covariance into a perfect endpoint.
     Ok(correlation.clamp(-1.0, 1.0))
 }
 
