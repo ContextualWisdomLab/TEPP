@@ -13,6 +13,11 @@ use crate::{EventTimeInterval, LongitudinalError, association};
 /// the scientific ±1 endpoint. Rounded square-root/division arithmetic may not
 /// promote a strict interior covariance to a perfect-correlation claim.
 ///
+/// Exact zero covariance has one public scientific encoding: `+0.0`. IEEE-754
+/// signed zero is an arithmetic representation detail, not evidence of a
+/// directional association, so the projection boundary canonicalizes either
+/// zero sign after the numerical primitive has completed validation.
+///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidTemporalAssociationInput`] for invalid
@@ -28,12 +33,18 @@ pub fn recover_event_time_lagged_correlation(
     later_total_variance: f64,
     event_interval: EventTimeInterval,
 ) -> Result<f64, LongitudinalError> {
-    association::recover_event_time_lagged_correlation(
+    let correlation = association::recover_event_time_lagged_correlation(
         lagged_covariance,
         earlier_total_variance,
         later_total_variance,
         event_interval,
-    )
+    )?;
+
+    if correlation == 0.0 {
+        return Ok(0.0);
+    }
+
+    Ok(correlation)
 }
 
 #[cfg(test)]
