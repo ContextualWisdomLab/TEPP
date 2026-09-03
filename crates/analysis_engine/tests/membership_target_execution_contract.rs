@@ -1,9 +1,9 @@
 //! End-to-end contract for cutoff-safe membership-target refusals.
 
 use analysis_engine::{
-    execute_membership_target_run, AnalysisEngineError, MembershipTargetArtifact,
-    MembershipTargetDocument, MAX_EVIDENCE_UNITS, MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION,
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION,
     MEMBERSHIP_TARGET_MODEL_CONTRACT_VERSION, MEMBERSHIP_TARGET_OUTPUT_PROFILE,
+    MembershipTargetArtifact, MembershipTargetDocument, execute_membership_target_run,
 };
 use membership_target::MembershipTargetKind;
 use temporal_core::KnowledgeCutoff;
@@ -115,7 +115,10 @@ fn equivalent_rfc3339_cutoff_offsets_are_the_same_instant() {
     let mut offset_request = request();
     offset_request.knowledge_cutoff = "2026-08-01T09:00:00+09:00".into();
     let execution = execute(&offset_request, &mixed_documents()).expect("equivalent cutoff");
-    assert_eq!(execution.artifact.knowledge_cutoff, "2026-08-01T00:00:00+00:00");
+    assert_eq!(
+        execution.artifact.knowledge_cutoff,
+        "2026-08-01T00:00:00Z"
+    );
 }
 
 #[test]
@@ -137,7 +140,8 @@ fn compact_oversized_artifact_counts_fail_closed() {
         project_count: 1,
         refused_as_entity_count: language_count,
         refused_as_project_count: language_count,
-        inference_status: "language_episode_template_department_opportunity_pool_are_not_entities".into(),
+        inference_status: "language_episode_template_department_opportunity_pool_are_not_entities"
+            .into(),
     };
     let raw_payload = serde_json::to_string(&artifact).expect("raw json");
     assert_eq!(
