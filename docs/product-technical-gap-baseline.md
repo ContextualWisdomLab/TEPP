@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-03T03:42Z
+**Snapshot:** 2026-09-03T03:56Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -44,7 +44,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main` | Validation / Analysis Run landing vehicle; availability cutoff precedes duplicate-identity admission. |
-| #310 | `34fd059aa10c7538f3513b6fb994a9f2972ff5b1` | true | `main` | Longitudinal Modeling vehicle; mixed-sign retained-mean double rounding repaired and CWC/occasion public contracts share the same original-denominator numerical authority. Hosted exact-head verification remains non-passing. |
+| #310 | `a1aef11e8e38f34ac4d6cdfb4c61b099c04e69e6` | true | `main` | Longitudinal Modeling vehicle; CWC, occasion-mean, and within/between decomposition now share one Longitudinal-local stable-mean authority. Hosted exact-head verification remains non-passing. |
 
 Exact-head evidence becomes stale after any source push.
 
@@ -77,15 +77,17 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 ### #310 — Longitudinal Modeling
 
-#310 remains the canonical Longitudinal Modeling landing vehicle. Its lineage covers lagged Pearson correlation with both marginal variances, stationary-variance materialization versus algebraically cancelled standardized maps, discrete-diffusion endpoint/subnormal representability, CWC atomistic admission, one irregular-rate authority, occasion-mean composition, known-truth recovery, and DDD relocation from `psychometric_core` to `longitudinal_core`.
+#310 remains the canonical Longitudinal Modeling landing vehicle. Its lineage covers lagged Pearson correlation with both marginal variances, stationary-variance materialization versus algebraically cancelled standardized maps, discrete-diffusion endpoint/subnormal representability, CWC atomistic admission, one irregular-rate authority, occasion-mean composition, known-truth recovery, within/between decomposition, and DDD relocation from `psychometric_core` to `longitudinal_core`.
 
 The #486 occasion-mean fold is owner-correct on #310: RED `75b0184d...`, owner repair `7fe9aaf2...`, export/test repairs `b900e213...` / `30771ff2...`, determinism RED `8a59019e...`, same-sign ordering repair `465d139d...`, same-panel/sparse successor regressions `b9e952bb...` / `aad56b50...`, ADR `04b3c26e...`, PRD `a221f494...`, research trace `27aa78ee...`, subnormal RED `9aff817f...`, source repair `40e057b8...`, and trace `a2e6ace7...`.
 
 The earlier CWC RED `23476f45c506504babf16f33e6d61fdddef23b67` / repair `b14eb6e863cce1b94b36e787ada2ec32c129cadf` closed the sorted-incremental `[from_bits(1), from_bits(2)]` ties-to-even defect. RED `b073f03f5e28c94226e7dcaa72e11b25233ccc65` then exposed arbitrary max-magnitude normalization at `[from_bits(1), from_bits(14)]`; repair `350b8d4e0fdb3f5d68cd22bdfffb3b879cea62f2` switched to an exact power-of-two scale and `dd53eff6ed939ae06b51d70959c06b2a36fade08` consolidated CWC and occasion means onto one Longitudinal-local primitive.
 
-Fresh review then found a separate mixed-sign double-rounding boundary. For minimum-subnormal ULP `u`, `[-20u, -20u, 9u]` has exact mean `-31u/3` and must round once to `-10u`. The predecessor cancelled signs, rounded the surviving `[-11u, -20u]` mean to `-16u`, then weighted that rounded intermediate by `2/3`, yielding `-11u`. RED `ae5e61f9a829adbfed2ea13c5705d4b85d80b0d6` pins the correct value through public CWC. Causal repair `39469067aca2fa93e2fa4c914848f7cec8031811` applies the original sample-count denominator directly inside the shared normalized compensated sum. Contract hardening `201f3900960278cb87d2e6b28176ac0d23e51954` exercises the same boundary through public occasion-mean composition. Research trace `34fd059aa10c7538f3513b6fb994a9f2972ff5b1` makes the documented algorithm code-current.
+Fresh review then found a separate mixed-sign double-rounding boundary. For minimum-subnormal ULP `u`, `[-20u, -20u, 9u]` has exact mean `-31u/3` and must round once to `-10u`. The predecessor cancelled signs, rounded the surviving `[-11u, -20u]` mean to `-16u`, then weighted that rounded intermediate by `2/3`, yielding `-11u`. RED `ae5e61f9a829adbfed2ea13c5705d4b85d80b0d6` pins the correct value through public CWC. Causal repair `39469067aca2fa93e2fa4c914848f7cec8031811` applies the original sample-count denominator directly inside the shared normalized compensated sum. Contract hardening `201f3900960278cb87d2e6b28176ac0d23e51954` exercises the same boundary through public occasion-mean composition. Research trace `34fd059aa10c7538f3513b6fb994a9f2972ff5b1` makes that algorithm code-current.
 
-At exact head `34fd059a...`, Documentation Quality, SAST Semgrep, Rust Foundation CI, Security Scan, Scorecard PR, and OSV-Scanner PR are queued. Commit check-runs do not currently materialize a CodeQL check for this head. Fresh review submissions contain no qualifying `APPROVED`. #310 therefore remains Draft and non-passing; predecessor-head evidence is not inherited.
+GAP-018 review then found that `decompose_within_between` still maintained a shadow running/cancellation mean after CWC and occasion composition had one numerical authority. For minimum positive binary64 subnormal ULP `u`, unit scores `[u, 2u]` have exact mean `1.5u`, which ties-to-even must represent as `2u`; the predecessor recurrence rounded the half-ULP update away and returned `u`, shifting public within residuals from `[-u, 0]` to `[0, u]`. RED `7dc87aa8ad4de4a73a502646c5667d01656e9dbd` pins the public decomposition result. Causal repair `97c8ad35d1a1a483d8feb2d617e5fbc035c5ead9` removes the decomposition-only arithmetic and delegates to the existing Longitudinal-local `scaled_compensated_mean`. Research trace `a1aef11e8e38f34ac4d6cdfb4c61b099c04e69e6` records the exact API/test/module lineage.
+
+At exact #310 head `a1aef11...`, current-head check runs have materialized but remain queued, including Rust/format-test-rustdoc/dependency, production coverage, and live PostgreSQL integration lanes. Fresh formal reviews contain no qualifying `APPROVED`. #310 therefore remains Draft and non-passing; predecessor-head evidence is not inherited.
 
 #486 remains open Draft beneath the #310 branch. It can close only after its remaining valid CHANGELOG/operational wording is either inherited owner-correctly or verified redundant; wrong-owner source and mixed `Z KST` provenance are intentionally rejected rather than copied.
 
@@ -97,7 +99,7 @@ At exact head `34fd059a...`, Documentation Quality, SAST Semgrep, Rust Foundatio
 
 ### #480 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires the contextual-orchestrator owner contract. Fresh owner evidence is protected `contextual-orchestrator/main@f4e5fc67dfcb7ddb1afb004a06417e915afb9826` with zero GitHub releases. That owner main now contains the hourly OpenCode contract repair that removes repository-authored elapsed-time caps and pins model-backed execution to `orchestrator/free`, but it is still mutable unreleased evidence. #480 remains Draft/blocked-equivalent; mutable owner `main` is not a released production contract.
+#480 removes TEPP-owned provider discovery/ranking and requires the contextual-orchestrator owner contract. Fresh owner evidence is protected `contextual-orchestrator/main@f4e5fc67dfcb7ddb1afb004a06417e915afb9826` with zero GitHub releases. That owner main contains the hourly OpenCode contract repair that removes repository-authored elapsed-time caps and pins model-backed execution to `orchestrator/free`, but it is still mutable unreleased evidence. #480 remains Draft/blocked-equivalent; mutable owner `main` is not a released production contract.
 
 ### Owner handoffs
 
@@ -130,7 +132,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-015 | contextual-orchestrator lacks immutable released contract for current owner behavior | `release-blocking` | compatible immutable CO release, deployment provenance, safe gateway auth, exact TEPP ACL adoption |
 | GAP-016 | hourly LLM path needs released owner-only routing/authentication | `active-repair` | #480 Draft + released CO adoption + exact-head GREEN/review/main merge |
 | GAP-017 | dynamic evaluation item/rater/anchor drift monitoring | `owner-contract-active` | released/digest-pinned dynamic criterion/item/run contract, ACL conformance, no-anchor/no-linking refusal, evidence-gated temporal monitoring |
-| GAP-018 | Longitudinal stable-mean logic remains duplicated outside the now-shared CWC/occasion primitive | `active-refactor` | semantic-equivalence proof for remaining decomposition/recovery means, one TEPP Longitudinal primitive where semantics match or released fast-mlsirm generic owner contract, recovery parity |
+| GAP-018 | Longitudinal stable-mean logic had a separate decomposition implementation after CWC/occasion consolidation | `verification-pending` | RED `7dc87aa8...` + causal repair `97c8ad35...` + trace `a1aef11e...`; scan remaining Longitudinal means, exact-head GREEN/review/main integration |
 | GAP-019 | Longitudinal scientific instructions contradicted stationary-overflow implementation | `verification-pending` | RED `9d8a82d...` + repair `9c962205...`; exact-head documentation/review GREEN and protected-main integration |
 | GAP-020 | Nonzero lagged covariance can be misreported as exact-zero correlation when standardized magnitude is unrepresentable | `verification-pending` | RED `c345ee7b...` + repair `5785e07a...`; exact-head Rust/documentation/review GREEN and protected-main integration |
 | GAP-021 | Longitudinal irregular-rate facade duplicated public wrapper identities over one canonical implementation | `verification-pending` | RED `464863860...` + repair `7f0bea084...`; exact-head Rust/documentation/review GREEN and protected-main integration |
@@ -147,6 +149,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-032 | CWC/irregular-residual same-sign averaging retained the same minimum-subnormal double-rounding defect | `verification-pending` | RED `23476f45...` + repair `b14eb6e8...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-033 | Arbitrary max-magnitude normalization introduced a second rounding and misrounded a 7.5-ULP subnormal mean to 7 ULPs | `verification-pending` | RED `b073f03f...` + exact-power-of-two repair `350b8d4e...` + Longitudinal mean-authority consolidation `dd53eff6...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-034 | Mixed-sign cancellation rounded a retained-only mean before restoring the original denominator, moving a representable subnormal mean by one ULP | `verification-pending` | RED `ae5e61f9...` + causal repair `39469067...` + occasion public-contract hardening `201f3900...` + research trace `34fd059a...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-035 | Within/between decomposition shadow running mean misrounded the representable `[1 ULP, 2 ULP]` unit mean and shifted residuals by one ULP | `verification-pending` | RED `7dc87aa8...` + causal repair `97c8ad35...` + research trace `a1aef11e...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 
 ## Release gate
 
