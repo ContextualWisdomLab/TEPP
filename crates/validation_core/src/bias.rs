@@ -2,6 +2,7 @@
 
 use crate::ValidationError;
 use crate::input::require_paired_finite;
+use crate::numeric::deterministic_compensated_sum;
 
 fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, ValidationError> {
     require_paired_finite(truth, recovered)?;
@@ -17,22 +18,6 @@ fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, Valida
             }
         })
         .collect()
-}
-
-fn deterministic_compensated_sum(mut values: Vec<f64>) -> f64 {
-    values.sort_by(f64::total_cmp);
-    let mut sum = 0.0_f64;
-    let mut correction = 0.0_f64;
-    for value in values {
-        let next = sum + value;
-        if sum.abs() >= value.abs() {
-            correction += (sum - next) + value;
-        } else {
-            correction += (value - next) + sum;
-        }
-        sum = next;
-    }
-    sum + correction
 }
 
 fn scaled_compensated_mean(values: &[f64]) -> Result<f64, ValidationError> {
