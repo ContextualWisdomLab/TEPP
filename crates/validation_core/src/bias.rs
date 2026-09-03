@@ -116,6 +116,7 @@ mod tests {
         let truth = [1.0, 2.0, 3.0];
         let recovered = [2.0, 3.0, 4.0];
         assert!((mean_bias(&truth, &recovered).expect("bias") - 1.0).abs() < 1e-12);
+        assert_eq!(mean_bias(&[1.0], &[1.0]), Ok(0.0));
         let se = bias_standard_error(&truth, &recovered).expect("se");
         assert_eq!(se, 0.0);
         assert_eq!(mean_bias(&[], &[]), Err(ValidationError::InvalidInput));
@@ -178,6 +179,14 @@ mod tests {
         let huge = 1e200;
         assert_eq!(
             bias_standard_error(&[0.0, 0.0], &[huge, -huge]),
+            Err(ValidationError::InvalidInput)
+        );
+        let finite_square_overflowing_sum = 1e154;
+        assert_eq!(
+            bias_standard_error(
+                &[0.0, 0.0],
+                &[finite_square_overflowing_sum, -finite_square_overflowing_sum],
+            ),
             Err(ValidationError::InvalidInput)
         );
     }
