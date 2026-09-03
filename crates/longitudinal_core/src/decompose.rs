@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use crate::irregular_residual::scaled_compensated_mean;
 use crate::{ComponentLevel, ComponentValue, LongitudinalError};
 
 /// One occasion score for one unit.
@@ -42,99 +43,19 @@ impl OccasionObservation {
     }
 }
 
-fn same_sign_unit_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
-    let mut mean = 0.0_f64;
-    for (index, &value) in values.iter().enumerate() {
-        mean += (value - mean) / (index + 1) as f64;
-    }
-    if mean.is_finite() {
-        Ok(mean)
-    } else {
-        Err(LongitudinalError::InvalidObservationPayload)
-    }
-}
-
 fn stable_unit_mean(rows: &[OccasionObservation]) -> Result<f64, LongitudinalError> {
     let values: Vec<f64> = rows.iter().map(|row| row.score()).collect();
-    let mut positives: Vec<f64> = values.iter().copied().filter(|value| *value > 0.0).collect();
-    let mut negatives: Vec<f64> = values.iter().copied().filter(|value| *value < 0.0).collect();
-
-    if positives.is_empty() && negatives.is_empty() {
-        return Ok(0.0);
-    }
-    if positives.is_empty() || negatives.is_empty() {
-        return same_sign_unit_mean(&values);
-    }
-
-    positives.sort_by(|left, right| right.total_cmp(left));
-    negatives.sort_by(|left, right| left.total_cmp(right));
-
-    let mut positive_index = 0_usize;
-    let mut negative_index = 0_usize;
-    let mut positive = positives[0];
-    let mut negative = negatives[0];
-    let mut residuals = Vec::with_capacity(values.len());
-
-    loop {
-        let residual = positive + negative;
-        if residual > 0.0 {
-            positive = residual;
-            negative_index += 1;
-            if negative_index == negatives.len() {
-                residuals.push(positive);
-                residuals.extend_from_slice(&positives[positive_index + 1..]);
-                break;
-            }
-            negative = negatives[negative_index];
-        } else if residual < 0.0 {
-            negative = residual;
-            positive_index += 1;
-            if positive_index == positives.len() {
-                residuals.push(negative);
-                residuals.extend_from_slice(&negatives[negative_index + 1..]);
-                break;
-            }
-            positive = positives[positive_index];
-        } else {
-            positive_index += 1;
-            negative_index += 1;
-            if positive_index == positives.len() || negative_index == negatives.len() {
-                residuals.extend_from_slice(&positives[positive_index..]);
-                residuals.extend_from_slice(&negatives[negative_index..]);
-                break;
-            }
-            positive = positives[positive_index];
-            negative = negatives[negative_index];
-        }
-    }
-
-    if residuals.is_empty() {
-        return Ok(0.0);
-    }
-    let residual_mean = same_sign_unit_mean(&residuals)?;
-    let retained_count = residuals.len() as f64;
-    let total_count = values.len() as f64;
-    let retained_mass = residual_mean * retained_count;
-    let mean = if retained_mass.is_finite() {
-        retained_mass / total_count
-    } else {
-        (residual_mean / total_count) * retained_count
-    };
-    if mean.is_finite() {
-        Ok(mean)
-    } else {
-        Err(LongitudinalError::InvalidObservationPayload)
-    }
+    scaled_compensated_mean(&values).map_err(|_| LongitudinalError::InvalidObservationPayload)
 }
 
 /// Decompose occasion scores into unit means and within residuals.
 ///
 /// Each unit contributes one between component at occasion `0` and one within
 /// residual per observed occasion. Units and occasions are emitted in sorted
-/// order so recovery tests can pair known truth without extra matching. Mixed-
-/// sign unit means cancel opposite extreme values before averaging retained
-/// mass, preserving representable low-order and subnormal evidence without raw
-/// sum overflow or max-scale normalization underflow.
+/// order so recovery tests can pair known truth without extra matching. Unit
+/// means use the same Longitudinal-local overflow-safe, cancellation-safe,
+/// halfway-rounding numerical authority as CWC and occasion means, so
+/// decomposition does not maintain a shadow averaging algorithm.
 ///
 /// # Errors
 ///
