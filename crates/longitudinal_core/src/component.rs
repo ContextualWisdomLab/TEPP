@@ -16,8 +16,9 @@ pub struct ComponentValue {
 impl ComponentValue {
     /// Construct a component record from its identity fields and raw value.
     ///
-    /// The value is stored exactly as given, including non-finite values;
-    /// this constructor performs no validation.
+    /// The value and identity fields are stored exactly as given; this
+    /// constructor performs no validation. Recovery admission enforces that a
+    /// stable between-unit component uses canonical occasion index `0`.
     #[must_use]
     pub const fn new(
         unit_index: u32,
@@ -58,6 +59,19 @@ impl ComponentValue {
     }
 }
 
+fn validated_component_identity(
+    row: &ComponentValue,
+) -> Result<(u32, u32, &'static str), LongitudinalError> {
+    if row.level() == ComponentLevel::Between && row.occasion_index() != 0 {
+        return Err(LongitudinalError::InvalidComponentPayload);
+    }
+    Ok((
+        row.unit_index(),
+        row.occasion_index(),
+        row.level().wire_name(),
+    ))
+}
+
 fn add_scaled_square(
     scale: &mut f64,
     scaled_sum_squares: &mut f64,
@@ -90,17 +104,21 @@ fn add_scaled_square(
 /// represented as `endpoint_scale × normalized_difference`, where the latter
 /// is bounded by two. The root-mean-square accumulator then rescales those
 /// representations without ever materializing a non-representable residual.
-/// Every `(unit, occasion, level)` identity may contribute exactly once;
-/// duplicate identities would silently change the recovery denominator and
-/// therefore fail closed. Slice order is not scientific identity: truth and
-/// recovered rows are aligned by that tuple and accumulated in canonical tuple
-/// order so row permutations cannot change the deterministic `f64` reference.
+/// Stable between-unit components have one unit-level scientific identity and
+/// therefore use canonical occasion index `0`; within-unit components retain
+/// their actual `(unit, occasion)` identity. Every admitted identity may
+/// contribute exactly once. Duplicate or aliased identities would silently
+/// change the recovery denominator and therefore fail closed. Slice order is
+/// not scientific identity: truth and recovered rows are aligned by the
+/// admitted identity tuple and accumulated in canonical tuple order so row
+/// permutations cannot change the deterministic `f64` reference.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidComponentPayload`] when either slice is
-/// empty, the lengths differ, an identity is missing or duplicated, an input
-/// value is non-finite, or the final RMSE is not representable.
+/// empty, the lengths differ, a stable between-unit component uses a nonzero
+/// occasion index, an identity is missing or duplicated, an input value is
+/// non-finite, or the final RMSE is not representable.
 pub fn component_root_mean_square_error(
     truth: &[ComponentValue],
     decided: &[ComponentValue],
@@ -114,11 +132,7 @@ pub fn component_root_mean_square_error(
         if !truth_row.value().is_finite() {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
-        let identity = (
-            truth_row.unit_index(),
-            truth_row.occasion_index(),
-            truth_row.level().wire_name(),
-        );
+        let identity = validated_component_identity(truth_row)?;
         if truth_by_identity.insert(identity, truth_row).is_some() {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
@@ -129,11 +143,7 @@ pub fn component_root_mean_square_error(
         if !decided_row.value().is_finite() {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
-        let identity = (
-            decided_row.unit_index(),
-            decided_row.occasion_index(),
-            decided_row.level().wire_name(),
-        );
+        let identity = validated_component_identity(decided_row)?;
         if decided_by_identity.insert(identity, decided_row).is_some() {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
