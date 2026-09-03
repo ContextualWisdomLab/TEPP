@@ -1,5 +1,7 @@
 //! Known-truth RMSE for within/between components.
 
+use std::collections::HashSet;
+
 use crate::{ComponentLevel, LongitudinalError};
 
 /// One unit-specific within or between component.
@@ -88,12 +90,16 @@ fn add_scaled_square(
 /// represented as `endpoint_scale × normalized_difference`, where the latter
 /// is bounded by two. The root-mean-square accumulator then rescales those
 /// representations without ever materializing a non-representable residual.
+/// Every `(unit, occasion, level)` identity may contribute exactly once;
+/// duplicate identities would silently change the recovery denominator and
+/// therefore fail closed.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidComponentPayload`] when either slice is
-/// empty, the lengths differ, a unit/occasion/level identity mismatches, an
-/// input value is non-finite, or the final RMSE is not representable.
+/// empty, the lengths differ, a unit/occasion/level identity mismatches or is
+/// duplicated, an input value is non-finite, or the final RMSE is not
+/// representable.
 pub fn component_root_mean_square_error(
     truth: &[ComponentValue],
     decided: &[ComponentValue],
@@ -102,6 +108,7 @@ pub fn component_root_mean_square_error(
         return Err(LongitudinalError::InvalidComponentPayload);
     }
 
+    let mut seen_identities = HashSet::with_capacity(truth.len());
     let mut scale = 0.0_f64;
     let mut scaled_sum_squares = 0.0_f64;
     for (truth_row, decided_row) in truth.iter().zip(decided) {
@@ -111,6 +118,15 @@ pub fn component_root_mean_square_error(
             || !truth_row.value().is_finite()
             || !decided_row.value().is_finite()
         {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        }
+
+        let identity = (
+            truth_row.unit_index(),
+            truth_row.occasion_index(),
+            truth_row.level().wire_name(),
+        );
+        if !seen_identities.insert(identity) {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
 
