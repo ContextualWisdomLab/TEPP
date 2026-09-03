@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-03T03:31Z
+**Snapshot:** 2026-09-03T03:42Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -97,7 +97,7 @@ At exact head `34fd059a...`, Documentation Quality, SAST Semgrep, Rust Foundatio
 
 ### #480 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires the contextual-orchestrator owner contract. Fresh owner evidence is protected `contextual-orchestrator/main@394bf4ed84947c95698979e376ed12103de007b5` with zero GitHub releases. #480 remains Draft/blocked-equivalent; mutable owner `main` is not a released production contract.
+#480 removes TEPP-owned provider discovery/ranking and requires the contextual-orchestrator owner contract. Fresh owner evidence is protected `contextual-orchestrator/main@f4e5fc67dfcb7ddb1afb004a06417e915afb9826` with zero GitHub releases. That owner main now contains the hourly OpenCode contract repair that removes repository-authored elapsed-time caps and pins model-backed execution to `orchestrator/free`, but it is still mutable unreleased evidence. #480 remains Draft/blocked-equivalent; mutable owner `main` is not a released production contract.
 
 ### Owner handoffs
 
