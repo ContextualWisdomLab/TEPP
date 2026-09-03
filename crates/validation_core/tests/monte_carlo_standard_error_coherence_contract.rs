@@ -19,6 +19,10 @@ fn monte_carlo_summary_rejects_impossible_standard_error_evidence() {
         Err(ValidationError::InvalidInput)
     );
 
+    let canonical_standard_error = 0.5 / 4.0_f64.sqrt();
+    let adjacent_standard_error = f64::from_bits(canonical_standard_error.to_bits() + 1);
+    assert!(summary(4, 0.5, adjacent_standard_error).validate().is_ok());
+
     let equal_to_sd_with_multiple_replications = summary(4, 0.5, 0.5);
     assert_eq!(
         equal_to_sd_with_multiple_replications.validate(),
