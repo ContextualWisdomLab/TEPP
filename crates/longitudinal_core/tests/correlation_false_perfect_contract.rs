@@ -9,15 +9,17 @@ fn strict_binary_covariance_bound_cannot_round_to_perfect_correlation() {
 
     // For these exact binary64 inputs covariance² is strictly below
     // earlier_variance * later_variance, but rounded sqrt/division arithmetic
-    // produces 1.0. Reporting that as perfect association would strengthen the
-    // scientific claim beyond the supplied covariance evidence.
-    assert_eq!(
-        recover_event_time_lagged_correlation(
-            covariance,
-            earlier_variance,
-            later_variance,
-            interval,
-        ),
-        Err(LongitudinalError::InvalidTemporalAssociationInput)
-    );
+    // produces ±1.0. Reporting either endpoint as perfect association would
+    // strengthen the scientific claim beyond the supplied covariance evidence.
+    for signed_covariance in [covariance, -covariance] {
+        assert_eq!(
+            recover_event_time_lagged_correlation(
+                signed_covariance,
+                earlier_variance,
+                later_variance,
+                interval,
+            ),
+            Err(LongitudinalError::InvalidTemporalAssociationInput)
+        );
+    }
 }
