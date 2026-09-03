@@ -15,5 +15,6 @@ fn representable_bias_standard_error_survives_raw_square_sum_overflow() {
     let recovered = [1.0e154, -1.0e154, 0.0];
 
     let expected = 1.0e154 / 3.0_f64.sqrt();
-    assert_eq!(bias_standard_error(&truth, &recovered), Ok(expected));
+    let actual = bias_standard_error(&truth, &recovered).expect("representable standard error");
+    assert!(((actual - expected) / expected).abs() <= f64::EPSILON);
 }
