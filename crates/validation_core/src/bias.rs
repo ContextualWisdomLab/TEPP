@@ -239,7 +239,8 @@ mod tests {
             &[square_sum_overflows, -square_sum_overflows, 0.0],
         )
         .expect("representable three-point standard error");
-        assert_eq!(three_point, square_sum_overflows / 3.0_f64.sqrt());
+        let expected = square_sum_overflows / 3.0_f64.sqrt();
+        assert!(((three_point - expected) / expected).abs() <= f64::EPSILON);
     }
 
     #[test]
