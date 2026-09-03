@@ -272,19 +272,20 @@ fn pairwise_same_sign_log_rate(lagged: &[LaggedWithinResidual]) -> Result<f64, L
 
 /// Overflow-safe mean for finite values across binary64 scales.
 ///
-/// Same-sign inputs are normalized by their maximum magnitude before a
-/// deterministic compensated sum, so the intermediate cannot overflow and a
-/// representable subnormal mean is rounded only once when scaled back. Mixed-
-/// sign inputs are partitioned by sign and sorted from largest magnitude
-/// downward. Opposite signs are cancelled before any scale reduction, so a
-/// subnormal addend is never divided into zero merely to protect an unrelated
-/// extreme term. Each cancellation is an opposite-sign addition and therefore
-/// cannot overflow. The remaining terms have one sign and are averaged safely;
-/// their mean is then weighted by their term count relative to the original
-/// sample count. Retained mass is evaluated multiply-first when representable;
-/// only an overflowing intermediate switches to divide-first-then-count so both
+/// Same-sign inputs are normalized by an exact power-of-two scale derived from
+/// their maximum magnitude before a deterministic compensated sum. Power-of-two
+/// scaling avoids the extra division rounding that can turn an exact halfway
+/// subnormal mean into the wrong even-neighbour result. Mixed-sign inputs are
+/// partitioned by sign and sorted from largest magnitude downward. Opposite
+/// signs are cancelled before any scale reduction, so a subnormal addend is
+/// never divided into zero merely to protect an unrelated extreme term. Each
+/// cancellation is an opposite-sign addition and therefore cannot overflow.
+/// The remaining terms have one sign and are averaged safely; their mean is
+/// then weighted by their term count relative to the original sample count.
+/// Retained mass is evaluated multiply-first when representable; only an
+/// overflowing intermediate switches to divide-first-then-count so both
 /// subnormal retained mass and representable large final means are preserved.
-fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
+pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     if values.is_empty() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
@@ -368,15 +369,16 @@ fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
 }
 
 fn same_sign_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
-    let scale = values
+    let max_magnitude = values
         .iter()
         .map(|value| value.abs())
         .max_by(f64::total_cmp)
         .ok_or(LongitudinalError::InvalidTemporalTransformInput)?;
-    if scale == 0.0 {
+    if max_magnitude == 0.0 {
         return Ok(0.0);
     }
 
+    let scale = exact_power_of_two_scale(max_magnitude);
     let mut normalized: Vec<f64> = values.iter().map(|value| *value / scale).collect();
     normalized.sort_by(f64::total_cmp);
     let mut sum = 0.0_f64;
@@ -389,6 +391,18 @@ fn same_sign_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     }
     let mean = (sum / values.len() as f64) * scale;
     require_finite(mean)
+}
+
+fn exact_power_of_two_scale(max_magnitude: f64) -> f64 {
+    let bits = max_magnitude.to_bits();
+    let exponent = (bits >> 52) & 0x7ff;
+    if exponent == 0 {
+        let significand = bits & 0x000f_ffff_ffff_ffff;
+        let highest_bit = 63 - significand.leading_zeros();
+        f64::from_bits(1_u64 << highest_bit)
+    } else {
+        f64::from_bits(exponent << 52)
+    }
 }
 
 /// Nonzero residuals of equal sign admit a real Driver Eq. 3 logarithm.
