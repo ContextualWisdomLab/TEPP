@@ -22,6 +22,11 @@ use crate::{EventTimeInterval, LongitudinalError};
 /// units must contribute a consecutive lag. Occasion means use the same
 /// Longitudinal-local overflow-safe, cancellation-safe, halfway-rounding
 /// numerical authority as CWC means and are bit-stable under row permutation.
+/// Exact zero occasion-mean residuals use canonical public `+0.0` because a
+/// zero Hamaker Eq. 1a deviation has no directional measurement meaning;
+/// signed zero remains available to private numerical intermediates and to
+/// caller-constructed already-centered pairs. The returned pairs still retain
+/// between-person differences and are not within-person or RI-CLPM lags.
 ///
 /// # Errors
 ///
@@ -91,8 +96,16 @@ pub fn center_occasion_mean_event_lags(
             }
             let event_interval = EventTimeInterval::new(later.event_time() - earlier.event_time())?;
             pairs.push(LaggedWithinResidual::new(
-                earlier_residual,
-                later_residual,
+                if earlier_residual == 0.0 {
+                    0.0
+                } else {
+                    earlier_residual
+                },
+                if later_residual == 0.0 {
+                    0.0
+                } else {
+                    later_residual
+                },
                 event_interval,
             ));
         }
