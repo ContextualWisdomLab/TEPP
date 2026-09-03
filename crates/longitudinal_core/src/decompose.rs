@@ -55,7 +55,10 @@ fn stable_unit_mean(rows: &[OccasionObservation]) -> Result<f64, LongitudinalErr
 /// order so recovery tests can pair known truth without extra matching. Unit
 /// means use the same Longitudinal-local overflow-safe, cancellation-safe,
 /// halfway-rounding numerical authority as CWC and occasion means, so
-/// decomposition does not maintain a shadow averaging algorithm.
+/// decomposition does not maintain a shadow averaging algorithm. Exact zero
+/// within residuals use canonical public `+0.0` because a zero deviation has no
+/// directional measurement meaning; signed zero remains available to private
+/// numerical intermediates where it can carry diagnostic information.
 ///
 /// # Errors
 ///
@@ -110,11 +113,12 @@ pub fn decompose_within_between(
             if !residual.is_finite() {
                 return Err(LongitudinalError::InvalidObservationPayload);
             }
+            let public_residual = if residual == 0.0 { 0.0 } else { residual };
             components.push(ComponentValue::new(
                 unit,
                 row.occasion_index(),
                 ComponentLevel::Within,
-                residual,
+                public_residual,
             ));
         }
     }
