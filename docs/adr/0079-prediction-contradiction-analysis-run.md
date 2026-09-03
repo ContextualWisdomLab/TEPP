@@ -1,105 +1,59 @@
 # ADR 0079 — Prediction-contradiction refusals as an analysis-run output profile
 
-**Decision status:** Accepted
-**Implementation maturity:** active-PR — composed on this branch; not implemented-main
+**Decision status:** Proposed
+
+**Implementation maturity:** fold-child — source/tests/doctoring live on Draft #487 and are not implemented-main; canonical landing authority remains #416 pending repository-wide ADR normalization under #437.
+
 **Date:** 2026-09-03
-**Supersedes:** None; complements ADR 0002 (six-clock eligibility and Allen algebra), ADR 0016 (TDT/CHRONOS prediction stays hypothetical until coverage), and ADR 0022 (cutoff-safe analysis-run execution). Does not reuse ADR 0078 (support-edge), ADR 0077 (summarizes-edge), ADR 0076 (retrospective-edge), ADR 0075 (role-contradiction), ADR 0074 (subevent-containment), ADR 0073 (inferred-status), ADR 0072 (episode-membership), ADR 0071 (relation-absence), ADR 0070 (outcome-order), ADR 0069 (membership-target), ADR 0066 (location-membership), ADR 0065 (copied-text residue), ADR 0064 (provenance-is-not-transition / citation-edge), or ADR 0058 (copy-identity / template-copy).
+
+**Supersedes:** None. This is implementation lineage under ADR 0002 (six-clock eligibility and Allen algebra), ADR 0016 (TDT/CHRONOS prediction remains hypothetical until supported), and ADR 0022 (cutoff-safe analysis-run execution). It does not mint an independently accepted bounded context.
+
 **Figma File ID:** N/A — this increment changes a Rust service crate and has no user-interface surface.
+
 **Storybook inventory:** N/A — no reusable web object or interaction changed.
 
 ## Context
 
-Protected main already refuses to promote unmatched predicted mass to observed
-fact, via `prediction_contradiction::refuse_promotion`. Coverage requires Allen
-`during`, `starts`, `finishes`, or `equals`. Partial overlap, `meets` /
-`met_by`, and Allen `before` / `after` stay hypothetical.
-`refuse_contradiction_or_adjacency` is not promotion authority.
-Operators still cannot request that mixed-kind census as a digest-bound
-analysis-run output.
+Protected main already refuses to promote unmatched predicted mass to observed fact through `prediction_contradiction::refuse_promotion`. Coverage requires Allen `during`, `starts`, `finishes`, or `equals`; partial overlap, `meets` / `met_by`, and Allen `before` / `after` remain hypothetical or contradictory as defined by the owning domain crate. `refuse_contradiction_or_adjacency` is not promotion authority.
 
-Support-edge (#485 / ADR 0078) binds evidential kinds that never become
-transitions. Summarizes-edge (#484 / ADR 0077) binds summary-versus-source
-identity. Retrospective-edge (#483 / ADR 0076) binds later reports about
-earlier events. Role-contradiction (#482 / ADR 0075) binds customer/competitor
-group overlap. Citation-edge (#426 / ADR 0064) binds provenance-is-not-transition.
+The Analysis Run application boundary needs a digest-bound, cutoff-safe profile for those existing domain refusals without duplicating Allen semantics. `contradiction_agreement_rate` stays library-side and is not projected into operator inspect payloads. GPU kernels, MCMC, and topic birth/split/merge remain outside this slice.
 
-`contradiction_agreement_rate` stays library-side. This slice does not put a
-`scientific_acceptance` metric on inspect payloads.
-
-GPU kernels, MCMC, and topic birth/split/merge remain later GAP-004 work
-and are not this slice.
+An earlier branch version made a scientific admission error: it required a deliberately mixed four-class fixture to appear in production data. Covered, partial-overlap, adjacent, and contradictory classes are observations, not design strata. A valid historical census may contain only covered predictions, only contradictions, or any other nonempty combination. Zero counts for absent classes are evidence and must not become missing-data failures.
 
 ## Decision
 
-Add the `prediction_contradiction_v1` analysis-run output profile to
-`analysis_engine`. The executor:
+Keep `prediction_contradiction_v1` / `tepp.prediction_contradiction.v1` as a Draft Validation / Analysis Run profile to be folded into #416. The profile:
 
-- consumes already-validated `PredictionContradictionAssignment` rows with
-  predicted and observed closed event-time intervals and availability time;
-- requires the request snapshot and knowledge cutoff to match the offered
-  input construction, comparing cutoffs as typed `KnowledgeCutoff::instant()`
-  values rather than strings;
-- excludes assignments whose availability is later than the knowledge cutoff
-  before duplicate-identity checks;
-- invokes `refuse_promotion` without reimplementing Allen classification;
-- requires a mixed census of covered, partial-overlap, adjacent, and
-  contradictory pairs after cutoff exclusion, with matching promotion-refusal
-  counts;
-- emits a canonical SHA-256-digested `tepp.prediction_contradiction.v1`
-  artifact with per-kind counts, matching refusal counts, and inference status
-  `unmatched_prediction_is_not_observed`;
-- applies `MAX_EVIDENCE_UNITS` to both execution admission and artifact
-  validation;
-- does not emit `contradiction_agreement_rate`, invent MCMC, select GPU
-  backends, or emit topic birth/split/merge events.
+- consumes bounded `PredictionContradictionAssignment` rows with predicted and observed closed event-time intervals plus availability time;
+- requires request snapshot, output profile, and knowledge cutoff to match the execution context, comparing cutoffs through `KnowledgeCutoff::instant()` rather than RFC 3339 string identity;
+- excludes rows whose `AvailableTime` is later than the knowledge cutoff **before** duplicate-identity admission, so future-unavailable evidence cannot perturb an earlier historical result;
+- invokes `prediction_contradiction::refuse_promotion` rather than reimplementing Allen classification;
+- admits any nonempty cutoff-eligible census up to `MAX_EVIDENCE_UNITS`; no relation class has a required minimum count;
+- preserves exact count invariants: the four class counts sum to `assignment_count`, and `refused_promotion_count + covered_count == assignment_count`;
+- emits canonical SHA-256-digested artifact identity and fixed inference status `unmatched_prediction_is_not_observed`;
+- keeps `contradiction_agreement_rate` library-side and keeps inspect payloads metric-free;
+- remains a fold child until #416 or a verified successor inherits the unique source, tests, fixtures, contract, and doctoring and reacquires exact-head gates.
 
 ## Alternatives considered
 
-1. Duplicate support-edge (#485 / ADR 0078) — rejected because that profile
-   binds evidential-versus-transition kinds, not predicted-versus-observed
-   promotion.
-2. Duplicate citation-edge (#426 / ADR 0064) — rejected because that profile
-   binds provenance identity, not promotion coverage.
-3. Duplicate role-contradiction (#482 / ADR 0075) — rejected because that
-   profile binds customer/competitor overlap, not predicted intervals.
-4. Bind `refuse_contradiction_or_adjacency` as promotion authority — rejected
-   because partial overlap still leaves unmatched predicted mass.
-5. Put `contradiction_agreement_rate` on the operator artifact — rejected
-   because inspect payloads stay metric-free and `tepp.scientific_acceptance.v1`
-   never appears.
-6. Bind the existing prediction-contradiction refusals to ADR 0022's
-   analysis-run profile — accepted.
+1. Treat all four Allen support classes as mandatory design strata — rejected. Relation classes are outcomes observed in the admitted census, and requiring every class would reject truthful sparse historical data.
+2. Duplicate support-edge semantics — rejected because support-edge classifies evidence-versus-transition roles, not predicted-versus-observed promotion.
+3. Bind `refuse_contradiction_or_adjacency` as promotion authority — rejected because partial overlap can still leave unmatched predicted mass.
+4. Put `contradiction_agreement_rate` on the operator artifact — rejected because the inspect contract is metric-free and the agreement helper is not a generative known-truth recovery metric.
+5. Create a new bounded-context authority for this profile — rejected. The profile composes existing Prediction Contradiction domain truth inside the existing Validation / Analysis Run application boundary.
 
 ## Consequences
 
-Operators can request cutoff-safe prediction-contradiction refusals as a
-digest-bound terminal result. The artifact does not claim MCMC, GPU
-parity, support-edge, summarizes-edge, retrospective-edge, role-contradiction,
-subevent-containment, inferred-status, episode-membership, relation-absence,
-outcome-order, membership-target, location-membership, membership-posterior
-ICC, copied-text, copy-identity, citation-edge, corpus-background,
-method-effect estimation, or topic birth/split/merge. Snapshot / profile /
-cutoff mismatch, empty or incomplete mixed-kind corpora, duplicate assignment
-identities, and oversized corpora fail closed.
+Operators can eventually request cutoff-safe prediction-contradiction refusals as a digest-bound terminal result once the profile lands through #416. Sparse covered-only or contradiction-only censuses remain valid and expose zero counts for absent classes. Snapshot/profile/cutoff mismatch, no cutoff-eligible evidence, duplicate identities among evidence available at the cutoff, count-invariant violations, and oversized corpora fail closed.
 
-## Verification
+This profile does not claim MCMC, GPU parity, support-edge, summarizes-edge, retrospective-edge, role-contradiction, subevent-containment, inferred-status, episode-membership, relation-absence, outcome-order, membership-target, location-membership, copy-identity, citation-edge, method-effect estimation, or topic birth/split/merge authority.
 
-The PR includes Rust unit and integration tests for mixed four-kind
-corpora, cutoff exclusion, equivalent RFC 3339 cutoff instants,
-empty/incomplete/duplicate refusal, snapshot / profile / cutoff
-mismatch, oversize, compact census claims above `MAX_EVIDENCE_UNITS`,
-and artifact tampering. Run:
+## Verification and traceability
 
-```text
-cargo fmt --all -- --check
-cargo test -p analysis_engine
-cargo clippy -p analysis_engine --all-targets -- -D warnings
-python3 scripts/validate_documentation.py
-```
+Scientific RED `a2892b6ad4f632882f63da39eed2d4706ddf9213` adds covered-only and contradiction-only production-shaped censuses. Causal repair `a64020152300232cb3214a66b45d97225b6d2b5b` removes the artificial minimum/four-class gate while preserving nonempty evidence, bounded counts, exact count sums, digest validation, cutoff-before-identity admission, and the fixed claim boundary. Commit `6b0c8de64f41bc11f8bf908e0f9cbe854c1e213c` removes predecessor tests that encoded the rejected mixed-fixture eligibility rule.
+
+The four-class fixture remains test coverage because it exercises every `PredictionContradictionError` mapping; it is not a scientific eligibility condition. The eventual #416 survivor must run the focused sparse-census, cutoff-semantics, and execution contracts plus full `analysis_engine` tests, Clippy, documentation validation, and all live required workflows on its own exact head.
 
 ## Rollback and supersession
 
-Rollback removes the `prediction_contradiction_v1` profile. No persisted
-schema migration is introduced. Supersede only with an ADR that keeps
-unmatched predicted mass hypothetical and keeps
-`contradiction_agreement_rate` off inspect payloads.
+Until protected-main integration, rollback is simply removal of the fold-child profile; no persisted schema migration exists. Supersession must preserve leakage-safe cutoff admission, truthful zero relation-class counts, Prediction Contradiction owner semantics, and the metric-free inspect boundary. ADR identity/status normalization remains owned by #437.
