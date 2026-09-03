@@ -5,13 +5,13 @@ use longitudinal_core::{
 #[test]
 fn component_rmse_aligns_by_scientific_identity_not_row_position() {
     let truth = [
-        ComponentValue::new(7, 2, ComponentLevel::Between, 1.25),
+        ComponentValue::new(7, 0, ComponentLevel::Between, 1.25),
         ComponentValue::new(7, 3, ComponentLevel::Within, -0.5),
-        ComponentValue::new(11, 1, ComponentLevel::Between, 4.0),
+        ComponentValue::new(11, 0, ComponentLevel::Between, 4.0),
     ];
     let decided = [
-        ComponentValue::new(11, 1, ComponentLevel::Between, 4.0),
-        ComponentValue::new(7, 2, ComponentLevel::Between, 1.25),
+        ComponentValue::new(11, 0, ComponentLevel::Between, 4.0),
+        ComponentValue::new(7, 0, ComponentLevel::Between, 1.25),
         ComponentValue::new(7, 3, ComponentLevel::Within, -0.5),
     ];
 
