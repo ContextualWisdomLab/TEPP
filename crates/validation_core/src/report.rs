@@ -177,6 +177,8 @@ impl Serialize for MonteCarloSummary {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
+
+        (*self).validate().map_err(serde::ser::Error::custom)?;
         let mut state = serializer.serialize_struct("MonteCarloSummary", 6)?;
         state.serialize_field("replication_count", &self.replication_count)?;
         state.serialize_field("mean", &self.mean)?;
