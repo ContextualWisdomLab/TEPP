@@ -99,8 +99,12 @@ impl LaggedWithinResidual {
 ///
 /// Stable between-unit means are removed first (CWC). Consecutive within-unit
 /// residuals then become [`LaggedWithinResidual`] pairs on possibly irregular
-/// event intervals. Singleton units do not contribute lags and therefore do not
-/// count toward the two-unit longitudinal evidence floor. Curran and Bauer
+/// event intervals. Exact zero within residuals use canonical public `+0.0`
+/// because a zero person-mean deviation has no directional measurement
+/// meaning; signed zero remains available to private numerical intermediates
+/// and to caller-constructed already-centered pairs. Singleton units do not
+/// contribute lags and therefore do not count toward the two-unit longitudinal
+/// evidence floor. Curran and Bauer
 /// (2011, pp. 583–619; PMC3059070 XML opened 2026-09-02; Eq. 36) show that
 /// person-mean subtraction of a time-varying covariate related to time is
 /// biased for the within-person effect. The returned pairs are therefore not a
@@ -154,8 +158,16 @@ pub fn center_within_unit_event_lags(
             let event_delta = window[1].event_time() - window[0].event_time();
             let event_interval = EventTimeInterval::new(event_delta)?;
             pairs.push(LaggedWithinResidual::new(
-                earlier_residual,
-                later_residual,
+                if earlier_residual == 0.0 {
+                    0.0
+                } else {
+                    earlier_residual
+                },
+                if later_residual == 0.0 {
+                    0.0
+                } else {
+                    later_residual
+                },
                 event_interval,
             ));
         }
@@ -358,10 +370,7 @@ pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, Longitudina
     same_sign_mean_over_total(&residuals, values.len())
 }
 
-fn same_sign_mean_over_total(
-    values: &[f64],
-    total_count: usize,
-) -> Result<f64, LongitudinalError> {
+fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, LongitudinalError> {
     let max_magnitude = values
         .iter()
         .map(|value| value.abs())
@@ -607,20 +616,15 @@ mod tests {
             .expect("full exponent range cancellation");
         assert_eq!(full_range.to_bits(), (1.0e-16_f64 / 3.0).to_bits());
         let minimum_subnormal = f64::from_bits(1);
-        let subnormal = scaled_compensated_mean(&[
-            f64::MAX,
-            f64::from_bits(2),
-            f64::from_bits(2),
-            -f64::MAX,
-        ])
-        .expect("subnormal cancellation residue");
+        let subnormal =
+            scaled_compensated_mean(&[f64::MAX, f64::from_bits(2), f64::from_bits(2), -f64::MAX])
+                .expect("subnormal cancellation residue");
         assert_eq!(subnormal.to_bits(), minimum_subnormal.to_bits());
         let finite_after_mass_overflow = scaled_compensated_mean(&[large, large, -1.0, -1.0])
             .expect("representable final mean after retained-mass overflow");
         assert!(finite_after_mass_overflow.is_finite());
         assert!(
-            (finite_after_mass_overflow - large / 2.0).abs()
-                <= (large / 2.0) * 4.0 * f64::EPSILON
+            (finite_after_mass_overflow - large / 2.0).abs() <= (large / 2.0) * 4.0 * f64::EPSILON
         );
         assert_eq!(
             scaled_compensated_mean(&[]),

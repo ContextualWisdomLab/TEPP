@@ -1,3 +1,5 @@
+//! Nonzero known-truth RMSE must not underflow to false perfect recovery.
+
 use longitudinal_core::{
     ComponentLevel, ComponentValue, LongitudinalError, component_root_mean_square_error,
 };

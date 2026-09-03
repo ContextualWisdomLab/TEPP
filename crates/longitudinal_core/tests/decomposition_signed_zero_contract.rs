@@ -1,3 +1,5 @@
+//! Exact-zero within residuals have one public encoding.
+
 use longitudinal_core::{ComponentLevel, OccasionObservation, decompose_within_between};
 
 #[test]

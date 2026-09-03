@@ -63,20 +63,22 @@ pub use irregular_residual::LaggedWithinResidual;
 pub use irregular_residual::center_within_unit_event_lags;
 /// Refuse treating a CWC residual log-rate as raw-process AR drift.
 pub use irregular_residual::refuse_cwc_residual_log_rate_as_raw_process_drift;
+/// Established longitudinal component level.
+pub use level::ComponentLevel;
+/// Refuse to treat a between-unit component as within-unit change.
+pub use level::refuse_between_as_within_change;
 /// Form consecutive event-time lags after subtracting each occasion's group mean.
 pub use occasion_mean::center_occasion_mean_event_lags;
 /// Recover the exact scalar log-rate of occasion-mean residuals.
 pub use occasion_mean::recover_occasion_mean_centered_irregular_residual_log_rate;
 /// Refuse treating occasion-mean residual lag as within-person change.
 pub use occasion_mean::refuse_occasion_mean_centered_log_rate_as_within_person_lag;
-/// Established longitudinal component level.
-pub use level::ComponentLevel;
-/// Refuse to treat a between-unit component as within-unit change.
-pub use level::refuse_between_as_within_change;
 /// Mean exact scalar log-rate on already-centered residuals with stable count weighting.
 pub use stable_irregular_rate::recover_centered_irregular_residual_log_rate;
 /// Pairwise-mean exact log-rate after CWC with stable count weighting.
 pub use stable_irregular_rate::recover_within_unit_irregular_residual_log_rate;
+/// Recover the scalar Driver p.16 unstandardised stationary within-person variance.
+pub use stationary::recover_stationary_within_variance;
 /// Recover a valid event-time lagged correlation from covariance and both
 /// marginal variances through the typed event-time boundary.
 pub use temporal_association::recover_event_time_lagged_correlation;

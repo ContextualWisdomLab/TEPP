@@ -1,3 +1,5 @@
+//! Near-equal large residuals keep a finite log-rate instead of underflowing.
+
 use longitudinal_core::{
     EventTimeInterval, LaggedWithinResidual, LongitudinalError,
     recover_centered_irregular_residual_log_rate,

@@ -1,3 +1,5 @@
+//! Finite log-rate pairs must survive overflowing raw ratio intermediates.
+
 use longitudinal_core::{
     EventTimeInterval, LaggedWithinResidual, recover_centered_irregular_residual_log_rate,
 };

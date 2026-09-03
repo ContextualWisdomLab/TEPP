@@ -1,3 +1,5 @@
+//! Unit-mean decomposition uses the shared compensated-mean authority.
+
 use longitudinal_core::{ComponentLevel, OccasionObservation, decompose_within_between};
 
 #[test]

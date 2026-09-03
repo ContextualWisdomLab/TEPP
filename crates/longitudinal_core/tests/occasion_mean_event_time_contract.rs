@@ -1,3 +1,5 @@
+//! Occasion-mean event-time lags are Hamaker Eq. 1a deviations, not CWC.
+
 use longitudinal_core::{
     EventTimedObservation, LongitudinalError, center_occasion_mean_event_lags,
     recover_occasion_mean_centered_irregular_residual_log_rate,

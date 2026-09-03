@@ -31,7 +31,7 @@ pub(crate) fn validate_stationary_process_inputs(
 /// actually returns `p`, so the stationary variance itself must be representable
 /// as binary64. Callers decide whether zero stationary variance is admissible
 /// for their named estimand.
-pub(crate) fn recover_stationary_within_variance(
+pub fn recover_stationary_within_variance(
     continuous_diffusion: f64,
     log_rate: f64,
 ) -> Result<f64, LongitudinalError> {

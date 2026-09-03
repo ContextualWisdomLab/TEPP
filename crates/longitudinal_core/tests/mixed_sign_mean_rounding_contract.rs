@@ -1,3 +1,5 @@
+//! Mixed-sign CWC and occasion means divide by the original sample count.
+
 use longitudinal_core::{
     EventTimedObservation, center_occasion_mean_event_lags, center_within_unit_event_lags,
 };

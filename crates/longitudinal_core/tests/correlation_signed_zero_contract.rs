@@ -1,3 +1,5 @@
+//! Exact-zero lagged covariance has one public no-association encoding.
+
 use longitudinal_core::{EventTimeInterval, recover_event_time_lagged_correlation};
 
 #[test]

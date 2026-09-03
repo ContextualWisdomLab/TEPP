@@ -1,4 +1,8 @@
-use longitudinal_core::{EventTimeInterval, LongitudinalError, recover_event_time_lagged_correlation};
+//! Strict-interior covariance cannot become a false exact ±1 correlation.
+
+use longitudinal_core::{
+    EventTimeInterval, LongitudinalError, recover_event_time_lagged_correlation,
+};
 
 #[test]
 fn strict_binary_covariance_bound_cannot_round_to_perfect_correlation() {
