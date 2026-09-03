@@ -2,6 +2,7 @@
 
 use crate::ValidationError;
 use crate::input::require_finite;
+use crate::numeric::{deterministic_compensated_sum, deterministic_representable_mean};
 
 /// Summary of Monte Carlo replications for a scalar metric.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -52,16 +53,87 @@ impl MonteCarloSummary {
     }
 }
 
+fn standard_deviation_from_deviations(deviations: &[f64]) -> Result<f64, ValidationError> {
+    let scale = deviations
+        .iter()
+        .map(|deviation| deviation.abs())
+        .fold(0.0, f64::max);
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+
+    let normalized_squares = deviations
+        .iter()
+        .map(|deviation| {
+            let normalized = *deviation / scale;
+            normalized * normalized
+        })
+        .collect();
+    let square_sum = deterministic_compensated_sum(normalized_squares);
+    let normalized_standard_deviation =
+        (square_sum / (deviations.len() as f64 - 1.0)).sqrt();
+    let standard_deviation = scale * normalized_standard_deviation;
+    if !standard_deviation.is_finite()
+        || (standard_deviation == 0.0 && normalized_standard_deviation != 0.0)
+    {
+        Err(ValidationError::InvalidInput)
+    } else if standard_deviation == 0.0 {
+        Ok(0.0)
+    } else {
+        Ok(standard_deviation)
+    }
+}
+
+fn scaled_sample_standard_deviation(samples: &[f64], mean: f64) -> Result<f64, ValidationError> {
+    let direct_deviations: Option<Vec<f64>> = samples
+        .iter()
+        .map(|value| {
+            let deviation = *value - mean;
+            deviation.is_finite().then_some(deviation)
+        })
+        .collect();
+    if let Some(deviations) = direct_deviations {
+        return standard_deviation_from_deviations(&deviations);
+    }
+
+    let outer_scale = samples.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    if outer_scale == 0.0 {
+        return Ok(0.0);
+    }
+    let normalized_mean = mean / outer_scale;
+    let normalized_deviations: Vec<_> = samples
+        .iter()
+        .map(|value| (*value / outer_scale) - normalized_mean)
+        .collect();
+    let normalized_standard_deviation =
+        standard_deviation_from_deviations(&normalized_deviations)?;
+    let standard_deviation = outer_scale * normalized_standard_deviation;
+    if !standard_deviation.is_finite()
+        || (standard_deviation == 0.0 && normalized_standard_deviation != 0.0)
+    {
+        Err(ValidationError::InvalidInput)
+    } else if standard_deviation == 0.0 {
+        Ok(0.0)
+    } else {
+        Ok(standard_deviation)
+    }
+}
+
 /// Aggregate Monte Carlo metric replications with percentile bounds.
 ///
 /// Percentiles use the inclusive nearest-rank method on sorted finite samples.
-/// Mean and variance use Welford accumulation so large finite samples do not
-/// overflow intermediate sums.
+/// Mean and sampling uncertainty use deterministic cancellation-safe/scaled
+/// binary64 references so an avoidable raw sum, Welford delta product, or raw
+/// square cannot reject a representable summary. A mathematically nonzero
+/// standard deviation or standard error that becomes exact zero only at the
+/// binary64 projection boundary fails closed rather than reporting no Monte
+/// Carlo uncertainty.
 ///
 /// # Errors
 ///
-/// Returns input errors for empty/non-finite samples or non-finite summaries,
-/// and configuration errors for invalid percentile bounds.
+/// Returns input errors for empty/non-finite samples, an unrepresentable mean,
+/// standard deviation, standard error, or summary; and configuration errors for
+/// invalid percentile bounds.
 ///
 /// # Panics
 ///
@@ -81,18 +153,21 @@ pub fn summarize_replications(
         return Err(ValidationError::InvalidConfiguration);
     }
     let mut sorted = samples.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let (mean, m2, count) = welford_moments(&sorted)?;
-    let n = count as f64;
-    let standard_deviation = if count == 1 {
+    sorted.sort_by(f64::total_cmp);
+    let mean = deterministic_representable_mean(&sorted)?;
+    let n = sorted.len() as f64;
+    let standard_deviation = if sorted.len() == 1 {
         0.0
     } else {
-        require_finite((m2 / (n - 1.0)).sqrt())?
+        scaled_sample_standard_deviation(&sorted, mean)?
     };
     let standard_error = require_finite(standard_deviation / n.sqrt())?;
+    if standard_error == 0.0 && standard_deviation != 0.0 {
+        return Err(ValidationError::InvalidInput);
+    }
     let summary = MonteCarloSummary {
         replication_count: sorted.len(),
-        mean: require_finite(mean)?,
+        mean,
         standard_deviation,
         standard_error,
         percentile_lower: nearest_rank(&sorted, lower_percentile),
@@ -138,24 +213,6 @@ pub fn accept_within_standard_errors(
     let scaled_bound = k * (standard_error / scale);
     // scale is at least 1.0 and all inputs are finite, so scaled terms are finite.
     Ok(scaled_error.abs() <= scaled_bound)
-}
-
-/// Welford one-pass mean and sum of squared deviations.
-fn welford_moments(samples: &[f64]) -> Result<(f64, f64, usize), ValidationError> {
-    let mut mean = 0.0_f64;
-    let mut m2 = 0.0_f64;
-    let mut count = 0_usize;
-    for value in samples {
-        count += 1;
-        let delta = value - mean;
-        mean += delta / count as f64;
-        if !mean.is_finite() {
-            return Err(ValidationError::InvalidInput);
-        }
-        let delta2 = value - mean;
-        m2 += delta * delta2;
-    }
-    Ok((mean, m2, count))
 }
 
 #[allow(clippy::cast_possible_truncation)]
