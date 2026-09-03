@@ -1,9 +1,9 @@
 //! Execution and serialization bounds for the copy-identity profile.
 
 use analysis_engine::{
-    AnalysisEngineError, CopyIdentityArtifact, CopyIdentityDocument, MAX_EVIDENCE_UNITS,
-    COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION, COPY_IDENTITY_MODEL_CONTRACT_VERSION,
-    COPY_IDENTITY_OUTPUT_PROFILE, execute_copy_identity_run,
+    AnalysisEngineError, COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION,
+    COPY_IDENTITY_MODEL_CONTRACT_VERSION, COPY_IDENTITY_OUTPUT_PROFILE, CopyIdentityArtifact,
+    CopyIdentityDocument, MAX_EVIDENCE_UNITS, execute_copy_identity_run,
 };
 use copy_identity::CopyKind;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
