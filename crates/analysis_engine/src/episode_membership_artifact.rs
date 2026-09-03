@@ -243,7 +243,8 @@ pub fn execute_episode_membership_run(
         inference_status: EPISODE_MEMBERSHIP_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new("episode_membership", assignment_count, 4, "validated")?;
+    let summary =
+        AnalysisResultSummary::new("episode_membership", assignment_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
