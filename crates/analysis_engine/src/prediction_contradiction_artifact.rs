@@ -169,12 +169,8 @@ impl PredictionContradictionArtifact {
             || !valid_identifier(&self.run_id)
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
-            || self.assignment_count < 4
+            || self.assignment_count == 0
             || self.assignment_count > MAX_EVIDENCE_UNITS as u64
-            || self.covered_count == 0
-            || self.partial_overlap_count == 0
-            || self.adjacent_count == 0
-            || self.contradictory_count == 0
             || kind_sum != Some(self.assignment_count)
             || refused_sum != Some(self.refused_promotion_count)
             || self.refused_promotion_count.checked_add(self.covered_count)
@@ -207,9 +203,9 @@ pub struct PredictionContradictionExecution {
 ///
 /// # Errors
 ///
-/// Returns a request/receipt/snapshot/cutoff/profile error, empty or
-/// incomplete mixed-kind corpus, missing refusal, duplicate assignment
-/// identity, oversized corpus, or invalid artifact error.
+/// Returns a request/receipt/snapshot/cutoff/profile error, empty admitted
+/// corpus, duplicate assignment identity, oversized corpus, or invalid
+/// artifact error.
 pub fn execute_prediction_contradiction_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -315,11 +311,7 @@ fn census_admitted_assignments(
         .and_then(|sum| sum.checked_add(adjacent_count))
         .and_then(|sum| sum.checked_add(contradictory_count))
         .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-    if assignment_count < 4
-        || covered_count == 0
-        || partial_overlap_count == 0
-        || adjacent_count == 0
-        || contradictory_count == 0
+    if assignment_count == 0
         || refused_promotion_count
             .checked_add(covered_count)
             .ok_or(AnalysisEngineError::ArithmeticOverflow)?
@@ -455,35 +447,17 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
-                value.assignment_count = 3;
-                value
-            },
-            {
-                let mut value = artifact.clone();
+                value.assignment_count = 0;
                 value.covered_count = 0;
-                value.assignment_count = 3;
-                value.refused_promotion_count = 3;
-                value
-            },
-            {
-                let mut value = artifact.clone();
                 value.partial_overlap_count = 0;
-                value.assignment_count = 3;
-                value.refused_promotion_count = 2;
-                value
-            },
-            {
-                let mut value = artifact.clone();
                 value.adjacent_count = 0;
-                value.assignment_count = 3;
-                value.refused_promotion_count = 2;
+                value.contradictory_count = 0;
+                value.refused_promotion_count = 0;
                 value
             },
             {
                 let mut value = artifact.clone();
-                value.contradictory_count = 0;
                 value.assignment_count = 3;
-                value.refused_promotion_count = 2;
                 value
             },
             {
