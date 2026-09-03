@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-03T13:08Z
+**Snapshot:** 2026-09-03T13:18Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -34,7 +34,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
-| #488 | `859e66b4ab5e61613d9c62f51d1e27430475616a` | true | `main` | Validation Evidence numerical repair. RED `c5ec42e4...` proves raw residual summation can reject a representable `f64::MAX` mean bias; repair `7499042f...` uses scale-normalized deterministic compensated mean, `e379d164...` reinforces zero/underflow/variance-overflow branches, and `311bef6e...` doctors the current scientific/IEEE trace. Exact-head hosted gates and independent review remain required. |
+| #488 | `956c9c98931cb22a445f22ec674eb48d598c7d5c` | true | `main` | Validation Evidence numerical repair. Mean-bias RED `c5ec42e4...` / repair `7499042f...` removes avoidable raw residual-sum overflow; bias-SE RED `7de0ef90...` / repair `cad23162...` removes avoidable raw squared-deviation/variance overflow and supplies a scaled direct SEM path. Exact-head hosted gates and independent review remain required. |
 | #487 | `e07b2ff9f78ef456ff911b8643710af20921fe54` | true | #416 `feat/copy-identity-analysis-run-gap-004` | Validation / Analysis Run fold child. Sparse observed relation classes are valid evidence; RED `a2892b6...`, repair `a6402015...`, predecessor-test correction `6b0c8de6...`; ADR 0079 is repaired to `Proposed` at `e07b2ff...`. No child-head CI transfers to #416. |
 | #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 | Analysis Run fold child; preserve support-edge source/tests/doctoring. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 | Analysis Run fold child; preserve summarizes-edge source/tests/doctoring. |
@@ -68,6 +68,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - Known-truth component recovery aligns truth and recovered values by unique `(unit, occasion, level)` identity and accumulates in canonical identity order. A permutation of either slice must preserve the same deterministic CPU `f64` result.
 - A representable final scientific estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. False exact 0/1/non-finite endpoints remain fail-closed when the mathematical estimand is interior/nonzero.
 - Mean signed bias is a Validation Evidence performance measure over admitted recovery units. A representable bias must not fail solely because a raw residual sum overflows; exact cancellation remains zero, while a mathematically nonzero bias below binary64 range fails closed rather than becoming false zero.
+- Bias standard error is formed from the same admitted signed differences. A representable SEM must not fail solely because raw squared deviations, their sum, or an intermediate sample variance overflows; scaling is applied before squaring and the SEM is formed directly.
 - A mathematically nonzero scientific error metric must not be promoted to exact perfect recovery merely because its final binary64 representation underflows to zero.
 - Known-truth recovery denominators are defined by unique scientific component identity. Duplicate `(unit, occasion, level)` rows are not implicit weights and must fail closed unless a separately named weighted contract explicitly owns the weighting rule.
 - A mathematically nonzero one-sign temporal-rate mean must not be promoted to exact no-change merely because its final binary64 representation underflows to zero. All-zero inputs and exact mixed-sign cancellation remain exact zero.
@@ -116,11 +117,13 @@ At exact #310 head `464df01e9268f13ba8e135f72d0fb62beead3e04`, predecessor workf
 
 ### #488 — Validation Evidence bias arithmetic
 
-Protected-main `validation_core::mean_bias` defines bias correctly as `mean(recovered − truth)` but implemented the mean as a raw residual sum followed by division. Two finite `f64::MAX` residuals therefore overflowed the intermediate sum even though the final mean bias is representable as `f64::MAX`; `bias_standard_error` inherited the same failure and rejected a constant extreme bias whose sampling variance is exactly zero.
+Protected-main `validation_core::mean_bias` defines bias correctly as `mean(recovered − truth)` but implemented the mean as a raw residual sum followed by division. Two finite `f64::MAX` residuals therefore overflowed the intermediate sum even though the final mean bias is representable as `f64::MAX`; `bias_standard_error` inherited the same mean failure and rejected a constant extreme bias whose sampling variance is exactly zero.
 
-Public RED `c5ec42e40307f3645c18b0d73114b73e01745a20` fixes that recovery contract. Causal repair `7499042f7451b2e3d5e9f83843aeea82c4f5ff06` validates each signed residual, normalizes by the maximum magnitude, sums normalized residuals deterministically with compensated arithmetic, divides by the recovery count, and restores scale once. Exact cancellation remains canonical zero; a represented nonzero normalized mean that becomes zero only at final scale-back fails closed. Coverage reinforcement `e379d164c66abb2efa8918422b4e6cf7fe8e0cf0` exercises all-zero, exact cancellation, nonzero subnormal underflow, and finite-square variance-sum overflow. Research trace `311bef6eb1d5d063a195f079597bfc09a31289ed` and release fragment/current head `859e66b4ab5e61613d9c62f51d1e27430475616a` keep method and buyer-visible evidence attached to the source.
+Public RED `c5ec42e40307f3645c18b0d73114b73e01745a20` fixes that recovery contract. Causal repair `7499042f7451b2e3d5e9f83843aeea82c4f5ff06` validates each signed residual, normalizes by the maximum magnitude, sums normalized residuals deterministically with compensated arithmetic, divides by the recovery count, and restores scale once. Exact cancellation remains canonical zero; a represented nonzero normalized mean that becomes zero only at final scale-back fails closed.
 
-This belongs to TEPP Validation Evidence because it repairs the generic recovery metric already owned by `validation_core`. It does not move Longitudinal composition or create a second psychometric estimator authority. The remaining sample-variance squared-deviation representability and generic RMSE numerical limitations are separate future findings.
+Review of the repaired SE path exposed a second avoidable overflow. Public RED `7de0ef90944925ae7b232a8280f5bf9096df6502` uses `[1e154, -1e154, 0]`, whose raw squared-deviation sum overflows even though the final SEM is finite. Repair `cad231620679d8f912bded36c654446032b45e57` scales deviations before squaring and forms the SEM directly; if direct subtraction from the finite mean overflows it re-expresses the same deviations in a normalized scale. `8a6cc346...` and `28d96c23...` harden the public/unit oracle without requiring incidental last-bit equality. Research trace `1f22ef675d632b15378da982ace2182de3fdbab0` and release fragment/current head `956c9c98931cb22a445f22ec674eb48d598c7d5c` keep the complete scientific and buyer-visible lineage attached to the source.
+
+This belongs to TEPP Validation Evidence because it repairs the generic recovery metrics already owned by `validation_core`. It does not move Longitudinal composition or create a second psychometric estimator authority. Generic RMSE numerical limitations remain a separate future finding.
 
 ### #416 — Validation / Analysis Run consolidation
 
@@ -190,7 +193,8 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-042 | Ratio-first logarithm could nearly double an adjacent-float power-of-two irregular residual growth rate before event-time scaling | `verification-pending` | public RED `766ddc7a...` + causal `ln_1p` repair `16f21d9a...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-043 | Duplicate known-truth component identities could silently reweight RMSE recovery evidence by changing the denominator without adding a new scientific target | `verification-pending` | public RED `698f12f5...` + causal uniqueness repair `2fae4cb2...` + research trace `1106c005...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-044 | Known-truth component RMSE alignment and deterministic binary64 accumulation depended on serialization row order rather than scientific component identity | `verification-pending` | cross-slice RED `8ad72ac9...` + identity-alignment repair `2dd9537e...` + truth-order rounding RED `5fb93c40...` + canonical-order repair `025dce7f...` + edge coverage `976ce7d7...` + research trace/current #310 `1106c005...` / `464df01e...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
-| GAP-045 | Mean signed bias could reject a representable recovery result because finite residuals were summed before dividing, and constant extreme bias could therefore lose its exact-zero SE | `verification-pending` | public RED `c5ec42e4...` + scaled compensated-mean repair `7499042f...` + coverage reinforcement `e379d164...` + research trace `311bef6e...` + current #488 `859e66b4...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-045 | Mean signed bias could reject a representable recovery result because finite residuals were summed before dividing | `verification-pending` | public RED `c5ec42e4...` + scaled compensated-mean repair `7499042f...` + research trace `1f22ef67...` + current #488 `956c9c98...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-046 | Bias standard error could reject a representable SEM because raw squared deviations, their sum, or an intermediate sample variance overflowed | `verification-pending` | public RED `7de0ef90...` + scaled direct-SEM repair `cad23162...` + oracle/edge reinforcement `8a6cc346...` / `28d96c23...` + research trace/current #488 `1f22ef67...` / `956c9c98...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 
 ## Release gate
 
