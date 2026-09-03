@@ -30,14 +30,17 @@ impl MonteCarloSummary {
     /// so a positive sample SD must agree numerically with `SD / sqrt(n)`.
     /// Admission allows a small relative binary64 tolerance rather than requiring
     /// cross-language bit-for-bit equality, but rejects materially understated or
-    /// overstated uncertainty. Zero spread requires zero SE, and the canonical
-    /// singleton summary has zero spread and zero SE.
+    /// overstated uncertainty. Zero spread requires zero SE and degenerate
+    /// empirical percentile support at the represented mean; the same support
+    /// rule applies to the canonical singleton summary. Numeric equality keeps
+    /// IEEE `-0.0` and `+0.0` as one zero-valued scientific state.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when counts or numeric fields
-    /// violate the summary contract or the standard-error field is incoherent
-    /// with the represented sample spread/count.
+    /// violate the summary contract, empirical support contradicts zero sample
+    /// spread, or the standard-error field is incoherent with the represented
+    /// sample spread/count.
     pub fn validate(self) -> Result<Self, ValidationError> {
         if self.replication_count == 0 {
             return Err(ValidationError::InvalidInput);
@@ -60,7 +63,10 @@ impl MonteCarloSummary {
             return Err(ValidationError::InvalidInput);
         }
         if self.standard_deviation == 0.0 {
-            if self.standard_error != 0.0 {
+            if self.standard_error != 0.0
+                || self.percentile_lower != self.mean
+                || self.percentile_upper != self.mean
+            {
                 return Err(ValidationError::InvalidInput);
             }
         } else {
