@@ -13,6 +13,12 @@ fn summary(replication_count: usize, standard_deviation: f64, standard_error: f6
 
 #[test]
 fn monte_carlo_summary_rejects_impossible_standard_error_evidence() {
+    let equal_to_sd_with_multiple_replications = summary(4, 0.5, 0.5);
+    assert_eq!(
+        equal_to_sd_with_multiple_replications.validate(),
+        Err(ValidationError::InvalidInput)
+    );
+
     let larger_than_sd = summary(4, 0.5, 1.0);
     assert_eq!(larger_than_sd.validate(), Err(ValidationError::InvalidInput));
     assert!(serde_json::to_string(&larger_than_sd).is_err());
