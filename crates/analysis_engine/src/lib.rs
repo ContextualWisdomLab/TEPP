@@ -12,6 +12,7 @@
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod summarizes_edge_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -45,6 +46,12 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Summarizes-edge artifact and execution contracts from this engine.
+pub use summarizes_edge_artifact::{
+    SUMMARIZES_EDGE_ARTIFACT_BYTE_LIMIT, SUMMARIZES_EDGE_ARTIFACT_SCHEMA_VERSION,
+    SUMMARIZES_EDGE_MODEL_CONTRACT_VERSION, SUMMARIZES_EDGE_OUTPUT_PROFILE, SummarizesEdgeArtifact,
+    SummarizesEdgeAssignment, SummarizesEdgeExecution, execute_summarizes_edge_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +255,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A summarizes-edge artifact violated its bounded schema or count invariants.
+    InvalidSummarizesEdgeArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +271,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidSummarizesEdgeArtifact => "invalid summarizes-edge artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +690,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidSummarizesEdgeArtifact,
+                "invalid summarizes-edge artifact",
             ),
         ];
         for (error, message) in messages {
