@@ -13,6 +13,12 @@ fn summary(replication_count: usize, standard_deviation: f64, standard_error: f6
 
 #[test]
 fn monte_carlo_summary_rejects_impossible_standard_error_evidence() {
+    let understated_for_n = summary(4, 0.5, 0.2);
+    assert_eq!(
+        understated_for_n.validate(),
+        Err(ValidationError::InvalidInput)
+    );
+
     let equal_to_sd_with_multiple_replications = summary(4, 0.5, 0.5);
     assert_eq!(
         equal_to_sd_with_multiple_replications.validate(),
@@ -29,12 +35,18 @@ fn monte_carlo_summary_rejects_impossible_standard_error_evidence() {
         Err(ValidationError::InvalidInput)
     );
 
+    let zero_spread_with_positive_uncertainty = summary(4, 0.0, 0.1);
+    assert_eq!(
+        zero_spread_with_positive_uncertainty.validate(),
+        Err(ValidationError::InvalidInput)
+    );
+
     let impossible_singleton_spread = summary(1, 0.5, 0.5);
     assert_eq!(
         impossible_singleton_spread.validate(),
         Err(ValidationError::InvalidInput)
     );
 
-    let payload = r#"{"replication_count":4,"mean":0.5,"standard_deviation":0.5,"standard_error":1.0,"percentile_lower":-2.0,"percentile_upper":3.0}"#;
+    let payload = r#"{"replication_count":4,"mean":0.5,"standard_deviation":0.5,"standard_error":0.2,"percentile_lower":-2.0,"percentile_upper":3.0}"#;
     assert!(serde_json::from_str::<MonteCarloSummary>(payload).is_err());
 }
