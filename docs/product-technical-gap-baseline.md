@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-03T12:08Z
+**Snapshot:** 2026-09-03T13:08Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -19,8 +19,8 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | Signal | Fresh evidence | Implication |
 | --- | ---: | --- |
 | Protected `main` | `1bc02f580cf48e1d39da239f0e818453437c31c3` | Capability claims remain bounded to this commit until main advances. |
-| Open pull requests | **133** | WIP circuit breaker remains active; consolidate into existing bounded-context vehicles. |
-| Draft pull requests | **133** | Every current open PR is Draft. |
+| Open pull requests | **134** | WIP circuit breaker remains active; consolidate into existing bounded-context vehicles. |
+| Draft pull requests | **134** | Every current open PR is Draft. |
 | Non-Draft pull requests | **0** | No PR is eligible for normal merge until it is deliberately made Ready after exact-head evidence. |
 | Open issues | **16** | ADR normalization, orchestration admission, evaluation drift, and scientific recovery remain open. |
 | GitHub releases | **0** | No TEPP open head is a released contract. |
@@ -34,6 +34,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
+| #488 | `859e66b4ab5e61613d9c62f51d1e27430475616a` | true | `main` | Validation Evidence numerical repair. RED `c5ec42e4...` proves raw residual summation can reject a representable `f64::MAX` mean bias; repair `7499042f...` uses scale-normalized deterministic compensated mean, `e379d164...` reinforces zero/underflow/variance-overflow branches, and `311bef6e...` doctors the current scientific/IEEE trace. Exact-head hosted gates and independent review remain required. |
 | #487 | `e07b2ff9f78ef456ff911b8643710af20921fe54` | true | #416 `feat/copy-identity-analysis-run-gap-004` | Validation / Analysis Run fold child. Sparse observed relation classes are valid evidence; RED `a2892b6...`, repair `a6402015...`, predecessor-test correction `6b0c8de6...`; ADR 0079 is repaired to `Proposed` at `e07b2ff...`. No child-head CI transfers to #416. |
 | #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 | Analysis Run fold child; preserve support-edge source/tests/doctoring. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 | Analysis Run fold child; preserve summarizes-edge source/tests/doctoring. |
@@ -42,7 +43,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 | #480 | `01f45a99392457334a4f6d3d659f992af739eeee` | true | `main` | contextual-orchestrator consumer repair; stays Draft while immutable CO release/deployment/auth provenance is unavailable. |
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
-| #416 | `0b7155cc238defb1e55129ff3000658f04b343cf` | true | `main` | Validation / Analysis Run landing vehicle; availability cutoff precedes duplicate-identity admission. |
+| #416 | `aa730c63563eb4a33048d822b581036c8487bd47` | true | `main` | Validation / Analysis Run landing vehicle. Generic cutoff-before-identity repair remains in ancestry; six current-head follow-up commits canonicalize episode/cutoff fixtures and harden bounded artifact/profile tests. |
 | #310 | `464df01e9268f13ba8e135f72d0fb62beead3e04` | true | `main` | Longitudinal Modeling vehicle; known-truth RMSE now aligns and accumulates by canonical component identity so serialization order cannot change admission or deterministic CPU `f64` recovery. Exact-head verification remains non-passing until current gates and review complete. |
 
 Exact-head evidence becomes stale after any source push.
@@ -66,6 +67,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - Row arrival order is not scientific evidence. Fixed admitted observations must produce bit-identical means/centered results under permutation wherever the contract claims deterministic f64 reference behavior.
 - Known-truth component recovery aligns truth and recovered values by unique `(unit, occasion, level)` identity and accumulates in canonical identity order. A permutation of either slice must preserve the same deterministic CPU `f64` result.
 - A representable final scientific estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. False exact 0/1/non-finite endpoints remain fail-closed when the mathematical estimand is interior/nonzero.
+- Mean signed bias is a Validation Evidence performance measure over admitted recovery units. A representable bias must not fail solely because a raw residual sum overflows; exact cancellation remains zero, while a mathematically nonzero bias below binary64 range fails closed rather than becoming false zero.
 - A mathematically nonzero scientific error metric must not be promoted to exact perfect recovery merely because its final binary64 representation underflows to zero.
 - Known-truth recovery denominators are defined by unique scientific component identity. Duplicate `(unit, occasion, level)` rows are not implicit weights and must fail closed unless a separately named weighted contract explicitly owns the weighting rule.
 - A mathematically nonzero one-sign temporal-rate mean must not be promoted to exact no-change merely because its final binary64 representation underflows to zero. All-zero inputs and exact mixed-sign cancellation remain exact zero.
@@ -112,9 +114,17 @@ At exact #310 head `464df01e9268f13ba8e135f72d0fb62beead3e04`, predecessor workf
 
 #486 is closed as a verified-successor consolidation, not a PR-count-only close. No child-head CI/review evidence transfers to #310.
 
+### #488 — Validation Evidence bias arithmetic
+
+Protected-main `validation_core::mean_bias` defines bias correctly as `mean(recovered − truth)` but implemented the mean as a raw residual sum followed by division. Two finite `f64::MAX` residuals therefore overflowed the intermediate sum even though the final mean bias is representable as `f64::MAX`; `bias_standard_error` inherited the same failure and rejected a constant extreme bias whose sampling variance is exactly zero.
+
+Public RED `c5ec42e40307f3645c18b0d73114b73e01745a20` fixes that recovery contract. Causal repair `7499042f7451b2e3d5e9f83843aeea82c4f5ff06` validates each signed residual, normalizes by the maximum magnitude, sums normalized residuals deterministically with compensated arithmetic, divides by the recovery count, and restores scale once. Exact cancellation remains canonical zero; a represented nonzero normalized mean that becomes zero only at final scale-back fails closed. Coverage reinforcement `e379d164c66abb2efa8918422b4e6cf7fe8e0cf0` exercises all-zero, exact cancellation, nonzero subnormal underflow, and finite-square variance-sum overflow. Research trace `311bef6eb1d5d063a195f079597bfc09a31289ed` and release fragment/current head `859e66b4ab5e61613d9c62f51d1e27430475616a` keep method and buyer-visible evidence attached to the source.
+
+This belongs to TEPP Validation Evidence because it repairs the generic recovery metric already owned by `validation_core`. It does not move Longitudinal composition or create a second psychometric estimator authority. The remaining sample-variance squared-deviation representability and generic RMSE numerical limitations are separate future findings.
+
 ### #416 — Validation / Analysis Run consolidation
 
-#416 `0b7155cc...` centralizes the leakage-safe invariant that availability filtering occurs before duplicate-identity admission. #458/#460/#482/#483/#484/#485/#487 are current fold children over shared Cargo/lib/lock/docs surfaces. Their unique evidence must reach a surviving #416 exact head before any child can be considered fully superseded.
+#416 exact head is `aa730c63563eb4a33048d822b581036c8487bd47`. The generic cutoff-before-identity repair `0b7155cc...` remains in its ancestry; six newer commits canonicalize episode/cutoff fixtures and harden bounded artifact/profile tests without transferring child-head CI. #458/#460/#482/#483/#484/#485/#487 remain current fold children over shared Cargo/lib/lock/docs surfaces. Their unique evidence must reach a surviving #416 exact head before any child can be considered fully superseded.
 
 #487 exposed a scientific acceptance bug: the first implementation required all four Allen support classes and at least four assignments merely because the test fixture exercised those branches. RED `a2892b6...` requires covered-only and contradiction-only historical censuses to succeed with truthful zero counts. Repair `a6402015...` keeps only real invariants: nonempty admitted evidence, size bound, exact class sums, refusal-plus-covered conservation, cutoff-safe admission, digest/schema validation, and claim boundary. `6b0c8de6...` removes predecessor tests that encoded the rejected fixture-as-production rule. Fresh docs-to-code repair `e07b2ff9...` makes branch-local ADR 0079 `Proposed` under the existing canonical ADR lineage and removes the contradictory mixed-four-class prerequisite. The child remains conflicted beneath #416 and does not transfer child-head evidence to #416.
 
@@ -136,7 +146,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 
 | ID | Gap | Maturity | Closure evidence |
 | --- | --- | --- | --- |
-| GAP-001 | PR authority fragmented across 133 open PRs | `release-blocking` | coherent landing vehicles, unique-evidence preservation, protected-main reduction |
+| GAP-001 | PR authority fragmented across 134 open PRs | `release-blocking` | coherent landing vehicles, unique-evidence preservation, protected-main reduction |
 | GAP-002 | multilingual span-grounded semantic/concept admission | `partial` | immutable offsets/layout, KO/EN/JA/ZH/VI/ES/DE/FR profiles, concept dictionary, invariance/calibration, hostile-input tests |
 | GAP-003 | shared-latent temporal topic estimator | `partial` | Rust CPU f64 likelihood/uncertainty, relation/time/membership effects, true recovery, fitted candidate-K |
 | GAP-004 | durable end-to-end Analysis Run | `partial` | idempotent lifecycle, persistence/recovery, estimator-bound artifacts, validation/promotion separation, Compose E2E |
@@ -180,6 +190,7 @@ Repository-wide ADR IDs are immutable authority. Duplicate index IDs/targets/num
 | GAP-042 | Ratio-first logarithm could nearly double an adjacent-float power-of-two irregular residual growth rate before event-time scaling | `verification-pending` | public RED `766ddc7a...` + causal `ln_1p` repair `16f21d9a...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-043 | Duplicate known-truth component identities could silently reweight RMSE recovery evidence by changing the denominator without adding a new scientific target | `verification-pending` | public RED `698f12f5...` + causal uniqueness repair `2fae4cb2...` + research trace `1106c005...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 | GAP-044 | Known-truth component RMSE alignment and deterministic binary64 accumulation depended on serialization row order rather than scientific component identity | `verification-pending` | cross-slice RED `8ad72ac9...` + identity-alignment repair `2dd9537e...` + truth-order rounding RED `5fb93c40...` + canonical-order repair `025dce7f...` + edge coverage `976ce7d7...` + research trace/current #310 `1106c005...` / `464df01e...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
+| GAP-045 | Mean signed bias could reject a representable recovery result because finite residuals were summed before dividing, and constant extreme bias could therefore lose its exact-zero SE | `verification-pending` | public RED `c5ec42e4...` + scaled compensated-mean repair `7499042f...` + coverage reinforcement `e379d164...` + research trace `311bef6e...` + current #488 `859e66b4...`; exact-head Rust/documentation/security/review GREEN and protected-main integration |
 
 ## Release gate
 
