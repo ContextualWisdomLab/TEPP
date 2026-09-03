@@ -1,5 +1,7 @@
 //! Known-truth RMSE for within/between components.
 
+use std::collections::HashMap;
+
 use crate::{ComponentLevel, LongitudinalError};
 
 /// One unit-specific within or between component.
@@ -14,8 +16,9 @@ pub struct ComponentValue {
 impl ComponentValue {
     /// Construct a component record from its identity fields and raw value.
     ///
-    /// The value is stored exactly as given, including non-finite values;
-    /// this constructor performs no validation.
+    /// The value and identity fields are stored exactly as given; this
+    /// constructor performs no validation. Recovery admission enforces that a
+    /// stable between-unit component uses canonical occasion index `0`.
     #[must_use]
     pub const fn new(
         unit_index: u32,
@@ -56,16 +59,66 @@ impl ComponentValue {
     }
 }
 
+fn validated_component_identity(
+    row: &ComponentValue,
+) -> Result<(u32, u32, &'static str), LongitudinalError> {
+    if row.level() == ComponentLevel::Between && row.occasion_index() != 0 {
+        return Err(LongitudinalError::InvalidComponentPayload);
+    }
+    Ok((
+        row.unit_index(),
+        row.occasion_index(),
+        row.level().wire_name(),
+    ))
+}
+
+fn add_scaled_square(
+    scale: &mut f64,
+    scaled_sum_squares: &mut f64,
+    residual_scale: f64,
+    residual_ratio: f64,
+) {
+    if residual_scale == 0.0 || residual_ratio == 0.0 {
+        return;
+    }
+    if *scale == 0.0 {
+        *scale = residual_scale;
+        *scaled_sum_squares = residual_ratio * residual_ratio;
+    } else if residual_scale > *scale {
+        let ratio = *scale / residual_scale;
+        *scaled_sum_squares =
+            *scaled_sum_squares * ratio * ratio + residual_ratio * residual_ratio;
+        *scale = residual_scale;
+    } else {
+        let ratio = residual_scale / *scale;
+        let normalized = ratio * residual_ratio;
+        *scaled_sum_squares += normalized * normalized;
+    }
+}
+
 /// RMSE of recovered components against known-truth components.
 ///
-/// The sum of squared residuals is accumulated with max-magnitude scaling so
-/// large finite residuals cannot overflow to infinity.
+/// Direct finite residuals keep their own magnitude so small recovery errors
+/// are not erased merely because an unrelated matched component is extreme.
+/// If one finite endpoint subtraction overflows, that residual alone is
+/// represented as `endpoint_scale × normalized_difference`, where the latter
+/// is bounded by two. The root-mean-square accumulator then rescales those
+/// representations without ever materializing a non-representable residual.
+/// Stable between-unit components have one unit-level scientific identity and
+/// therefore use canonical occasion index `0`; within-unit components retain
+/// their actual `(unit, occasion)` identity. Every admitted identity may
+/// contribute exactly once. Duplicate or aliased identities would silently
+/// change the recovery denominator and therefore fail closed. Slice order is
+/// not scientific identity: truth and recovered rows are aligned by the
+/// admitted identity tuple and accumulated in canonical tuple order so row
+/// permutations cannot change the deterministic `f64` reference.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidComponentPayload`] when either slice is
-/// empty, the lengths differ, a unit/occasion/level identity mismatches, a
-/// value or a computed residual is non-finite.
+/// empty, the lengths differ, a stable between-unit component uses a nonzero
+/// occasion index, an identity is missing or duplicated, an input value is
+/// non-finite, or the final RMSE is not representable.
 pub fn component_root_mean_square_error(
     truth: &[ComponentValue],
     decided: &[ComponentValue],
@@ -73,32 +126,70 @@ pub fn component_root_mean_square_error(
     if truth.is_empty() || truth.len() != decided.len() {
         return Err(LongitudinalError::InvalidComponentPayload);
     }
-    let mut scale = 0.0_f64;
-    let mut scaled_sum_squares = 0.0_f64;
-    for (truth_row, decided_row) in truth.iter().zip(decided) {
-        if truth_row.unit_index() != decided_row.unit_index()
-            || truth_row.occasion_index() != decided_row.occasion_index()
-            || truth_row.level() != decided_row.level()
-            || !truth_row.value().is_finite()
-            || !decided_row.value().is_finite()
-        {
+
+    let mut truth_by_identity = HashMap::with_capacity(truth.len());
+    for truth_row in truth {
+        if !truth_row.value().is_finite() {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
-        let residual = decided_row.value() - truth_row.value();
-        if !residual.is_finite() {
+        let identity = validated_component_identity(truth_row)?;
+        if truth_by_identity.insert(identity, truth_row).is_some() {
             return Err(LongitudinalError::InvalidComponentPayload);
-        }
-        let magnitude = residual.abs();
-        if magnitude > scale {
-            let ratio = scale / magnitude;
-            scaled_sum_squares = 1.0 + scaled_sum_squares * ratio * ratio;
-            scale = magnitude;
-        } else if scale > 0.0 {
-            let ratio = magnitude / scale;
-            scaled_sum_squares += ratio * ratio;
         }
     }
-    Ok(scale * (scaled_sum_squares / truth.len() as f64).sqrt())
+
+    let mut decided_by_identity = HashMap::with_capacity(decided.len());
+    for decided_row in decided {
+        if !decided_row.value().is_finite() {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        }
+        let identity = validated_component_identity(decided_row)?;
+        if decided_by_identity.insert(identity, decided_row).is_some() {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        }
+    }
+
+    let mut identities: Vec<_> = truth_by_identity.keys().copied().collect();
+    identities.sort_unstable();
+
+    let mut scale = 0.0_f64;
+    let mut scaled_sum_squares = 0.0_f64;
+    for identity in identities {
+        let truth_row = truth_by_identity[&identity];
+        let Some(decided_row) = decided_by_identity.get(&identity).copied() else {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        };
+
+        let residual = decided_row.value() - truth_row.value();
+        if residual.is_finite() {
+            add_scaled_square(
+                &mut scale,
+                &mut scaled_sum_squares,
+                residual.abs(),
+                1.0,
+            );
+        } else {
+            let endpoint_scale = truth_row.value().abs().max(decided_row.value().abs());
+            let normalized_residual =
+                decided_row.value() / endpoint_scale - truth_row.value() / endpoint_scale;
+            add_scaled_square(
+                &mut scale,
+                &mut scaled_sum_squares,
+                endpoint_scale,
+                normalized_residual.abs(),
+            );
+        }
+    }
+
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+    let rmse = scale * (scaled_sum_squares / truth.len() as f64).sqrt();
+    if rmse.is_finite() && rmse != 0.0 {
+        Ok(rmse)
+    } else {
+        Err(LongitudinalError::InvalidComponentPayload)
+    }
 }
 
 #[cfg(test)]
@@ -126,6 +217,41 @@ mod tests {
         ];
         let expected = f64::MAX / f64::sqrt(2.0);
         let got = component_root_mean_square_error(&truth, &partial_extreme).expect("scaled rmse");
+        assert!((got - expected).abs() <= expected * 4.0 * f64::EPSILON);
+    }
+
+    #[test]
+    fn representable_rmse_survives_an_overflowing_individual_residual() {
+        let truth = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, -f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(2, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(3, 0, ComponentLevel::Between, 0.0),
+        ];
+        let decided = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(2, 0, ComponentLevel::Between, 0.0),
+            ComponentValue::new(3, 0, ComponentLevel::Between, 0.0),
+        ];
+        assert_eq!(
+            component_root_mean_square_error(&truth, &decided),
+            Ok(f64::MAX)
+        );
+    }
+
+    #[test]
+    fn finite_residual_precision_is_not_lost_to_unrelated_endpoint_scale() {
+        let truth = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.0),
+        ];
+        let decided = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, f64::MAX),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 1.0),
+        ];
+        let expected = 1.0 / f64::sqrt(2.0);
+        let got = component_root_mean_square_error(&truth, &decided).expect("finite residual");
         assert!((got - expected).abs() <= expected * 4.0 * f64::EPSILON);
     }
 

@@ -1,8 +1,8 @@
-//! Fail-closed longitudinal within/between errors.
+//! Fail-closed longitudinal modeling errors.
 
 use std::fmt;
 
-/// A fail-closed longitudinal-decomposition error.
+/// A fail-closed longitudinal-modeling error.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum LongitudinalError {
@@ -14,6 +14,36 @@ pub enum LongitudinalError {
     InvalidComponentPayload,
     /// Observations were empty, sparse, duplicated, or non-finite.
     InvalidObservationPayload,
+    /// A lagged covariance, marginal variance, or event interval was non-finite.
+    InvalidTemporalAssociationInput,
+    /// A temporal transform input or intermediate value was not representable.
+    InvalidTemporalTransformInput,
+    /// At least one marginal variance was not strictly positive.
+    NonPositiveMarginalVariance,
+    /// The event-time interval was not strictly positive.
+    NonPositiveEventInterval,
+    /// The covariance violates the Cauchy-Schwarz bound implied by the two marginals.
+    CovarianceBoundViolation,
+    /// A stationary within-person variance was requested without stable negative drift.
+    StationaryVarianceRequiresStableDrift,
+    /// A standardised diffusion candidate was requested without positive within variance.
+    StandardisedDiffusionRequiresPositiveWithinVariance,
+    /// `discreteDRIFTstd` was requested without positive stationary within-person variance.
+    StandardisedDriftRequiresPositiveWithinVariance,
+    /// Unstandardised `discreteDRIFT` was substituted for `discreteDRIFTstd`.
+    UnstandardisedDriftIsNotStandardisedDrift,
+    /// A trait-plus-state association was substituted for `discreteDRIFTstd`.
+    TraitStateAssociationIsNotStandardisedDrift,
+    /// Between-unit trait variance was used as the drift standardisation variance.
+    TraitVarianceIsNotDriftStandardisationVariance,
+    /// A continuous diffusion ratio was substituted for a discrete diffusion ratio.
+    ContinuousDiffusionIsNotDiscreteDiffusion,
+    /// An unstandardised diffusion quantity was substituted for a standardised one.
+    UnstandardisedDiffusionIsNotStandardisedDiffusion,
+    /// Diffusion was scaled by total variance instead of relevant within variance.
+    TotalVarianceScaledDiffusionIsNotStandardisedDiffusion,
+    /// Cluster-mean-centered residual log-rate was treated as raw-process AR drift.
+    CwcResidualLogRateIsNotRawProcessDrift,
 }
 
 impl fmt::Display for LongitudinalError {
@@ -23,6 +53,47 @@ impl fmt::Display for LongitudinalError {
             Self::UnknownComponentLevel => "unknown component level",
             Self::InvalidComponentPayload => "invalid longitudinal component payload",
             Self::InvalidObservationPayload => "invalid longitudinal observation payload",
+            Self::InvalidTemporalAssociationInput => "invalid temporal association input",
+            Self::InvalidTemporalTransformInput => "invalid temporal transform input",
+            Self::NonPositiveMarginalVariance => {
+                "temporal correlation requires strictly positive marginal variances"
+            }
+            Self::NonPositiveEventInterval => {
+                "temporal composition requires a strictly positive event-time interval"
+            }
+            Self::CovarianceBoundViolation => {
+                "lagged covariance is incompatible with the supplied marginal variances"
+            }
+            Self::StationaryVarianceRequiresStableDrift => {
+                "stationary within-person variance requires strictly negative drift"
+            }
+            Self::StandardisedDiffusionRequiresPositiveWithinVariance => {
+                "standardised diffusion requires positive stationary within-person variance"
+            }
+            Self::StandardisedDriftRequiresPositiveWithinVariance => {
+                "standardised discrete drift requires positive stationary within-person variance"
+            }
+            Self::UnstandardisedDriftIsNotStandardisedDrift => {
+                "unstandardised discrete drift is not standardised discrete drift"
+            }
+            Self::TraitStateAssociationIsNotStandardisedDrift => {
+                "trait-plus-state association is not standardised discrete drift"
+            }
+            Self::TraitVarianceIsNotDriftStandardisationVariance => {
+                "trait variance is not the drift standardisation variance"
+            }
+            Self::ContinuousDiffusionIsNotDiscreteDiffusion => {
+                "continuous standardised diffusion is not discrete standardised diffusion"
+            }
+            Self::UnstandardisedDiffusionIsNotStandardisedDiffusion => {
+                "unstandardised diffusion is not standardised diffusion"
+            }
+            Self::TotalVarianceScaledDiffusionIsNotStandardisedDiffusion => {
+                "total-variance-scaled diffusion is not relevant-variance-standardised diffusion"
+            }
+            Self::CwcResidualLogRateIsNotRawProcessDrift => {
+                "cluster-mean-centered residual log-rate is not the raw-process autoregressive drift"
+            }
         };
         formatter.write_str(message)
     }
@@ -52,6 +123,66 @@ mod tests {
             (
                 LongitudinalError::InvalidObservationPayload,
                 "invalid longitudinal observation payload",
+            ),
+            (
+                LongitudinalError::InvalidTemporalAssociationInput,
+                "invalid temporal association input",
+            ),
+            (
+                LongitudinalError::InvalidTemporalTransformInput,
+                "invalid temporal transform input",
+            ),
+            (
+                LongitudinalError::NonPositiveMarginalVariance,
+                "temporal correlation requires strictly positive marginal variances",
+            ),
+            (
+                LongitudinalError::NonPositiveEventInterval,
+                "temporal composition requires a strictly positive event-time interval",
+            ),
+            (
+                LongitudinalError::CovarianceBoundViolation,
+                "lagged covariance is incompatible with the supplied marginal variances",
+            ),
+            (
+                LongitudinalError::StationaryVarianceRequiresStableDrift,
+                "stationary within-person variance requires strictly negative drift",
+            ),
+            (
+                LongitudinalError::StandardisedDiffusionRequiresPositiveWithinVariance,
+                "standardised diffusion requires positive stationary within-person variance",
+            ),
+            (
+                LongitudinalError::StandardisedDriftRequiresPositiveWithinVariance,
+                "standardised discrete drift requires positive stationary within-person variance",
+            ),
+            (
+                LongitudinalError::UnstandardisedDriftIsNotStandardisedDrift,
+                "unstandardised discrete drift is not standardised discrete drift",
+            ),
+            (
+                LongitudinalError::TraitStateAssociationIsNotStandardisedDrift,
+                "trait-plus-state association is not standardised discrete drift",
+            ),
+            (
+                LongitudinalError::TraitVarianceIsNotDriftStandardisationVariance,
+                "trait variance is not the drift standardisation variance",
+            ),
+            (
+                LongitudinalError::ContinuousDiffusionIsNotDiscreteDiffusion,
+                "continuous standardised diffusion is not discrete standardised diffusion",
+            ),
+            (
+                LongitudinalError::UnstandardisedDiffusionIsNotStandardisedDiffusion,
+                "unstandardised diffusion is not standardised diffusion",
+            ),
+            (
+                LongitudinalError::TotalVarianceScaledDiffusionIsNotStandardisedDiffusion,
+                "total-variance-scaled diffusion is not relevant-variance-standardised diffusion",
+            ),
+            (
+                LongitudinalError::CwcResidualLogRateIsNotRawProcessDrift,
+                "cluster-mean-centered residual log-rate is not the raw-process autoregressive drift",
             ),
         ] {
             assert_eq!(error.to_string(), message);

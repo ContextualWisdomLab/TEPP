@@ -2,6 +2,7 @@
 
 use std::collections::HashSet;
 
+use crate::irregular_residual::scaled_compensated_mean;
 use crate::{ComponentLevel, ComponentValue, LongitudinalError};
 
 /// One occasion score for one unit.
@@ -42,17 +43,29 @@ impl OccasionObservation {
     }
 }
 
+fn stable_unit_mean(rows: &[OccasionObservation]) -> Result<f64, LongitudinalError> {
+    let values: Vec<f64> = rows.iter().map(|row| row.score()).collect();
+    scaled_compensated_mean(&values).map_err(|_| LongitudinalError::InvalidObservationPayload)
+}
+
 /// Decompose occasion scores into unit means and within residuals.
 ///
 /// Each unit contributes one between component at occasion `0` and one within
 /// residual per observed occasion. Units and occasions are emitted in sorted
-/// order so recovery tests can pair known truth without extra matching.
+/// order so recovery tests can pair known truth without extra matching. Unit
+/// means use the same Longitudinal-local overflow-safe, cancellation-safe,
+/// halfway-rounding numerical authority as CWC and occasion means, so
+/// decomposition does not maintain a shadow averaging algorithm. Exact zero
+/// within residuals use canonical public `+0.0` because a zero deviation has no
+/// directional measurement meaning; signed zero remains available to private
+/// numerical intermediates where it can carry diagnostic information.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidObservationPayload`] when fewer than two
 /// units are present, any unit has fewer than two occasions, a `(unit,
-/// occasion)` pair is duplicated, or a score is non-finite.
+/// occasion)` pair is duplicated, a score is non-finite, or a resulting mean
+/// or within residual is not representable.
 pub fn decompose_within_between(
     observations: &[OccasionObservation],
 ) -> Result<Vec<ComponentValue>, LongitudinalError> {
@@ -93,21 +106,19 @@ pub fn decompose_within_between(
         if count < 2 {
             return Err(LongitudinalError::InvalidObservationPayload);
         }
-        let mut total = 0.0_f64;
-        for row in &rows[start..end] {
-            total += row.score();
-        }
-        let mean = total / count as f64;
-        if !mean.is_finite() {
-            return Err(LongitudinalError::InvalidObservationPayload);
-        }
+        let mean = stable_unit_mean(&rows[start..end])?;
         components.push(ComponentValue::new(unit, 0, ComponentLevel::Between, mean));
         for row in &rows[start..end] {
+            let residual = row.score() - mean;
+            if !residual.is_finite() {
+                return Err(LongitudinalError::InvalidObservationPayload);
+            }
+            let public_residual = if residual == 0.0 { 0.0 } else { residual };
             components.push(ComponentValue::new(
                 unit,
                 row.occasion_index(),
                 ComponentLevel::Within,
-                row.score() - mean,
+                public_residual,
             ));
         }
     }
@@ -170,16 +181,6 @@ mod tests {
             decompose_within_between(&nan),
             Err(LongitudinalError::InvalidObservationPayload)
         );
-        let overflow = [
-            OccasionObservation::new(0, 0, f64::MAX),
-            OccasionObservation::new(0, 1, f64::MAX),
-            OccasionObservation::new(1, 0, 0.0),
-            OccasionObservation::new(1, 1, 0.0),
-        ];
-        assert_eq!(
-            decompose_within_between(&overflow),
-            Err(LongitudinalError::InvalidObservationPayload)
-        );
         let recovered = decompose_within_between(&[
             OccasionObservation::new(1, 1, 4.0),
             OccasionObservation::new(0, 1, 2.0),
@@ -191,5 +192,37 @@ mod tests {
         assert_eq!(recovered[0].unit_index(), 0);
         assert!((recovered[0].value() - 1.0).abs() < f64::EPSILON);
         assert_eq!(OccasionObservation::new(9, 8, 0.0).unit_index(), 9);
+    }
+
+    #[test]
+    fn representable_unit_mean_survives_raw_sum_overflow() {
+        let recovered = decompose_within_between(&[
+            OccasionObservation::new(0, 0, f64::MAX),
+            OccasionObservation::new(0, 1, f64::MAX),
+            OccasionObservation::new(1, 0, 0.0),
+            OccasionObservation::new(1, 1, 0.0),
+        ])
+        .expect("representable unit mean must not fail on an overflowing partial sum");
+
+        assert_eq!(recovered[0].level(), ComponentLevel::Between);
+        assert_eq!(recovered[0].value(), f64::MAX);
+        assert_eq!(recovered[1].value(), 0.0);
+        assert_eq!(recovered[2].value(), 0.0);
+    }
+
+    #[test]
+    fn representable_subnormal_unit_mean_survives_extreme_cancellation() {
+        let minimum_subnormal = f64::from_bits(1);
+        let recovered = decompose_within_between(&[
+            OccasionObservation::new(0, 0, f64::MAX),
+            OccasionObservation::new(0, 1, -f64::MAX),
+            OccasionObservation::new(0, 2, f64::from_bits(4)),
+            OccasionObservation::new(1, 0, 0.0),
+            OccasionObservation::new(1, 1, 0.0),
+        ])
+        .expect("a representable subnormal unit mean must survive extreme cancellation");
+
+        assert_eq!(recovered[0].level(), ComponentLevel::Between);
+        assert_eq!(recovered[0].value().to_bits(), minimum_subnormal.to_bits());
     }
 }
