@@ -29,7 +29,17 @@ The unmerged implementation that introduced a public `expected_autocorrelation` 
 
 ## TEPP contract
 
-`longitudinal_core::recover_event_time_lagged_correlation` accepts a lagged covariance, the earlier marginal variance, the later marginal variance, and an admitted `EventTimeInterval`. The typed value object is carried through the public boundary into the internal association implementation rather than being erased back to a bare duration. The operation performs only temporal association standardization and does not infer state variance, process noise, or a psychometric response kernel. The function computes the correlation after an exact binary64 covariance-bound check, so floating-point rounding in `sqrt(variance)` cannot admit a covariance that is actually one ULP above the represented bound.
+`longitudinal_core::recover_event_time_lagged_correlation` accepts a lagged covariance, the earlier marginal variance, the later marginal variance, and an admitted `EventTimeInterval`. The typed value object is carried through the public boundary into the internal association implementation rather than being erased back to a bare duration. The operation performs only temporal association standardization and does not infer state variance, process noise, or a psychometric response kernel.
+
+Admissibility and perfect-correlation endpoint claims both use the exact binary64 covariance relation. The implementation decomposes the covariance and marginal variances into integer significands and powers of two, compares `Cov²` with `Var_t Var_{t+Δ}` without a rounded square-root product, and records whether the relation is strict or exact. Rounded `sqrt`/division arithmetic is then used only to form an interior representable coefficient or to render an already-authorized exact endpoint.
+
+This distinction is necessary. For the exact binary64 inputs
+
+- earlier variance `f64::from_bits(4_607_182_418_800_016_408)`,
+- later variance `f64::from_bits(4_607_182_418_800_016_427)`, and
+- covariance magnitude `f64::from_bits(4_607_182_418_800_016_417)`,
+
+`Cov²` is strictly smaller than the exact product of the two supplied marginal variances, yet the rounded square roots followed by the two divisions produce `1.0`. Returning that endpoint would convert an interior association into a scientifically stronger perfect-correlation claim. RED `683b28eeeda3ad72ac11f5317c5aea54f34e0692` fixes both covariance signs through the public API in `crates/longitudinal_core/tests/correlation_false_perfect_contract.rs`; causal repair `9eeb373df2cd333fe7543df2197ea0cc0c492780` permits rounded `±1` only when the exact integer relation is on the Cauchy–Schwarz boundary. Public rustdoc is synchronized in `d21c0a2db681df5d9c0fbf2e64f4d2feec73a9e6`.
 
 This preserves the DDD ownership boundary:
 
@@ -38,11 +48,11 @@ This preserves the DDD ownership boundary:
 - measurement occasion, rater, and method facets are not substitutes for substantive event time;
 - callers must assemble occasion-specific marginals from an identified temporal model before asking for a correlation.
 
-The function fails closed when either marginal is non-positive, covariance or marginal inputs are non-finite, or the supplied covariance violates the Cauchy–Bunyakovsky–Schwarz covariance bound. `EventTimeInterval` itself fails admission for non-finite or non-positive durations. Pearson standardization does not estimate or transform time; the event-time value object exists to preserve clock ownership through the API.
+The function fails closed when either marginal is non-positive, covariance or marginal inputs are non-finite, the supplied covariance violates the Cauchy–Bunyakovsky–Schwarz covariance bound, a nonzero exact coefficient would collapse to binary64 zero, or a strict interior covariance would round to exact `±1`. `EventTimeInterval` itself fails admission for non-finite or non-positive durations. Pearson standardization does not estimate or transform time; the event-time value object exists to preserve clock ownership through the API.
 
 ## Regression evidence
 
-The regression suite includes a nonstationary case with earlier variance `1`, later variance `4`, and lagged covariance `1.5`. The retired one-sided ratio would be `1.5`; correct standardization yields `0.75`. It also verifies exact `±1` boundaries at ordinary, `f64::MAX`, and minimum-subnormal scales; rejects one-ULP over-bound covariance for both signs; classifies gross subnormal violations before division; rejects invalid event-time value construction; and avoids forming `Var_t * Var_{t+Δ}` directly.
+The regression suite includes a nonstationary case with earlier variance `1`, later variance `4`, and lagged covariance `1.5`. The retired one-sided ratio would be `1.5`; correct standardization yields `0.75`. It also verifies exact `±1` boundaries at ordinary, `f64::MAX`, and minimum-subnormal scales; rejects one-ULP over-bound covariance for both signs; rejects strict-interior covariances whose rounded standardization would otherwise become false exact `±1`; classifies gross subnormal violations before division; rejects invalid event-time value construction; and avoids forming `Var_t * Var_{t+Δ}` directly.
 
 The scalar `discreteDRIFTstd` regressions separately require monotone temporal ordering for stable negative drift and fail closed when a finite negative drift multiplied by a positive admitted event interval underflows to signed zero. That case must not silently become `exp(-0.0) == 1.0`.
 
