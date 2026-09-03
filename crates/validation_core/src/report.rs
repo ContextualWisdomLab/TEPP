@@ -30,12 +30,20 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
-    /// Reject non-finite numeric fields before serialization or export.
+    /// Validate numeric and scientific invariants before serialization or export.
+    ///
+    /// RMSE and standard errors are nonnegative; empirical coverage, Wilson
+    /// endpoints, and temporal-order accuracy are probabilities in `[0, 1]`;
+    /// the Wilson interval is ordered and must contain the empirical coverage
+    /// recorded in the same report. Mean signed bias remains unrestricted in
+    /// sign. These checks prevent a finite but scientifically impossible payload
+    /// from becoming durable Validation Evidence.
     ///
     /// # Errors
     ///
-    /// Returns [`ValidationError::InvalidInput`] when any `f64` field or the
-    /// optional Monte Carlo summary violates finiteness / summary invariants.
+    /// Returns [`ValidationError::InvalidInput`] when any `f64` field is
+    /// non-finite, violates its metric domain, Wilson evidence is incoherent, or
+    /// the optional Monte Carlo summary violates its own invariants.
     pub fn validate(&self) -> Result<(), ValidationError> {
         for value in [
             self.rmse,
@@ -51,6 +59,24 @@ impl ValidationReport {
                 return Err(ValidationError::InvalidInput);
             }
         }
+
+        if self.rmse < 0.0 || self.rmse_standard_error < 0.0 || self.bias_standard_error < 0.0 {
+            return Err(ValidationError::InvalidInput);
+        }
+        if !(0.0..=1.0).contains(&self.interval_coverage)
+            || !(0.0..=1.0).contains(&self.coverage_wilson_lower)
+            || !(0.0..=1.0).contains(&self.coverage_wilson_upper)
+            || !(0.0..=1.0).contains(&self.temporal_order_accuracy)
+        {
+            return Err(ValidationError::InvalidInput);
+        }
+        if self.coverage_wilson_lower > self.coverage_wilson_upper
+            || self.interval_coverage < self.coverage_wilson_lower
+            || self.interval_coverage > self.coverage_wilson_upper
+        {
+            return Err(ValidationError::InvalidInput);
+        }
+
         if let Some(summary) = self.monte_carlo_rmse {
             summary.validate()?;
         }
@@ -61,8 +87,8 @@ impl ValidationReport {
     ///
     /// # Errors
     ///
-    /// Returns [`ValidationError::InvalidInput`] when fields are non-finite or
-    /// serialization fails.
+    /// Returns [`ValidationError::InvalidInput`] when fields violate report
+    /// invariants or serialization fails.
     pub fn to_json(&self) -> Result<String, ValidationError> {
         self.validate()?;
         serde_json::to_string(self).map_err(|_| ValidationError::InvalidInput)
