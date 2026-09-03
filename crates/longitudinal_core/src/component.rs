@@ -1,6 +1,6 @@
 //! Known-truth RMSE for within/between components.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::{ComponentLevel, LongitudinalError};
 
@@ -92,14 +92,14 @@ fn add_scaled_square(
 /// representations without ever materializing a non-representable residual.
 /// Every `(unit, occasion, level)` identity may contribute exactly once;
 /// duplicate identities would silently change the recovery denominator and
-/// therefore fail closed.
+/// therefore fail closed. Slice order is not scientific identity: truth and
+/// recovered rows are aligned by that tuple before residual accumulation.
 ///
 /// # Errors
 ///
 /// Returns [`LongitudinalError::InvalidComponentPayload`] when either slice is
-/// empty, the lengths differ, a unit/occasion/level identity mismatches or is
-/// duplicated, an input value is non-finite, or the final RMSE is not
-/// representable.
+/// empty, the lengths differ, an identity is missing or duplicated, an input
+/// value is non-finite, or the final RMSE is not representable.
 pub fn component_root_mean_square_error(
     truth: &[ComponentValue],
     decided: &[ComponentValue],
@@ -108,16 +108,26 @@ pub fn component_root_mean_square_error(
         return Err(LongitudinalError::InvalidComponentPayload);
     }
 
-    let mut seen_identities = HashSet::with_capacity(truth.len());
+    let mut decided_by_identity = HashMap::with_capacity(decided.len());
+    for decided_row in decided {
+        if !decided_row.value().is_finite() {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        }
+        let identity = (
+            decided_row.unit_index(),
+            decided_row.occasion_index(),
+            decided_row.level().wire_name(),
+        );
+        if decided_by_identity.insert(identity, decided_row).is_some() {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        }
+    }
+
+    let mut seen_truth_identities = HashSet::with_capacity(truth.len());
     let mut scale = 0.0_f64;
     let mut scaled_sum_squares = 0.0_f64;
-    for (truth_row, decided_row) in truth.iter().zip(decided) {
-        if truth_row.unit_index() != decided_row.unit_index()
-            || truth_row.occasion_index() != decided_row.occasion_index()
-            || truth_row.level() != decided_row.level()
-            || !truth_row.value().is_finite()
-            || !decided_row.value().is_finite()
-        {
+    for truth_row in truth {
+        if !truth_row.value().is_finite() {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
 
@@ -126,9 +136,12 @@ pub fn component_root_mean_square_error(
             truth_row.occasion_index(),
             truth_row.level().wire_name(),
         );
-        if !seen_identities.insert(identity) {
+        if !seen_truth_identities.insert(identity) {
             return Err(LongitudinalError::InvalidComponentPayload);
         }
+        let Some(decided_row) = decided_by_identity.get(&identity) else {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        };
 
         let residual = decided_row.value() - truth_row.value();
         if residual.is_finite() {
