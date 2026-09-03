@@ -32,8 +32,10 @@ pub struct ValidationReport {
 impl ValidationReport {
     /// Validate numeric and scientific invariants before serialization or export.
     ///
-    /// RMSE and standard errors are nonnegative; empirical coverage, Wilson
-    /// endpoints, and temporal-order accuracy are probabilities in `[0, 1]`;
+    /// RMSE and standard errors are nonnegative; an exact-zero RMSE is perfect
+    /// recovery and therefore requires an exact-zero RMSE standard error under
+    /// the crate's squared-residual delta-method definition. Empirical coverage,
+    /// Wilson endpoints, and temporal-order accuracy are probabilities in `[0, 1]`;
     /// the Wilson interval is ordered and must contain the empirical coverage
     /// recorded in the same report. Mean signed bias remains unrestricted in
     /// sign. A generic [`MonteCarloSummary`] may summarize a signed metric, but
@@ -47,9 +49,10 @@ impl ValidationReport {
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when any `f64` field is
-    /// non-finite, violates its metric domain, Wilson evidence is incoherent, or
-    /// the optional Monte Carlo RMSE summary violates either generic summary
-    /// invariants or the nonnegative RMSE domain.
+    /// non-finite, violates its metric domain, point RMSE and its standard error
+    /// contradict exact recovery, Wilson evidence is incoherent, or the optional
+    /// Monte Carlo RMSE summary violates either generic summary invariants or the
+    /// nonnegative RMSE domain.
     pub fn validate(&self) -> Result<(), ValidationError> {
         for value in [
             self.rmse,
@@ -67,6 +70,9 @@ impl ValidationReport {
         }
 
         if self.rmse < 0.0 || self.rmse_standard_error < 0.0 || self.bias_standard_error < 0.0 {
+            return Err(ValidationError::InvalidInput);
+        }
+        if self.rmse == 0.0 && self.rmse_standard_error != 0.0 {
             return Err(ValidationError::InvalidInput);
         }
         if !(0.0..=1.0).contains(&self.interval_coverage)
