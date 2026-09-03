@@ -1,6 +1,6 @@
 //! Known-truth RMSE for within/between components.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use crate::{ComponentLevel, LongitudinalError};
 
@@ -93,7 +93,8 @@ fn add_scaled_square(
 /// Every `(unit, occasion, level)` identity may contribute exactly once;
 /// duplicate identities would silently change the recovery denominator and
 /// therefore fail closed. Slice order is not scientific identity: truth and
-/// recovered rows are aligned by that tuple before residual accumulation.
+/// recovered rows are aligned by that tuple and accumulated in canonical tuple
+/// order so row permutations cannot change the deterministic `f64` reference.
 ///
 /// # Errors
 ///
@@ -106,6 +107,21 @@ pub fn component_root_mean_square_error(
 ) -> Result<f64, LongitudinalError> {
     if truth.is_empty() || truth.len() != decided.len() {
         return Err(LongitudinalError::InvalidComponentPayload);
+    }
+
+    let mut truth_by_identity = HashMap::with_capacity(truth.len());
+    for truth_row in truth {
+        if !truth_row.value().is_finite() {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        }
+        let identity = (
+            truth_row.unit_index(),
+            truth_row.occasion_index(),
+            truth_row.level().wire_name(),
+        );
+        if truth_by_identity.insert(identity, truth_row).is_some() {
+            return Err(LongitudinalError::InvalidComponentPayload);
+        }
     }
 
     let mut decided_by_identity = HashMap::with_capacity(decided.len());
@@ -123,23 +139,14 @@ pub fn component_root_mean_square_error(
         }
     }
 
-    let mut seen_truth_identities = HashSet::with_capacity(truth.len());
+    let mut identities: Vec<_> = truth_by_identity.keys().copied().collect();
+    identities.sort_unstable();
+
     let mut scale = 0.0_f64;
     let mut scaled_sum_squares = 0.0_f64;
-    for truth_row in truth {
-        if !truth_row.value().is_finite() {
-            return Err(LongitudinalError::InvalidComponentPayload);
-        }
-
-        let identity = (
-            truth_row.unit_index(),
-            truth_row.occasion_index(),
-            truth_row.level().wire_name(),
-        );
-        if !seen_truth_identities.insert(identity) {
-            return Err(LongitudinalError::InvalidComponentPayload);
-        }
-        let Some(decided_row) = decided_by_identity.get(&identity) else {
+    for identity in identities {
+        let truth_row = truth_by_identity[&identity];
+        let Some(decided_row) = decided_by_identity.get(&identity).copied() else {
             return Err(LongitudinalError::InvalidComponentPayload);
         };
 
