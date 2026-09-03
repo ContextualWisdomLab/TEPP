@@ -104,7 +104,9 @@ fn covariance_binary_bound_relation(
 ///
 /// [`EventTimeInterval`] makes substantive event-time ownership explicit. This
 /// function does not infer either marginal variance and does not estimate a
-/// state process.
+/// state process. Exact binary64 Cauchy–Schwarz equality is authoritative for
+/// a perfect-correlation endpoint; rounded square roots and divisions may
+/// neither invent nor weaken that endpoint.
 ///
 /// # Errors
 ///
@@ -140,6 +142,19 @@ pub(crate) fn recover_event_time_lagged_correlation(
         return Err(LongitudinalError::CovarianceBoundViolation);
     }
 
+    // The exact represented relation is authoritative at the scientific
+    // endpoint. For example, covariance=4 with marginals 2 and 8 lies exactly
+    // on the boundary, while rounded sqrt/division arithmetic evaluates to the
+    // predecessor of 1.0. Returning that rounded interior value would weaken a
+    // perfect-correlation claim that is exact in the supplied binary64 data.
+    if on_exact_bound {
+        return Ok(if lagged_covariance.is_sign_negative() {
+            -1.0
+        } else {
+            1.0
+        });
+    }
+
     let earlier_scale = earlier_total_variance.sqrt();
     let later_scale = later_total_variance.sqrt();
     // Divide by the smaller scale first. The exact covariance-bound gate above
@@ -160,16 +175,14 @@ pub(crate) fn recover_event_time_lagged_correlation(
         return Err(LongitudinalError::InvalidTemporalAssociationInput);
     }
 
-    // Rounded square roots/divisions can also strengthen a strict interior
-    // covariance into an exact ±1 endpoint. Only the exact integer relation
-    // above may authorize a perfect-correlation claim.
-    if correlation.abs() >= 1.0 && !on_exact_bound {
+    // Exact boundary cases returned above. Any remaining rounded ±1 endpoint
+    // necessarily strengthens a strict-interior covariance and must fail
+    // closed rather than be clamped into a perfect-correlation claim.
+    if correlation.abs() >= 1.0 {
         return Err(LongitudinalError::InvalidTemporalAssociationInput);
     }
 
-    // On the exact boundary, clamping absorbs only final square-root/division
-    // rounding; it cannot turn an interior covariance into a perfect endpoint.
-    Ok(correlation.clamp(-1.0, 1.0))
+    Ok(correlation)
 }
 
 #[cfg(test)]
