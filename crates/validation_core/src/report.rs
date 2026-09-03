@@ -38,9 +38,11 @@ impl ValidationReport {
     /// recorded in the same report. Mean signed bias remains unrestricted in
     /// sign. A generic [`MonteCarloSummary`] may summarize a signed metric, but
     /// when it occupies `monte_carlo_rmse` its mean and percentile endpoints are
-    /// nonnegative because every RMSE replication is nonnegative. These checks
-    /// prevent a finite but scientifically impossible payload from becoming
-    /// durable Validation Evidence.
+    /// nonnegative because every RMSE replication is nonnegative. A zero Monte
+    /// Carlo RMSE mean is exact perfect recovery across every retained replication,
+    /// so spread, standard error, and empirical percentile endpoints must all be
+    /// zero as well. These checks prevent a finite but scientifically impossible
+    /// payload from becoming durable Validation Evidence.
     ///
     /// # Errors
     ///
@@ -86,6 +88,14 @@ impl ValidationReport {
             if summary.mean < 0.0
                 || summary.percentile_lower < 0.0
                 || summary.percentile_upper < 0.0
+            {
+                return Err(ValidationError::InvalidInput);
+            }
+            if summary.mean == 0.0
+                && (summary.standard_deviation != 0.0
+                    || summary.standard_error != 0.0
+                    || summary.percentile_lower != 0.0
+                    || summary.percentile_upper != 0.0)
             {
                 return Err(ValidationError::InvalidInput);
             }
@@ -255,7 +265,7 @@ mod tests {
                 replication_count: 10,
                 mean: 0.11,
                 standard_deviation: 0.01,
-                standard_error: 0.003,
+                standard_error: 0.01 / 10.0_f64.sqrt(),
                 percentile_lower: 0.09,
                 percentile_upper: 0.13,
             }),
