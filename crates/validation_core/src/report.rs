@@ -16,9 +16,15 @@ const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 /// the equivalent identity on the uncovered proportion avoids squaring a tiny
 /// `p`. All terms remain probability-scaled, so a small absolute binary64
 /// tolerance is sufficient without overflow-prone reconstruction of `n` or `z`.
+/// At exact all-covered `p = 1`, the eliminated identity is degenerate, while the
+/// canonical producer still requires the lower endpoint `n / (n + z²)` to be
+/// strictly positive for every non-empty sample and finite represented `z²`.
 fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool {
-    if p == 0.0 || p == 1.0 {
+    if p == 0.0 {
         return true;
+    }
+    if p == 1.0 {
+        return lower > 0.0;
     }
 
     let endpoint_sum = lower + upper;
