@@ -1,5 +1,5 @@
-# Validation: preserve subnormal standard-error bound decisions
+# Validation: preserve standard-error ties below correction resolution
 
-- Reject SE-aware recovery when an exact finite residual equals the rounded minimum-subnormal `k * SE` bound but the exact product represented by `k` and `SE` is smaller.
-- On this subnormal finite-tie boundary, compare the exact represented residual magnitude with the exact dyadic product when both subtraction and FMA correction terms project to zero; keep exact minimum-subnormal equality accepted.
-- Preserve the existing finite direct path, low-term tie discriminator, one-sided overflow behavior, and both-overflow exact comparator outside this boundary.
+- Reject SE-aware recovery when an exact finite residual equals a rounded `k * SE` bound but the exact represented product is smaller and the FMA correction itself falls below binary64 resolution.
+- Cover both the minimum-subnormal rounded bound and the minimum-normal boundary: when subtraction is exact and both finite-tie correction projections are zero, compare the represented residual magnitude with the exact dyadic product of represented `k` and `SE`.
+- Keep exact minimum-subnormal/minimum-normal equality accepted and preserve the existing finite direct path, nonzero low-term tie discriminator, one-sided overflow behavior, and both-overflow exact comparator outside this boundary.
