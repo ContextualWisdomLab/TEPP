@@ -48,7 +48,7 @@ This remains TEPP Validation Evidence provenance/projection behavior. No reusabl
 - Boundary scale-switch repair: `0f4783929b8d067eecb91696e1ad5761cd315b1e`
 - Single-writer cleanup: `8e2058f2fc6ab42af8f732f03e7ae1dcee3e873d`
 - Exact-denominator quotient correction: `93d5d2089db1fcf4c6167930adb362333a2ed809`
-- Changelog: `8a73cb64d15e5412e5afabbae80603a66c12a7f0` plus the current-head wording correction
+- Changelog correction: `43b6562c4c2ad3af51970040c127c784cccff228`
 - Module: `crates/validation_core/src/coverage.rs`
 - Durable carrier: `crates/validation_core/src/coverage_evidence.rs`
 - Public contract: `crates/validation_core/tests/wilson_all_covered_inexact_count_extreme_z_contract.rs`
