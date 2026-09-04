@@ -333,13 +333,21 @@ fn represented_magnitude_le_exact_product(value: f64, factor_a: f64, factor_b: f
     )
 }
 
-/// Compare a represented correction with the exact rounding correction of a represented product.
+/// Compare an equal nonzero projected correction with the exact product roundoff.
 fn represented_correction_le_exact_product_roundoff(
     correction: f64,
     factor_a: f64,
     factor_b: f64,
     rounded_product: f64,
 ) -> bool {
+    debug_assert!(correction.is_finite() && correction != 0.0);
+    debug_assert!(rounded_product.is_finite() && rounded_product > 0.0);
+    debug_assert_eq!(
+        factor_a.mul_add(factor_b, -rounded_product),
+        correction,
+        "caller must provide the equal nonzero projected product correction"
+    );
+
     let (a_significand, a_exponent) = binary64_magnitude_components(factor_a);
     let (b_significand, b_exponent) = binary64_magnitude_components(factor_b);
     let product_significand = (a_significand as u128) * (b_significand as u128);
@@ -352,26 +360,17 @@ fn represented_correction_le_exact_product_roundoff(
     debug_assert!(product_significand.leading_zeros() >= product_shift);
     debug_assert!((rounded_significand as u128).leading_zeros() >= rounded_shift);
     let exact_product = product_significand << product_shift;
-    let rounded_product = (rounded_significand as u128) << rounded_shift;
+    let rounded_product_significand = (rounded_significand as u128) << rounded_shift;
     let (product_roundoff_negative, product_roundoff_significand) =
-        if exact_product < rounded_product {
-            (true, rounded_product - exact_product)
+        if exact_product < rounded_product_significand {
+            (true, rounded_product_significand - exact_product)
         } else {
-            (false, exact_product - rounded_product)
+            (false, exact_product - rounded_product_significand)
         };
 
-    if product_roundoff_significand == 0 {
-        return correction <= 0.0;
-    }
-    if correction == 0.0 {
-        return !product_roundoff_negative;
-    }
-
+    debug_assert_ne!(product_roundoff_significand, 0);
     let correction_negative = correction.is_sign_negative();
-    if correction_negative != product_roundoff_negative {
-        return correction_negative;
-    }
-
+    debug_assert_eq!(correction_negative, product_roundoff_negative);
     let (correction_significand, correction_exponent) =
         binary64_magnitude_components(correction.abs());
     if correction_negative {
@@ -447,11 +446,11 @@ fn subtraction_roundoff(minuend: f64, subtrahend: f64, difference: f64) -> f64 {
 /// residual while the product correction may still have underflowed below binary64
 /// resolution; TEPP therefore compares the represented residual with the exact
 /// dyadic product of represented `k` and `se`. If the two nonzero correction
-/// projections are equal, the subtraction correction is already exact but the FMA
-/// projection may have rounded a finer exact product residual; TEPP compares that
-/// represented subtraction correction with the exact dyadic product roundoff before
-/// deciding the tie. This preserves the represented-input inequality without
-/// claiming a broader exact comparator for unequal rounded residuals and bounds.
+/// projections are equal, TEPP compares the represented subtraction correction with
+/// the exact dyadic product roundoff before deciding the tie; only the two signed
+/// orderings reachable from that equal-projection branch are implemented. This
+/// preserves the represented-input inequality without adding dead generic branches
+/// or claiming a broader exact comparator for unequal rounded residuals and bounds.
 /// This also preserves a positive acceptance bound when dividing `se` by a much
 /// larger estimate/target scale would underflow to zero. If only the positive bound
 /// overflows, every finite residual is covered; if only the residual overflows, a
