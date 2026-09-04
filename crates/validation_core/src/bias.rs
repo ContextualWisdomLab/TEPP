@@ -2,7 +2,10 @@
 
 use crate::ValidationError;
 use crate::input::require_paired_finite;
-use crate::numeric::{deterministic_compensated_sum, deterministic_representable_mean};
+use crate::numeric::{
+    deterministic_compensated_sum, deterministic_representable_mean,
+    deterministic_representable_sum_over_count,
+};
 
 fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, ValidationError> {
     require_paired_finite(truth, recovered)?;
@@ -88,21 +91,38 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
 
 /// Mean signed bias `mean(recovered − truth)`.
 ///
-/// Mixed-sign residuals cancel at their represented magnitudes before any
-/// scale reduction, so a tiny residual needed after extreme cancellation is
-/// not divided into zero. The remaining one-sign mass is normalized by an exact
-/// power-of-two scale and summed deterministically before the original recovery
-/// denominator is applied. This keeps representable bias finite without
-/// allowing raw-sum overflow or false zero from scale normalization.
+/// Finite signed residuals use the canonical cancellation-safe mean directly.
+/// If an individual `recovered - truth` difference overflows even though the
+/// final mean bias is representable, TEPP expands the same algebraic numerator
+/// into recovered values plus negated truth values, cancels opposing represented
+/// mass first, and divides by the original paired-observation count. This avoids
+/// treating an unrepresentable intermediate residual as an unrepresentable
+/// scientific result while still failing closed when the final represented bias
+/// itself is outside or below binary64 range.
 ///
 /// # Errors
 ///
-/// Returns [`ValidationError::InvalidInput`] for empty, unequal-length,
-/// non-finite inputs, an unrepresentable signed residual, or an unrepresentable
-/// final mean bias.
+/// Returns [`ValidationError::InvalidInput`] for empty, unequal-length, or
+/// non-finite inputs, or for an unrepresentable nonzero final mean bias.
 pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
-    let residuals = signed_residuals(truth, recovered)?;
-    deterministic_representable_mean(&residuals)
+    require_paired_finite(truth, recovered)?;
+
+    let residuals: Option<Vec<f64>> = truth
+        .iter()
+        .zip(recovered)
+        .map(|(truth_value, recovered_value)| {
+            let residual = recovered_value - truth_value;
+            residual.is_finite().then_some(residual)
+        })
+        .collect();
+    if let Some(residuals) = residuals {
+        return deterministic_representable_mean(&residuals);
+    }
+
+    let mut expanded_terms = Vec::with_capacity(truth.len().saturating_mul(2));
+    expanded_terms.extend_from_slice(recovered);
+    expanded_terms.extend(truth.iter().map(|value| -*value));
+    deterministic_representable_sum_over_count(&expanded_terms, truth.len())
 }
 
 /// Standard error of the mean signed bias under independent observations.
@@ -111,6 +131,8 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// reference as [`mean_bias`]. Squared deviations are accumulated only after
 /// scaling by their largest magnitude, and the standard error is formed
 /// directly without materializing an avoidably overflowing raw variance.
+/// Individual signed residuals must still be representable because their
+/// dispersion is itself part of the requested scientific result.
 ///
 /// # Errors
 ///
