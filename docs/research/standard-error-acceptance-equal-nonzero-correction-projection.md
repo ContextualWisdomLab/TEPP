@@ -51,7 +51,7 @@ The repair claims only the finite case where the directly rounded residual and b
 - Causal repair: `7d597a18e043f3619b893981823b9be15ddb823c`
 - Signed edge coverage: `b463a991adc6ff98fa09f91eb428cda9e0ff1255`
 - Branch-scope refinement: `ca8c2b86a81cfa6e99a10bdcc141fc10d49ec011`
-- Contract test: `crates/validation_core/tests/standard_error_acceptance_equal_nonzero-correction_projection_contract.rs`
+- Contract test: `crates/validation_core/tests/standard_error_acceptance_equal_nonzero_correction_projection_contract.rs`
 - CHANGELOG fragment: `CHANGELOG.d/validation-standard-error-acceptance-equal-nonzero-correction-projection.md`
 - Landing vehicle: PR #488; only its current exact head after documentation commits is authoritative for hosted checks and review.
 
