@@ -28,7 +28,7 @@ The normalized operands are finite and bounded by one, so the final relative-dis
 - Causal implementation was corrected and stabilized at `d48f8fef08e77b8fa654f2852814c25c5d1baa79` after immediate source review of the first contents update; `fb314d8afccdf19f0074c64f6277d2edb290e907` adds explicit represented-mean coverage, and `440b78d86908fe1464e65bdbc4ceb5f9f6606c9f` removes an unreachable non-finite comparison branch while retaining the same scientific contract.
 - Changelog trace `45116498f29c0d3421192d452e26182975b114ae` records the durable-evidence repair.
 
-This remains TEPP Validation Evidence artifact admission. It does not add a psychometric estimator, change Longital Modeling composition, or copy mutable arithmetic from fast-mlsirm.
+This remains TEPP Validation Evidence artifact admission. It does not add a psychometric estimator, change Longitudinal Modeling composition, or copy mutable arithmetic from fast-mlsirm.
 
 ## Methodological reference
 
