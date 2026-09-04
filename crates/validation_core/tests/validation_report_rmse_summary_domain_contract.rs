@@ -21,7 +21,7 @@ fn validation_report_rejects_negative_monte_carlo_rmse_evidence() {
         replication_count: 20,
         mean: -0.1,
         standard_deviation: 0.02,
-        standard_error: 0.004,
+        standard_error: 0.02 / 20.0_f64.sqrt(),
         percentile_lower: -0.14,
         percentile_upper: -0.06,
     });
@@ -36,7 +36,7 @@ fn validation_report_rejects_negative_monte_carlo_rmse_evidence() {
         replication_count: 20,
         mean: 0.02,
         standard_deviation: 0.03,
-        standard_error: 0.006,
+        standard_error: 0.03 / 20.0_f64.sqrt(),
         percentile_lower: -0.01,
         percentile_upper: 0.07,
     });
@@ -49,6 +49,7 @@ fn validation_report_rejects_negative_monte_carlo_rmse_evidence() {
         "study_label":"rmse-domain-contract",
         "rmse":0.2,
         "rmse_standard_error":0.01,
+        "mean":0.0,
         "mean_bias":0.0,
         "bias_standard_error":0.01,
         "interval_coverage":0.5,
@@ -59,7 +60,7 @@ fn validation_report_rejects_negative_monte_carlo_rmse_evidence() {
             "replication_count":20,
             "mean":-0.1,
             "standard_deviation":0.02,
-            "standard_error":0.004,
+            "standard_error":0.004472135954999579,
             "percentile_lower":-0.14,
             "percentile_upper":-0.06
         }
