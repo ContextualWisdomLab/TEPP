@@ -73,6 +73,19 @@ fn correctly_rounded_unit_ratio(numerator: u64, denominator: u64) -> f64 {
     f64::from_bits((biased_exponent << 52) | fraction)
 }
 
+fn u64_is_exact_binary64_integer(value: u64) -> bool {
+    if value == 0 {
+        return true;
+    }
+    let significant_bits = 64 - value.leading_zeros();
+    if significant_bits <= 53 {
+        return true;
+    }
+    let discarded_bits = significant_bits - 53;
+    let discarded_mask = (1_u64 << discarded_bits) - 1;
+    value & discarded_mask == 0
+}
+
 pub(crate) fn represented_coverage_from_counts(
     covered_count: u64,
     sample_count: u64,
@@ -120,6 +133,24 @@ fn rationalized_wilson_positive_lower(n: f64, p: f64, z: f64, z2: f64) -> f64 {
     (numerator / denominator).clamp(0.0, 1.0)
 }
 
+fn rationalized_wilson_positive_lower_from_inverse_sample_count(
+    inverse_n: f64,
+    p: f64,
+    z: f64,
+    z2: f64,
+) -> f64 {
+    // This path is used only when the exact u64 denominator cannot be represented
+    // as binary64. Such counts exceed 2^53, so inverse_n is small enough that
+    // the natural reciprocal-scale form remains finite even for the largest z
+    // whose square is finite. It avoids materializing a rounded sample count.
+    let numerator = 2.0 * p * p;
+    let inverse_n_squared = inverse_n * inverse_n;
+    let denominator = z2 * inverse_n
+        + 2.0 * p
+        + z * (z2 * inverse_n_squared + 4.0 * p * (1.0 - p) * inverse_n).sqrt();
+    (numerator / denominator).clamp(0.0, 1.0)
+}
+
 fn wilson_bounds_from_represented_proportion(
     n: f64,
     p: f64,
@@ -146,6 +177,52 @@ fn wilson_bounds_from_represented_proportion(
     (low, high)
 }
 
+fn wilson_bounds_from_represented_proportion_and_inverse_sample_count(
+    inverse_n: f64,
+    p: f64,
+    z: f64,
+    z2: f64,
+) -> (f64, f64) {
+    let low = if p > 0.0 {
+        rationalized_wilson_positive_lower_from_inverse_sample_count(inverse_n, p, z, z2)
+    } else {
+        0.0
+    };
+
+    let z2_over_n = z2 * inverse_n;
+    let denominator = 1.0 + z2_over_n;
+    let center = p + z2_over_n / 2.0;
+    let radical = p * (1.0 - p) * inverse_n + z2 * inverse_n * inverse_n / 4.0;
+    let margin = z * radical.sqrt();
+    let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
+    let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
+        let uncovered_lower = rationalized_wilson_positive_lower_from_inverse_sample_count(
+            inverse_n,
+            1.0 - p,
+            z,
+            z2,
+        );
+        (1.0 - uncovered_lower).clamp(0.0, 1.0)
+    } else {
+        direct_high
+    };
+    (low, high)
+}
+
+fn wilson_bounds_for_sample_count(
+    n: f64,
+    inverse_n: Option<f64>,
+    p: f64,
+    z: f64,
+    z2: f64,
+) -> (f64, f64) {
+    if let Some(inverse_n) = inverse_n {
+        wilson_bounds_from_represented_proportion_and_inverse_sample_count(inverse_n, p, z, z2)
+    } else {
+        wilson_bounds_from_represented_proportion(n, p, z, z2)
+    }
+}
+
 pub(crate) fn wilson_coverage_interval_from_counts(
     covered_count: u64,
     sample_count: u64,
@@ -163,7 +240,18 @@ pub(crate) fn wilson_coverage_interval_from_counts(
     if !z2.is_finite() {
         return Err(ValidationError::InvalidConfiguration);
     }
+    let inverse_n = if u64_is_exact_binary64_integer(sample_count) {
+        None
+    } else {
+        Some(correctly_rounded_unit_ratio(1, sample_count))
+    };
+
     if covered_count == sample_count {
+        if let Some(inverse_n) = inverse_n {
+            let z2_over_n = z2 * inverse_n;
+            let uncovered_mass = z2_over_n / (1.0 + z2_over_n);
+            return Ok(((1.0 - uncovered_mass).clamp(0.0, 1.0), 1.0));
+        }
         return Ok((n / (n + z2), 1.0));
     }
 
@@ -175,7 +263,7 @@ pub(crate) fn wilson_coverage_interval_from_counts(
         // uncovered proportion and reflect its endpoints instead.
         let uncovered = correctly_rounded_unit_ratio(uncovered_count, sample_count);
         let (uncovered_low, uncovered_high) =
-            wilson_bounds_from_represented_proportion(n, uncovered, z, z2);
+            wilson_bounds_for_sample_count(n, inverse_n, uncovered, z, z2);
         return Ok((
             (1.0 - uncovered_high).clamp(0.0, 1.0),
             (1.0 - uncovered_low).clamp(0.0, 1.0),
@@ -183,7 +271,7 @@ pub(crate) fn wilson_coverage_interval_from_counts(
     }
 
     let p = correctly_rounded_unit_ratio(covered_count, sample_count);
-    Ok(wilson_bounds_from_represented_proportion(n, p, z, z2))
+    Ok(wilson_bounds_for_sample_count(n, inverse_n, p, z, z2))
 }
 
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
@@ -196,8 +284,13 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 /// `center - margin`; the implementation switches scale at `z² = 1` so the
 /// stable form neither suffers large-z cancellation nor small-z division
 /// overflow. Count proportions are rounded to binary64 from their exact integer
-/// ratio before Wilson evaluation. Near the all-covered boundary, the smaller
-/// uncovered count is evaluated and reflected by Wilson complement symmetry.
+/// ratio before Wilson evaluation. When the exact sample count itself is not
+/// binary64-representable, Wilson scale terms are evaluated through the
+/// correctly rounded reciprocal `1 / n` rather than a pre-rounded `n as f64`;
+/// the all-covered branch uses the complementary miss mass so representable
+/// uncertainty immediately below one is not erased. Near the all-covered
+/// boundary, the smaller uncovered count is evaluated and reflected by Wilson
+/// complement symmetry.
 ///
 /// # Errors
 ///
@@ -219,7 +312,8 @@ pub fn wilson_coverage_interval(
 #[cfg(test)]
 mod tests {
     use super::{
-        correctly_rounded_unit_ratio, interval_coverage, wilson_coverage_interval,
+        correctly_rounded_unit_ratio, interval_coverage, u64_is_exact_binary64_integer,
+        wilson_coverage_interval,
     };
     use crate::ValidationError;
 
@@ -251,6 +345,16 @@ mod tests {
             correctly_rounded_unit_ratio((1_u64 << 54) - 1, 1_u64 << 54),
             1.0
         );
+    }
+
+    #[test]
+    fn sample_count_exactness_detection_matches_binary64_integer_spacing() {
+        assert!(u64_is_exact_binary64_integer(0));
+        assert!(u64_is_exact_binary64_integer(1_u64 << 53));
+        assert!(!u64_is_exact_binary64_integer((1_u64 << 53) + 1));
+        assert!(u64_is_exact_binary64_integer((1_u64 << 53) + 2));
+        assert!(!u64_is_exact_binary64_integer((1_u64 << 55) + 3));
+        assert!(u64_is_exact_binary64_integer((1_u64 << 55) + 8));
     }
 
     #[test]
