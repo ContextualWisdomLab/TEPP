@@ -35,3 +35,31 @@ fn mean_bias_rounds_subnormal_halfway_cases_to_even_units() {
     let even_floor_bias = mean_bias(&truth, &even_floor).expect("even-floor halfway mean");
     assert_eq!(even_floor_bias.to_bits(), 2);
 }
+
+#[test]
+fn mean_bias_uses_exact_subnormal_units_when_float_compensation_hits_a_halfway_case() {
+    let truth = [0.0; 16];
+    let recovered = [
+        f64::from_bits(0x0cb6_6819_cb62_2e),
+        f64::from_bits(0x0947_199e_fa89_8b),
+        f64::from_bits(0x06f1_7b1c_5d14_35),
+        f64::from_bits(0x0017_01d7_09e8_e5),
+        f64::from_bits(0x0c4f_af0b_45b7_f2),
+        f64::from_bits(0x0618_7545_3090_72),
+        f64::from_bits(0x0a85_ae8e_ad81_bb),
+        f64::from_bits(0x08c0_d3d1_61a3_65),
+        f64::from_bits(0x0dd3_b523_39f6_96),
+        f64::from_bits(0x0d7e_53f0_d4c2_46),
+        f64::from_bits(0x0175_247a_3171_15),
+        f64::from_bits(0x0c74_caf9_0802_51),
+        f64::from_bits(0x0a8a_2b1f_baba_e0),
+        f64::from_bits(0x04dd_bbf2_5f17_35),
+        f64::from_bits(0x0efe_fdfe_b832_bd),
+        f64::from_bits(0x0887_8ef3_1114_1d),
+    ];
+
+    // The exact unit sum leaves remainder 8 on division by 16, exactly halfway
+    // between adjacent subnormals. The lower candidate is even and must win.
+    let bias = mean_bias(&truth, &recovered).expect("halfway represented mean bias");
+    assert_eq!(bias.to_bits(), 0x092d_f11e_7dd9_b8);
+}
