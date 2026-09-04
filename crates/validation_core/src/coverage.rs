@@ -28,6 +28,23 @@ pub(crate) fn interval_covered_count(
     Ok(covered)
 }
 
+pub(crate) fn represented_coverage_from_counts(
+    covered_count: u64,
+    sample_count: u64,
+) -> Result<f64, ValidationError> {
+    if sample_count == 0 || covered_count > sample_count {
+        return Err(ValidationError::InvalidInput);
+    }
+    let uncovered_count = sample_count - covered_count;
+    let n = sample_count as f64;
+    let coverage = if covered_count <= uncovered_count {
+        covered_count as f64 / n
+    } else {
+        1.0 - uncovered_count as f64 / n
+    };
+    Ok(coverage)
+}
+
 /// Empirical coverage of closed intervals `[lower, upper]` for truth values.
 ///
 /// # Errors
@@ -40,7 +57,7 @@ pub fn interval_coverage(
     upper: &[f64],
 ) -> Result<f64, ValidationError> {
     let covered = interval_covered_count(truth, lower, upper)?;
-    Ok(covered as f64 / truth.len() as f64)
+    represented_coverage_from_counts(covered as u64, truth.len() as u64)
 }
 
 fn rationalized_wilson_positive_lower(n: f64, p: f64, z: f64, z2: f64) -> f64 {
@@ -65,28 +82,12 @@ fn rationalized_wilson_positive_lower(n: f64, p: f64, z: f64, z2: f64) -> f64 {
     (numerator / denominator).clamp(0.0, 1.0)
 }
 
-pub(crate) fn wilson_coverage_interval_from_counts(
-    covered_count: usize,
-    sample_count: usize,
+fn wilson_bounds_from_represented_proportion(
+    n: f64,
+    p: f64,
     z: f64,
-) -> Result<(f64, f64), ValidationError> {
-    if sample_count == 0 || covered_count > sample_count {
-        return Err(ValidationError::InvalidInput);
-    }
-    if !z.is_finite() || z <= 0.0 {
-        return Err(ValidationError::InvalidConfiguration);
-    }
-
-    let p = covered_count as f64 / sample_count as f64;
-    let n = sample_count as f64;
-    let z2 = z * z;
-    if !z2.is_finite() {
-        return Err(ValidationError::InvalidConfiguration);
-    }
-    if p == 1.0 {
-        return Ok((n / (n + z2), 1.0));
-    }
-
+    z2: f64,
+) -> (f64, f64) {
     let low = if p > 0.0 {
         rationalized_wilson_positive_lower(n, p, z, z2)
     } else {
@@ -96,7 +97,6 @@ pub(crate) fn wilson_coverage_interval_from_counts(
     let denominator = 1.0 + z2 / n;
     let center = p + z2 / (2.0 * n);
     let radical = (p * (1.0 - p) / n) + z2 / (4.0 * n * n);
-    // With finite z² and coverage p in [0,1], Wilson terms remain finite.
     let margin = z * radical.sqrt();
     let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
     let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
@@ -105,7 +105,47 @@ pub(crate) fn wilson_coverage_interval_from_counts(
     } else {
         direct_high
     };
-    Ok((low, high))
+    (low, high)
+}
+
+pub(crate) fn wilson_coverage_interval_from_counts(
+    covered_count: u64,
+    sample_count: u64,
+    z: f64,
+) -> Result<(f64, f64), ValidationError> {
+    if sample_count == 0 || covered_count > sample_count {
+        return Err(ValidationError::InvalidInput);
+    }
+    if !z.is_finite() || z <= 0.0 {
+        return Err(ValidationError::InvalidConfiguration);
+    }
+
+    let n = sample_count as f64;
+    let z2 = z * z;
+    if !z2.is_finite() {
+        return Err(ValidationError::InvalidConfiguration);
+    }
+    if covered_count == sample_count {
+        return Ok((n / (n + z2), 1.0));
+    }
+
+    let uncovered_count = sample_count - covered_count;
+    if covered_count > uncovered_count {
+        // Near all-covered samples can lose the observed misses if both integer
+        // counts are independently rounded to binary64 before division. Wilson
+        // intervals are complement-symmetric, so evaluate the smaller uncovered
+        // proportion and reflect its endpoints instead.
+        let uncovered = uncovered_count as f64 / n;
+        let (uncovered_low, uncovered_high) =
+            wilson_bounds_from_represented_proportion(n, uncovered, z, z2);
+        return Ok((
+            (1.0 - uncovered_high).clamp(0.0, 1.0),
+            (1.0 - uncovered_low).clamp(0.0, 1.0),
+        ));
+    }
+
+    let p = covered_count as f64 / n;
+    Ok(wilson_bounds_from_represented_proportion(n, p, z, z2))
 }
 
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
@@ -117,10 +157,9 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 /// evaluated through the algebraically rationalized positive root rather than
 /// `center - margin`; the implementation switches scale at `z² = 1` so the
 /// stable form neither suffers large-z cancellation nor small-z division
-/// overflow. The same positive-lower representation is applied to the
-/// complementary uncovered proportion when `center + margin` falsely rounds an
-/// upper endpoint to exact one even though the represented Wilson endpoint
-/// remains below one.
+/// overflow. Near the all-covered boundary, the smaller uncovered count is
+/// evaluated and reflected by Wilson complement symmetry so distinct integer
+/// counts are not erased when they exceed binary64's exact-integer range.
 ///
 /// # Errors
 ///
@@ -136,7 +175,7 @@ pub fn wilson_coverage_interval(
         return Err(ValidationError::InvalidConfiguration);
     }
     let covered_count = interval_covered_count(truth, lower, upper)?;
-    wilson_coverage_interval_from_counts(covered_count, truth.len(), z)
+    wilson_coverage_interval_from_counts(covered_count as u64, truth.len() as u64, z)
 }
 
 #[cfg(test)]
