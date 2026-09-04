@@ -44,27 +44,31 @@ fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, 
     let normalized = values.iter().map(|value| *value / scale).collect();
     let normalized_mean = deterministic_compensated_sum(normalized) / total_count as f64;
     let mean = normalized_mean * scale;
-    if mean == 0.0 {
+    if !mean.is_finite() || mean == 0.0 {
         Err(ValidationError::InvalidInput)
     } else {
         Ok(mean)
     }
 }
 
-/// Deterministic mean of finite binary64 values with cancellation before scale reduction.
+/// Deterministically divide the represented sum of finite binary64 values by an explicit count.
 ///
-/// Opposite signs cancel at represented magnitude before the remaining one-sign
-/// mass is normalized by an exact power of two. The original sample count stays
-/// in the denominator after cancellation. Exact all-zero input and exact mixed-
-/// sign cancellation return canonical zero; a mathematically nonzero one-sign
-/// mean that falls below binary64 range fails closed.
+/// Opposite signs cancel before exact power-of-two scale reduction. The divisor
+/// is independent of `values.len()`, which lets callers preserve an original
+/// scientific denominator when an algebraically equivalent expanded term set is
+/// needed to avoid overflowing intermediate differences. Exact cancellation
+/// returns canonical zero; a nonzero quotient outside or below binary64 range
+/// fails closed.
 ///
 /// # Errors
 ///
-/// Returns [`ValidationError::InvalidInput`] for empty or non-finite input, or
-/// when a nonzero represented mass has no nonzero binary64 mean.
-pub(crate) fn deterministic_representable_mean(values: &[f64]) -> Result<f64, ValidationError> {
-    if values.is_empty() || values.iter().any(|value| !value.is_finite()) {
+/// Returns [`ValidationError::InvalidInput`] for an empty value set, a zero
+/// divisor, non-finite input, or an unrepresentable nonzero quotient.
+pub(crate) fn deterministic_representable_sum_over_count(
+    values: &[f64],
+    total_count: usize,
+) -> Result<f64, ValidationError> {
+    if values.is_empty() || total_count == 0 || values.iter().any(|value| !value.is_finite()) {
         return Err(ValidationError::InvalidInput);
     }
 
@@ -82,7 +86,7 @@ pub(crate) fn deterministic_representable_mean(values: &[f64]) -> Result<f64, Va
         return Ok(0.0);
     }
     if positives.is_empty() || negatives.is_empty() {
-        return same_sign_mean_over_total(values, values.len());
+        return same_sign_mean_over_total(values, total_count);
     }
 
     positives.sort_by(|left, right| right.total_cmp(left));
@@ -130,12 +134,31 @@ pub(crate) fn deterministic_representable_mean(values: &[f64]) -> Result<f64, Va
     if residuals.is_empty() {
         return Ok(0.0);
     }
-    same_sign_mean_over_total(&residuals, values.len())
+    same_sign_mean_over_total(&residuals, total_count)
+}
+
+/// Deterministic mean of finite binary64 values with cancellation before scale reduction.
+///
+/// Opposite signs cancel at represented magnitude before the remaining one-sign
+/// mass is normalized by an exact power of two. The original sample count stays
+/// in the denominator after cancellation. Exact all-zero input and exact mixed-
+/// sign cancellation return canonical zero; a mathematically nonzero one-sign
+/// mean that falls below binary64 range fails closed.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] for empty or non-finite input, or
+/// when a nonzero represented mass has no nonzero binary64 mean.
+pub(crate) fn deterministic_representable_mean(values: &[f64]) -> Result<f64, ValidationError> {
+    deterministic_representable_sum_over_count(values, values.len())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{deterministic_compensated_sum, deterministic_representable_mean};
+    use super::{
+        deterministic_compensated_sum, deterministic_representable_mean,
+        deterministic_representable_sum_over_count,
+    };
     use crate::ValidationError;
 
     #[test]
@@ -176,6 +199,28 @@ mod tests {
         assert_eq!(
             deterministic_representable_mean(&[f64::MAX, -f64::MAX]),
             Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn explicit_denominator_preserves_representable_expanded_sum() {
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(
+            deterministic_representable_sum_over_count(
+                &[f64::MAX, -f64::MAX, f64::from_bits(3)],
+                3,
+            )
+            .expect("explicit denominator")
+            .to_bits(),
+            minimum_subnormal.to_bits()
+        );
+        assert_eq!(
+            deterministic_representable_sum_over_count(&[f64::MAX, f64::MAX], 1),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            deterministic_representable_sum_over_count(&[0.0], 0),
+            Err(ValidationError::InvalidInput)
         );
     }
 
