@@ -23,6 +23,15 @@ fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, Valida
         .collect()
 }
 
+fn subtraction_has_roundoff(recovered: f64, truth: f64, residual: f64) -> bool {
+    let negated_truth = -truth;
+    let truth_virtual = residual - recovered;
+    let recovered_virtual = residual - truth_virtual;
+    let recovered_roundoff = recovered - recovered_virtual;
+    let truth_roundoff = negated_truth - truth_virtual;
+    recovered_roundoff + truth_roundoff != 0.0
+}
+
 fn standard_error_from_deviations(deviations: &[f64]) -> Result<f64, ValidationError> {
     let scale = deviations
         .iter()
@@ -91,14 +100,15 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
 
 /// Mean signed bias `mean(recovered − truth)`.
 ///
-/// Finite signed residuals use the canonical cancellation-safe mean directly.
-/// If an individual `recovered - truth` difference overflows even though the
-/// final mean bias is representable, TEPP expands the same algebraic numerator
-/// into recovered values plus negated truth values, cancels opposing represented
-/// mass first, and divides by the original paired-observation count. This avoids
-/// treating an unrepresentable intermediate residual as an unrepresentable
-/// scientific result while still failing closed when the final represented bias
-/// itself is outside or below binary64 range.
+/// Exactly representable finite signed residuals use the canonical
+/// cancellation-safe mean directly. If a finite pairwise subtraction discards
+/// represented low-order mass, or if the subtraction overflows even though the
+/// final mean bias can remain representable, TEPP expands the same algebraic
+/// numerator into recovered values plus negated truth values. The canonical
+/// cancellation path then carries represented input mass through the original
+/// paired-observation denominator instead of making a rounded pairwise residual
+/// authoritative. This preserves the existing fast path when every subtraction
+/// is exact while avoiding subtraction-rounding and overflow artifacts.
 ///
 /// # Errors
 ///
@@ -107,15 +117,19 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
 pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     require_paired_finite(truth, recovered)?;
 
-    let residuals: Option<Vec<f64>> = truth
-        .iter()
-        .zip(recovered)
-        .map(|(truth_value, recovered_value)| {
-            let residual = recovered_value - truth_value;
-            residual.is_finite().then_some(residual)
-        })
-        .collect();
-    if let Some(residuals) = residuals {
+    let mut residuals = Vec::with_capacity(truth.len());
+    let mut requires_expanded_numerator = false;
+    for (truth_value, recovered_value) in truth.iter().zip(recovered) {
+        let residual = recovered_value - truth_value;
+        if !residual.is_finite() {
+            requires_expanded_numerator = true;
+            break;
+        }
+        requires_expanded_numerator |=
+            subtraction_has_roundoff(*recovered_value, *truth_value, residual);
+        residuals.push(residual);
+    }
+    if !requires_expanded_numerator {
         return deterministic_representable_mean(&residuals);
     }
 
