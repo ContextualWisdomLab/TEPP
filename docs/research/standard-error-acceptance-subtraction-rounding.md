@@ -12,7 +12,7 @@ Public RED `58cbc03253997865b7c8ec19fb501fc89c22c851` uses `estimate = 1`, `targ
 
 Causal repair `68a6fd98b4f661ad5d4c3c35dc8b9074f2c59281` remains inside the existing `validation_core` writer. On a nonzero finite rounded equality only, it obtains the error-free low term of `estimate - target`, changes that low-term sign when the rounded difference is negative so it describes the absolute residual, and compares it with the FMA low term of `k * standard_error`. If those two correction projections differ, their order determines the represented-input decision. If they are equal, TEPP preserves the predecessor rounded decision rather than claiming a global exact comparator.
 
-This preserves the earlier finite-direct, scale-underflow, one-sided overflow, and both-overflow paths. It also preserves the GAP-081 multiplication-only boundary as the special case whose residual correction is zero.
+This preserves the earlier finite-direct, scale-underflow, one-sided overflow, and both-overflow paths. It also preserves the GAP-081 multiplication-only boundary as the special case whose residual correction is zero. Edge-coverage commit `b2c06512b6d795555269862c1c3d7e4bc67f3f18` adds the sign-symmetric negative rounded-difference case so the absolute-residual correction sign is exercised explicitly rather than left to branch inference.
 
 Alternatives rejected: blanket rejection of rounded ties would break valid below-bound cases; replacing all finite comparisons with arbitrary precision would widen the owner and implementation surface beyond the demonstrated defect; scale or logarithmic comparison would introduce another rounded approximation at a boundary already expressible with binary floating-point error terms.
 
