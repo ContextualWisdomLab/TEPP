@@ -10,6 +10,37 @@ const SCHEMA: &str = "tepp.wilson_coverage_evidence.v1";
 const CRITICAL_VALUE_KIND: &str = "standard_normal_z";
 const INTERVAL_SIDEDNESS: &str = "two_sided";
 
+fn u64_is_exact_binary64_integer(value: u64) -> bool {
+    if value == 0 {
+        return true;
+    }
+    let significant_bits = 64 - value.leading_zeros();
+    if significant_bits <= 53 {
+        return true;
+    }
+    let discarded_bits = significant_bits - 53;
+    let discarded_mask = (1_u64 << discarded_bits) - 1;
+    value & discarded_mask == 0
+}
+
+fn all_covered_lower_from_exact_count(
+    sample_count: u64,
+    normal_critical_value: f64,
+) -> Result<f64, ValidationError> {
+    let z2 = normal_critical_value * normal_critical_value;
+    if !z2.is_finite() {
+        return Err(ValidationError::InvalidInput);
+    }
+    let inverse_n = represented_coverage_from_counts(1, sample_count)?;
+    let z2_over_n = z2 * inverse_n;
+    if z2_over_n <= 1.0 {
+        let uncovered_mass = z2_over_n / (1.0 + z2_over_n);
+        Ok((1.0 - uncovered_mass).clamp(0.0, 1.0))
+    } else {
+        Ok((1.0 / (1.0 + z2_over_n)).clamp(0.0, 1.0))
+    }
+}
+
 /// Durable Wilson interval-coverage evidence with denominator and critical-value provenance.
 ///
 /// The carrier stores fixed-width retained-sample and covered counts rather than only the projected
@@ -19,7 +50,11 @@ const INTERVAL_SIDEDNESS: &str = "two_sided";
 /// or a one-sided confidence claim. Validation recomputes represented empirical coverage and both
 /// Wilson endpoints from the stored counts and `z`; tampered or internally inconsistent artifacts
 /// fail closed. Near all-covered samples are evaluated from the smaller uncovered count so a real
-/// miss is not erased when integer counts exceed binary64's exact-integer range.
+/// miss is not erased when integer counts exceed binary64's exact-integer range. For exact
+/// all-covered durable counts that are not themselves binary64-representable, validation switches
+/// between complementary-miss and direct reciprocal forms according to `z² / n`: the former keeps
+/// tiny uncertainty below one, while the latter prevents a large miss mass rounding to exactly one
+/// and erasing an ordinary positive lower endpoint.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WilsonCoverageEvidenceV1 {
     /// Number of interval/truth triples admitted to the empirical coverage calculation.
@@ -102,12 +137,24 @@ impl WilsonCoverageEvidenceV1 {
 
         let expected_coverage =
             represented_coverage_from_counts(self.covered_count, self.sample_count)?;
-        let (expected_lower, expected_upper) = wilson_coverage_interval_from_counts(
-            self.covered_count,
-            self.sample_count,
-            self.normal_critical_value,
-        )
-        .map_err(|_| ValidationError::InvalidInput)?;
+        let (expected_lower, expected_upper) = if self.covered_count == self.sample_count
+            && !u64_is_exact_binary64_integer(self.sample_count)
+        {
+            (
+                all_covered_lower_from_exact_count(
+                    self.sample_count,
+                    self.normal_critical_value,
+                )?,
+                1.0,
+            )
+        } else {
+            wilson_coverage_interval_from_counts(
+                self.covered_count,
+                self.sample_count,
+                self.normal_critical_value,
+            )
+            .map_err(|_| ValidationError::InvalidInput)?
+        };
 
         if self.empirical_coverage != expected_coverage
             || self.wilson_lower != expected_lower
