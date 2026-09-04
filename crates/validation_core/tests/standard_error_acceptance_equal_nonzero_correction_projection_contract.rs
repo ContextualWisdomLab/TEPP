@@ -43,9 +43,9 @@ fn equal_negative_correction_projection_preserves_exact_rejection() {
     // exact product lies slightly farther below the rounded bound than the exact
     // residual does. The strict inequality therefore remains a rejection.
     let estimate = f64::from_bits(0x018b_af20_e855_2bb6);
-    let correction = f64::from_bits(0x0000_0000_005d_636);
+    let correction = f64::from_bits(0x0000_0000_0005_d636);
     let target = correction;
-    let k = f64::from_bits(0x2c70_fef0_d26f_1ed);
+    let k = f64::from_bits(0x2c6f_de1e_a0d4_de3d);
     let standard_error = f64::from_bits(0x150b_cc8f_a576_9411);
 
     assert_eq!(estimate - target, k * standard_error);
