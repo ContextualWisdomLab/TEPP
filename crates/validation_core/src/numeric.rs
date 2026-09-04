@@ -51,14 +51,53 @@ fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, 
     }
 }
 
+fn error_free_sum(left: f64, right: f64) -> (f64, f64) {
+    let sum = left + right;
+    let right_virtual = sum - left;
+    let left_virtual = sum - right_virtual;
+    let left_roundoff = left - left_virtual;
+    let right_roundoff = right - right_virtual;
+    (sum, left_roundoff + right_roundoff)
+}
+
+fn mixed_remainder_mean_over_total(
+    values: &[f64],
+    total_count: usize,
+) -> Result<f64, ValidationError> {
+    let max_magnitude = values
+        .iter()
+        .map(|value| value.abs())
+        .fold(0.0, f64::max);
+    if max_magnitude == 0.0 {
+        return Ok(0.0);
+    }
+
+    let scale = exact_power_of_two_scale(max_magnitude);
+    let normalized = values.iter().map(|value| *value / scale).collect();
+    let normalized_sum = deterministic_compensated_sum(normalized);
+    if normalized_sum == 0.0 {
+        return Ok(0.0);
+    }
+
+    let normalized_mean = normalized_sum / total_count as f64;
+    let mean = normalized_mean * scale;
+    if !mean.is_finite() || mean == 0.0 {
+        Err(ValidationError::InvalidInput)
+    } else {
+        Ok(mean)
+    }
+}
+
 /// Deterministically divide the represented sum of finite binary64 values by an explicit count.
 ///
-/// Opposite signs cancel before exact power-of-two scale reduction. The divisor
-/// is independent of `values.len()`, which lets callers preserve an original
-/// scientific denominator when an algebraically equivalent expanded term set is
-/// needed to avoid overflowing intermediate differences. Exact cancellation
-/// returns canonical zero; a nonzero quotient outside or below binary64 range
-/// fails closed.
+/// Opposite signs cancel before exact power-of-two scale reduction. Each
+/// opposite-sign addition also retains its error-free low term so repeated
+/// sub-ULP contributions cannot disappear one at a time before they collectively
+/// become representable. The divisor is independent of `values.len()`, which
+/// lets callers preserve an original scientific denominator when an algebraically
+/// equivalent expanded term set is needed to avoid overflowing intermediate
+/// differences. Exact cancellation returns canonical zero; a nonzero quotient
+/// outside or below binary64 range fails closed.
 ///
 /// # Errors
 ///
@@ -97,9 +136,14 @@ pub(crate) fn deterministic_representable_sum_over_count(
     let mut positive = positives[0];
     let mut negative = negatives[0];
     let mut residuals = Vec::with_capacity(values.len());
+    let mut roundoff_terms = Vec::new();
 
     loop {
-        let residual = positive + negative;
+        let (residual, roundoff) = error_free_sum(positive, negative);
+        if roundoff != 0.0 {
+            roundoff_terms.push(roundoff);
+        }
+
         if residual > 0.0 {
             positive = residual;
             negative_index += 1;
@@ -131,19 +175,26 @@ pub(crate) fn deterministic_representable_sum_over_count(
         }
     }
 
-    if residuals.is_empty() {
-        return Ok(0.0);
+    if roundoff_terms.is_empty() {
+        if residuals.is_empty() {
+            return Ok(0.0);
+        }
+        return same_sign_mean_over_total(&residuals, total_count);
     }
-    same_sign_mean_over_total(&residuals, total_count)
+
+    residuals.extend(roundoff_terms);
+    mixed_remainder_mean_over_total(&residuals, total_count)
 }
 
 /// Deterministic mean of finite binary64 values with cancellation before scale reduction.
 ///
-/// Opposite signs cancel at represented magnitude before the remaining one-sign
-/// mass is normalized by an exact power of two. The original sample count stays
-/// in the denominator after cancellation. Exact all-zero input and exact mixed-
-/// sign cancellation return canonical zero; a mathematically nonzero one-sign
-/// mean that falls below binary64 range fails closed.
+/// Opposite signs cancel at represented magnitude before the remaining mass is
+/// normalized by an exact power of two. Error-free low terms from cancellation
+/// are retained so several individually sub-ULP contributions can still affect
+/// the represented mean when their combined mass is large enough. The original
+/// sample count stays in the denominator after cancellation. Exact all-zero input
+/// and exact mixed-sign cancellation return canonical zero; a mathematically
+/// nonzero mean that falls below binary64 range fails closed.
 ///
 /// # Errors
 ///
@@ -200,6 +251,20 @@ mod tests {
             deterministic_representable_mean(&[f64::MAX, -f64::MAX]),
             Ok(0.0)
         );
+    }
+
+    #[test]
+    fn representable_mean_retains_accumulated_opposite_sign_roundoff() {
+        let quarter_ulp_at_one = 2.0_f64.powi(-54);
+        let mean = deterministic_representable_mean(&[
+            1.0,
+            -quarter_ulp_at_one,
+            -quarter_ulp_at_one,
+            -quarter_ulp_at_one,
+            -quarter_ulp_at_one,
+        ])
+        .expect("representable mixed-sign mean");
+        assert_eq!(mean.to_bits(), 0x3fc9_9999_9999_9998);
     }
 
     #[test]
