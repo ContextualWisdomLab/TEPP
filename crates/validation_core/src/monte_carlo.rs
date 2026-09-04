@@ -290,7 +290,7 @@ pub fn summarize_replications(
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
 ///
 /// Comparison scales all terms by a shared finite magnitude so opposite-sign
-/// extremes do not overflow both finite sides of the inequality to infinity. A zero
+/// extremes do not overflow both sides of the inequality to infinity. A zero
 /// standard error or zero multiplier is an exact-recovery gate and is compared
 /// before scale reduction so a huge SE cannot erase a nonzero residual. Exact
 /// recovery uses numeric equality, for which IEEE `-0.0` and `+0.0` denote the
@@ -455,7 +455,7 @@ mod tests {
         assert_eq!(
             MonteCarloSummary {
                 replication_count: 2,
-                f64::NAN,
+                mean: 0.0,
                 standard_deviation: 0.0,
                 standard_error: -0.1,
                 percentile_lower: 0.0,
