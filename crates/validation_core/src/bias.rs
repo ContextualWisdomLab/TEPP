@@ -53,8 +53,13 @@ fn standard_error_from_deviations(deviations: &[f64]) -> Result<f64, ValidationE
         })
         .collect();
     let square_sum = deterministic_compensated_sum(normalized_squares);
-    let sample_variance_scale = square_sum / (deviations.len() as f64 - 1.0);
-    let normalized_standard_error = sample_variance_scale.sqrt() / (deviations.len() as f64).sqrt();
+    let sample_count = deviations.len() as f64;
+    // Form SE directly as sqrt(sum(d²) / (n * (n - 1))). Separately
+    // rounding sqrt(sample_variance) and sqrt(n) can move the final binary64
+    // standard error by one ULP even when the represented squared-deviation
+    // ratio is exact.
+    let normalized_standard_error =
+        (square_sum / (sample_count * (sample_count - 1.0))).sqrt();
     let standard_error = scale * normalized_standard_error;
     if !standard_error.is_finite()
         || (standard_error == 0.0 && normalized_standard_error != 0.0)
@@ -147,8 +152,9 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 ///
 /// The signed-difference mean uses the same cancellation-safe deterministic
 /// reference as [`mean_bias`]. Squared deviations are accumulated only after
-/// scaling by their largest magnitude, and the standard error is formed
-/// directly without materializing an avoidably overflowing raw variance.
+/// scaling by their largest magnitude, and the standard error is formed from
+/// `sqrt(sum(d²) / (n * (n - 1)))` so an avoidable intermediate variance or
+/// separately rounded `sqrt(n)` cannot change the final represented result.
 /// For two finite represented residuals whose pairwise subtraction discarded
 /// low-order input mass, the exact two-observation identity `SE = |r₁-r₂| / 2`
 /// is evaluated from the expanded represented inputs. For larger samples whose
