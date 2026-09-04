@@ -15,7 +15,7 @@ fn distinct_percentile_endpoints_exhaust_a_two_replication_sample() {
     // could supply additional spread. These endpoint values imply sample
     // SD = sqrt(0.5), so recording SD = 1.0 is scientifically impossible even
     // though each endpoint separately and jointly fits the looser moment budget.
-    let impossible = MonteCarloSummary {
+    let impossible_spread = MonteCarloSummary {
         replication_count: 2,
         mean: 0.0,
         standard_deviation: 1.0,
@@ -23,8 +23,27 @@ fn distinct_percentile_endpoints_exhaust_a_two_replication_sample() {
         percentile_lower: -0.5,
         percentile_upper: 0.5,
     };
-    assert_eq!(impossible.validate(), Err(ValidationError::InvalidInput));
-    assert!(serde_json::to_string(&impossible).is_err());
+    assert_eq!(
+        impossible_spread.validate(),
+        Err(ValidationError::InvalidInput)
+    );
+    assert!(serde_json::to_string(&impossible_spread).is_err());
+
+    // The same exhaustion also fixes the represented mean. This payload still
+    // passes the looser individual/joint endpoint-radius budget, but its mean
+    // cannot be the mean of the only two retained values.
+    let impossible_mean = MonteCarloSummary {
+        replication_count: 2,
+        mean: 0.25,
+        standard_deviation: 1.0,
+        standard_error: 1.0 / 2.0_f64.sqrt(),
+        percentile_lower: -0.5,
+        percentile_upper: 0.5,
+    };
+    assert_eq!(
+        impossible_mean.validate(),
+        Err(ValidationError::InvalidInput)
+    );
 
     let payload = format!(
         "{{\"replication_count\":2,\"mean\":0.0,\"standard_deviation\":1.0,\"standard_error\":{},\"percentile_lower\":-0.5,\"percentile_upper\":0.5}}",
