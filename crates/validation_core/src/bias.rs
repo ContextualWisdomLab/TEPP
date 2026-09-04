@@ -145,8 +145,13 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// reference as [`mean_bias`]. Squared deviations are accumulated only after
 /// scaling by their largest magnitude, and the standard error is formed
 /// directly without materializing an avoidably overflowing raw variance.
-/// Individual signed residuals must still be representable because their
-/// dispersion is itself part of the requested scientific result.
+/// For two finite represented residuals whose pairwise subtraction discarded
+/// low-order input mass, the exact two-observation identity `SE = |r₁-r₂| / 2`
+/// is evaluated from the expanded represented inputs so two distinct residuals
+/// cannot become false zero uncertainty merely because both rounded to the same
+/// binary64 subtraction result. Individual signed residuals must still be
+/// representable because their dispersion is itself part of the requested
+/// scientific result.
 ///
 /// # Errors
 ///
@@ -158,6 +163,22 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
         return Err(ValidationError::InvalidInput);
     }
     let diffs = signed_residuals(truth, recovered)?;
+
+    if diffs.len() == 2
+        && truth
+            .iter()
+            .zip(recovered)
+            .zip(&diffs)
+            .any(|((truth_value, recovered_value), residual)| {
+                subtraction_has_roundoff(*recovered_value, *truth_value, *residual)
+            })
+    {
+        let expanded_difference = [recovered[0], -truth[0], -recovered[1], truth[1]];
+        let half_difference =
+            deterministic_representable_sum_over_count(&expanded_difference, 2)?;
+        return Ok(half_difference.abs());
+    }
+
     let mean = deterministic_representable_mean(&diffs)?;
     scaled_standard_error(&diffs, mean)
 }
