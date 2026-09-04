@@ -16,7 +16,7 @@ The validation pack checks the approved product requirements, delivery roadmap, 
 - No unresolved placeholder markers occur in approved artifacts.
 - Required governance files exist.
 - GitHub Action references are pinned to full commit SHAs.
-- Hourly PR maintenance and hourly product-development schedules are distinct and concurrency bounded.
+- PR maintenance is owned by the central required workflow; local product development remains separately concurrency bounded.
 - Autonomous LLM development maps `NVIDIA_NIM_API_KEY` to the provider runtime and contains no `COPILOT_GITHUB_TOKEN` reference.
 - Source artifacts are listed in a SHA-256 manifest and the generated source archives are reproducible.
 - Temporal leakage, relation-aware splitting, multilevel/multiple-membership, realistic truth simulation, 100% production coverage/docstrings, CPU/GPU parity, SBOM, provenance, and rollback requirements are represented in the plan.
