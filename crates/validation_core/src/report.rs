@@ -18,9 +18,7 @@ fn minority_zero_lower_is_rounding_feasible(p: f64, upper: f64) -> bool {
     // final represented lower root itself would round to zero.
     let p_squared = p * p;
     let denominator = p_squared + (1.0 - 2.0 * p) * upper;
-    if !denominator.is_finite() || denominator <= 0.0 {
-        return false;
-    }
+    debug_assert!(denominator.is_finite() && denominator > 0.0);
     let implied_lower = p * ((p / denominator) * (1.0 - upper));
     implied_lower == 0.0
 }
@@ -32,14 +30,15 @@ fn minority_zero_lower_is_rounding_feasible(p: f64, upper: f64) -> bool {
 /// the unrecorded `a` gives a necessary endpoint-pair identity. For `p < 0.5`,
 /// the equivalent identity on the uncovered proportion avoids squaring a tiny
 /// `p`. All terms remain probability-scaled, so a small absolute binary64
-/// tolerance is sufficient without overflow-prone reconstruction of `n` or `z`.
-/// A boundary endpoint needs one additional peer-root check: the eliminated
-/// identity can lose all sensitivity to a representable minority lower root when
-/// the stored lower endpoint is exact zero. The complement-symmetric case applies
-/// to an exact-one upper endpoint above `p = 0.5`. At exact all-covered `p = 1`,
-/// the eliminated identity is degenerate, while the canonical producer still
-/// requires the lower endpoint `n / (n + z²)` to be strictly positive for every
-/// non-empty sample and finite represented `z²`.
+/// tolerance is sufficient for ordinary interior pairs without overflow-prone
+/// reconstruction of `n` or `z`. A boundary endpoint needs one additional
+/// peer-root check: the eliminated identity can lose all sensitivity to a
+/// representable minority lower root when the stored lower endpoint is exact
+/// zero. The complement-symmetric case applies to an exact-one upper endpoint
+/// above `p = 0.5`. At exact all-covered `p = 1`, the eliminated identity is
+/// degenerate, while the canonical producer still requires the lower endpoint
+/// `n / (n + z²)` to be strictly positive for every non-empty sample and finite
+/// represented `z²`.
 fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool {
     if p == 0.0 {
         return true;
