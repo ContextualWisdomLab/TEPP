@@ -2,12 +2,7 @@
 
 use crate::ValidationError;
 
-/// Sum finite values in a canonical order with Neumaier compensation.
-///
-/// Callers own domain validation and any scale normalization needed to keep the
-/// final sum representable. Canonical ordering keeps equivalent metric inputs
-/// from changing only because transport order changed.
-pub(crate) fn deterministic_compensated_sum(mut values: Vec<f64>) -> f64 {
+fn deterministic_compensated_parts(mut values: Vec<f64>) -> (f64, f64) {
     values.sort_by(f64::total_cmp);
     let mut sum = 0.0_f64;
     let mut correction = 0.0_f64;
@@ -20,6 +15,16 @@ pub(crate) fn deterministic_compensated_sum(mut values: Vec<f64>) -> f64 {
         }
         sum = next;
     }
+    (sum, correction)
+}
+
+/// Sum finite values in a canonical order with Neumaier compensation.
+///
+/// Callers own domain validation and any scale normalization needed to keep the
+/// final sum representable. Canonical ordering keeps equivalent metric inputs
+/// from changing only because transport order changed.
+pub(crate) fn deterministic_compensated_sum(values: Vec<f64>) -> f64 {
+    let (sum, correction) = deterministic_compensated_parts(values);
     sum + correction
 }
 
@@ -74,12 +79,15 @@ fn mixed_remainder_mean_over_total(
 
     let scale = exact_power_of_two_scale(max_magnitude);
     let normalized = values.iter().map(|value| *value / scale).collect();
-    let normalized_sum = deterministic_compensated_sum(normalized);
-    if normalized_sum == 0.0 {
+    let (normalized_sum, normalized_correction) = deterministic_compensated_parts(normalized);
+    if normalized_sum == 0.0 && normalized_correction == 0.0 {
         return Ok(0.0);
     }
 
-    let normalized_mean = normalized_sum / total_count as f64;
+    let denominator = total_count as f64;
+    let leading_mean = normalized_sum / denominator;
+    let division_residual = (-leading_mean).mul_add(denominator, normalized_sum);
+    let normalized_mean = leading_mean + (division_residual + normalized_correction) / denominator;
     let mean = normalized_mean * scale;
     if !mean.is_finite() || mean == 0.0 {
         Err(ValidationError::InvalidInput)
@@ -93,11 +101,14 @@ fn mixed_remainder_mean_over_total(
 /// Opposite signs cancel before exact power-of-two scale reduction. Each
 /// opposite-sign addition also retains its error-free low term so repeated
 /// sub-ULP contributions cannot disappear one at a time before they collectively
-/// become representable. The divisor is independent of `values.len()`, which
-/// lets callers preserve an original scientific denominator when an algebraically
-/// equivalent expanded term set is needed to avoid overflowing intermediate
-/// differences. Exact cancellation returns canonical zero; a nonzero quotient
-/// outside or below binary64 range fails closed.
+/// become representable. When those retained terms remain material after
+/// normalization, their compensation is carried through the scientific divisor
+/// instead of being rounded into a single numerator first. The divisor is
+/// independent of `values.len()`, which lets callers preserve an original
+/// scientific denominator when an algebraically equivalent expanded term set is
+/// needed to avoid overflowing intermediate differences. Exact cancellation
+/// returns canonical zero; a nonzero quotient outside or below binary64 range
+/// fails closed.
 ///
 /// # Errors
 ///
@@ -191,10 +202,11 @@ pub(crate) fn deterministic_representable_sum_over_count(
 /// Opposite signs cancel at represented magnitude before the remaining mass is
 /// normalized by an exact power of two. Error-free low terms from cancellation
 /// are retained so several individually sub-ULP contributions can still affect
-/// the represented mean when their combined mass is large enough. The original
-/// sample count stays in the denominator after cancellation. Exact all-zero input
-/// and exact mixed-sign cancellation return canonical zero; a mathematically
-/// nonzero mean that falls below binary64 range fails closed.
+/// the represented mean when their combined mass is large enough, and retained
+/// compensation is carried through the original sample-count division before the
+/// final scale is restored. Exact all-zero input and exact mixed-sign cancellation
+/// return canonical zero; a mathematically nonzero mean that falls below
+/// binary64 range fails closed.
 ///
 /// # Errors
 ///
