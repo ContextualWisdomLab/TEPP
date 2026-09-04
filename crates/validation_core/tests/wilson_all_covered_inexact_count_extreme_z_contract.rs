@@ -26,3 +26,27 @@ fn inexact_durable_count_preserves_positive_all_covered_lower_at_extreme_z() {
     assert!(evidence.wilson_lower > 0.0);
     assert_eq!(evidence.wilson_upper, 1.0);
 }
+
+#[test]
+fn inexact_durable_count_handles_subnormal_squared_critical_value_scale() {
+    // z=1e-160 squares to a positive binary64 subnormal. Dividing that scale
+    // by n > 2^53 is below binary64 range, so the all-covered endpoint rounds
+    // to one rather than inventing a non-representable miss mass.
+    let json = r#"{
+        "schema":"tepp.wilson_coverage_evidence.v1",
+        "sample_count":9007199254740993,
+        "covered_count":9007199254740993,
+        "critical_value_kind":"standard_normal_z",
+        "interval_sidedness":"two_sided",
+        "normal_critical_value":1e-160,
+        "empirical_coverage":1.0,
+        "wilson_lower":1.0,
+        "wilson_upper":1.0
+    }"#;
+
+    let evidence: WilsonCoverageEvidenceV1 = serde_json::from_str(json)
+        .expect("subnormal z-squared scale must remain a valid deterministic boundary case");
+
+    assert_eq!(evidence.wilson_lower, 1.0);
+    assert_eq!(evidence.wilson_upper, 1.0);
+}
