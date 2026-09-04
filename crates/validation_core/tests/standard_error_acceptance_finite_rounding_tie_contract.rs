@@ -98,3 +98,31 @@ fn negative_rounded_difference_uses_absolute_residual_correction_sign() {
         "the subtraction low term must flip sign when the rounded difference is negative"
     );
 }
+
+#[test]
+fn subnormal_bound_rounding_must_not_hide_a_strict_rejection() {
+    let minimum_subnormal = f64::from_bits(1);
+    let multiplier = f64::from_bits(0x1e5_8000_0000_0000); // 1.5 * 2^-538
+    let standard_error = f64::from_bits(0x1e6_0000_0000_0000); // 2^-537
+
+    assert_eq!(multiplier * standard_error, minimum_subnormal);
+    // The exact represented product is 3/4 of the minimum subnormal. Its FMA
+    // correction is only -1/4 ULP at zero and therefore rounds to signed zero.
+    assert_eq!(multiplier.mul_add(standard_error, -minimum_subnormal), -0.0);
+
+    assert_eq!(
+        accept_within_standard_errors(minimum_subnormal, 0.0, standard_error, multiplier),
+        Ok(false),
+        "a product rounded up to the minimum subnormal must not cover the larger exact residual"
+    );
+}
+
+#[test]
+fn exact_minimum_subnormal_bound_remains_accepted() {
+    let minimum_subnormal = f64::from_bits(1);
+    assert_eq!(
+        accept_within_standard_errors(minimum_subnormal, 0.0, minimum_subnormal, 1.0),
+        Ok(true),
+        "an exactly represented minimum-subnormal bound still covers an equal residual"
+    );
+}
