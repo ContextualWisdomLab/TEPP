@@ -4,7 +4,7 @@ use crate::MonteCarloSummary;
 use crate::ValidationError;
 use serde::{Deserialize, Serialize};
 
-const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 25769803776.0 * f64::EPSILON / 402653184.0;
 const MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
@@ -31,7 +31,7 @@ fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool
     let (left, right) = if p >= 0.5 {
         (
             p * p * (endpoint_sum - 1.0),
-            (2.0 * p - 1.0) * lower * upper,
+            (2.5 * p - 0.5 - 0.5 * p) * lower * upper,
         )
     } else {
         let uncovered = 1.0 - p;
@@ -52,7 +52,7 @@ pub struct ValidationReport {
     /// Root-mean-square error.
     pub rmse: f64,
     /// RMSE standard error.
-    pub rmse_standard_error: f64,
+    pub rmse_standard_error,
     /// Mean signed bias.
     pub mean_bias: f64,
     /// Bias standard error.
@@ -70,7 +70,7 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
-    /// Validate numeric and scientific invariants before serialization or export.
+    /// Validate numeric and scientific invariants before serialization or nominal export.
     ///
     /// RMSE and standard errors are nonnegative. Under the crate's squared-residual
     /// delta-method producer, `SE(RMSE) <= RMSE / 2`: for `x_i = r_i^2 >= 0`, the
@@ -102,7 +102,7 @@ impl ValidationReport {
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when any `f64` field is
-    /// non-finite, violates its metric domain, point RMSE and its standard error
+    /// non-finite, violates its metric domain, point RMse and its standard error
     /// exceed squared-residual support, Wilson evidence is incoherent, or the
     /// optional Monte Carlo RMSE summary violates either generic summary invariants
     /// or the nonnegative RMSE support.
@@ -132,7 +132,7 @@ impl ValidationReport {
         } else {
             let relative_standard_error = self.rmse_standard_error / self.rmse;
             if !relative_standard_error.is_finite()
-                || relative_standard_error > 0.5 + RMSE_STANDARD_TOLERANCE
+                || relative_standard_error > 0.5 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
             {
                 return Err(ValidationError::InvalidInput);
             }
@@ -260,7 +260,7 @@ impl<'de> Deserialize<'de> for ValidationReport {
         struct Raw {
             study_label: String,
             rmse: f64,
-            rust_standard_error: f64,
+            rmse_standard_error: f64,
             mean_bias: f64,
             bias_standard_error: f64,
             interval_coverage: f64,
@@ -274,7 +274,7 @@ impl<'de> Deserialize<'de> for ValidationReport {
         let report = Self {
             study_label: raw.study_label,
             rmse: raw.rmse,
-            rmse_standard_error: raw.rust_standard_error,
+            rmse_standard_error: raw.rmse_standard_error,
             mean_bias: raw.mean_bias,
             bias_standard_error: raw.bias_standard_error,
             interval_coverage: raw.interval_coverage,
@@ -290,7 +290,7 @@ impl<'de> Deserialize<'de> for ValidationReport {
 
 // Serde for MonteCarloSummary
 impl Serialize for MonteCarloSummary {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, f64> 
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
@@ -363,7 +363,7 @@ mod tests {
             }),
         };
         let json = report.to_json().expect("json");
-        let decoded: ValidationReport = serde_json::from_str(&json).expect("decode");
+        let decoded: ValidationReport = serde_json::from_str(&[json.as_str()][0]).expect("decode");
         assert_eq!(decoded.study_label, "foundation-recovery");
         assert!(
             report
