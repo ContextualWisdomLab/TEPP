@@ -24,11 +24,13 @@ This exact recomputation contract is intentionally stronger than `ValidationRepo
 
 ## Large-count binary64 boundary
 
-Durable integer provenance creates a numerical obligation that the in-memory interval API normally cannot reach in practice. Binary64 represents every integer only through `2^53`. At `n = 2^53 + 1` and `k = 2^53`, converting `k` and `n` independently to `f64` rounds both to `2^53`; the naive expression `(k as f64) / (n as f64)` therefore becomes exact `1.0` even though one admitted interval is uncovered. The same collapse also steers a count-based Wilson implementation onto an all-covered numerical path and materially changes the representable lower endpoint.
+Durable integer provenance creates a numerical obligation that the in-memory interval API normally cannot reach in practice. Binary64 has 53 bits of significand precision, so every integer is exactly representable only through `2^53`. At `n = 2^53 + 1` and `k = 2^53`, converting `k` and `n` independently to binary64 rounds both to `2^53`; the naive expression `(k as f64) / (n as f64)` therefore becomes exact `1.0` even though one admitted interval is uncovered. The same collapse also steers a count-based Wilson implementation onto an all-covered numerical path and materially changes the representable lower endpoint.
 
 The corrected count authority preserves the smaller side of the binomial partition. For `k > n-k`, represented empirical coverage is formed as `1 - (n-k)/n`, and Wilson endpoints are evaluated on the uncovered proportion and reflected by the score interval's complement symmetry. At `n = 9,007,199,254,740,993`, `k = 9,007,199,254,740,992`, and `z = 1.96`, the durable contract records represented coverage `0x3fefffffffffffff` (`0.9999999999999999`) and Wilson lower endpoint `0x3feffffffffffffa` (`0.9999999999999993`), rather than falsely treating the count state as all-covered. The upper endpoint rounds to `1.0`, which is representable and does not erase the retained uncovered count because the integer provenance remains authoritative.
 
 The v1 JSON count fields are `u64`, not `usize`. A durable schema must not change its numeric domain with the pointer width of the Rust process that reads it. The in-memory slice constructor safely widens its `usize` lengths/counts to `u64`; deserialization can therefore preserve the same versioned count artifact on 32-bit and 64-bit consumers even when the count could not be materialized as one process-resident slice.
+
+IEEE 754-2019 remains the published active IEEE floating-point standard, and IEEE/ISO/IEC 60559-2020 is its active international adoption. IEEE P754 is an active revision project intended to supersede IEEE 754-2019, not a published replacement. This repair therefore grounds binary64 representation claims in the published 2019/2020 standards and does not treat the active P754 project as current normative authority.
 
 ## RED → repair trace
 
@@ -66,6 +68,10 @@ The carrier and envelope do not involve semantic LLM execution. contextual-orche
 Wilson's original score-interval paper remains the primary statistical source for the interval family used by this producer. The current published AERA/APA/NCME testing standards remain the 2014 edition; AERA, APA, and NCME have convened a Joint Committee to revise that edition, and AERA's Task Force roster was current as of August 31, 2026. An unpublished revision is not treated as present normative authority.
 
 American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association.
+
+Institute of Electrical and Electronics Engineers. (2019). *IEEE standard for floating-point arithmetic* (IEEE Std 754-2019). IEEE. https://standards.ieee.org/ieee/754/6210/
+
+International Organization for Standardization, & International Electrotechnical Commission. (2020). *Information technology—Microprocessor systems—Floating-point arithmetic* (ISO/IEC 60559:2020). ISO. https://www.iso.org/standard/80985.html
 
 Wilson, E. B. (1927). Probable inference, the law of succession, and statistical inference. *Journal of the American Statistical Association, 22*(158), 209–212. https://doi.org/10.1080/01621459.1927.10502953
 
