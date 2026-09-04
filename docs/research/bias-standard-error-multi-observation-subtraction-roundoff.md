@@ -19,6 +19,8 @@ All three binary64 subtractions round to `1.0`, so the predecessor's rounded-res
 
 The first public contract accidentally encoded `0x3c72_79a7_4590_331d`, which is the result of evaluating `1 / rounded_sqrt(3)` and then restoring the exact power-of-two scale. Exact high-precision evaluation of the represented-input expression shows that the correctly rounded final binary64 value is instead `0x3c72_79a7_4590_331c` (`0x1.279a74590331cp-56`). Oracle correction `6224320410ccabb1cf16d36cc12f88e2b7a05bb1` makes that distinction executable. This exposed GAP-094: the predecessor standard-error helper separately rounded `sqrt(sample_variance)` and `sqrt(n)`, moving the final standard error by one ULP even after GAP-093 restored the missing low-order dispersion.
 
+The dedicated GAP-094 contract `89fd9ef0add3930346900f75518708978ec9861e` removes subtraction collapse from that second finding entirely: with `truth=[0,0,0]` and exact residuals `recovered=[-2^-55,0,2^-55]`, the same represented standard error must still round to `0x3c72_79a7_4590_331c`. Its sign mirror and an exact two-observation control prevent the repair from being justified only by the GAP-093 special path.
+
 This is a Validation Evidence defect: zero uncertainty is materially stronger than small but nonzero uncertainty, and a one-ULP numerical boundary is not interchangeable with the represented-input target when the deterministic CPU `f64` reference claims that boundary. Morris, White, and Crowther (2019) treat bias and simulation uncertainty as performance measures whose uncertainty must be reported rather than silently collapsed by implementation arithmetic.
 
 ## Constraints
@@ -43,10 +45,12 @@ For GAP-094, keeping `sqrt(sample_variance) / sqrt(n)` was rejected because it r
 | GAP-093 source repair | `04c62514a23722d63a62bd5d5af6e3a930cc3147` | Preserve subtraction low terms and use them only when all rounded residual high parts are equal. |
 | GAP-094 oracle correction / RED | `6224320410ccabb1cf16d36cc12f88e2b7a05bb1` | Correct expected represented-input SE from `...331d` to `...331c`, exposing the separate square-root double rounding. |
 | GAP-094 source repair | `8b8f0a21ccc825f355859cadbf20d83f04d2369f` | Form normalized SE as `sqrt(sum(d²)/(n(n-1)))` before exact scale restoration. |
+| GAP-094 direct-residual contract | `89fd9ef0add3930346900f75518708978ec9861e` | Reproduces the one-ULP square-root defect without pairwise subtraction roundoff. |
 | GAP-093 CHANGELOG | `56d091544a5780567a6ef772568d62b0fc651747` | Buyer-visible false-zero repair and scope are recorded. |
+| GAP-094 CHANGELOG | `184f4e2c109c7904027f782e91b8d9a01a1d46f1` | Buyer-visible one-ULP final-standard-error repair and corrected oracle are recorded. |
 | PR authority | `#488` | Validation Evidence landing vehicle; exact current head is maintained in the PR body and queue-authority baseline. |
 | Module/API | `crates/validation_core/src/bias.rs::bias_standard_error` | Owner-correct production boundary. |
-| Public contract | `crates/validation_core/tests/bias_standard_error_multi_observation_subtraction_roundoff_contract.rs` | Correctly rounded positive case, sign mirror, and equal-residual zero control. |
+| Public contracts | `crates/validation_core/tests/bias_standard_error_multi_observation_subtraction_roundoff_contract.rs`, `crates/validation_core/tests/bias_standard_error_sqrt_double_rounding_contract.rs` | False-zero, sign symmetry, corrected final rounding, and exact-control coverage. |
 
 These repairs do **not** claim globally correctly rounded standard errors for every finite n>2 input. In particular, when rounded residual high parts differ, retained subtraction low terms may still move a nonzero standard error across a final binary64 boundary; that requires an independent represented-input counterexample before widening the production algorithm.
 
