@@ -21,6 +21,7 @@ fn versioned_wilson_coverage_evidence_round_trips_denominator_and_critical_value
     let json = evidence.to_json().expect("canonical json");
     assert!(json.contains("\"schema\":\"tepp.wilson_coverage_evidence.v1\""));
     assert!(json.contains("\"critical_value_kind\":\"standard_normal_z\""));
+    assert!(json.contains("\"interval_sidedness\":\"two_sided\""));
 
     let decoded: WilsonCoverageEvidenceV1 = serde_json::from_str(&json).expect("decode");
     assert_eq!(decoded, evidence);
@@ -60,7 +61,7 @@ fn tampered_denominator_critical_value_or_endpoint_fails_closed() {
 }
 
 #[test]
-fn serde_requires_the_versioned_schema_and_standard_normal_critical_value_semantics() {
+fn serde_requires_version_critical_value_scale_and_two_sided_semantics() {
     let json = canonical_evidence().to_json().expect("canonical json");
 
     let wrong_schema = json.replace(
@@ -71,6 +72,9 @@ fn serde_requires_the_versioned_schema_and_standard_normal_critical_value_semant
 
     let wrong_kind = json.replace("standard_normal_z", "student_t");
     assert!(serde_json::from_str::<WilsonCoverageEvidenceV1>(&wrong_kind).is_err());
+
+    let wrong_sidedness = json.replace("two_sided", "one_sided");
+    assert!(serde_json::from_str::<WilsonCoverageEvidenceV1>(&wrong_sidedness).is_err());
 
     let unknown_field = json.replacen('{', "{\"confidence_level\":0.95,", 1);
     assert!(serde_json::from_str::<WilsonCoverageEvidenceV1>(&unknown_field).is_err());
