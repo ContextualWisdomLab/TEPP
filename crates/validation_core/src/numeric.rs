@@ -45,6 +45,24 @@ fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, 
         .iter()
         .map(|value| value.abs())
         .fold(0.0, f64::max);
+
+    if max_magnitude < f64::MIN_POSITIVE {
+        // Scaling an all-subnormal numerator creates a second rounding point when
+        // the normalized mean is restored to the subnormal grid. The raw sum of
+        // same-sign subnormals cannot overflow on supported `usize` widths, so
+        // preserve the scientific division directly in the original scale.
+        let (sum, correction) = deterministic_compensated_parts(values.to_vec());
+        let denominator = total_count as f64;
+        let leading_mean = sum / denominator;
+        let division_residual = (-leading_mean).mul_add(denominator, sum);
+        let mean = leading_mean + (division_residual + correction) / denominator;
+        return if !mean.is_finite() || mean == 0.0 {
+            Err(ValidationError::InvalidInput)
+        } else {
+            Ok(mean)
+        };
+    }
+
     let scale = exact_power_of_two_scale(max_magnitude);
     let normalized = values.iter().map(|value| *value / scale).collect();
     let (normalized_sum, normalized_correction) = deterministic_compensated_parts(normalized);
