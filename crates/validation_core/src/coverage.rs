@@ -299,7 +299,17 @@ pub(crate) fn wilson_coverage_interval_from_counts(
                 1.0,
             ));
         }
-        return Ok((n / (n + z2), 1.0));
+        let direct_lower = n / (n + z2);
+        if direct_lower == 1.0 && z2 > 0.0 {
+            // The exact-count denominator can absorb a small positive z² even
+            // when the Wilson miss mass is still representable immediately
+            // below one. Evaluate the algebraically equivalent miss fraction
+            // only on that collapsed boundary instead of changing the ordinary
+            // direct path globally.
+            let uncovered_mass = z2 / (n + z2);
+            return Ok(((1.0 - uncovered_mass).clamp(0.0, 1.0), 1.0));
+        }
+        return Ok((direct_lower, 1.0));
     }
 
     let uncovered_count = sample_count - covered_count;
@@ -325,20 +335,24 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 ///
 /// Returns `(lower, upper)` for the empirical coverage rate at the stated
 /// normal critical value `z` (for example `1.96` for nominal 95%). For an
-/// all-covered sample, the exact Wilson lower endpoint is evaluated as
-/// `n / (n + z²)`. For nonzero strict-interior coverage, the lower endpoint is
-/// evaluated through the algebraically rationalized positive root rather than
-/// `center - margin`; the implementation switches scale at `z² = 1` so the
-/// stable form neither suffers large-z cancellation nor small-z division
-/// overflow. Count proportions are rounded to binary64 from their exact integer
-/// ratio before Wilson evaluation. When the exact sample count itself is not
-/// binary64-representable, strict-interior Wilson scale terms use the correctly
-/// rounded reciprocal `1 / n` rather than a pre-rounded `n as f64`. The exact
-/// all-covered path additionally decodes finite `z²` into its binary significand
-/// and power-of-two scale, divides that significand by the exact retained `u64`
+/// all-covered sample, the exact Wilson lower endpoint is algebraically
+/// `n / (n + z²)`. When an exactly representable sample count and a positive
+/// finite `z²` make that direct expression collapse spuriously to exact one,
+/// the implementation subtracts the equivalent miss fraction `z² / (n + z²)`
+/// so representable uncertainty immediately below one is retained. For nonzero
+/// strict-interior coverage, the lower endpoint is evaluated through the
+/// algebraically rationalized positive root rather than `center - margin`; the
+/// implementation switches scale at `z² = 1` so the stable form neither suffers
+/// large-z cancellation nor small-z division overflow. Count proportions are
+/// rounded to binary64 from their exact integer ratio before Wilson evaluation.
+/// When the exact sample count itself is not binary64-representable,
+/// strict-interior Wilson scale terms use the correctly rounded reciprocal
+/// `1 / n` rather than a pre-rounded `n as f64`. The inexact-count all-covered
+/// path additionally decodes finite `z²` into its binary significand and
+/// power-of-two scale, divides that significand by the exact retained `u64`
 /// denominator, and then switches between complementary-miss and direct
 /// reciprocal forms at `z² / n = 1`. This avoids both reciprocal-product double
-/// rounding in the exposed extreme-`z` contract and the false exact 0/1 boundary
+/// rounding in the exposed extreme-`z` contract and false exact 0/1 boundary
 /// failures. Near the all-covered boundary, the smaller uncovered count is
 /// evaluated and reflected by Wilson complement symmetry.
 ///
