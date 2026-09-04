@@ -19,10 +19,10 @@ fn bias_standard_error_preserves_roundoff_when_residual_high_parts_differ() {
         .expect("mirrored represented standard error");
     assert_eq!(mirrored_standard_error.to_bits(), 0x3c8c_38aa_37c3_f68d);
 
-    // Without subtraction roundoff, the existing rounded-residual path remains
-    // authoritative for the same high-part pattern.
-    let exact_residuals = [1.0, 1.0 - 2.0_f64.powi(-52), 1.0];
+    // A symmetric exact-residual case remains on the established direct path.
+    let ulp_at_one = 2.0_f64.powi(-52);
+    let exact_residuals = [1.0 - ulp_at_one, 1.0, 1.0 + ulp_at_one];
     let control = bias_standard_error(&[0.0; 3], &exact_residuals)
-        .expect("exact-residual control standard error");
-    assert_eq!(control.to_bits(), 0x3c96_a09e_667f_3bcd);
+        .expect("symmetric exact-residual control standard error");
+    assert_eq!(control.to_bits(), 0x3ca2_79a7_4590_331d);
 }
