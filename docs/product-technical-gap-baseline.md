@@ -4,7 +4,7 @@
 
 **Product:** Temporal Event Psychometrics Platform (TEPP)
 
-**Snapshot:** 2026-09-04T04:10Z
+**Snapshot:** 2026-09-04T04:10:00Z
 
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`
 
@@ -28,18 +28,18 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 
 Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward updates on the default branch. Organization-admin bypass is not normal delivery evidence and is not used by this writer.
 
-## Current landing authority
+## Current priority open pull-request evidence
 
 #435 intentionally omits its own mutable branch SHA from this file.
 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
-| #488 | `4f1fdc52c1857072f79a3f91f80b5c4f9af8966d` | true | `main` | Validation Evidence numerical/artifact repair. Generic `MonteCarloSummary` binds SE to represented `SD / sqrt(n)`, zero spread to degenerate support, nearest-rank endpoints to represented moment support, distinct endpoints jointly to one squared-deviation budget, and—when `n = 2` and the endpoints are numerically distinct—the exposed endpoints exhaust the retained sample, so recorded mean/SD must match those two values. Typed `monte_carlo_rmse` additionally enforces nonnegative RMSE support. Exact-head hosted gates and independent review remain required. |
+| #488 | `4f1fdc52c1857072f79a3f91f80b5c4f9af8966d` | true | `main` | Validation Evidence numerical/artifact repair. Generic `MonteCarloSummary` binds SE to represented `SD / sqrt(n)`, zero spread to degenerate support, nearest-rank endpoints to represented moment support, distinct endpoints jointly to one squared-deviation budget, and—when `n = 2` and the endpoints are numerically distinct—the exposed endpoints exhaust the retained sample, so recorded mean/SD must match those two values. Exact-head hosted gates and independent review remain required. |
 | #487 | `e07b2ff9f78ef456ff911b8643710af20921fe54` | true | #416 | Validation / Analysis Run fold child. Unique evidence must be inherited by a conflict-resolving survivor; child-head CI does not transfer. |
 | #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 | Analysis Run fold child; preserve support-edge source/tests/doctoring. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 | Analysis Run fold child; preserve summarizes-edge source/tests/doctoring. |
 | #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 | Analysis Run fold child; preserve unique evidence. |
-| #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 | Analysis Run fold child; preserve unique evidence. |
+| #482 | `506dbae236a4484301b7046c6a05b20faf0fe69` | true | #416 | Analysis Run fold child; preserve unique evidence. |
 | #480 | `01f45a99392457334a4f6d3d659f992af739eeee` | true | `main` | contextual-orchestrator consumer repair; stays Draft while immutable CO release/deployment/auth provenance is unavailable. |
 | #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
 | #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
@@ -180,4 +180,4 @@ Morris, White, and Crowther (2019) remain the simulation performance-measure/Mon
 
 ## Release gate
 
-TEPP currently has no GitHub release. Release is permitted only after a coherent vertical reaches protected main with exact protected-head CI/security/recovery evidence, reproducible package + SBOM + provenance + rollback artifacts, current version/CHANGELOG, required migration/restore/load evidence, and released integration contracts where deployment depends on them. Queued/pending/startup-failed/skipped or predecessor-head evidence is not GREEN.
+TEPP currently has no GitHub release. Release is permitted only after a clean coherent vertical reaches protected main with exact protected-head CI/security evidence, scientific/recovery acceptance, reproducible package/build artifacts with SBOM and provenance, validated migrations/upgrade/rollback/recovery where applicable, consistent version metadata and current `CHANGELOG.md`, accessibility/operability evidence for user-facing components, no unresolved scientific/privacy/security/supply-chain blockers, and released integration contracts where deployment depends on them. Queued/pending/startup-failed/skipped or predecessor-head evidence is not GREEN.
