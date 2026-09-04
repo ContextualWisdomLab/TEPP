@@ -19,3 +19,22 @@ fn exact_count_all_covered_preserves_large_z_denominator_residual() {
     assert_eq!(lower.to_bits(), 0x3c48_0000_0000_0001);
     assert_eq!(upper, 1.0);
 }
+
+#[test]
+fn exact_count_all_covered_keeps_correct_power_of_two_large_z_rounding() {
+    // At z=2^30 the sample count is likewise fully absorbed by z^2 when the
+    // denominator is formed, but the ordinary quotient already lands on the
+    // correctly rounded represented-input endpoint. Residual compensation must
+    // preserve that value rather than forcing a one-ULP adjustment.
+    let z = f64::from_bits(0x41d0_0000_0000_0000);
+    assert_eq!((z * z).to_bits(), 0x43b0_0000_0000_0000);
+
+    let truth = [0.0; 3];
+    let lower_bounds = [-1.0; 3];
+    let upper_bounds = [1.0; 3];
+    let (lower, upper) = wilson_coverage_interval(&truth, &lower_bounds, &upper_bounds, z)
+        .expect("large finite power-of-two z must remain valid Wilson evidence");
+
+    assert_eq!(lower.to_bits(), 0x3c48_0000_0000_0000);
+    assert_eq!(upper, 1.0);
+}
