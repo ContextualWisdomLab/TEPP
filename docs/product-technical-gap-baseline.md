@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-04T05:18:00Z  
+**Snapshot:** 2026-09-04T05:42:00Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`
 
@@ -30,7 +30,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
-| #488 | `1246c583161d7f64a7d33139cec46665ee745584` | true | `main` | Validation Evidence numerical/artifact repair. Current finding rejects stored Wilson endpoint pairs that contain empirical coverage but cannot be the roots of one Wilson score interval for that coverage. Self-review repaired dependent fixtures so unrelated tests remain scientifically coherent. Exact-head hosted gates and independent review remain required. |
+| #488 | `b6a6604b405a1119357813fa4d97b54a4d9a4b01` | true | `main` | Validation Evidence numerical/artifact repair. Current finding rejects exact all-covered Wilson evidence with a zero lower endpoint because the canonical `n/(n+z²)` producer is strictly positive for every accepted non-empty sample and finite represented `z²`. Exact-head hosted gates and independent review remain required. |
 | #487 | `e07b2ff9f78ef456ff911b8643710af20921fe54` | true | #416 | Validation / Analysis Run fold child. Unique evidence must be inherited by a conflict-resolving survivor; child-head CI does not transfer. |
 | #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 | Analysis Run fold child; preserve support-edge source/tests/doctoring. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 | Analysis Run fold child; preserve summarizes-edge source/tests/doctoring. |
@@ -50,7 +50,7 @@ TEPP owns temporal/event composition, irregular time, time-varying multilevel/cr
 
 `psychometric_core` is not authority for new temporal/state composition. fast-mlsirm owns reusable static/generalized-mixed/dependence-aware psychometric specification and arithmetic. TEPP consumes only immutable released/versioned Published Language through an ACL; source copying and mutable sibling-head dependencies are prohibited.
 
-contextual-orchestrator owns provider/model routing and semantic LLM execution. Its protected main is currently `17095dad706199a2e108ea6c20d7e6f1f5ac3b89`, but GitHub releases remain zero. Semantic LLM work and model-backed Actions therefore continue to require a future released/versioned contextual-orchestrator contract; Actions use `orchestrator/free` through the gateway credential and must not select providers/models/groups or consume direct provider keys. Mutable owner main is evidence, not a TEPP production contract. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No cross-service SQL.
+contextual-orchestrator owns provider/model routing and semantic LLM execution. Its protected main is currently `60c562defc81fb1897fa97ebdb5bf8f69eae0c55`, but GitHub releases remain zero. Semantic LLM work and model-backed Actions therefore continue to require a future released/versioned contextual-orchestrator contract; Actions use `orchestrator/free` through the gateway credential and must not select providers/models/groups or consume direct provider keys. Mutable owner main is evidence, not a TEPP production contract. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No cross-service SQL.
 
 The clock contract separates event/valid time, assertion time, document time, system time, available time, and knowledge cutoff. Retrospective evidence may describe an earlier event but cannot enter an earlier knowledge cutoff. Forward state/transition edges remain distinct from retrospective/citation/revision/provenance relations.
 
@@ -69,7 +69,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - When the generic carrier occupies `ValidationReport::monte_carlo_rmse`, retained replications are nonnegative; positive mean implies `SE(mean) <= mean`, and inclusive nearest-rank endpoints cannot exceed the nonnegative sample-sum support `n * mean`. These typed bounds are not imposed on signed metrics such as bias.
 - SE-aware acceptance is `|estimate - target| <= k * SE`. For `k = 0` or exact-zero SE, exact recovery is evaluated before scale reduction; `-0.0` and `+0.0` are one numeric zero-valued scientific state.
 - `match_count` is a finite-threshold decision and does not require materializing an unrepresentable absolute residual; `absolute_residuals` remains fail closed when the magnitude itself is requested.
-- Wilson interval coverage evidence preserves representable endpoints through stable rationalized/complementary forms rather than cancellation-prone center±margin evaluation. A stored lower/upper pair must also satisfy the Wilson root identity for the same empirical coverage after eliminating the unrecorded `z²/n` term; containment alone is not sufficient evidence of a coherent Wilson interval. This is a necessary artifact-level check, not denominator/critical-value provenance.
+- Wilson interval coverage evidence preserves representable endpoints through stable rationalized/complementary forms rather than cancellation-prone center±margin evaluation. A stored lower/upper pair must also satisfy the Wilson root identity for the same empirical coverage after eliminating the unrecorded `z²/n` term; containment alone is not sufficient evidence of a coherent Wilson interval. At exact all-covered `p = 1`, the eliminated identity degenerates, but the canonical non-empty finite-`z²` producer still requires `coverage_wilson_lower > 0`; `[0,1]` is therefore invalid durable evidence. The `p = 0` boundary is intentionally asymmetric because represented `z² = 0` can make the producer's upper endpoint zero. These are necessary artifact-level checks, not denominator/critical-value provenance.
 - Durable and human-facing Validation Evidence must preserve producing-metric invariants on explicit validation, serde ingress/egress, and human projection. Finiteness alone is not evidence validity.
 - Bias, RMSE, and Monte Carlo may share private deterministic scalar support inside `validation_core`, but metric-specific cancellation/normalization, denominator, uncertainty, and fail-closed semantics remain with their bounded modules.
 - Historical-cutoff admission occurs before duplicate-identity checks. Future-unavailable evidence cannot change an earlier run's conflicts, counts, or terminal state.
@@ -84,17 +84,17 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 ### #488 — Validation Evidence
 
-#488 is the generic Validation Evidence landing vehicle at exact head `1246c583161d7f64a7d33139cec46665ee745584`. It remains distinct from Longitudinal Modeling and does not consume mutable fast-mlsirm source.
+#488 is the generic Validation Evidence landing vehicle at exact head `b6a6604b405a1119357813fa4d97b54a4d9a4b01`. It remains distinct from Longitudinal Modeling and does not consume mutable fast-mlsirm source.
 
-The preceding RMSE, bias, stable-Wilson arithmetic, Monte Carlo SE, durable-artifact, typed-RMSE, matching, individual/joint percentile moment-support, and two-replication exhaustion lineages remain in branch ancestry and GAP-045–GAP-069.
+The preceding RMSE, bias, stable-Wilson arithmetic, Monte Carlo SE, durable-artifact, typed-RMSE, matching, individual/joint percentile moment-support, two-replication exhaustion, and Wilson endpoint-pair coherence lineages remain in branch ancestry and GAP-045–GAP-070.
 
-Fresh review found a durable Wilson-artifact coherence hole. The predecessor accepted any ordered Wilson endpoints containing the recorded empirical coverage. At `p = 0.5`, `[0.2, 0.9]` passes those checks but no Wilson score interval can produce it because the roots must be symmetric about `0.5`. More generally, with `a = z²/n`, Wilson roots satisfy `LU = p²/(1+a)` and `L+U = 1 + (2p-1)/(1+a)`; eliminating `a` yields `p²(L+U-1) = (2p-1)LU`. Below `p = 0.5`, the complementary uncovered-proportion identity is used to avoid squaring a tiny `p`.
+The latest review found a boundary hole left by the eliminated Wilson-root identity. At exact empirical coverage `p = 1`, `U = 1` makes that identity degenerate, so the predecessor accepted `L = 0`. The canonical producer cannot emit that state: for a non-empty sample and finite represented `z²`, it returns `L = n / (n + z²) > 0`, `U = 1`. Even a positive `z` whose square underflows to represented zero yields `L = 1`, not zero.
 
-Public RED `a839c606fb2329ce1b339eb235c79e02abf40e16`; causal admission repair `38c5b8e83fe2433167afb6ece13e72b6608ceb03`; asymmetric/complement edge `c1cb16a78499648c10d6d5a8dad5e212a267064a`; changelog `6af0821bc2fca3e9f101cfa4ad36048ecfaa6ddd`; dependent-fixture doctoring through `59e40b4f0ebbb3b991c84724ded157ffe974abcd`; research/current #488 `1246c583161d7f64a7d33139cec46665ee745584`.
+Public RED `ce714f077fe1575b50f1b97131e1857ad0c69b1e` adds the all-covered positive-lower contract. Two intermediate source edits (`422745c8...`, `b2f46d6f...`) introduced unrelated transcription defects and are not counted as repair evidence; non-force restore `184990522287e254a8e4c1995c02bce20aaa288e` reinstates the exact predecessor `report.rs` blob while retaining the RED. Causal source repair `72e9d9546e4bf98a63544d6e76a92116da5bf670` makes the sole surviving source change by requiring `coverage_wilson_lower > 0.0` for exact all-covered evidence. Changelog `e3a2f4a27a9355c77c2aa9aad92793d254536439`; research/current #488 `b6a6604b405a1119357813fa4d97b54a4d9a4b01`.
 
-The new check is deliberately necessary rather than falsely sufficient. `ValidationReport` does not retain the interval-coverage denominator or Wilson critical value `z`, so exact recomputation, confidence-level interpretation, and denominator provenance cannot be proved from the current artifact. That limitation is GAP-071 rather than information inferred by the current repair. The producer also permits positive `z` values whose squared binary64 representation underflows to zero; artifact admission therefore does not invent a non-degeneracy rule that the producer itself does not guarantee.
+The prior pair-coherence lineage remains intact: RED `a839c606fb2329ce1b339eb235c79e02abf40e16`; causal admission repair `38c5b8e83fe2433167afb6ece13e72b6608ceb03`; asymmetric/complement edge `c1cb16a78499648c10d6d5a8dad5e212a267064a`; changelog `6af0821bc2fca3e9f101cfa4ad36048ecfaa6ddd`; dependent-fixture doctoring through `59e40b4f0ebbb3b991c84724ded157ffe974abcd`.
 
-Self-review changed old unrelated report fixtures from arbitrary Wilson-looking values to the exactly coherent `p=0.5`, `[0.2,0.8]` pair. Typed RMSE RED fixtures were also rechecked against predecessor generic `MonteCarloSummary` support so each test still fails for the intended typed invariant rather than an earlier generic one. No coverage or security gate was weakened.
+The artifact checks remain deliberately necessary rather than falsely sufficient. `ValidationReport` does not retain the interval-coverage denominator or Wilson critical value `z`, so exact recomputation, confidence-level interpretation, and denominator provenance cannot be proved from the current artifact. That limitation remains GAP-071 rather than information inferred by the current repairs.
 
 Wilson (1927) remains the primary score-interval reference. AERA/APA/NCME (2014) remains the current published testing-standards edition while revision is underway. Exact-head hosted Rust/documentation/security/supply-chain/100%-coverage gates and a qualifying independent current-head review remain required.
 
@@ -104,7 +104,7 @@ Wilson (1927) remains the primary score-interval reference. AERA/APA/NCME (2014)
 
 ### #480 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires a released contextual-orchestrator owner contract. Its exact source head remains `01f45a99392457334a4f6d3d659f992af739eeee`. Fresh owner main is `17095dad706199a2e108ea6c20d7e6f1f5ac3b89`, but contextual-orchestrator still has zero GitHub releases. #480 therefore remains Draft until an immutable compatible release plus deployment/auth/schema/artifact provenance exists. Mutable owner main is evidence, not a production contract.
+#480 removes TEPP-owned provider discovery/ranking and requires a released contextual-orchestrator owner contract. Its exact source head remains `01f45a99392457334a4f6d3d659f992af739eeee`. Fresh owner main is `60c562defc81fb1897fa97ebdb5bf8f69eae0c55`, but contextual-orchestrator still has zero GitHub releases. #480 therefore remains Draft until an immutable compatible release plus deployment/auth/schema/artifact provenance exists. Mutable owner main is evidence, not a production contract.
 
 ## Gap register
 
@@ -181,6 +181,7 @@ Wilson (1927) remains the primary score-interval reference. AERA/APA/NCME (2014)
 | GAP-069 | Two-replication distinct nearest-rank endpoints could exhaust the retained sample while the stored mean or SD remained impossible | `verification-pending` | RED `81bf0d9e...` + causal repair `d48f8fef...` + mean coverage `fb314d8a...` + branch cleanup `440b78d8...` + changelog `45116498...` + research; #488 `1246c583...`; exact-head GREEN/review/main integration |
 | GAP-070 | Stored Wilson bounds could contain empirical coverage while the lower/upper pair could not arise from one Wilson score interval for that same coverage | `verification-pending` | RED `a839c606...` + causal repair `38c5b8e8...` + complementary edge `c1cb16a7...` + changelog `6af0821b...` + dependent fixture doctoring + research/current #488 `1246c583...`; exact-head GREEN/review/main integration |
 | GAP-071 | Durable Wilson coverage evidence does not retain the empirical denominator or critical value, so exact recomputation, confidence-level interpretation, and denominator provenance cannot be verified from `ValidationReport` alone | `active-design` | add versioned coverage-evidence provenance carrying retained denominator and critical-value/confidence-level semantics; RED round-trip/recompute contracts; preserve backward migration and fail closed when provenance is required but absent |
+| GAP-072 | Exact all-covered Wilson evidence could retain a zero lower endpoint even though the canonical non-empty finite-`z²` producer always emits `n/(n+z²) > 0` | `verification-pending` | RED `ce714f07...` + non-force source-restore RCA `18499052...` + causal repair `72e9d954...` + changelog `e3a2f4a2...` + research/current #488 `b6a6604b...`; exact-head GREEN/review/main integration |
 
 ## Release gate
 
