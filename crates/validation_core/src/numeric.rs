@@ -49,7 +49,7 @@ pub(crate) fn deterministic_compensated_sum(values: Vec<f64>) -> f64 {
     sum + correction
 }
 
-fn exact_power_of_two_scale(max_magnitude: f64) -> f64 {
+pub(crate) fn exact_power_of_two_scale(max_magnitude: f64) -> f64 {
     let bits = max_magnitude.to_bits();
     let exponent = (bits >> 52) & 0x7ff;
     if exponent == 0 {
