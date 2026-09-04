@@ -9,7 +9,7 @@
 //! parameter match counts, RMSE, bias, interval coverage with Wilson bounds,
 //! temporal-order accuracy, relation precision/recall, and SE-aware Monte Carlo
 //! acceptance gates. ADR 0014 claim authorities are promoted only by exact-head
-//! evidence; queued, predecessor, skipped, and L-head LLM judgments fail closed.
+//! evidence; queued, predecessor, skipped, and LLM judgments fail closed.
 //! Metrics are pure `f64` CPU reference implementations.
 
 mod bias;
@@ -31,13 +31,13 @@ mod validation_evidence;
 pub use bias::bias_standard_error;
 /// Mean signed bias.
 pub use bias::mean_bias;
-/// Four ADR 0016 claim authorities.
+/// Four ADR 0014 claim authorities.
 pub use claim::ClaimAuthority;
 /// One evidence item offered for promotion.
 pub use claim::ClaimEvidence;
 /// Kind of evidence offered for a promotion request.
 pub use claim::ClaimEvidenceKind;
-/// A claim bound to exact commit after every required gate passed.
+/// A claim bound to one exact commit after every required gate passed.
 pub use claim::PromotedClaim;
 /// Exact-head promotion request.
 pub use claim::PromotionRequest;
