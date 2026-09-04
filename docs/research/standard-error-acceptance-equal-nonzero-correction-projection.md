@@ -31,6 +31,8 @@ Edge commit `b463a991adc6ff98fa09f91eb428cda9e0ff1255` adds the sign-complementa
 
 Commit `7d597a18e043f3619b893981823b9be15ddb823c` keeps the existing decision hierarchy and changes only the unresolved equal-nonzero finite-tie branch. `represented_correction_le_exact_product_roundoff` decodes the represented factors and rounded product into integer significands and powers of two, forms the exact represented product and its exact signed roundoff in `u128`, and compares that exact roundoff with the represented subtraction correction.
 
+Self-review refinement `ca8c2b86a81cfa6e99a10bdcc141fc10d49ec011` removes generic zero/sign-mismatch branches that the equal-nonzero caller cannot reach. The helper now encodes those caller invariants as debug assertions and retains only the positive/negative signed orderings exercised by public contracts, avoiding a synthetic branch-coverage obligation with no production state behind it.
+
 The chosen repair avoids a second public decision authority, arbitrary-precision runtime dependency, decimal conversion, scale normalization, or a source copy from another CWL repository. The product significand is at most 106 bits, so the exact product and alignment required by this branch fit the existing `u128` numerical boundary.
 
 ## Alternatives rejected
@@ -48,7 +50,8 @@ The repair claims only the finite case where the directly rounded residual and b
 - Public RED: `35ea85ba5c049e3736e8549445bc799638cc6555`
 - Causal repair: `7d597a18e043f3619b893981823b9be15ddb823c`
 - Signed edge coverage: `b463a991adc6ff98fa09f91eb428cda9e0ff1255`
-- Contract test: `crates/validation_core/tests/standard_error_acceptance_equal_nonzero_correction_projection_contract.rs`
+- Branch-scope refinement: `ca8c2b86a81cfa6e99a10bdcc141fc10d49ec011`
+- Contract test: `crates/validation_core/tests/standard_error_acceptance_equal_nonzero-correction_projection_contract.rs`
 - CHANGELOG fragment: `CHANGELOG.d/validation-standard-error-acceptance-equal-nonzero-correction-projection.md`
 - Landing vehicle: PR #488; only its current exact head after documentation commits is authoritative for hosted checks and review.
 
