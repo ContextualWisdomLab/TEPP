@@ -7,9 +7,9 @@ fn report_with_rmse_summary(summary: MonteCarloSummary) -> ValidationReport {
         rmse_standard_error: 0.01,
         mean_bias: 0.0,
         bias_standard_error: 0.01,
-        interval_coverage: 0.95,
-        coverage_wilson_lower: 0.85,
-        coverage_wilson_upper: 0.99,
+        interval_coverage: 0.5,
+        coverage_wilson_lower: 0.2,
+        coverage_wilson_upper: 0.8,
         temporal_order_accuracy: 0.9,
         monte_carlo_rmse: Some(summary),
     }
@@ -37,7 +37,7 @@ fn validation_report_rejects_negative_monte_carlo_rmse_evidence() {
         mean: 0.02,
         standard_deviation: 0.03,
         standard_error: 0.006,
-        percentile_lower: -0.01,
+        percentile_lower: -0.1,
         percentile_upper: 0.07,
     });
     assert_eq!(
@@ -51,9 +51,9 @@ fn validation_report_rejects_negative_monte_carlo_rmse_evidence() {
         "rmse_standard_error":0.01,
         "mean_bias":0.0,
         "bias_standard_error":0.01,
-        "interval_coverage":0.95,
-        "coverage_wilson_lower":0.85,
-        "coverage_wilson_upper":0.99,
+        "interval_coverage":0.5,
+        "coverage_wilson_lower":0.2,
+        "coverage_wilson_upper":0.8,
         "temporal_order_accuracy":0.9,
         "monte_carlo_rmse":{
             "replication_count":20,
