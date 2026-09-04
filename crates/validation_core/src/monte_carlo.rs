@@ -5,6 +5,7 @@ use crate::input::require_finite;
 use crate::numeric::{deterministic_compensated_sum, deterministic_representable_mean};
 
 const STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+const EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
 /// Summary of Monte Carlo replications for a scalar metric.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -32,15 +33,20 @@ impl MonteCarloSummary {
     /// cross-language bit-for-bit equality, but rejects materially understated or
     /// overstated uncertainty. Zero spread requires zero SE and degenerate
     /// empirical percentile support at the represented mean; the same support
-    /// rule applies to the canonical singleton summary. Numeric equality keeps
-    /// IEEE `-0.0` and `+0.0` as one zero-valued scientific state.
+    /// rule applies to the canonical singleton summary. For positive spread,
+    /// nearest-rank percentile endpoints are retained observations and therefore
+    /// must fit the finite-sample moment support
+    /// `|x - mean| <= SD * (n - 1) / sqrt(n)`. The comparison is scale-normalized
+    /// so opposite-sign full-range finite values do not create an overflowing
+    /// validation-only subtraction or product. Numeric equality keeps IEEE
+    /// `-0.0` and `+0.0` as one zero-valued scientific state.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when counts or numeric fields
-    /// violate the summary contract, empirical support contradicts zero sample
-    /// spread, or the standard-error field is incoherent with the represented
-    /// sample spread/count.
+    /// violate the summary contract, empirical percentile support is impossible
+    /// for the represented mean/sample spread/count, or the standard-error field
+    /// is incoherent with the represented sample spread/count.
     pub fn validate(self) -> Result<Self, ValidationError> {
         if self.replication_count == 0 {
             return Err(ValidationError::InvalidInput);
@@ -82,6 +88,26 @@ impl MonteCarloSummary {
                 (self.standard_error / expected_standard_error - 1.0).abs();
             if !relative_error.is_finite() || relative_error > STANDARD_ERROR_RELATIVE_TOLERANCE {
                 return Err(ValidationError::InvalidInput);
+            }
+
+            let n = self.replication_count as f64;
+            let moment_factor = (n - 1.0) / n.sqrt();
+            for endpoint in [self.percentile_lower, self.percentile_upper] {
+                let scale = self
+                    .mean
+                    .abs()
+                    .max(endpoint.abs())
+                    .max(self.standard_deviation)
+                    .max(1.0);
+                let scaled_deviation = ((endpoint / scale) - (self.mean / scale)).abs();
+                let scaled_support = (self.standard_deviation / scale) * moment_factor;
+                if !scaled_deviation.is_finite()
+                    || !scaled_support.is_finite()
+                    || scaled_deviation
+                        > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
             }
         }
         Ok(self)
