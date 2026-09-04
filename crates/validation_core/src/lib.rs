@@ -9,7 +9,7 @@
 //! parameter match counts, RMSE, bias, interval coverage with Wilson bounds,
 //! temporal-order accuracy, relation precision/recall, and SE-aware Monte Carlo
 //! acceptance gates. ADR 0014 claim authorities are promoted only by exact-head
-//! evidence; queued, predecessor, skipped, and LLM judgments fail closed.
+//! evidence; queued, predecessor, skipped, and L-head LLM judgments fail closed.
 //! Metrics are pure `f64` CPU reference implementations.
 
 mod bias;
@@ -25,18 +25,19 @@ mod numeric;
 mod report;
 mod rmse;
 mod temporal_order;
+mod validation_evidence;
 
 /// Standard error of mean signed bias.
 pub use bias::bias_standard_error;
 /// Mean signed bias.
 pub use bias::mean_bias;
-/// Four ADR 0014 claim authorities.
+/// Four ADR 0016 claim authorities.
 pub use claim::ClaimAuthority;
 /// One evidence item offered for promotion.
 pub use claim::ClaimEvidence;
 /// Kind of evidence offered for a promotion request.
 pub use claim::ClaimEvidenceKind;
-/// A claim bound to one exact commit after every required gate passed.
+/// A claim bound to exact commit after every required gate passed.
 pub use claim::PromotedClaim;
 /// Exact-head promotion request.
 pub use claim::PromotionRequest;
@@ -78,3 +79,5 @@ pub use rmse::rmse_standard_error;
 pub use rmse::root_mean_square_error;
 /// Pairwise temporal-order accuracy.
 pub use temporal_order::temporal_order_accuracy;
+/// Versioned durable validation envelope binding projections to scientific provenance.
+pub use validation_evidence::ValidationEvidenceV1;
