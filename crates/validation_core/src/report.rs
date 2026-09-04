@@ -8,6 +8,23 @@ const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 const MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
+fn minority_zero_lower_is_rounding_feasible(p: f64, upper: f64) -> bool {
+    debug_assert!(p > 0.0 && p < 0.5);
+    debug_assert!(upper >= p && upper <= 1.0);
+
+    // Solving the Wilson root identity for the lower endpoint avoids the
+    // cancellation that makes the complement-form residual insensitive near
+    // p = 0. The multiplication order keeps p² from underflowing before the
+    // final represented lower root itself would round to zero.
+    let p_squared = p * p;
+    let denominator = p_squared + (1.0 - 2.0 * p) * upper;
+    if !denominator.is_finite() || denominator <= 0.0 {
+        return false;
+    }
+    let implied_lower = p * ((p / denominator) * (1.0 - upper));
+    implied_lower == 0.0
+}
+
 /// Check whether a stored Wilson endpoint pair can arise from one Wilson score interval.
 ///
 /// For empirical coverage `p` and `a = z² / n`, the Wilson roots satisfy
@@ -16,15 +33,29 @@ const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 /// the equivalent identity on the uncovered proportion avoids squaring a tiny
 /// `p`. All terms remain probability-scaled, so a small absolute binary64
 /// tolerance is sufficient without overflow-prone reconstruction of `n` or `z`.
-/// At exact all-covered `p = 1`, the eliminated identity is degenerate, while the
-/// canonical producer still requires the lower endpoint `n / (n + z²)` to be
-/// strictly positive for every non-empty sample and finite represented `z²`.
+/// A boundary endpoint needs one additional peer-root check: the eliminated
+/// identity can lose all sensitivity to a representable minority lower root when
+/// the stored lower endpoint is exact zero. The complement-symmetric case applies
+/// to an exact-one upper endpoint above `p = 0.5`. At exact all-covered `p = 1`,
+/// the eliminated identity is degenerate, while the canonical producer still
+/// requires the lower endpoint `n / (n + z²)` to be strictly positive for every
+/// non-empty sample and finite represented `z²`.
 fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool {
     if p == 0.0 {
         return true;
     }
     if p == 1.0 {
         return lower > 0.0;
+    }
+
+    if p < 0.5 && lower == 0.0 && !minority_zero_lower_is_rounding_feasible(p, upper) {
+        return false;
+    }
+    if p > 0.5
+        && upper == 1.0
+        && !minority_zero_lower_is_rounding_feasible(1.0 - p, 1.0 - lower)
+    {
+        return false;
     }
 
     let endpoint_sum = lower + upper;
@@ -81,21 +112,22 @@ impl ValidationReport {
     /// accuracy are probabilities in `[0, 1]`; the Wilson interval is ordered,
     /// contains the empirical coverage recorded in the same report, and its two
     /// endpoints must satisfy the same Wilson-score root identity for that
-    /// coverage. This prevents two individually plausible bounds from being
-    /// combined into an interval that no finite positive Wilson `z² / n` can
-    /// produce. Mean signed bias remains unrestricted in sign. A generic
-    /// [`MonteCarloSummary`] may summarize a signed metric, but when it occupies
-    /// `monte_carlo_rmse` every retained replication is nonnegative. Its mean and
-    /// percentile endpoints are therefore nonnegative. Nonnegative sample support
-    /// additionally implies `SD <= sqrt(n) * mean`, `SE(mean) <= mean`, and every
-    /// retained value—and thus every inclusive nearest-rank percentile endpoint—is
-    /// at most `n * mean`. Admission evaluates the percentile support as
-    /// `endpoint / mean <= n` with a small relative binary64 tolerance so the check
-    /// does not overflow a finite sample sum. A zero Monte Carlo RMSE mean is exact
-    /// perfect recovery across every retained replication, so spread, standard
-    /// error, and empirical percentile endpoints must all be zero as well. These
-    /// checks prevent a finite but scientifically impossible payload from becoming
-    /// durable Validation Evidence.
+    /// coverage. A stored zero/one endpoint is additionally refused when the peer
+    /// endpoint implies a representable non-boundary Wilson root. This prevents two
+    /// individually plausible bounds from being combined into an interval that no
+    /// finite positive Wilson `z² / n` can produce. Mean signed bias remains
+    /// unrestricted in sign. A generic [`MonteCarloSummary`] may summarize a signed
+    /// metric, but when it occupies `monte_carlo_rmse` every retained replication is
+    /// nonnegative. Its mean and percentile endpoints are therefore nonnegative.
+    /// Nonnegative sample support additionally implies `SD <= sqrt(n) * mean`,
+    /// `SE(mean) <= mean`, and every retained value—and thus every inclusive
+    /// nearest-rank percentile endpoint—is at most `n * mean`. Admission evaluates
+    /// the percentile support as `endpoint / mean <= n` with a small relative
+    /// binary64 tolerance so the check does not overflow a finite sample sum. A
+    /// zero Monte Carlo RMSE mean is exact perfect recovery across every retained
+    /// replication, so spread, standard error, and empirical percentile endpoints
+    /// must all be zero as well. These checks prevent a finite but scientifically
+    /// impossible payload from becoming durable Validation Evidence.
     ///
     /// # Errors
     ///
