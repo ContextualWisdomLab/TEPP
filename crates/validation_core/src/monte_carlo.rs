@@ -320,6 +320,19 @@ fn scaled_u128_le(
     (lhs_significand << lhs_shift) <= (rhs_significand << rhs_shift)
 }
 
+/// Compare one represented nonnegative binary64 magnitude with an exact product of two represented factors.
+fn represented_magnitude_le_exact_product(value: f64, factor_a: f64, factor_b: f64) -> bool {
+    let (value_significand, value_exponent) = binary64_magnitude_components(value);
+    let (a_significand, a_exponent) = binary64_magnitude_components(factor_a);
+    let (b_significand, b_exponent) = binary64_magnitude_components(factor_b);
+    scaled_u128_le(
+        value_significand as u128,
+        value_exponent,
+        (a_significand as u128) * (b_significand as u128),
+        a_exponent + b_exponent,
+    )
+}
+
 /// Compare the exact represented residual magnitude with `k * SE` after both direct operations overflow.
 fn both_overflow_acceptance(
     estimate: f64,
@@ -371,8 +384,12 @@ fn subtraction_roundoff(minuend: f64, subtrahend: f64, difference: f64) -> f64 {
 /// and nonzero, TEPP compares the error-free subtraction correction (with its sign
 /// adjusted for the absolute residual) with the fused multiply-add product
 /// correction. Different correction projections preserve the represented-input
-/// ordering even when either direct operation rounded to the same binary64 value;
-/// equal projected corrections remain on the ordinary rounded decision instead of
+/// ordering even when either direct operation rounded to the same binary64 value.
+/// When both projected corrections are zero at a subnormal rounded bound and the
+/// subtraction was exact, TEPP compares that represented residual with the exact
+/// dyadic product of the represented `k` and `se`; this prevents FMA-underflowed
+/// product error from turning a strict rejection into equality. Other equal
+/// correction projections remain on the ordinary rounded decision instead of
 /// claiming a broader exact comparator. This also preserves a positive acceptance
 /// bound when dividing `se` by a much larger estimate/target scale would underflow
 /// to zero. If only the positive bound overflows, every finite residual is covered;
@@ -423,6 +440,13 @@ pub fn accept_within_standard_errors(
                 let product_roundoff = k.mul_add(standard_error, -direct_bound);
                 if residual_roundoff != product_roundoff {
                     return Ok(residual_roundoff < product_roundoff);
+                }
+                if residual_roundoff == 0.0 && direct_bound.is_subnormal() {
+                    return Ok(represented_magnitude_le_exact_product(
+                        residual,
+                        k,
+                        standard_error,
+                    ));
                 }
             }
             return Ok(residual <= direct_bound);
