@@ -38,10 +38,13 @@ impl MonteCarloSummary {
     /// must fit the support implied directly by the recorded sample spread:
     /// `|x - mean| <= SD * sqrt(n - 1)`. Distinct lower and upper endpoints are
     /// distinct retained values, so their squared deviations must also fit the
-    /// same total `(n - 1) * SD^2` deviation budget jointly. These rules remain
-    /// valid when the represented binary64 mean is a rounded projection of the
-    /// mathematical sample mean. Comparisons are scale-normalized so opposite-sign
-    /// full-range finite values do not create overflowing validation-only arithmetic.
+    /// same total `(n - 1) * SD^2` deviation budget jointly. With exactly two
+    /// replications, two distinct nearest-rank endpoint values exhaust the sample;
+    /// the recorded mean and sample SD must therefore agree with the summary of
+    /// those two endpoint values themselves. These rules remain valid when the
+    /// represented binary64 mean is a rounded projection of the mathematical
+    /// sample mean. Comparisons are scale-normalized so opposite-sign full-range
+    /// finite values do not create overflowing validation-only arithmetic.
     /// Numeric equality keeps IEEE `-0.0` and `+0.0` as one zero-valued scientific state.
     ///
     /// # Errors
@@ -131,6 +134,29 @@ impl MonteCarloSummary {
                         > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
                 {
                     return Err(ValidationError::InvalidInput);
+                }
+
+                if self.replication_count == 2 {
+                    let endpoint_samples = [self.percentile_lower, self.percentile_upper];
+                    let expected_mean = deterministic_representable_mean(&endpoint_samples)?;
+                    let expected_standard_deviation =
+                        scaled_sample_standard_deviation(&endpoint_samples, expected_mean)?;
+                    for (recorded, expected) in [
+                        (self.mean, expected_mean),
+                        (self.standard_deviation, expected_standard_deviation),
+                    ] {
+                        let coherence_scale = recorded.abs().max(expected.abs());
+                        if coherence_scale == 0.0 {
+                            continue;
+                        }
+                        let relative_distance =
+                            ((recorded / coherence_scale) - (expected / coherence_scale)).abs();
+                        if !relative_distance.is_finite()
+                            || relative_distance > EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE
+                        {
+                            return Err(ValidationError::InvalidInput);
+                        }
+                    }
                 }
             }
         }
@@ -264,7 +290,7 @@ pub fn summarize_replications(
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
 ///
 /// Comparison scales all terms by a shared finite magnitude so opposite-sign
-/// extremes do not overflow both sides of the inequality to infinity. A zero
+/// extremes do not overflow both finite sides of the inequality to infinity. A zero
 /// standard error or zero multiplier is an exact-recovery gate and is compared
 /// before scale reduction so a huge SE cannot erase a nonzero residual. Exact
 /// recovery uses numeric equality, for which IEEE `-0.0` and `+0.0` denote the
@@ -429,7 +455,7 @@ mod tests {
         assert_eq!(
             MonteCarloSummary {
                 replication_count: 2,
-                mean: 0.0,
+                f64::NAN,
                 standard_deviation: 0.0,
                 standard_error: -0.1,
                 percentile_lower: 0.0,
