@@ -151,6 +151,20 @@ fn rationalized_wilson_positive_lower_from_inverse_sample_count(
     (numerator / denominator).clamp(0.0, 1.0)
 }
 
+fn all_covered_wilson_lower_from_inverse_sample_count(inverse_n: f64, z2: f64) -> f64 {
+    let z2_over_n = z2 * inverse_n;
+    if z2_over_n <= 1.0 {
+        // For small z²/n, 1 / (1 + z²/n) can round to exact one before the
+        // finite-sample miss mass is represented. Subtract the miss mass instead.
+        let uncovered_mass = z2_over_n / (1.0 + z2_over_n);
+        (1.0 - uncovered_mass).clamp(0.0, 1.0)
+    } else {
+        // For large z²/n, the complementary miss mass rounds to exact one and
+        // subtraction would erase an ordinary positive lower endpoint.
+        (1.0 / (1.0 + z2_over_n)).clamp(0.0, 1.0)
+    }
+}
+
 fn wilson_bounds_from_represented_proportion(
     n: f64,
     p: f64,
@@ -248,9 +262,10 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 
     if covered_count == sample_count {
         if let Some(inverse_n) = inverse_n {
-            let z2_over_n = z2 * inverse_n;
-            let uncovered_mass = z2_over_n / (1.0 + z2_over_n);
-            return Ok(((1.0 - uncovered_mass).clamp(0.0, 1.0), 1.0));
+            return Ok((
+                all_covered_wilson_lower_from_inverse_sample_count(inverse_n, z2),
+                1.0,
+            ));
         }
         return Ok((n / (n + z2), 1.0));
     }
@@ -287,10 +302,11 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 /// ratio before Wilson evaluation. When the exact sample count itself is not
 /// binary64-representable, Wilson scale terms are evaluated through the
 /// correctly rounded reciprocal `1 / n` rather than a pre-rounded `n as f64`;
-/// the all-covered branch uses the complementary miss mass so representable
-/// uncertainty immediately below one is not erased. Near the all-covered
-/// boundary, the smaller uncovered count is evaluated and reflected by Wilson
-/// complement symmetry.
+/// the all-covered branch switches between complementary-miss and direct
+/// reciprocal forms at `z² / n = 1`, preserving both tiny uncertainty below one
+/// and positive lower endpoints under extreme finite critical values. Near the
+/// all-covered boundary, the smaller uncovered count is evaluated and reflected
+/// by Wilson complement symmetry.
 ///
 /// # Errors
 ///
