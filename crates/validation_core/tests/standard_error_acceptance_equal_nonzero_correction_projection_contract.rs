@@ -35,3 +35,20 @@ fn equal_nonzero_correction_projection_preserves_exact_acceptance() {
     assert!(accept_within_standard_errors(estimate, target, standard_error, k)
         .expect("finite represented inputs"));
 }
+
+#[test]
+fn equal_negative_correction_projection_preserves_exact_rejection() {
+    // The same projection collision also exists below the rounded value. Here
+    // both first-order corrections are the same negative subnormal, but the
+    // exact product lies slightly farther below the rounded bound than the exact
+    // residual does. The strict inequality therefore remains a rejection.
+    let estimate = f64::from_bits(0x018b_af20_e855_2bb6);
+    let correction = f64::from_bits(0x0000_0000_005d_636);
+    let target = correction;
+    let k = f64::from_bits(0x2c70_fef0_d26f_1ed);
+    let standard_error = f64::from_bits(0x150b_cc8f_a576_9411);
+
+    assert_eq!(estimate - target, k * standard_error);
+    assert!(!accept_within_standard_errors(estimate, target, standard_error, k)
+        .expect("finite represented inputs"));
+}
