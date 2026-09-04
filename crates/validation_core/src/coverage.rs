@@ -2,17 +2,11 @@
 
 use crate::ValidationError;
 
-/// Empirical coverage of closed intervals `[lower, upper]` for truth values.
-///
-/// # Errors
-///
-/// Returns [`ValidationError::InvalidInput`] when vectors are empty, lengths
-/// differ, bounds are non-finite, or any interval is inverted (`lower > upper`).
-pub fn interval_coverage(
+pub(crate) fn interval_covered_count(
     truth: &[f64],
     lower: &[f64],
     upper: &[f64],
-) -> Result<f64, ValidationError> {
+) -> Result<usize, ValidationError> {
     if truth.is_empty() || truth.len() != lower.len() || truth.len() != upper.len() {
         return Err(ValidationError::InvalidInput);
     }
@@ -27,12 +21,25 @@ pub fn interval_coverage(
         if lo > hi {
             return Err(ValidationError::InvalidInput);
         }
-        let low_ok = t >= lo;
-        let high_ok = t <= hi;
-        if low_ok && high_ok {
+        if t >= lo && t <= hi {
             covered += 1;
         }
     }
+    Ok(covered)
+}
+
+/// Empirical coverage of closed intervals `[lower, upper]` for truth values.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when vectors are empty, lengths
+/// differ, bounds are non-finite, or any interval is inverted (`lower > upper`).
+pub fn interval_coverage(
+    truth: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+) -> Result<f64, ValidationError> {
+    let covered = interval_covered_count(truth, lower, upper)?;
     Ok(covered as f64 / truth.len() as f64)
 }
 
@@ -56,6 +63,49 @@ fn rationalized_wilson_positive_lower(n: f64, p: f64, z: f64, z2: f64) -> f64 {
     let denominator =
         z2 + 2.0 * n * p + z * (z2 + 4.0 * n * p * (1.0 - p)).sqrt();
     (numerator / denominator).clamp(0.0, 1.0)
+}
+
+pub(crate) fn wilson_coverage_interval_from_counts(
+    covered_count: usize,
+    sample_count: usize,
+    z: f64,
+) -> Result<(f64, f64), ValidationError> {
+    if sample_count == 0 || covered_count > sample_count {
+        return Err(ValidationError::InvalidInput);
+    }
+    if !z.is_finite() || z <= 0.0 {
+        return Err(ValidationError::InvalidConfiguration);
+    }
+
+    let p = covered_count as f64 / sample_count as f64;
+    let n = sample_count as f64;
+    let z2 = z * z;
+    if !z2.is_finite() {
+        return Err(ValidationError::InvalidConfiguration);
+    }
+    if p == 1.0 {
+        return Ok((n / (n + z2), 1.0));
+    }
+
+    let low = if p > 0.0 {
+        rationalized_wilson_positive_lower(n, p, z, z2)
+    } else {
+        0.0
+    };
+
+    let denominator = 1.0 + z2 / n;
+    let center = p + z2 / (2.0 * n);
+    let radical = (p * (1.0 - p) / n) + z2 / (4.0 * n * n);
+    // With finite z² and coverage p in [0,1], Wilson terms remain finite.
+    let margin = z * radical.sqrt();
+    let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
+    let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
+        let uncovered_lower = rationalized_wilson_positive_lower(n, 1.0 - p, z, z2);
+        (1.0 - uncovered_lower).clamp(0.0, 1.0)
+    } else {
+        direct_high
+    };
+    Ok((low, high))
 }
 
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
@@ -85,35 +135,8 @@ pub fn wilson_coverage_interval(
     if !z.is_finite() || z <= 0.0 {
         return Err(ValidationError::InvalidConfiguration);
     }
-    let p = interval_coverage(truth, lower, upper)?;
-    let n = truth.len() as f64;
-    let z2 = z * z;
-    if !z2.is_finite() {
-        return Err(ValidationError::InvalidConfiguration);
-    }
-    if p == 1.0 {
-        return Ok((n / (n + z2), 1.0));
-    }
-
-    let low = if p > 0.0 {
-        rationalized_wilson_positive_lower(n, p, z, z2)
-    } else {
-        0.0
-    };
-
-    let denominator = 1.0 + z2 / n;
-    let center = p + z2 / (2.0 * n);
-    let radical = (p * (1.0 - p) / n) + z2 / (4.0 * n * n);
-    // With finite z² and coverage p in [0,1], Wilson terms remain finite.
-    let margin = z * radical.sqrt();
-    let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
-    let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
-        let uncovered_lower = rationalized_wilson_positive_lower(n, 1.0 - p, z, z2);
-        (1.0 - uncovered_lower).clamp(0.0, 1.0)
-    } else {
-        direct_high
-    };
-    Ok((low, high))
+    let covered_count = interval_covered_count(truth, lower, upper)?;
+    wilson_coverage_interval_from_counts(covered_count, truth.len(), z)
 }
 
 #[cfg(test)]
