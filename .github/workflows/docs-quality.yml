@@ -13,7 +13,6 @@ on:
       - ".github/workflows/**"
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
-      - "crates/**"
   push:
     branches:
       - main
@@ -23,15 +22,14 @@ on:
       - ".github/workflows/**"
       - "scripts/validate_documentation.py"
       - "tests/quality/test_validate_documentation.py"
-      - "crates/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: docs-quality-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: docs-quality-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   validate:
