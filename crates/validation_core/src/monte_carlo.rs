@@ -287,12 +287,14 @@ pub fn summarize_replications(
 
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
 ///
-/// Comparison scales all terms by a shared finite magnitude so opposite-sign
-/// extremes do not overflow both sides of the inequality to infinity. A zero
-/// standard error or zero multiplier is an exact-recovery gate and is compared
-/// before scale reduction so a huge SE cannot erase a nonzero residual. Exact
-/// recovery uses numeric equality, for which IEEE `-0.0` and `+0.0` denote the
-/// same zero-valued scientific result.
+/// Finite represented residuals and finite represented `k · se` bounds are
+/// compared before normalization. This preserves a positive acceptance bound
+/// when dividing `se` by a much larger estimate/target scale would underflow to
+/// zero. Scale-normalized comparison is reserved for the only ambiguous binary64
+/// case: both the direct residual subtraction and direct bound multiplication
+/// overflow. A zero standard error or zero multiplier remains an exact-recovery
+/// gate and is compared before either path. Exact recovery uses numeric equality,
+/// for which IEEE `-0.0` and `+0.0` denote the same zero-valued scientific result.
 ///
 /// # Errors
 ///
@@ -317,6 +319,22 @@ pub fn accept_within_standard_errors(
         // Exact recovery is numerical equality; signed zero is one zero value.
         return Ok(estimate == target);
     }
+
+    let direct_error = estimate - target;
+    let direct_bound = k * standard_error;
+    if direct_error.is_finite() {
+        if direct_bound.is_finite() {
+            return Ok(direct_error.abs() <= direct_bound);
+        }
+        // A finite residual is necessarily inside a positive bound whose
+        // represented multiplication overflowed beyond binary64's finite range.
+        return Ok(true);
+    }
+    if direct_bound.is_finite() {
+        // The represented residual overflowed while the positive bound did not.
+        return Ok(false);
+    }
+
     let scale = estimate
         .abs()
         .max(target.abs())
@@ -324,7 +342,6 @@ pub fn accept_within_standard_errors(
         .max(1.0);
     let scaled_error = (estimate / scale) - (target / scale);
     let scaled_bound = k * (standard_error / scale);
-    // scale is at least 1.0 and all inputs are finite, so scaled terms are finite.
     Ok(scaled_error.abs() <= scaled_bound)
 }
 
