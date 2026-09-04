@@ -29,3 +29,29 @@ fn durable_wilson_endpoint_does_not_pre_round_exact_sample_count() {
     assert_eq!(evidence.wilson_lower.to_bits(), 0x3fc2_4924_82c4_3bea);
     assert_eq!(evidence.wilson_upper.to_bits(), 0x3fc2_4924_a1ce_0d41);
 }
+
+#[test]
+fn durable_all_covered_lower_does_not_round_exact_sample_size_away() {
+    // At n = 2^55 + 3 the exact all-covered Wilson lower endpoint for z = 1.96
+    // rounds to next_down(1.0). Materializing n as f64 first, or adding z^2/n
+    // to 1.0 before inversion, rounds the uncertainty away and returns exact 1.
+    // The complement form 1 - (z^2/n)/(1 + z^2/n) preserves the representable
+    // nonzero miss mass for this exact count provenance.
+    let json = r#"{
+        "schema":"tepp.wilson_coverage_evidence.v1",
+        "sample_count":36028797018963971,
+        "covered_count":36028797018963971,
+        "critical_value_kind":"standard_normal_z",
+        "interval_sidedness":"two_sided",
+        "normal_critical_value":1.96,
+        "empirical_coverage":1.0,
+        "wilson_lower":0.9999999999999999,
+        "wilson_upper":1.0
+    }"#;
+
+    let evidence: WilsonCoverageEvidenceV1 = serde_json::from_str(json)
+        .expect("all-covered exact count provenance must retain Wilson uncertainty");
+
+    assert_eq!(evidence.wilson_lower.to_bits(), 1.0_f64.to_bits() - 1);
+    assert_eq!(evidence.wilson_upper, 1.0);
+}
