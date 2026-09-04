@@ -35,11 +35,12 @@ impl MonteCarloSummary {
     /// empirical percentile support at the represented mean; the same support
     /// rule applies to the canonical singleton summary. For positive spread,
     /// nearest-rank percentile endpoints are retained observations and therefore
-    /// must fit the finite-sample moment support
-    /// `|x - mean| <= SD * (n - 1) / sqrt(n)`. The comparison is scale-normalized
-    /// so opposite-sign full-range finite values do not create an overflowing
-    /// validation-only subtraction or product. Numeric equality keeps IEEE
-    /// `-0.0` and `+0.0` as one zero-valued scientific state.
+    /// must fit the support implied directly by the recorded sample spread:
+    /// `|x - mean| <= SD * sqrt(n - 1)`. This remains valid when the represented
+    /// binary64 mean is a rounded projection of the mathematical sample mean.
+    /// The comparison is scale-normalized so opposite-sign full-range finite
+    /// values do not create an overflowing validation-only subtraction or product.
+    /// Numeric equality keeps IEEE `-0.0` and `+0.0` as one zero-valued scientific state.
     ///
     /// # Errors
     ///
@@ -90,8 +91,7 @@ impl MonteCarloSummary {
                 return Err(ValidationError::InvalidInput);
             }
 
-            let n = self.replication_count as f64;
-            let moment_factor = (n - 1.0) / n.sqrt();
+            let moment_factor = ((self.replication_count - 1) as f64).sqrt();
             for endpoint in [self.percentile_lower, self.percentile_upper] {
                 let scale = self
                     .mean
