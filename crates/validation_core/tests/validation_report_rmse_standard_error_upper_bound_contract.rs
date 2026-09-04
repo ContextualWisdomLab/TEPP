@@ -9,9 +9,9 @@ fn report_with(rmse: f64, rmse_standard_error: f64) -> ValidationReport {
         rmse_standard_error,
         mean_bias: 0.0,
         bias_standard_error: 0.0,
-        interval_coverage: 0.95,
-        coverage_wilson_lower: 0.90,
-        coverage_wilson_upper: 0.98,
+        interval_coverage: 0.5,
+        coverage_wilson_lower: 0.2,
+        coverage_wilson_upper: 0.8,
         temporal_order_accuracy: 1.0,
         monte_carlo_rmse: None,
     }
@@ -38,6 +38,6 @@ fn report_rejects_rmse_standard_error_above_squared_residual_support_bound() {
         Err(ValidationError::InvalidInput)
     );
 
-    let ingress = r#"{"study_label":"rmse-se-support","rmse":0.2,"rmse_standard_error":0.11,"mean_bias":0.0,"bias_standard_error":0.0,"interval_coverage":0.95,"coverage_wilson_lower":0.9,"coverage_wilson_upper":0.98,"temporal_order_accuracy":1.0,"monte_carlo_rmse":null}"#;
+    let ingress = r#"{"study_label":"rmse-se-support","rmse":0.2,"rmse_standard_error":0.11,"mean_bias":0.0,"bias_standard_error":0.0,"interval_coverage":0.5,"coverage_wilson_lower":0.2,"coverage_wilson_upper":0.8,"temporal_order_accuracy":1.0,"monte_carlo_rmse":null}"#;
     assert!(serde_json::from_str::<ValidationReport>(ingress).is_err());
 }
