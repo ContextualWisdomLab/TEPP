@@ -28,6 +28,51 @@ pub(crate) fn interval_covered_count(
     Ok(covered)
 }
 
+fn correctly_rounded_unit_ratio(numerator: u64, denominator: u64) -> f64 {
+    debug_assert!(denominator > 0);
+    debug_assert!(numerator <= denominator);
+    if numerator == 0 {
+        return 0.0;
+    }
+
+    // u64/u64 lies in [2^-64, 1], so its binary64 result is always normal.
+    // Determine floor(log2(numerator/denominator)) without first rounding either
+    // integer to f64, then round the exact scaled significand ties-to-even.
+    let numerator_bits = 64_i32 - numerator.leading_zeros() as i32;
+    let denominator_bits = 64_i32 - denominator.leading_zeros() as i32;
+    let mut exponent = numerator_bits - denominator_bits;
+    if exponent == 0 {
+        if numerator < denominator {
+            exponent = -1;
+        }
+    } else {
+        let exponent_shift = (-exponent) as u32;
+        if (numerator as u128) << exponent_shift < denominator as u128 {
+            exponent -= 1;
+        }
+    }
+
+    let significand_shift = (52 - exponent) as u32;
+    let scaled_numerator = (numerator as u128) << significand_shift;
+    let denominator_u128 = denominator as u128;
+    let quotient = scaled_numerator / denominator_u128;
+    let remainder = scaled_numerator % denominator_u128;
+    let twice_remainder = remainder << 1;
+    let round_up = twice_remainder > denominator_u128
+        || (twice_remainder == denominator_u128 && quotient & 1 == 1);
+    let mut significand = quotient + u128::from(round_up);
+
+    if significand == 1_u128 << 53 {
+        significand >>= 1;
+        exponent += 1;
+    }
+
+    debug_assert!((1_u128 << 52..1_u128 << 53).contains(&significand));
+    let biased_exponent = (exponent + 1023) as u64;
+    let fraction = significand as u64 - (1_u64 << 52);
+    f64::from_bits((biased_exponent << 52) | fraction)
+}
+
 pub(crate) fn represented_coverage_from_counts(
     covered_count: u64,
     sample_count: u64,
@@ -35,14 +80,7 @@ pub(crate) fn represented_coverage_from_counts(
     if sample_count == 0 || covered_count > sample_count {
         return Err(ValidationError::InvalidInput);
     }
-    let uncovered_count = sample_count - covered_count;
-    let n = sample_count as f64;
-    let coverage = if covered_count <= uncovered_count {
-        covered_count as f64 / n
-    } else {
-        1.0 - uncovered_count as f64 / n
-    };
-    Ok(coverage)
+    Ok(correctly_rounded_unit_ratio(covered_count, sample_count))
 }
 
 /// Empirical coverage of closed intervals `[lower, upper]` for truth values.
@@ -131,11 +169,11 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 
     let uncovered_count = sample_count - covered_count;
     if covered_count > uncovered_count {
-        // Near all-covered samples can lose the observed misses if both integer
-        // counts are independently rounded to binary64 before division. Wilson
-        // intervals are complement-symmetric, so evaluate the smaller uncovered
-        // proportion and reflect its endpoints instead.
-        let uncovered = uncovered_count as f64 / n;
+        // Near all-covered samples can lose observed misses if both integer
+        // counts are independently rounded before division. Wilson intervals
+        // are complement-symmetric, so evaluate the correctly rounded smaller
+        // uncovered proportion and reflect its endpoints instead.
+        let uncovered = correctly_rounded_unit_ratio(uncovered_count, sample_count);
         let (uncovered_low, uncovered_high) =
             wilson_bounds_from_represented_proportion(n, uncovered, z, z2);
         return Ok((
@@ -144,7 +182,7 @@ pub(crate) fn wilson_coverage_interval_from_counts(
         ));
     }
 
-    let p = covered_count as f64 / n;
+    let p = correctly_rounded_unit_ratio(covered_count, sample_count);
     Ok(wilson_bounds_from_represented_proportion(n, p, z, z2))
 }
 
@@ -157,9 +195,9 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 /// evaluated through the algebraically rationalized positive root rather than
 /// `center - margin`; the implementation switches scale at `z² = 1` so the
 /// stable form neither suffers large-z cancellation nor small-z division
-/// overflow. Near the all-covered boundary, the smaller uncovered count is
-/// evaluated and reflected by Wilson complement symmetry so distinct integer
-/// counts are not erased when they exceed binary64's exact-integer range.
+/// overflow. Count proportions are rounded to binary64 from their exact integer
+/// ratio before Wilson evaluation. Near the all-covered boundary, the smaller
+/// uncovered count is evaluated and reflected by Wilson complement symmetry.
 ///
 /// # Errors
 ///
@@ -180,8 +218,40 @@ pub fn wilson_coverage_interval(
 
 #[cfg(test)]
 mod tests {
-    use super::{interval_coverage, wilson_coverage_interval};
+    use super::{
+        correctly_rounded_unit_ratio, interval_coverage, wilson_coverage_interval,
+    };
     use crate::ValidationError;
+
+    #[test]
+    fn exact_integer_ratio_rounding_covers_binary64_boundaries() {
+        assert_eq!(correctly_rounded_unit_ratio(0, 3), 0.0);
+        assert_eq!(correctly_rounded_unit_ratio(1, 1), 1.0);
+        assert_eq!(correctly_rounded_unit_ratio(1, 2), 0.5);
+        assert_eq!(correctly_rounded_unit_ratio(1, 3), 1.0 / 3.0);
+
+        // Halfway between 0.5 and its successor: lower significand is even.
+        assert_eq!(
+            correctly_rounded_unit_ratio((1_u64 << 53) + 1, 1_u64 << 54),
+            0.5
+        );
+        // Just above that midpoint rounds upward.
+        assert_eq!(
+            correctly_rounded_unit_ratio((1_u64 << 54) + 3, 1_u64 << 55).to_bits(),
+            0.5_f64.to_bits() + 1
+        );
+        // Just below the midpoint rounds downward.
+        assert_eq!(
+            correctly_rounded_unit_ratio((1_u64 << 54) + 1, 1_u64 << 55),
+            0.5
+        );
+        // Halfway between predecessor(1.0) and 1.0: 1.0 has the even
+        // significand, so ties-to-even rounds upward and renormalizes.
+        assert_eq!(
+            correctly_rounded_unit_ratio((1_u64 << 54) - 1, 1_u64 << 54),
+            1.0
+        );
+    }
 
     #[test]
     fn coverage_and_wilson_bounds_are_oracle_correct() {
