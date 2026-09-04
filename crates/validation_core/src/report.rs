@@ -6,6 +6,37 @@ use serde::{Deserialize, Serialize};
 
 const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 const MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+
+/// Check whether a stored Wilson endpoint pair can arise from one Wilson score interval.
+///
+/// For empirical coverage `p` and `a = z² / n`, the Wilson roots satisfy
+/// `L * U = p² / (1 + a)` and `L + U = 1 + (2p - 1) / (1 + a)`. Eliminating
+/// the unrecorded `a` gives a necessary endpoint-pair identity. For `p < 0.5`,
+/// the equivalent identity on the uncovered proportion avoids squaring a tiny
+/// `p`. All terms remain probability-scaled, so a small absolute binary64
+/// tolerance is sufficient without overflow-prone reconstruction of `n` or `z`.
+fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool {
+    if p == 0.0 || p == 1.0 {
+        return true;
+    }
+
+    let endpoint_sum = lower + upper;
+    let (left, right) = if p >= 0.5 {
+        (
+            p * p * (endpoint_sum - 1.0),
+            (2.0 * p - 1.0) * lower * upper,
+        )
+    } else {
+        let uncovered = 1.0 - p;
+        (
+            uncovered * uncovered * (1.0 - endpoint_sum),
+            (1.0 - 2.0 * p) * (1.0 - lower) * (1.0 - upper),
+        )
+    };
+
+    (left - right).abs() <= WILSON_PAIR_ABSOLUTE_TOLERANCE
+}
 
 /// Machine-readable recovery report for a single study.
 #[derive(Clone, Debug, PartialEq)]
@@ -41,21 +72,24 @@ impl ValidationReport {
     /// allows a small relative binary64 tolerance at that support boundary. Exact
     /// zero RMSE is perfect recovery and therefore still requires exact-zero RMSE
     /// standard error. Empirical coverage, Wilson endpoints, and temporal-order
-    /// accuracy are probabilities in `[0, 1]`; the Wilson interval is ordered and
-    /// must contain the empirical coverage recorded in the same report. Mean
-    /// signed bias remains unrestricted in sign. A generic [`MonteCarloSummary`]
-    /// may summarize a signed metric, but when it occupies `monte_carlo_rmse` every
-    /// retained replication is nonnegative. Its mean and percentile endpoints are
-    /// therefore nonnegative. Nonnegative sample support additionally implies
-    /// `SD <= sqrt(n) * mean`, `SE(mean) <= mean`, and every retained value—and thus
-    /// every inclusive nearest-rank percentile endpoint—is at most `n * mean`.
-    /// Admission evaluates the percentile support as `endpoint / mean <= n` with a
-    /// small relative binary64 tolerance so the check does not overflow a finite
-    /// sample sum. A zero Monte Carlo RMSE mean is exact perfect recovery across
-    /// every retained replication, so spread, standard error, and empirical
-    /// percentile endpoints must all be zero as well. These checks prevent a
-    /// finite but scientifically impossible payload from becoming durable
-    /// Validation Evidence.
+    /// accuracy are probabilities in `[0, 1]`; the Wilson interval is ordered,
+    /// contains the empirical coverage recorded in the same report, and its two
+    /// endpoints must satisfy the same Wilson-score root identity for that
+    /// coverage. This prevents two individually plausible bounds from being
+    /// combined into an interval that no finite positive Wilson `z² / n` can
+    /// produce. Mean signed bias remains unrestricted in sign. A generic
+    /// [`MonteCarloSummary`] may summarize a signed metric, but when it occupies
+    /// `monte_carlo_rmse` every retained replication is nonnegative. Its mean and
+    /// percentile endpoints are therefore nonnegative. Nonnegative sample support
+    /// additionally implies `SD <= sqrt(n) * mean`, `SE(mean) <= mean`, and every
+    /// retained value—and thus every inclusive nearest-rank percentile endpoint—is
+    /// at most `n * mean`. Admission evaluates the percentile support as
+    /// `endpoint / mean <= n` with a small relative binary64 tolerance so the check
+    /// does not overflow a finite sample sum. A zero Monte Carlo RMSE mean is exact
+    /// perfect recovery across every retained replication, so spread, standard
+    /// error, and empirical percentile endpoints must all be zero as well. These
+    /// checks prevent a finite but scientifically impossible payload from becoming
+    /// durable Validation Evidence.
     ///
     /// # Errors
     ///
@@ -105,6 +139,11 @@ impl ValidationReport {
         if self.coverage_wilson_lower > self.coverage_wilson_upper
             || self.interval_coverage < self.coverage_wilson_lower
             || self.interval_coverage > self.coverage_wilson_upper
+            || !wilson_pair_is_algebraically_coherent(
+                self.interval_coverage,
+                self.coverage_wilson_lower,
+                self.coverage_wilson_upper,
+            )
         {
             return Err(ValidationError::InvalidInput);
         }
@@ -302,9 +341,9 @@ mod tests {
             rmse_standard_error: 0.01,
             mean_bias: 0.0,
             bias_standard_error: 0.02,
-            interval_coverage: 0.95,
-            coverage_wilson_lower: 0.9,
-            coverage_wilson_upper: 0.98,
+            interval_coverage: 0.5,
+            coverage_wilson_lower: 0.2,
+            coverage_wilson_upper: 0.8,
             temporal_order_accuracy: 1.0,
             monte_carlo_rmse: Some(MonteCarloSummary {
                 replication_count: 10,
