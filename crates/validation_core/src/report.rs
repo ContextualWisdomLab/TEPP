@@ -43,13 +43,14 @@ impl ValidationReport {
     /// accuracy are probabilities in `[0, 1]`; the Wilson interval is ordered and
     /// must contain the empirical coverage recorded in the same report. Mean
     /// signed bias remains unrestricted in sign. A generic [`MonteCarloSummary`]
-    /// may summarize a signed metric, but when it occupies `monte_carlo_rmse` its
-    /// mean and percentile endpoints are nonnegative because every RMSE replication
-    /// is nonnegative. A zero Monte Carlo RMSE mean is exact perfect recovery across
-    /// every retained replication, so spread, standard error, and empirical
-    /// percentile endpoints must all be zero as well. These checks prevent a finite
-    /// but scientifically impossible payload from becoming durable Validation
-    /// Evidence.
+    /// may summarize a signed metric, but when it occupies `monte_carlo_rmse` every
+    /// retained replication is nonnegative. Its mean and percentile endpoints are
+    /// therefore nonnegative, and nonnegative sample support additionally implies
+    /// `SD <= sqrt(n) * mean` and hence `SE(mean) <= mean`. A zero Monte Carlo RMSE
+    /// mean is exact perfect recovery across every retained replication, so spread,
+    /// standard error, and empirical percentile endpoints must all be zero as well.
+    /// These checks prevent a finite but scientifically impossible payload from
+    /// becoming durable Validation Evidence.
     ///
     /// # Errors
     ///
@@ -57,7 +58,7 @@ impl ValidationReport {
     /// non-finite, violates its metric domain, point RMSE and its standard error
     /// exceed squared-residual support, Wilson evidence is incoherent, or the
     /// optional Monte Carlo RMSE summary violates either generic summary invariants
-    /// or the nonnegative RMSE domain.
+    /// or the nonnegative RMSE support.
     pub fn validate(&self) -> Result<(), ValidationError> {
         for value in [
             self.rmse,
@@ -111,13 +112,22 @@ impl ValidationReport {
             {
                 return Err(ValidationError::InvalidInput);
             }
-            if summary.mean == 0.0
-                && (summary.standard_deviation != 0.0
+            if summary.mean == 0.0 {
+                if summary.standard_deviation != 0.0
                     || summary.standard_error != 0.0
                     || summary.percentile_lower != 0.0
-                    || summary.percentile_upper != 0.0)
-            {
-                return Err(ValidationError::InvalidInput);
+                    || summary.percentile_upper != 0.0
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
+            } else {
+                let relative_standard_error = summary.standard_error / summary.mean;
+                if !relative_standard_error.is_finite()
+                    || relative_standard_error
+                        > 1.0 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
             }
         }
         Ok(())
