@@ -234,14 +234,15 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// is evaluated from the expanded represented inputs. For larger samples whose
 /// rounded residuals all collapse to the same binary64 value, the common high
 /// part cannot contribute to dispersion, so TEPP evaluates the standard error
-/// from the error-free subtraction low terms instead. When rounded high parts
-/// differ but every anchor-relative high/low residual delta is itself exactly
-/// representable, TEPP evaluates the translation-invariant second moment of
-/// those exact deltas in O(n), preventing discarded subtraction mass from
-/// changing a nonzero uncertainty estimate. Cases that cannot prove those
-/// translated deltas representable retain the predecessor rounded-residual path.
-/// Individual signed residuals must still be representable because their
-/// dispersion is itself part of the requested scientific result.
+/// from the error-free subtraction low terms instead. For other larger samples,
+/// including exact pairwise residuals, TEPP uses the `high + low` decomposition
+/// and a translation-invariant second moment whenever every anchor-relative
+/// high delta, low delta, and combined residual delta is exactly representable.
+/// That path avoids making a rounded residual mean authoritative before
+/// dispersion is evaluated. Cases that cannot prove those translated deltas
+/// representable retain the predecessor rounded-residual path. Individual
+/// signed residuals must still be representable because their dispersion is
+/// itself part of the requested scientific result.
 ///
 /// # Errors
 ///
@@ -275,7 +276,7 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
         return scaled_standard_error(&subtraction_roundoffs, roundoff_mean);
     }
 
-    if has_subtraction_roundoff {
+    if diffs.len() > 2 {
         if let Some(standard_error) =
             exact_translated_residual_standard_error(&diffs, &subtraction_roundoffs)?
         {
