@@ -22,11 +22,15 @@ Artifact admission is exact for the represented binary64 contract. The carrier r
 
 This exact recomputation contract is intentionally stronger than `ValidationReport`'s legacy endpoint-pair admission. The legacy report lacks enough provenance to reproduce the original interval and therefore uses necessary algebraic support checks; the versioned carrier has the missing denominator and critical value, so it can call the actual canonical producer instead of relying on a loose identity.
 
-## Large-count binary64 boundary
+## Exact count-ratio representation
 
 Durable integer provenance creates a numerical obligation that the in-memory interval API normally cannot reach in practice. Binary64 has 53 bits of significand precision, so every integer is exactly representable only through `2^53`. At `n = 2^53 + 1` and `k = 2^53`, converting `k` and `n` independently to binary64 rounds both to `2^53`; the naive expression `(k as f64) / (n as f64)` therefore becomes exact `1.0` even though one admitted interval is uncovered. The same collapse also steers a count-based Wilson implementation onto an all-covered numerical path and materially changes the representable lower endpoint.
 
-The corrected count authority preserves the smaller side of the binomial partition. For `k > n-k`, represented empirical coverage is formed as `1 - (n-k)/n`, and Wilson endpoints are evaluated on the uncovered proportion and reflected by the score interval's complement symmetry. At `n = 9,007,199,254,740,993`, `k = 9,007,199,254,740,992`, and `z = 1.96`, the durable contract records represented coverage `0x3fefffffffffffff` (`0.9999999999999999`) and Wilson lower endpoint `0x3feffffffffffffa` (`0.9999999999999993`), rather than falsely treating the count state as all-covered. The upper endpoint rounds to `1.0`, which is representable and does not erase the retained uncovered count because the integer provenance remains authoritative.
+The first repair preserved the smaller side of the binomial partition for Wilson evaluation. Near the all-covered boundary, Wilson endpoints are evaluated on the uncovered proportion and reflected by score-interval complement symmetry, while exact integer equality `covered_count == sample_count` alone owns the all-covered branch. At `n = 9,007,199,254,740,993`, `k = 9,007,199,254,740,992`, and `z = 1.96`, the durable contract records represented coverage `0x3fefffffffffffff` (`0.9999999999999999`) and Wilson lower endpoint `0x3feffffffffffffa` (`0.9999999999999993`), rather than falsely treating the count state as all-covered. The upper endpoint rounds to `1.0`, which is representable and does not erase the retained uncovered count because the integer provenance remains authoritative.
+
+Complement selection alone does not make every `u64/u64` proportion correctly rounded. A second realistic count pair exposes the remaining defect: `n = 9,007,199,254,740,993` and `k = 4,503,599,627,370,396`. The exact rational `k/n` rounds to binary64 `0x1.fffffffffff37p-2` (`0.49999999999998884`), but independently converting both integers and then dividing yields `0x1.fffffffffff38p-2`, one ULP higher. That discrepancy is a projection error in durable empirical coverage even though neither count is near an exact 0/1 boundary.
+
+`correctly_rounded_unit_ratio` now derives the binary exponent from integer bit lengths and comparisons, forms the exact scaled significand in `u128`, and applies round-to-nearest, ties-to-even before constructing the binary64 bits. Every valid `u64/u64` unit ratio lies between `2^-64` and `1`, so its nonzero binary64 result is normal and the required scaled integer fits in `u128`; no bigint or Python validation path is needed. `represented_coverage_from_counts` uses this exact integer-ratio projection directly. `wilson_coverage_interval_from_counts` uses the same correctly rounded proportion and still evaluates the smaller uncovered side when complement symmetry avoids all-covered cancellation.
 
 The v1 JSON count fields are `u64`, not `usize`. A durable schema must not change its numeric domain with the pointer width of the Rust process that reads it. The in-memory slice constructor safely widens its `usize` lengths/counts to `u64`; deserialization can therefore preserve the same versioned count artifact on 32-bit and 64-bit consumers even when the count could not be materialized as one process-resident slice.
 
@@ -51,15 +55,18 @@ The initial implementation lineage is:
 The large-count repair lineage is:
 
 - `29d710a53d4988b46a37667b4ff03352d520b3c7`: public RED showing that a durable one-uncovered count state above `2^53` must decode to a non-all-covered represented coverage/Wilson artifact;
-- `29968c807368fe3fe19bef3013af9d577d5f6025`: make empirical coverage complement-aware and make count-based Wilson evaluation reflect the smaller uncovered proportion near the all-covered boundary;
+- `29968c807368fe3fe19bef3013af9d577d5f6025`: make count-based Wilson evaluation reflect the smaller uncovered proportion near the all-covered boundary and stop using a rounded proportion to decide all-covered status;
 - `91d9a3bb54b47605377e5159763a55f3386efcf9`: make v1 durable counts fixed-width `u64` and route carrier construction/validation through the same count-preserving authority;
-- `d908ce2a37685bdf915cc513be9f3f9dd36aae19`: add release-facing documentation for the count-precision and schema-portability repair.
+- `d908ce2a37685bdf915cc513be9f3f9dd36aae19`: add release-facing documentation for the count-precision and schema-portability repair;
+- `63ddfdd615de23c50910ce54cff60fbb537a45d4`: public RED showing a non-boundary `u64/u64` count ratio whose independent integer-to-binary64 conversions misround durable empirical coverage by one ULP;
+- `11323c579b499dc136ec564f8b04ca91c5d7076b`: add exact `u128` ratio projection with ties-to-even coverage and route represented coverage/Wilson proportions through it;
+- `7cad2f45771eab2e3ac2f498e27b3665406fe739`: add release-facing documentation for the exact count-ratio projection repair.
 
 Every later source or documentation commit on PR #488 invalidates predecessor exact-head workflow evidence; only the current surviving head's hosted gates and independent review count for landing.
 
 ## DDD and owner boundary
 
-This is Validation Evidence provenance and projection policy. It does not define a new psychometric estimator, change the Wilson score estimand, move longitudinal/time-varying composition into `validation_core`, or copy mutable arithmetic from fast-mlsirm. The count-based helper is private to the existing TEPP coverage producer so there remains one numeric authority inside this bounded context.
+This is Validation Evidence provenance and projection policy. It does not define a new psychometric estimator, change the Wilson score estimand, move longitudinal/time-varying composition into `validation_core`, or copy mutable arithmetic from fast-mlsirm. The count-based and exact-ratio helpers are private to the existing TEPP coverage producer so there remains one numeric authority inside this bounded context.
 
 The carrier and envelope do not involve semantic LLM execution. contextual-orchestrator remains the owner of model routing; no unreleased orchestrator source, direct provider route, or provider credential is introduced here.
 
@@ -77,4 +84,4 @@ Wilson, E. B. (1927). Probable inference, the law of succession, and statistical
 
 ## Verification contract
 
-`crates/validation_core/tests/wilson_coverage_evidence_v1_contract.rs` covers the provenance carrier and `crates/validation_core/tests/wilson_coverage_count_precision_contract.rs` covers the large-count representation boundary. `crates/validation_core/tests/validation_evidence_v1_coverage_provenance_contract.rs` covers the durable report/provenance envelope. Exact-head Rust tests, rustdoc/docstring checks, owned line/branch coverage, documentation validation, security/SAST/supply-chain checks, and qualifying independent review remain required before the Draft landing vehicle can be promoted or merged.
+`crates/validation_core/tests/wilson_coverage_evidence_v1_contract.rs` covers the provenance carrier. `crates/validation_core/tests/wilson_coverage_count_precision_contract.rs` covers the all-covered-adjacent large-count boundary, and `crates/validation_core/tests/wilson_coverage_ratio_rounding_contract.rs` covers non-boundary exact count-ratio rounding. `crates/validation_core/tests/validation_evidence_v1_coverage_provenance_contract.rs` covers the durable report/provenance envelope. Exact-head Rust tests, rustdoc/docstring checks, owned line/branch coverage, documentation validation, security/SAST/supply-chain checks, and qualifying independent review remain required before the Draft landing vehicle can be promoted or merged.
