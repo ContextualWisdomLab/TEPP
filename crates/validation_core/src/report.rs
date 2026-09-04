@@ -5,6 +5,7 @@ use crate::ValidationError;
 use serde::{Deserialize, Serialize};
 
 const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+const MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
 /// Machine-readable recovery report for a single study.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,12 +46,16 @@ impl ValidationReport {
     /// signed bias remains unrestricted in sign. A generic [`MonteCarloSummary`]
     /// may summarize a signed metric, but when it occupies `monte_carlo_rmse` every
     /// retained replication is nonnegative. Its mean and percentile endpoints are
-    /// therefore nonnegative, and nonnegative sample support additionally implies
-    /// `SD <= sqrt(n) * mean` and hence `SE(mean) <= mean`. A zero Monte Carlo RMSE
-    /// mean is exact perfect recovery across every retained replication, so spread,
-    /// standard error, and empirical percentile endpoints must all be zero as well.
-    /// These checks prevent a finite but scientifically impossible payload from
-    /// becoming durable Validation Evidence.
+    /// therefore nonnegative. Nonnegative sample support additionally implies
+    /// `SD <= sqrt(n) * mean`, `SE(mean) <= mean`, and every retained value—and thus
+    /// every inclusive nearest-rank percentile endpoint—is at most `n * mean`.
+    /// Admission evaluates the percentile support as `endpoint / mean <= n` with a
+    /// small relative binary64 tolerance so the check does not overflow a finite
+    /// sample sum. A zero Monte Carlo RMSE mean is exact perfect recovery across
+    /// every retained replication, so spread, standard error, and empirical
+    /// percentile endpoints must all be zero as well. These checks prevent a
+    /// finite but scientifically impossible payload from becoming durable
+    /// Validation Evidence.
     ///
     /// # Errors
     ///
@@ -125,6 +130,16 @@ impl ValidationReport {
                 if !relative_standard_error.is_finite()
                     || relative_standard_error
                         > 1.0 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
+
+                let relative_upper_percentile = summary.percentile_upper / summary.mean;
+                let replication_support = summary.replication_count as f64;
+                if !relative_upper_percentile.is_finite()
+                    || relative_upper_percentile
+                        > replication_support
+                            * (1.0 + MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE)
                 {
                     return Err(ValidationError::InvalidInput);
                 }
