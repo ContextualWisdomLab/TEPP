@@ -367,13 +367,16 @@ fn subtraction_roundoff(minuend: f64, subtrahend: f64, difference: f64) -> f64 {
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
 ///
 /// Finite represented residuals and finite represented `k · se` bounds are
-/// compared before any normalization. If both rounded finite quantities are equal,
-/// an exact subtraction together with a nonzero fused multiply-add product residual
-/// disambiguates a multiplication tie instead of silently accepting a strict
-/// represented-input rejection. This preserves a positive acceptance bound when
-/// dividing `se` by a much larger estimate/target scale would underflow to zero.
-/// If only the positive bound overflows, every finite residual is covered; if only
-/// the residual overflows, a finite bound cannot cover it. When both direct
+/// compared before any normalization. If both rounded finite quantities are equal
+/// and nonzero, TEPP compares the error-free subtraction correction (with its sign
+/// adjusted for the absolute residual) with the fused multiply-add product
+/// correction. Different correction projections preserve the represented-input
+/// ordering even when either direct operation rounded to the same binary64 value;
+/// equal projected corrections remain on the ordinary rounded decision instead of
+/// claiming a broader exact comparator. This also preserves a positive acceptance
+/// bound when dividing `se` by a much larger estimate/target scale would underflow
+/// to zero. If only the positive bound overflows, every finite residual is covered;
+/// if only the residual overflows, a finite bound cannot cover it. When both direct
 /// operations overflow, TEPP compares the exact binary64 input rationals by
 /// decoding their integer significands and powers of two, avoiding a false
 /// accept/reject caused by independently rounded normalization. A zero standard
@@ -412,9 +415,14 @@ pub fn accept_within_standard_errors(
             let residual = direct_error.abs();
             if residual == direct_bound && residual != 0.0 {
                 let difference_roundoff = subtraction_roundoff(estimate, target, direct_error);
+                let residual_roundoff = if direct_error.is_sign_negative() {
+                    -difference_roundoff
+                } else {
+                    difference_roundoff
+                };
                 let product_roundoff = k.mul_add(standard_error, -direct_bound);
-                if difference_roundoff == 0.0 && product_roundoff != 0.0 {
-                    return Ok(product_roundoff.is_sign_positive());
+                if residual_roundoff != product_roundoff {
+                    return Ok(residual_roundoff < product_roundoff);
                 }
             }
             return Ok(residual <= direct_bound);
