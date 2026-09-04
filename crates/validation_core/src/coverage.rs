@@ -197,6 +197,32 @@ fn all_covered_wilson_lower_from_inexact_sample_count(sample_count: u64, z2: f64
     }
 }
 
+fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
+    let denominator = n + z2;
+    let direct_lower = n / denominator;
+    if direct_lower == 1.0 && z2 > 0.0 {
+        // A tiny positive z² can be absorbed when the denominator is formed even
+        // though the Wilson miss mass is still representable immediately below
+        // one. Preserve that boundary through the complementary miss fraction.
+        let uncovered_mass = z2 / denominator;
+        return (1.0 - uncovered_mass).clamp(0.0, 1.0);
+    }
+    if denominator == z2 {
+        // At the opposite scale, a large z² can absorb the exactly represented
+        // sample count. Recover the TwoSum denominator residual, then correct the
+        // rounded quotient with an FMA residual. This branch is deliberately
+        // limited to complete denominator absorption rather than replacing the
+        // ordinary direct path with a globally different evaluation order.
+        let z2_virtual = denominator - n;
+        let denominator_residual =
+            (n - (denominator - z2_virtual)) + (z2 - z2_virtual);
+        let division_residual = (-direct_lower).mul_add(denominator, n);
+        let exact_residual = division_residual - direct_lower * denominator_residual;
+        return (direct_lower + exact_residual / denominator).clamp(0.0, 1.0);
+    }
+    direct_lower
+}
+
 fn wilson_bounds_from_represented_proportion(
     n: f64,
     p: f64,
@@ -299,17 +325,7 @@ pub(crate) fn wilson_coverage_interval_from_counts(
                 1.0,
             ));
         }
-        let direct_lower = n / (n + z2);
-        if direct_lower == 1.0 && z2 > 0.0 {
-            // The exact-count denominator can absorb a small positive z² even
-            // when the Wilson miss mass is still representable immediately
-            // below one. Evaluate the algebraically equivalent miss fraction
-            // only on that collapsed boundary instead of changing the ordinary
-            // direct path globally.
-            let uncovered_mass = z2 / (n + z2);
-            return Ok(((1.0 - uncovered_mass).clamp(0.0, 1.0), 1.0));
-        }
-        return Ok((direct_lower, 1.0));
+        return Ok((all_covered_wilson_lower_from_exact_sample_count(n, z2), 1.0));
     }
 
     let uncovered_count = sample_count - covered_count;
@@ -339,12 +355,15 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 /// `n / (n + z²)`. When an exactly representable sample count and a positive
 /// finite `z²` make that direct expression collapse spuriously to exact one,
 /// the implementation subtracts the equivalent miss fraction `z² / (n + z²)`
-/// so representable uncertainty immediately below one is retained. For nonzero
-/// strict-interior coverage, the lower endpoint is evaluated through the
-/// algebraically rationalized positive root rather than `center - margin`; the
-/// implementation switches scale at `z² = 1` so the stable form neither suffers
-/// large-z cancellation nor small-z division overflow. Count proportions are
-/// rounded to binary64 from their exact integer ratio before Wilson evaluation.
+/// so representable uncertainty immediately below one is retained. At the
+/// opposite scale, if a large finite `z²` completely absorbs an exactly
+/// represented sample count in `n + z²`, a compensated denominator/division
+/// residual preserves the correctly rounded finite-count contribution. For
+/// nonzero strict-interior coverage, the lower endpoint is evaluated through
+/// the algebraically rationalized positive root rather than `center - margin`;
+/// the implementation switches scale at `z² = 1` so the stable form neither
+/// suffers large-z cancellation nor small-z division overflow. Count proportions
+/// are rounded to binary64 from their exact integer ratio before Wilson evaluation.
 /// When the exact sample count itself is not binary64-representable,
 /// strict-interior Wilson scale terms use the correctly rounded reciprocal
 /// `1 / n` rather than a pre-rounded `n as f64`. The inexact-count all-covered
