@@ -47,7 +47,11 @@ fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, 
         .fold(0.0, f64::max);
     let scale = exact_power_of_two_scale(max_magnitude);
     let normalized = values.iter().map(|value| *value / scale).collect();
-    let normalized_mean = deterministic_compensated_sum(normalized) / total_count as f64;
+    let (normalized_sum, normalized_correction) = deterministic_compensated_parts(normalized);
+    let denominator = total_count as f64;
+    let leading_mean = normalized_sum / denominator;
+    let division_residual = (-leading_mean).mul_add(denominator, normalized_sum);
+    let normalized_mean = leading_mean + (division_residual + normalized_correction) / denominator;
     let mean = normalized_mean * scale;
     if !mean.is_finite() || mean == 0.0 {
         Err(ValidationError::InvalidInput)
