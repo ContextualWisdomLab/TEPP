@@ -208,11 +208,11 @@ fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
         return (1.0 - uncovered_mass).clamp(0.0, 1.0);
     }
 
-    // Recover the exact rounding residual of n + z² with TwoSum. Hardware
-    // division is correctly rounded for the rounded denominator, but an inexact
-    // denominator sum can still move the represented-input Wilson endpoint by an
-    // ULP. Correct that denominator error with an FMA residual without changing
-    // the exact-sum path or introducing a second Wilson writer.
+    // Recover the exact rounding residual of n + z² with TwoSum. The direct
+    // quotient is correctly rounded for the rounded denominator, so use the
+    // residual only to decide whether the exact represented-input quotient lies
+    // beyond the adjacent binary64 midpoint. Adding a rounded correction can
+    // itself force a one-ULP move when the true correction is below that midpoint.
     let z2_virtual = denominator - n;
     let denominator_residual =
         (n - (denominator - z2_virtual)) + (z2 - z2_virtual);
@@ -220,7 +220,25 @@ fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
         let division_residual = (-direct_lower).mul_add(denominator, n);
         let exact_residual =
             (-direct_lower).mul_add(denominator_residual, division_residual);
-        return (direct_lower + exact_residual / denominator).clamp(0.0, 1.0);
+        if exact_residual != 0.0 {
+            let neighbor = if exact_residual.is_sign_negative() {
+                f64::from_bits(direct_lower.to_bits() - 1)
+            } else {
+                f64::from_bits(direct_lower.to_bits() + 1)
+            };
+            let ulp_toward_exact = (neighbor - direct_lower).abs();
+            let midpoint_residual = 0.5
+                * ulp_toward_exact.mul_add(
+                    denominator,
+                    ulp_toward_exact * denominator_residual,
+                );
+            let residual_magnitude = exact_residual.abs();
+            if residual_magnitude > midpoint_residual
+                || (residual_magnitude == midpoint_residual && direct_lower.to_bits() & 1 == 1)
+            {
+                return neighbor.clamp(0.0, 1.0);
+            }
+        }
     }
     direct_lower
 }
@@ -356,26 +374,26 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 /// all-covered sample, the exact Wilson lower endpoint is algebraically
 /// `n / (n + z²)`. When an exactly representable sample count and positive
 /// finite `z²` make the denominator sum inexact, the implementation recovers
-/// the TwoSum residual and uses an FMA division residual to compensate the
-/// rounded denominator before durable evidence is emitted. A boundary-specific
-/// complementary miss fraction preserves representable uncertainty when the
-/// direct quotient has already collapsed spuriously to exact one, while genuine
-/// sub-ULP uncertainty remains exact one. For nonzero strict-interior coverage,
-/// the lower endpoint is evaluated through the algebraically rationalized
-/// positive root rather than `center - margin`; the implementation switches
-/// scale at `z² = 1` so the stable form neither suffers large-z cancellation nor
-/// small-z division overflow. Count proportions are rounded to binary64 from
-/// their exact integer ratio before Wilson evaluation. When the exact sample
-/// count itself is not binary64-representable, strict-interior Wilson scale
-/// terms use the correctly rounded reciprocal `1 / n` rather than a pre-rounded
-/// `n as f64`. The inexact-count all-covered path additionally decodes finite
-/// `z²` into its binary significand and power-of-two scale, divides that
-/// significand by the exact retained `u64` denominator, and then switches
-/// between complementary-miss and direct reciprocal forms at `z² / n = 1`.
-/// This avoids both reciprocal-product double rounding in the exposed extreme-`z`
-/// contract and false exact 0/1 boundary failures. Near the all-covered boundary,
-/// the smaller uncovered count is evaluated and reflected by Wilson complement
-/// symmetry.
+/// the TwoSum residual and uses an FMA quotient residual to compare the exact
+/// represented-input quotient with the adjacent binary64 midpoint before
+/// changing the direct result. A boundary-specific complementary miss fraction
+/// preserves representable uncertainty when the direct quotient has already
+/// collapsed spuriously to exact one, while genuine sub-ULP uncertainty remains
+/// exact one. For nonzero strict-interior coverage, the lower endpoint is
+/// evaluated through the algebraically rationalized positive root rather than
+/// `center - margin`; the implementation switches scale at `z² = 1` so the
+/// stable form neither suffers large-z cancellation nor small-z division
+/// overflow. Count proportions are rounded to binary64 from their exact integer
+/// ratio before Wilson evaluation. When the exact sample count itself is not
+/// binary64-representable, strict-interior Wilson scale terms use the correctly
+/// rounded reciprocal `1 / n` rather than a pre-rounded `n as f64`. The
+/// inexact-count all-covered path additionally decodes finite `z²` into its
+/// binary significand and power-of-two scale, divides that significand by the
+/// exact retained `u64` denominator, and then switches between complementary-
+/// miss and direct reciprocal forms at `z² / n = 1`. This avoids both
+/// reciprocal-product double rounding in the exposed extreme-`z` contract and
+/// false exact 0/1 boundary failures. Near the all-covered boundary, the smaller
+/// uncovered count is evaluated and reflected by Wilson complement symmetry.
 ///
 /// # Errors
 ///
