@@ -7,9 +7,9 @@ fn report_with(summary: MonteCarloSummary) -> ValidationReport {
         rmse_standard_error: 0.05,
         mean_bias: 0.0,
         bias_standard_error: 0.0,
-        interval_coverage: 0.95,
-        coverage_wilson_lower: 0.8,
-        coverage_wilson_upper: 1.0,
+        interval_coverage: 0.5,
+        coverage_wilson_lower: 0.2,
+        coverage_wilson_upper: 0.8,
         temporal_order_accuracy: 1.0,
         monte_carlo_rmse: Some(summary),
     }
@@ -41,7 +41,7 @@ fn monte_carlo_rmse_rejects_percentile_above_nonnegative_sample_sum_support() {
         Err(ValidationError::InvalidInput)
     );
 
-    let payload = r#"{"study_label":"rmse-summary-percentile-support","rmse":0.2,"rmse_standard_error":0.05,"mean_bias":0.0,"bias_standard_error":0.0,"interval_coverage":0.95,"coverage_wilson_lower":0.8,"coverage_wilson_upper":1.0,"temporal_order_accuracy":1.0,"monte_carlo_rmse":{"replication_count":4,"mean":1.0,"standard_deviation":0.5,"standard_error":0.25,"percentile_lower":0.0,"percentile_upper":5.0}}"#;
+    let payload = r#"{"study_label":"rmse-summary-percentile-support","rmse":0.2,"rmse_standard_error":0.05,"mean_bias":0.0,"coverage_wilson_lower":0.2,"bias_standard_error":0.0,"interval_coverage":0.5,"coverage_wilson_upper":0.8,"temporal_order_accuracy":1.0,"monte_carlo_rmse":{"replication_count":4,"mean":1.0,"standard_deviation":0.5,"standard_error":0.25,"percentile_lower":0.0,"percentile_upper":5.0}}"#;
     assert!(serde_json::from_str::<ValidationReport>(payload).is_err());
 }
 
