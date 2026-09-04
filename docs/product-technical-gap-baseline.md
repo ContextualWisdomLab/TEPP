@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-04T09:37:15Z  
+**Snapshot:** 2026-09-04T09:41:59Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`
 
@@ -48,9 +48,9 @@ Exact-head evidence becomes stale after any source push.
 
 TEPP owns temporal/event composition, irregular time, time-varying multilevel/cross-classified/multiple-membership semantics, longitudinal invariance/drift/alignment, leakage-safe knowledge cutoff, temporal recovery, Validation Evidence, and Projection policy. `longitudinal_modeling` is the bounded context and `longitudinal_core` is its current Rust implementation path.
 
-`psychometric_core` is not authority for new temporal/state composition. fast-mlsirm owns reusable static/generalized-mixed/dependence-aware psychometric specification and arithmetic. TEPP consumes only immutable released/versioned Published Language through an ACL; source copying and mutable sibling-head dependencies are prohibited.
+`psychometric_core` is not authority for new temporal/state composition. fast-mlsirm owns reusable static/generalized-mixed/dependence-aware psychometric specification and arithmetic. TEPP consumes only immutable released/versioned Published Language through an ACL; source copying and mutable sibling-head dependencies are prohibited. Fresh owner evidence is fast-mlsirm protected `main@b5a3a0c1057d4b53d7a4bb18e0de69f630c2b45c`; latest immutable release remains `v0.9.1`.
 
-contextual-orchestrator owns provider/model routing and semantic LLM execution. Its last verified protected-main evidence in this baseline is `c4f932b0aebe6fb7ba743451fa47775b678a7f8c`, while GitHub releases remain zero. Semantic LLM work and model-backed Actions therefore continue to require a released/versioned contextual-orchestrator contract; Actions use `orchestrator/free` through the gateway credential and do not select providers/models/groups or consume direct provider keys. Mutable owner main is evidence, not a TEPP production contract. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No cross-service SQL.
+contextual-orchestrator owns provider/model routing and semantic LLM execution. Fresh owner evidence is protected `main@2e414d15ba58f28597751b625a8a2f00fc9fadcf`, while GitHub releases remain zero. Semantic LLM work and model-backed Actions therefore continue to require a released/versioned contextual-orchestrator contract; Actions use `orchestrator/free` through the gateway credential and do not select providers/models/groups or consume direct provider keys. Mutable owner main is evidence, not a TEPP production contract. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No cross-service SQL.
 
 The clock contract separates event/valid time, assertion time, document time, system time, availability time, and knowledge cutoff. Retrospective evidence may describe an earlier event but cannot enter an earlier knowledge cutoff. Forward state/transition edges remain distinct from retrospective/citation/revision/provenance relations.
 
@@ -103,7 +103,7 @@ Wilson (1927) remains the primary score-interval reference. AERA/APA/NCME (2014)
 
 ### #480 — contextual-orchestrator boundary
 
-#480 removes TEPP-owned provider discovery/ranking and requires a released contextual-orchestrator owner contract. Its exact source head remains `01f45a99392457334a4f6d3d659f992af739eeee`. The latest owner state must be refreshed before any consumer bump; mutable owner main is evidence, not a production contract, and #480 stays Draft until an immutable compatible release plus deployment/auth/schema/artifact provenance exists.
+#480 removes TEPP-owned provider discovery/ranking and requires a released contextual-orchestrator owner contract. Its exact source head remains `01f45a99392457334a4f6d3d659f992af739eeee`. contextual-orchestrator protected main is `2e414d15ba58f28597751b625a8a2f00fc9fadcf`, but GitHub releases remain zero, so #480 stays Draft until an immutable compatible release plus deployment/auth/schema/artifact provenance exists. Mutable owner main is evidence, not a production contract.
 
 ## Gap register
 
