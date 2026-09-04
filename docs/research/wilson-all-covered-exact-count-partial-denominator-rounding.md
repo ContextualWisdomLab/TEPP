@@ -32,12 +32,16 @@ D = \operatorname{fl}(n + z^2), \qquad n + z^2 = D + \delta_D.
 
 When `δ_D != 0`, the direct quotient `q = fl(n / D)` is corrected with a fused residual for `n - qD` and the denominator residual contribution `-qδ_D`. The correction reuses the same compensated quotient mechanism already justified by the complete large-`z²` absorption repair; this change broadens its causal trigger from complete absorption to any demonstrably inexact exact-count denominator sum. Exact denominator sums remain on the direct path. The earlier false-exact-one complementary branch remains boundary-local because it also protects the case in which the quotient has already collapsed to `1.0`.
 
-The change does **not** claim that every possible floating-point rearrangement of the Wilson interval is globally correctly rounded. It closes the demonstrated partial-denominator state and retains bit-level public contracts for the near-one, partial-rounding, large-`z²`, and correctly rounded control boundaries.
+The change does **not** claim that every possible floating-point rearrangement of the Wilson interval is globally correctly rounded. It closes the demonstrated partial-denominator state and retains bit-level public contracts for the near-one, partial-rounding, large-`z²`, and correctly rounded control boundaries. The control added after the repair uses `z = 3 * 2^-27`: its denominator sum is likewise inexact, but the direct quotient is already correctly rounded, and the compensation must preserve that same endpoint rather than force a one-ULP move.
 
 ## Evidence and traceability
 
 - Public RED: `06e556538e171e675c4d8a8287d75052ffc2c4c3`, `crates/validation_core/tests/wilson_all_covered_exact_count_partial_denominator_rounding_contract.rs`.
 - Causal production repair: `6c084dbe607e6c415288c77fa41a4270947cd51e`, `crates/validation_core/src/coverage.rs`.
+- Research decision record introduced: `25cc19436085881602356e7f2609b697b575540c`.
+- Dedicated changelog fragment: `5acc894b8a4d42cd7af8cdc22a02b61a063f16aa`.
+- Predecessor large-`z²` changelog made code-current after the broadened trigger: `f89e36d1f2a048befb983327c83f5696baf530cc`.
+- Inexact-denominator control retained: `80a0a0ade16f516bf63907f2a8d5105dbcd9c438`.
 - Canonical API: `validation_core::wilson_coverage_interval`.
 - Predecessor complete-absorption contract retained: `crates/validation_core/tests/wilson_all_covered_exact_count_large_z_rounding_contract.rs`.
 - Owner boundary: TEPP Validation Evidence numerical representation/admission. No reusable static psychometric estimator was added.
