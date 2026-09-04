@@ -233,16 +233,18 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// low-order input mass, the exact two-observation identity `SE = |r₁-r₂| / 2`
 /// is evaluated from the expanded represented inputs. For larger samples whose
 /// rounded residuals all collapse to the same binary64 value, the common high
-/// part cannot contribute to dispersion, so TEPP evaluates the standard error
-/// from the error-free subtraction low terms instead. For other larger samples,
-/// including exact pairwise residuals, TEPP uses the `high + low` decomposition
-/// and a translation-invariant second moment whenever every anchor-relative
-/// high delta, low delta, and combined residual delta is exactly representable.
-/// That path avoids making a rounded residual mean authoritative before
-/// dispersion is evaluated. Cases that cannot prove those translated deltas
-/// representable retain the predecessor rounded-residual path. Individual
-/// signed residuals must still be representable because their dispersion is
-/// itself part of the requested scientific result.
+/// part cannot contribute to dispersion. TEPP therefore first evaluates a
+/// translation-invariant second moment directly from the error-free subtraction
+/// low terms when their anchor-relative differences are exactly representable;
+/// only cases that cannot prove that exact translation retain the predecessor
+/// rounded-low-term mean path. For other larger samples, including exact pairwise
+/// residuals, TEPP uses the `high + low` decomposition and the same translated
+/// second moment whenever every anchor-relative high delta, low delta, and
+/// combined residual delta is exactly representable. That path avoids making a
+/// rounded residual mean authoritative before dispersion is evaluated. Cases
+/// that cannot prove those translated deltas representable retain the predecessor
+/// rounded-residual path. Individual signed residuals must still be representable
+/// because their dispersion is itself part of the requested scientific result.
 ///
 /// # Errors
 ///
@@ -272,6 +274,12 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
     }
 
     if has_subtraction_roundoff && diffs.iter().all(|residual| *residual == diffs[0]) {
+        let zero_roundoffs = vec![0.0; subtraction_roundoffs.len()];
+        if let Some(standard_error) =
+            exact_translated_residual_standard_error(&subtraction_roundoffs, &zero_roundoffs)?
+        {
+            return Ok(standard_error);
+        }
         let roundoff_mean = deterministic_representable_mean(&subtraction_roundoffs)?;
         return scaled_standard_error(&subtraction_roundoffs, roundoff_mean);
     }
