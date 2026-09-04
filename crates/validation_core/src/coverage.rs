@@ -86,6 +86,38 @@ fn u64_is_exact_binary64_integer(value: u64) -> bool {
     value & discarded_mask == 0
 }
 
+fn positive_f64_over_inexact_u64(value: f64, denominator: u64) -> f64 {
+    debug_assert!(value.is_finite() && value >= 0.0);
+    debug_assert!(denominator > (1_u64 << 53));
+    debug_assert!(!u64_is_exact_binary64_integer(denominator));
+    if value == 0.0 {
+        return 0.0;
+    }
+
+    // Decode the exact binary64 value as `significand * 2^exponent`. The
+    // significand is at most 53 bits, while this path is restricted to an
+    // inexact u64 denominator above 2^53, so significand/denominator is a unit
+    // ratio that the integer routine can round without first rounding the
+    // denominator. Multiplication by an exact power of two then restores the
+    // original scale. This avoids the extra `round(1/n) * value` step that can
+    // move the final quotient by one ULP.
+    let bits = value.to_bits();
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & ((1_u64 << 52) - 1);
+    let (significand, exponent) = if exponent_bits == 0 {
+        (fraction, -1074)
+    } else {
+        ((1_u64 << 52) | fraction, exponent_bits - 1023 - 52)
+    };
+    let ratio = correctly_rounded_unit_ratio(significand, denominator);
+    let power_of_two = if exponent >= -1022 {
+        f64::from_bits(((exponent + 1023) as u64) << 52)
+    } else {
+        f64::from_bits(1_u64 << (exponent + 1074))
+    };
+    ratio * power_of_two
+}
+
 pub(crate) fn represented_coverage_from_counts(
     covered_count: u64,
     sample_count: u64,
@@ -151,8 +183,8 @@ fn rationalized_wilson_positive_lower_from_inverse_sample_count(
     (numerator / denominator).clamp(0.0, 1.0)
 }
 
-fn all_covered_wilson_lower_from_inverse_sample_count(inverse_n: f64, z2: f64) -> f64 {
-    let z2_over_n = z2 * inverse_n;
+fn all_covered_wilson_lower_from_inexact_sample_count(sample_count: u64, z2: f64) -> f64 {
+    let z2_over_n = positive_f64_over_inexact_u64(z2, sample_count);
     if z2_over_n <= 1.0 {
         // For small z²/n, 1 / (1 + z²/n) can round to exact one before the
         // finite-sample miss mass is represented. Subtract the miss mass instead.
@@ -261,9 +293,9 @@ pub(crate) fn wilson_coverage_interval_from_counts(
     };
 
     if covered_count == sample_count {
-        if let Some(inverse_n) = inverse_n {
+        if inverse_n.is_some() {
             return Ok((
-                all_covered_wilson_lower_from_inverse_sample_count(inverse_n, z2),
+                all_covered_wilson_lower_from_inexact_sample_count(sample_count, z2),
                 1.0,
             ));
         }
@@ -300,13 +332,15 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 /// stable form neither suffers large-z cancellation nor small-z division
 /// overflow. Count proportions are rounded to binary64 from their exact integer
 /// ratio before Wilson evaluation. When the exact sample count itself is not
-/// binary64-representable, Wilson scale terms are evaluated through the
-/// correctly rounded reciprocal `1 / n` rather than a pre-rounded `n as f64`;
-/// the all-covered branch switches between complementary-miss and direct
-/// reciprocal forms at `z² / n = 1`, preserving both tiny uncertainty below one
-/// and positive lower endpoints under extreme finite critical values. Near the
-/// all-covered boundary, the smaller uncovered count is evaluated and reflected
-/// by Wilson complement symmetry.
+/// binary64-representable, strict-interior Wilson scale terms use the correctly
+/// rounded reciprocal `1 / n` rather than a pre-rounded `n as f64`. The exact
+/// all-covered path additionally decodes finite `z²` into its binary significand
+/// and power-of-two scale, divides that significand by the exact retained `u64`
+/// denominator, and then switches between complementary-miss and direct
+/// reciprocal forms at `z² / n = 1`. This avoids both reciprocal-product double
+/// rounding in the exposed extreme-`z` contract and the false exact 0/1 boundary
+/// failures. Near the all-covered boundary, the smaller uncovered count is
+/// evaluated and reflected by Wilson complement symmetry.
 ///
 /// # Errors
 ///
@@ -328,8 +362,8 @@ pub fn wilson_coverage_interval(
 #[cfg(test)]
 mod tests {
     use super::{
-        correctly_rounded_unit_ratio, interval_coverage, u64_is_exact_binary64_integer,
-        wilson_coverage_interval,
+        correctly_rounded_unit_ratio, interval_coverage, positive_f64_over_inexact_u64,
+        u64_is_exact_binary64_integer, wilson_coverage_interval,
     };
     use crate::ValidationError;
 
@@ -371,6 +405,20 @@ mod tests {
         assert!(u64_is_exact_binary64_integer((1_u64 << 53) + 2));
         assert!(!u64_is_exact_binary64_integer((1_u64 << 55) + 3));
         assert!(u64_is_exact_binary64_integer((1_u64 << 55) + 8));
+    }
+
+    #[test]
+    fn inexact_u64_scaled_ratio_avoids_reciprocal_product_double_rounding() {
+        let sample_count = (1_u64 << 53) + 1;
+        assert_eq!(positive_f64_over_inexact_u64(0.0, sample_count), 0.0);
+        assert_eq!(
+            positive_f64_over_inexact_u64(f64::MIN_POSITIVE, sample_count),
+            0.0
+        );
+        assert_eq!(
+            positive_f64_over_inexact_u64(1e40, sample_count).to_bits(),
+            0x44ed_6329_f1c3_5ca4
+        );
     }
 
     #[test]
