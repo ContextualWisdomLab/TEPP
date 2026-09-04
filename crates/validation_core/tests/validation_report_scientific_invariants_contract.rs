@@ -7,9 +7,9 @@ fn valid_report() -> ValidationReport {
         rmse_standard_error: 0.01,
         mean_bias: -0.02,
         bias_standard_error: 0.02,
-        interval_coverage: 0.8,
-        coverage_wilson_lower: 0.6,
-        coverage_wilson_upper: 0.9,
+        interval_coverage: 0.5,
+        coverage_wilson_lower: 0.2,
+        coverage_wilson_upper: 0.8,
         temporal_order_accuracy: 0.75,
         monte_carlo_rmse: None,
     }
@@ -62,7 +62,7 @@ fn validation_report_rejects_incoherent_wilson_evidence() {
     assert_eq!(report.validate(), Err(ValidationError::InvalidInput));
 
     let mut report = valid_report();
-    report.coverage_wilson_upper = 0.79;
+    report.coverage_wilson_upper = 0.49;
     assert_eq!(report.validate(), Err(ValidationError::InvalidInput));
 }
 
@@ -84,8 +84,8 @@ fn every_report_projection_enforces_validation() {
         "mean_bias":0.0,
         "bias_standard_error":0.01,
         "interval_coverage":1.5,
-        "coverage_wilson_lower":0.6,
-        "coverage_wilson_upper":0.9,
+        "coverage_wilson_lower":0.2,
+        "coverage_wilson_upper":0.8,
         "temporal_order_accuracy":0.75,
         "monte_carlo_rmse":null
     }"#;
