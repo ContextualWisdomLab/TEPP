@@ -41,3 +41,41 @@ fn scale_underflow_repair_does_not_accept_a_smaller_finite_bound() {
         "restoring the finite bound must preserve a nearby rejection"
     );
 }
+
+#[test]
+fn both_overflow_fallback_does_not_round_an_exact_rejection_into_acceptance() {
+    let estimate = f64::from_bits(0x7fee_446c_f80d_ddbc);
+    let target = f64::from_bits(0xffe2_d7e3_9796_6af3);
+    let standard_error = f64::from_bits(0x7362_0ad2_2ddb_6f38);
+    let multiplier = f64::from_bits(0x4c85_c69a_c1c7_a9ed);
+
+    assert!((estimate - target).is_infinite());
+    assert!((multiplier * standard_error).is_infinite());
+
+    let scale = estimate.abs().max(target.abs()).max(standard_error).max(1.0);
+    let predecessor_scaled_error = (estimate / scale) - (target / scale);
+    let predecessor_scaled_bound = multiplier * (standard_error / scale);
+    assert_eq!(predecessor_scaled_error, predecessor_scaled_bound);
+
+    assert_eq!(
+        accept_within_standard_errors(estimate, target, standard_error, multiplier),
+        Ok(false),
+        "the both-overflow fallback must preserve the exact represented-input inequality instead of accepting a normalization tie"
+    );
+}
+
+#[test]
+fn both_overflow_fallback_accepts_the_adjacent_multiplier_that_crosses_the_boundary() {
+    let estimate = f64::from_bits(0x7fee_446c_f80d_ddbc);
+    let target = f64::from_bits(0xffe2_d7e3_9796_6af3);
+    let standard_error = f64::from_bits(0x7362_0ad2_2ddb_6f38);
+    let multiplier = f64::from_bits(0x4c85_c69a_c1c7_a9ee);
+
+    assert!((estimate - target).is_infinite());
+    assert!((multiplier * standard_error).is_infinite());
+    assert_eq!(
+        accept_within_standard_errors(estimate, target, standard_error, multiplier),
+        Ok(true),
+        "one ULP larger multiplier is on the admissible side of the represented-input boundary"
+    );
+}
