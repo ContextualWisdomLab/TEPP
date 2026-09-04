@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-04T06:38:00Z  
+**Snapshot:** 2026-09-04T06:44:00Z  
 **Protected-main evidence:** `1bc02f580cf48e1d39da239f0e818453437c31c3`  
 **Workspace version:** `0.2.0`
 
@@ -30,7 +30,7 @@ Ruleset `18156473` permits merge/squash and prohibits deletion/non-fast-forward 
 
 | PR | Exact current head | Draft | Base | Disposition |
 | ---: | --- | :---: | --- | --- |
-| #488 | `a2c4ad8b8b441ce3cd9d15fcc66794ffd573d021` | true | `main` | Validation Evidence landing vehicle. `WilsonCoverageEvidenceV1` retains fixed-width `u64` denominator/count provenance, standard-normal `z`, two-sided semantics, represented coverage and canonical Wilson endpoints. Large-count recomputation preserves one-uncovered states above binary64's exact-integer range by evaluating the smaller complement instead of rounding both counts into an all-covered path. Consumer adoption, exact-head hosted gates and independent review remain required. |
+| #488 | `2809a5ccf42731198f32cbc27e8db09c15000ac8` | true | `main` | Validation Evidence landing vehicle. `WilsonCoverageEvidenceV1` retains fixed-width `u64` denominator/count provenance, standard-normal `z`, two-sided semantics, represented coverage and canonical Wilson endpoints. Large-count recomputation preserves one-uncovered states above binary64's exact-integer range by evaluating the smaller complement instead of rounding both counts into an all-covered path. IEEE 754-2019 and ISO/IEC 60559:2020 ground the current binary64 representation trace. Consumer adoption, exact-head hosted gates and independent review remain required. |
 | #487 | `e07b2ff9f78ef456ff911b8643710af20921fe54` | true | #416 | Validation / Analysis Run fold child. Unique evidence must be inherited by a conflict-resolving survivor; child-head CI does not transfer. |
 | #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 | Analysis Run fold child; preserve support-edge source/tests/doctoring. |
 | #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 | Analysis Run fold child; preserve summarizes-edge source/tests/doctoring. |
@@ -84,15 +84,15 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 ### #488 — Validation Evidence
 
-#488 is the generic Validation Evidence landing vehicle at exact head `a2c4ad8b8b441ce3cd9d15fcc66794ffd573d021`. It remains distinct from Longitudinal Modeling and does not consume mutable fast-mlsirm source.
+#488 is the generic Validation Evidence landing vehicle at exact head `2809a5ccf42731198f32cbc27e8db09c15000ac8`. It remains distinct from Longitudinal Modeling and does not consume mutable fast-mlsirm source.
 
 GAP-070 and GAP-072 remain inherited: stored Wilson endpoints must be one coherent score interval, and exact all-covered evidence cannot use a zero lower endpoint. GAP-071 has advanced from design-only to source implementation. The first test draft `9fc96345...` was invalid and is not evidence; corrected public RED `6f6e06d2...` requires a versioned denominator/critical-value carrier. `ca517ed3...` establishes one private covered-count/Wilson-from-counts authority; `31e1ab2b...` adds `WilsonCoverageEvidenceV1`; `e9c63926...`/`fdd24a1a...` bind standard-normal/two-sided semantics. Envelope RED `07766cb0...` and repair `a16f22e6...` add `ValidationEvidenceV1`, which cross-validates the legacy report projection against the recomputable carrier. The accidental unrelated `lib.rs` wording mutation in `4e2381f3...` is excluded from repair evidence and was corrected non-force by `57d8bf57...`.
 
-GAP-073 closes a newly exposed large-count numerical/source-contract defect. Public RED `29d710a5...` uses `n = 2^53 + 1`, `k = 2^53`, and `z = 1.96` to require a one-uncovered durable artifact to retain represented coverage `0.9999999999999999` and Wilson lower `0.9999999999999993` instead of collapsing into an all-covered path. Causal repair `29968c80...` evaluates the smaller uncovered complement and reflects the Wilson endpoints; `91d9a3bb...` makes versioned count fields fixed-width `u64`; changelog `d908ce2a...`; research/current #488 `a2c4ad8b...`.
+GAP-073 closes a newly exposed large-count numerical/source-contract defect. Public RED `29d710a5...` uses `n = 2^53 + 1`, `k = 2^53`, and `z = 1.96` to require a one-uncovered durable artifact to retain represented coverage `0.9999999999999999` and Wilson lower `0.9999999999999993` instead of collapsing into an all-covered path. Causal repair `29968c80...` evaluates the smaller uncovered complement and reflects the Wilson endpoints; `91d9a3bb...` makes versioned count fields fixed-width `u64`; changelog `d908ce2a...`; standards/research/current #488 `2809a5cc...`.
 
 This closes the missing-source-contract portion of GAP-071 and the source portion of GAP-073 but not delivery: exact-head hosted gates, independent review, protected-main integration, and adoption by durable consumers that require v1 provenance remain outstanding. Bare legacy `ValidationReport` remains a backward-compatible compact projection and is not silently treated as v1 provenance.
 
-Wilson (1927) remains the primary score-interval reference. AERA/APA/NCME (2014) remains the current published testing-standards edition while revision is underway.
+Wilson (1927) remains the primary score-interval reference. AERA/APA/NCME (2014) remains the current published testing-standards edition while revision is underway. IEEE 754-2019 and ISO/IEC 60559:2020 remain the published active floating-point authorities used for the current binary64 representation trace; active IEEE P754 is not treated as a published replacement.
 
 ### #416 — Validation / Analysis Run consolidation
 
@@ -150,35 +150,35 @@ Wilson (1927) remains the primary score-interval reference. AERA/APA/NCME (2014)
 | GAP-042 | Ratio-first logarithm could nearly double an adjacent-float irregular residual growth rate | `verification-pending` | RED `766ddc7a...` + `ln_1p` repair `16f21d9a...` |
 | GAP-043 | Duplicate known-truth component identities could silently reweight RMSE recovery evidence | `verification-pending` | RED `698f12f5...` + uniqueness repair `2fae4cb2...` |
 | GAP-044 | Known-truth RMSE alignment/accumulation depended on row order instead of component identity | `verification-pending` | RED `8ad72ac9...` / `5fb93c40...` + repairs `2dd9537e...` / `025dce7f...`; #310 `c6680450...` |
-| GAP-045 | Mean signed bias could reject a representable recovery result because finite residuals were summed before dividing | `verification-pending` | RED `c5ec42e4...` + repair `7499042f...`; #488 `a2c4ad8b...` |
-| GAP-046 | Bias SE could reject a representable SEM because raw squared deviations/intermediates overflowed | `verification-pending` | RED `7de0ef90...` + repair `cad23162...`; #488 `a2c4ad8b...` |
-| GAP-047 | Generic RMSE/RMSE-SE could reject representable extremes/subnormals or report false perfect recovery | `verification-pending` | RED `dd41ff53...` / `f4e19991...` + repair `6b182107...`; #488 `a2c4ad8b...` |
-| GAP-048 | Mean signed bias could erase a representable subnormal residual during mixed-sign cancellation | `verification-pending` | RED `b6084750...` + repair `227921d9...`; #488 `a2c4ad8b...` |
+| GAP-045 | Mean signed bias could reject a representable recovery result because finite residuals were summed before dividing | `verification-pending` | RED `c5ec42e4...` + repair `7499042f...`; #488 `2809a5cc...` |
+| GAP-046 | Bias SE could reject a representable SEM because raw squared deviations/intermediates overflowed | `verification-pending` | RED `7de0ef90...` + repair `cad23162...`; #488 `2809a5cc...` |
+| GAP-047 | Generic RMSE/RMSE-SE could reject representable extremes/subnormals or report false perfect recovery | `verification-pending` | RED `dd41ff53...` / `f4e19991...` + repair `6b182107...`; #488 `2809a5cc...` |
+| GAP-048 | Mean signed bias could erase a representable subnormal residual during mixed-sign cancellation | `verification-pending` | RED `b6084750...` + repair `227921d9...`; #488 `2809a5cc...` |
 | GAP-049 | Stable `Between` recovery could be aliased across occasion indices and reweight RMSE | `verification-pending` | RED `0a03041c...` + repair `ec2c1219...`; #310 `c6680450...` |
-| GAP-050 | Zero-multiplier SE-aware acceptance could erase a nonzero residual during scale reduction | `verification-pending` | RED `bd8a7c8a...` + repair `00ef2d90...`; #488 `a2c4ad8b...` |
-| GAP-051 | Exact-recovery acceptance distinguished IEEE `-0.0` and `+0.0` | `verification-pending` | RED `379e6525...` + repair `55876e60...`; #488 `a2c4ad8b...` |
-| GAP-052 | All-covered Wilson lower endpoint could cancel a positive representable value to zero | `verification-pending` | RED `f84e5918...` + repair `fe9b9c8a...`; #488 `a2c4ad8b...` |
-| GAP-053 | Strict-interior Wilson lower endpoint could cancel a positive representable value to zero | `verification-pending` | RED `9d45f482...` + repair `4f259f6e...`; #488 `a2c4ad8b...` |
-| GAP-054 | Wilson upper endpoint could falsely round to exact `1.0` | `verification-pending` | RED `c070da26...` / `344081bf...` + repair `9a2fdd05...`; #488 `a2c4ad8b...` |
-| GAP-055 | Strict-interior Wilson lower endpoint could accept a nonzero cancellation residue | `verification-pending` | RED `1a24fac7...` + repair `f7e20ddc...`; #488 `a2c4ad8b...` |
-| GAP-056 | Durable/human-facing Validation Evidence could accept impossible finite relationships or bypass validation | `verification-pending` | report/serde/egress/projection repair lineage; #488 `a2c4ad8b...` |
-| GAP-057 | RMSE-specific Monte Carlo slot could admit negative mean/percentiles from a generic signed carrier | `verification-pending` | RED `3cd6e41d...` + repair `0090259d...`; #488 `a2c4ad8b...` |
-| GAP-058 | Generic Monte Carlo summary could admit impossible coarse SD/SE/count relationships | `verification-pending` | RED `e2d0c057...` + repair `0e973b56...`; #488 `a2c4ad8b...` |
-| GAP-059 | Generic Monte Carlo summary could materially misstate positive SE relative to `SD / sqrt(n)` | `verification-pending` | RED `0a4c242f...` + repair `9b53076a...`; #488 `a2c4ad8b...` |
-| GAP-060 | RMSE Monte Carlo exact-zero mean could coexist with positive spread/support | `verification-pending` | RED `a17dfe1b...` + repair `d17d8034...`; #488 `a2c4ad8b...` |
-| GAP-061 | Generic Monte Carlo zero spread could retain non-degenerate empirical support | `verification-pending` | RED `ce21941a...` + repair `d0f5c145...`; #488 `a2c4ad8b...` |
-| GAP-062 | Finite-tolerance matching could fail while the pair is deterministically outside every finite tolerance | `verification-pending` | RED `d023ecdb...` + repair `5040ff96...`; #488 `a2c4ad8b...` |
-| GAP-063 | Exact-zero point RMSE could coexist with positive point RMSE SE | `verification-pending` | RED `f7b018c5...` + repair `4c599918...`; #488 `a2c4ad8b...` |
-| GAP-064 | Positive point RMSE could carry SE above the declared squared-residual producer support | `verification-pending` | RED `a2aca5b0...` + repair `32f09402...`; #488 `a2c4ad8b...` |
-| GAP-065 | Positive Monte Carlo RMSE could carry spread/SE impossible for nonnegative replications | `verification-pending` | RED `43a7dec1...` + repair `2f78954e...`; #488 `a2c4ad8b...` |
-| GAP-066 | RMSE Monte Carlo nearest-rank percentile could exceed total nonnegative `n*mean` support | `verification-pending` | RED `84a200ee...` + repair `04c9cdd4...`; #488 `a2c4ad8b...` |
-| GAP-067 | Generic nearest-rank percentile endpoint could be individually incompatible with represented mean/sample spread | `verification-pending` | RED `40acb4f6...`; rejected over-strong repair `2798e4f9...`; causal repair `c7151b49...`; edge `dbef285b...`; changelog `c38a320c...`; research `2bbcbb24...`; #488 `a2c4ad8b...` |
-| GAP-068 | Distinct generic percentile endpoints could each pass individual radius checks while jointly exceeding the sample squared-deviation budget | `verification-pending` | RED `c4a13826...` + causal repair `cb3f80a2...` + changelog `f727450d...`; #488 `a2c4ad8b...` |
-| GAP-069 | Two-replication distinct nearest-rank endpoints could exhaust the retained sample while the stored mean or SD remained impossible | `verification-pending` | RED `81bf0d9e...` + causal repair `d48f8fef...` + mean coverage `fb314d8a...` + branch cleanup `440b78d8...` + changelog `45116498...`; #488 `a2c4ad8b...` |
-| GAP-070 | Stored Wilson bounds could contain empirical coverage while the lower/upper pair could not arise from one Wilson score interval for that same coverage | `verification-pending` | RED `a839c606...` + repair `38c5b8e8...` + complementary edge `c1cb16a7...`; #488 `a2c4ad8b...` |
-| GAP-071 | Durable Wilson evidence lacked denominator and critical-value/sidedness provenance, preventing exact recomputation from a persisted artifact | `active-repair` | valid carrier RED `6f6e06d2...`; shared count/Wilson authority `ca517ed3...`; `WilsonCoverageEvidenceV1` `31e1ab2b...`; sidedness `e9c63926...`/`fdd24a1a...`; envelope RED `07766cb0...` + `ValidationEvidenceV1` repair `a16f22e6...`; docs/current #488 `a2c4ad8b...`; remaining: hosted GREEN/review/main plus durable-consumer adoption |
-| GAP-072 | Exact all-covered Wilson evidence could retain a zero lower endpoint even though the canonical non-empty finite-`z²` producer always emits `n/(n+z²) > 0` | `verification-pending` | RED `ce714f07...` + non-force source-restore RCA `18499052...` + repair `72e9d954...` + changelog `e3a2f4a2...`; inherited by #488 `a2c4ad8b...` |
-| GAP-073 | Durable Wilson count provenance could round one uncovered observation away above binary64's exact-integer range and expose a pointer-width-dependent count schema | `verification-pending` | RED `29d710a5...` + complement/count repair `29968c80...` + fixed-width carrier repair `91d9a3bb...` + changelog `d908ce2a...`; research/current #488 `a2c4ad8b...` |
+| GAP-050 | Zero-multiplier SE-aware acceptance could erase a nonzero residual during scale reduction | `verification-pending` | RED `bd8a7c8a...` + repair `00ef2d90...`; #488 `2809a5cc...` |
+| GAP-051 | Exact-recovery acceptance distinguished IEEE `-0.0` and `+0.0` | `verification-pending` | RED `379e6525...` + repair `55876e60...`; #488 `2809a5cc...` |
+| GAP-052 | All-covered Wilson lower endpoint could cancel a positive representable value to zero | `verification-pending` | RED `f84e5918...` + repair `fe9b9c8a...`; #488 `2809a5cc...` |
+| GAP-053 | Strict-interior Wilson lower endpoint could cancel a positive representable value to zero | `verification-pending` | RED `9d45f482...` + repair `4f259f6e...`; #488 `2809a5cc...` |
+| GAP-054 | Wilson upper endpoint could falsely round to exact `1.0` | `verification-pending` | RED `c070da26...` / `344081bf...` + repair `9a2fdd05...`; #488 `2809a5cc...` |
+| GAP-055 | Strict-interior Wilson lower endpoint could accept a nonzero cancellation residue | `verification-pending` | RED `1a24fac7...` + repair `f7e20ddc...`; #488 `2809a5cc...` |
+| GAP-056 | Durable/human-facing Validation Evidence could accept impossible finite relationships or bypass validation | `verification-pending` | report/serde/egress/projection repair lineage; #488 `2809a5cc...` |
+| GAP-057 | RMSE-specific Monte Carlo slot could admit negative mean/percentiles from a generic signed carrier | `verification-pending` | RED `3cd6e41d...` + repair `0090259d...`; #488 `2809a5cc...` |
+| GAP-058 | Generic Monte Carlo summary could admit impossible coarse SD/SE/count relationships | `verification-pending` | RED `e2d0c057...` + repair `0e973b56...`; #488 `2809a5cc...` |
+| GAP-059 | Generic Monte Carlo summary could materially misstate positive SE relative to `SD / sqrt(n)` | `verification-pending` | RED `0a4c242f...` + repair `9b53076a...`; #488 `2809a5cc...` |
+| GAP-060 | RMSE Monte Carlo exact-zero mean could coexist with positive spread/support | `verification-pending` | RED `a17dfe1b...` + repair `d17d8034...`; #488 `2809a5cc...` |
+| GAP-061 | Generic Monte Carlo zero spread could retain non-degenerate empirical support | `verification-pending` | RED `ce21941a...` + repair `d0f5c145...`; #488 `2809a5cc...` |
+| GAP-062 | Finite-tolerance matching could fail while the pair is deterministically outside every finite tolerance | `verification-pending` | RED `d023ecdb...` + repair `5040ff96...`; #488 `2809a5cc...` |
+| GAP-063 | Exact-zero point RMSE could coexist with positive point RMSE SE | `verification-pending` | RED `f7b018c5...` + repair `4c599918...`; #488 `2809a5cc...` |
+| GAP-064 | Positive point RMSE could carry SE above the declared squared-residual producer support | `verification-pending` | RED `a2aca5b0...` + repair `32f09402...`; #488 `2809a5cc...` |
+| GAP-065 | Positive Monte Carlo RMSE could carry spread/SE impossible for nonnegative replications | `verification-pending` | RED `43a7dec1...` + repair `2f78954e...`; #488 `2809a5cc...` |
+| GAP-066 | RMSE Monte Carlo nearest-rank percentile could exceed total nonnegative `n*mean` support | `verification-pending` | RED `84a200ee...` + repair `04c9cdd4...`; #488 `2809a5cc...` |
+| GAP-067 | Generic nearest-rank percentile endpoint could be individually incompatible with represented mean/sample spread | `verification-pending` | RED `40acb4f6...`; rejected over-strong repair `2798e4f9...`; causal repair `c7151b49...`; edge `dbef285b...`; changelog `c38a320c...`; research `2bbcbb24...`; #488 `2809a5cc...` |
+| GAP-068 | Distinct generic percentile endpoints could each pass individual radius checks while jointly exceeding the sample squared-deviation budget | `verification-pending` | RED `c4a13826...` + causal repair `cb3f80a2...` + changelog `f727450d...`; #488 `2809a5cc...` |
+| GAP-069 | Two-replication distinct nearest-rank endpoints could exhaust the retained sample while the stored mean or SD remained impossible | `verification-pending` | RED `81bf0d9e...` + causal repair `d48f8fef...` + mean coverage `fb314d8a...` + branch cleanup `440b78d8...` + changelog `45116498...`; #488 `2809a5cc...` |
+| GAP-070 | Stored Wilson bounds could contain empirical coverage while the lower/upper pair could not arise from one Wilson score interval for that same coverage | `verification-pending` | RED `a839c606...` + repair `38c5b8e8...` + complementary edge `c1cb16a7...`; #488 `2809a5cc...` |
+| GAP-071 | Durable Wilson evidence lacked denominator and critical-value/sidedness provenance, preventing exact recomputation from a persisted artifact | `active-repair` | valid carrier RED `6f6e06d2...`; shared count/Wilson authority `ca517ed3...`; `WilsonCoverageEvidenceV1` `31e1ab2b...`; sidedness `e9c63926...`/`fdd24a1a...`; envelope RED `07766cb0...` + `ValidationEvidenceV1` repair `a16f22e6...`; docs/current #488 `2809a5cc...`; remaining: hosted GREEN/review/main plus durable-consumer adoption |
+| GAP-072 | Exact all-covered Wilson evidence could retain a zero lower endpoint even though the canonical non-empty finite-`z²` producer always emits `n/(n+z²) > 0` | `verification-pending` | RED `ce714f07...` + non-force source-restore RCA `18499052...` + repair `72e9d954...` + changelog `e3a2f4a2...`; inherited by #488 `2809a5cc...` |
+| GAP-073 | Durable Wilson count provenance could round one uncovered observation away above binary64's exact-integer range and expose a pointer-width-dependent count schema | `verification-pending` | RED `29d710a5...` + complement/count repair `29968c80...` + fixed-width carrier repair `91d9a3bb...` + changelog `d908ce2a...`; standards/research/current #488 `2809a5cc...` |
 
 ## Release gate
 
