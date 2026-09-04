@@ -16,9 +16,15 @@ const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 /// the equivalent identity on the uncovered proportion avoids squaring a tiny
 /// `p`. All terms remain probability-scaled, so a small absolute binary64
 /// tolerance is sufficient without overflow-prone reconstruction of `n` or `z`.
+/// At exact all-covered `p = 1`, the eliminated identity is degenerate, but the
+/// canonical producer still has the stronger necessary support `L = n/(n+z²) > 0`
+/// for every non-empty sample and finite represented `z²`.
 fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool {
-    if p == 0.0 || p == 1.0 {
+    if p == 0.0 {
         return true;
+    }
+    if p == 1.0 {
+        return lower > 0.0;
     }
 
     let endpoint_sum = lower + upper;
@@ -75,21 +81,23 @@ impl ValidationReport {
     /// accuracy are probabilities in `[0, 1]`; the Wilson interval is ordered,
     /// contains the empirical coverage recorded in the same report, and its two
     /// endpoints must satisfy the same Wilson-score root identity for that
-    /// coverage. This prevents two individually plausible bounds from being
-    /// combined into an interval that no finite positive Wilson `z² / n` can
-    /// produce. Mean signed bias remains unrestricted in sign. A generic
-    /// [`MonteCarloSummary`] may summarize a signed metric, but when it occupies
-    /// `monte_carlo_rmse` every retained replication is nonnegative. Its mean and
-    /// percentile endpoints are therefore nonnegative. Nonnegative sample support
-    /// additionally implies `SD <= sqrt(n) * mean`, `SE(mean) <= mean`, and every
-    /// retained value—and thus every inclusive nearest-rank percentile endpoint—is
-    /// at most `n * mean`. Admission evaluates the percentile support as
-    /// `endpoint / mean <= n` with a small relative binary64 tolerance so the check
-    /// does not overflow a finite sample sum. A zero Monte Carlo RMSE mean is exact
-    /// perfect recovery across every retained replication, so spread, standard
-    /// error, and empirical percentile endpoints must all be zero as well. These
-    /// checks prevent a finite but scientifically impossible payload from becoming
-    /// durable Validation Evidence.
+    /// coverage. Exact all-covered evidence additionally requires a strictly
+    /// positive Wilson lower endpoint, matching the canonical `n / (n + z²)`
+    /// producer for every non-empty sample and finite represented `z²`. These
+    /// checks prevent individually plausible bounds from being combined into an
+    /// interval that the canonical producer cannot emit. Mean signed bias remains
+    /// unrestricted in sign. A generic [`MonteCarloSummary`] may summarize a signed
+    /// metric, but when it occupies `monte_carlo_rmse` every retained replication is
+    /// nonnegative. Its mean and percentile endpoints are therefore nonnegative.
+    /// Nonnegative sample support additionally implies `SD <= sqrt(n) * mean`,
+    /// `SE(mean) <= mean`, and every retained value—and thus every inclusive
+    /// nearest-rank percentile endpoint—is at most `n * mean`. Admission evaluates
+    /// the percentile support as `endpoint / mean <= n` with a small relative
+    /// binary64 tolerance so the check does not overflow a finite sample sum. A
+    /// zero Monte Carlo RMSE mean is exact perfect recovery across every retained
+    /// replication, so spread, standard error, and empirical percentile endpoints
+    /// must all be zero as well. These checks prevent a finite but scientifically
+    /// impossible payload from becoming durable Validation Evidence.
     ///
     /// # Errors
     ///
@@ -124,7 +132,7 @@ impl ValidationReport {
         } else {
             let relative_standard_error = self.rmse_standard_error / self.rmse;
             if !relative_standard_error.is_finite()
-                || relative_standard_error > 0.5 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
+                || relative_standard_error > 0.5 + RMSE_STANDARD_TOLERANCE
             {
                 return Err(ValidationError::InvalidInput);
             }
@@ -252,7 +260,7 @@ impl<'de> Deserialize<'de> for ValidationReport {
         struct Raw {
             study_label: String,
             rmse: f64,
-            rmse_standard_error: f64,
+            rust_standard_error: f64,
             mean_bias: f64,
             bias_standard_error: f64,
             interval_coverage: f64,
@@ -266,7 +274,7 @@ impl<'de> Deserialize<'de> for ValidationReport {
         let report = Self {
             study_label: raw.study_label,
             rmse: raw.rmse,
-            rmse_standard_error: raw.rmse_standard_error,
+            rmse_standard_error: raw.rust_standard_error,
             mean_bias: raw.mean_bias,
             bias_standard_error: raw.bias_standard_error,
             interval_coverage: raw.interval_coverage,
@@ -282,7 +290,7 @@ impl<'de> Deserialize<'de> for ValidationReport {
 
 // Serde for MonteCarloSummary
 impl Serialize for MonteCarloSummary {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, f64> 
     where
         S: serde::Serializer,
     {
