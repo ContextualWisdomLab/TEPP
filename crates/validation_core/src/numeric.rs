@@ -18,6 +18,27 @@ fn deterministic_compensated_parts(mut values: Vec<f64>) -> (f64, f64) {
     (sum, correction)
 }
 
+fn deterministic_compensated_parts_with_tail(mut values: Vec<f64>) -> (f64, f64, f64) {
+    values.sort_by(f64::total_cmp);
+    let mut sum = 0.0_f64;
+    let mut correction = 0.0_f64;
+    let mut correction_tail = 0.0_f64;
+    for value in values {
+        let next = sum + value;
+        let increment = if sum.abs() >= value.abs() {
+            (sum - next) + value
+        } else {
+            (value - next) + sum
+        };
+        let (next_correction, correction_roundoff) = error_free_sum(correction, increment);
+        let (next_tail, tail_roundoff) = error_free_sum(correction_tail, correction_roundoff);
+        correction = next_correction;
+        correction_tail = next_tail + tail_roundoff;
+        sum = next;
+    }
+    (sum, correction, correction_tail)
+}
+
 /// Sum finite values in a canonical order with Neumaier compensation.
 ///
 /// Callers own domain validation and any scale normalization needed to keep the
@@ -98,6 +119,66 @@ fn error_free_sum(left: f64, right: f64) -> (f64, f64) {
     (sum, left_roundoff + right_roundoff)
 }
 
+fn adjacent_float(value: f64, upward: bool) -> f64 {
+    if value == 0.0 {
+        return if upward {
+            f64::from_bits(1)
+        } else {
+            f64::from_bits((1_u64 << 63) | 1)
+        };
+    }
+
+    let bits = value.to_bits();
+    if upward {
+        if value.is_sign_positive() {
+            f64::from_bits(bits + 1)
+        } else {
+            f64::from_bits(bits - 1)
+        }
+    } else if value.is_sign_positive() {
+        f64::from_bits(bits - 1)
+    } else {
+        f64::from_bits(bits + 1)
+    }
+}
+
+fn round_candidate_with_tail(candidate: f64, tail_head: f64, tail_tail: f64) -> f64 {
+    let (tail, tail_roundoff) = error_free_sum(tail_head, tail_tail);
+    if tail == 0.0 && tail_roundoff == 0.0 {
+        return candidate;
+    }
+
+    let upward = if tail != 0.0 {
+        tail.is_sign_positive()
+    } else {
+        tail_roundoff.is_sign_positive()
+    };
+    let neighbor = adjacent_float(candidate, upward);
+    if !neighbor.is_finite() {
+        return neighbor;
+    }
+
+    let half_gap = ((neighbor - candidate).abs()) * 0.5;
+    if half_gap == 0.0 {
+        return neighbor;
+    }
+
+    let tail_magnitude = tail.abs();
+    let beyond_midpoint = if tail_magnitude > half_gap {
+        true
+    } else if tail_magnitude < half_gap {
+        false
+    } else if tail_roundoff == 0.0 {
+        candidate.to_bits() & 1 == 1
+    } else if upward {
+        tail_roundoff > 0.0
+    } else {
+        tail_roundoff < 0.0
+    };
+
+    if beyond_midpoint { neighbor } else { candidate }
+}
+
 fn mixed_remainder_mean_over_total(
     values: &[f64],
     total_count: usize,
@@ -112,15 +193,31 @@ fn mixed_remainder_mean_over_total(
 
     let scale = exact_power_of_two_scale(max_magnitude);
     let normalized = values.iter().map(|value| *value / scale).collect();
-    let (normalized_sum, normalized_correction) = deterministic_compensated_parts(normalized);
-    if normalized_sum == 0.0 && normalized_correction == 0.0 {
+    let (normalized_sum, normalized_correction, normalized_correction_tail) =
+        deterministic_compensated_parts_with_tail(normalized);
+    if normalized_sum == 0.0
+        && normalized_correction == 0.0
+        && normalized_correction_tail == 0.0
+    {
         return Ok(0.0);
     }
 
     let denominator = total_count as f64;
     let leading_mean = normalized_sum / denominator;
     let division_residual = (-leading_mean).mul_add(denominator, normalized_sum);
-    let normalized_mean = leading_mean + (division_residual + normalized_correction) / denominator;
+    let (correction_numerator, correction_numerator_roundoff) =
+        error_free_sum(division_residual, normalized_correction);
+    let correction_mean = correction_numerator / denominator;
+    let correction_division_residual =
+        (-correction_mean).mul_add(denominator, correction_numerator) / denominator;
+    let (candidate, addition_roundoff) = error_free_sum(leading_mean, correction_mean);
+    let (tail_head, tail_tail) = deterministic_compensated_parts(vec![
+        addition_roundoff,
+        correction_division_residual,
+        correction_numerator_roundoff / denominator,
+        normalized_correction_tail / denominator,
+    ]);
+    let normalized_mean = round_candidate_with_tail(candidate, tail_head, tail_tail);
     let mean = normalized_mean * scale;
     if !mean.is_finite() || mean == 0.0 {
         Err(ValidationError::InvalidInput)
