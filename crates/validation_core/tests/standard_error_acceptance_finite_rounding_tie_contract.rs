@@ -126,3 +126,32 @@ fn exact_minimum_subnormal_bound_remains_accepted() {
         "an exactly represented minimum-subnormal bound still covers an equal residual"
     );
 }
+
+#[test]
+fn minimum_normal_bound_rounding_must_not_hide_a_strict_rejection() {
+    let minimum_normal = f64::MIN_POSITIVE;
+    let standard_error = f64::from_bits(0x1fff_ffff_fc00_0000); // (1 - 2^-27) * 2^-511
+    let multiplier = f64::from_bits(0x2000_0000_0200_0000); // (1 + 2^-27) * 2^-511
+
+    assert_eq!(multiplier * standard_error, minimum_normal);
+    // The exact represented product is (1 - 2^-54) * 2^-1022,
+    // one quarter of a minimum-subnormal ULP below the minimum normal. The
+    // multiplication rounds up, while its FMA correction itself rounds to zero.
+    assert_eq!(multiplier.mul_add(standard_error, -minimum_normal), -0.0);
+
+    assert_eq!(
+        accept_within_standard_errors(minimum_normal, 0.0, standard_error, multiplier),
+        Ok(false),
+        "an underflowed product correction at the normal/subnormal boundary must not erase a strict rejection"
+    );
+}
+
+#[test]
+fn exact_minimum_normal_bound_remains_accepted() {
+    let minimum_normal = f64::MIN_POSITIVE;
+    assert_eq!(
+        accept_within_standard_errors(minimum_normal, 0.0, minimum_normal, 1.0),
+        Ok(true),
+        "an exactly represented minimum-normal bound still covers an equal residual"
+    );
+}
