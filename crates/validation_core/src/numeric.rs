@@ -46,21 +46,32 @@ fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, 
         .map(|value| value.abs())
         .fold(0.0, f64::max);
 
-    if max_magnitude < f64::MIN_POSITIVE {
-        // Scaling an all-subnormal numerator creates a second rounding point when
-        // the normalized mean is restored to the subnormal grid. The raw sum of
-        // same-sign subnormals cannot overflow on supported `usize` widths, so
-        // preserve the scientific division directly in the original scale.
-        let (sum, correction) = deterministic_compensated_parts(values.to_vec());
-        let denominator = total_count as f64;
-        let leading_mean = sum / denominator;
-        let division_residual = (-leading_mean).mul_add(denominator, sum);
-        let mean = leading_mean + (division_residual + correction) / denominator;
-        return if !mean.is_finite() || mean == 0.0 {
-            Err(ValidationError::InvalidInput)
-        } else {
-            Ok(mean)
-        };
+    if max_magnitude < f64::MIN_POSITIVE && total_count >= values.len() {
+        // Subnormal values are exact integer multiples of 2^-1074. With a divisor
+        // at least as large as the term count, the exact mean remains subnormal;
+        // summing 52-bit units over any supported `usize` length fits in `u128`.
+        // Round those represented units once instead of normalizing and then
+        // rounding again while restoring a subnormal power-of-two scale.
+        let negative = values.iter().any(|value| *value < 0.0);
+        let total_units: u128 = values
+            .iter()
+            .map(|value| (value.to_bits() & 0x000f_ffff_ffff_ffff) as u128)
+            .sum();
+        let denominator = total_count as u128;
+        let mut rounded_units = total_units / denominator;
+        let remainder = total_units % denominator;
+        let twice_remainder = remainder * 2;
+        if twice_remainder > denominator
+            || (twice_remainder == denominator && rounded_units & 1 == 1)
+        {
+            rounded_units += 1;
+        }
+        if rounded_units == 0 {
+            return Err(ValidationError::InvalidInput);
+        }
+
+        let sign = if negative { 1_u64 << 63 } else { 0 };
+        return Ok(f64::from_bits(sign | rounded_units as u64));
     }
 
     let scale = exact_power_of_two_scale(max_magnitude);
