@@ -355,15 +355,27 @@ fn both_overflow_acceptance(
     )
 }
 
+/// Return the error-free low term of a finite binary64 subtraction.
+fn subtraction_roundoff(minuend: f64, subtrahend: f64, difference: f64) -> f64 {
+    let virtual_subtrahend = minuend - difference;
+    let virtual_minuend = difference + virtual_subtrahend;
+    let subtrahend_roundoff = virtual_subtrahend - subtrahend;
+    let minuend_roundoff = minuend - virtual_minuend;
+    minuend_roundoff + subtrahend_roundoff
+}
+
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
 ///
 /// Finite represented residuals and finite represented `k · se` bounds are
-/// compared before any normalization. This preserves a positive acceptance bound
-/// when dividing `se` by a much larger estimate/target scale would underflow to
-/// zero. If only the positive bound overflows, every finite residual is covered;
-/// if only the residual overflows, a finite bound cannot cover it. When both
-/// direct operations overflow, TEPP compares the exact binary64 input rationals
-/// by decoding their integer significands and powers of two, avoiding a false
+/// compared before any normalization. If both rounded finite quantities are equal,
+/// an exact subtraction together with a nonzero fused multiply-add product residual
+/// disambiguates a multiplication tie instead of silently accepting a strict
+/// represented-input rejection. This preserves a positive acceptance bound when
+/// dividing `se` by a much larger estimate/target scale would underflow to zero.
+/// If only the positive bound overflows, every finite residual is covered; if only
+/// the residual overflows, a finite bound cannot cover it. When both direct
+/// operations overflow, TEPP compares the exact binary64 input rationals by
+/// decoding their integer significands and powers of two, avoiding a false
 /// accept/reject caused by independently rounded normalization. A zero standard
 /// error or zero multiplier remains an exact-recovery gate and is compared before
 /// either path. Exact recovery uses numeric equality, for which IEEE `-0.0` and
@@ -397,7 +409,15 @@ pub fn accept_within_standard_errors(
     let direct_bound = k * standard_error;
     if direct_error.is_finite() {
         if direct_bound.is_finite() {
-            return Ok(direct_error.abs() <= direct_bound);
+            let residual = direct_error.abs();
+            if residual == direct_bound && residual != 0.0 {
+                let difference_roundoff = subtraction_roundoff(estimate, target, direct_error);
+                let product_roundoff = k.mul_add(standard_error, -direct_bound);
+                if difference_roundoff == 0.0 && product_roundoff != 0.0 {
+                    return Ok(product_roundoff.is_sign_positive());
+                }
+            }
+            return Ok(residual <= direct_bound);
         }
         // A finite residual is necessarily inside a positive bound whose
         // represented multiplication overflowed beyond binary64's finite range.
