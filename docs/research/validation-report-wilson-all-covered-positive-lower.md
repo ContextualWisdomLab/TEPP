@@ -21,7 +21,7 @@ An extreme finite fixture with `n = 1` and `z = 1e154` keeps `z²` finite and pr
 - Public RED: `ce714f077fe1575b50f1b97131e1857ad0c69b1e`, `crates/validation_core/tests/validation_report_wilson_all_covered_positive_lower_contract.rs`.
 - The RED proves the canonical extreme-`z` all-covered lower endpoint remains positive and requires `+0.0` and `-0.0` lower endpoints to fail explicit validation, JSON egress, human projection, and serde ingress.
 - During the source edit, two intermediate commits introduced unrelated transcription defects. They were not treated as valid evidence and were fully neutralized by `184990522287e254a8e4c1995c02bce20aaa288e`, which restores the exact predecessor `report.rs` blob while preserving the RED file and branch ancestry. No force push or destructive rebase was used.
-- Causal source repair: `72e9d9546e4bf98a63544d6e76a92116da5bf670`. The only surviving source delta splits the degredate `p = 1` case from `p = 0` and requires `coverage_wilson_lower > 0.0` for exact all-covered evidence.
+- Causal source repair: `72e9d9546e4bf98a63544d6e76a92116da5bf670`. The only surviving source delta splits the degenerate `p = 1` case from `p = 0` and requires `coverage_wilson_lower > 0.0` for exact all-covered evidence.
 - Changelog trace: `e3a2f4a27a9355c77c2aa9aad92793d254536439`.
 
 ## Scope and owner boundary
