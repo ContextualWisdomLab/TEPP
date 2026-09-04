@@ -107,6 +107,80 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
     }
 }
 
+fn exact_translated_residual_standard_error(
+    diffs: &[f64],
+    roundoffs: &[f64],
+) -> Result<Option<f64>, ValidationError> {
+    let anchor_high = diffs[0];
+    let anchor_low = roundoffs[0];
+    let mut translated = Vec::with_capacity(diffs.len());
+
+    for (&high, &low) in diffs.iter().zip(roundoffs) {
+        let high_delta = high - anchor_high;
+        if !high_delta.is_finite()
+            || subtraction_roundoff(high, anchor_high, high_delta) != 0.0
+        {
+            return Ok(None);
+        }
+
+        let low_delta = low - anchor_low;
+        if !low_delta.is_finite()
+            || subtraction_roundoff(low, anchor_low, low_delta) != 0.0
+        {
+            return Ok(None);
+        }
+
+        let delta = high_delta + low_delta;
+        if !delta.is_finite() || subtraction_roundoff(high_delta, -low_delta, delta) != 0.0 {
+            return Ok(None);
+        }
+        translated.push(delta);
+    }
+
+    let scale = translated
+        .iter()
+        .map(|value| value.abs())
+        .fold(0.0, f64::max);
+    if scale == 0.0 {
+        return Ok(Some(0.0));
+    }
+
+    let normalized: Vec<_> = translated.iter().map(|value| *value / scale).collect();
+    if translated
+        .iter()
+        .zip(&normalized)
+        .any(|(value, normalized_value)| *value != 0.0 && *normalized_value == 0.0)
+    {
+        return Ok(None);
+    }
+
+    let normalized_sum = deterministic_compensated_sum(normalized.clone());
+    let normalized_square_sum = deterministic_compensated_sum(
+        normalized
+            .iter()
+            .map(|value| value * value)
+            .collect(),
+    );
+    let sample_count = translated.len() as f64;
+    let scaled_square_sum = sample_count * normalized_square_sum;
+    let dispersion_numerator =
+        (-normalized_sum).mul_add(normalized_sum, scaled_square_sum);
+    if !dispersion_numerator.is_finite() || dispersion_numerator <= 0.0 {
+        return Ok(None);
+    }
+
+    let denominator = sample_count * sample_count * (sample_count - 1.0);
+    let normalized_standard_error = (dispersion_numerator / denominator).sqrt();
+    let standard_error = scale * normalized_standard_error;
+    if !standard_error.is_finite()
+        || (standard_error == 0.0 && normalized_standard_error != 0.0)
+    {
+        Err(ValidationError::InvalidInput)
+    } else {
+        Ok(Some(standard_error))
+    }
+}
+
 /// Mean signed bias `mean(recovered − truth)`.
 ///
 /// Exactly representable finite signed residuals use the canonical
@@ -160,11 +234,14 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// is evaluated from the expanded represented inputs. For larger samples whose
 /// rounded residuals all collapse to the same binary64 value, the common high
 /// part cannot contribute to dispersion, so TEPP evaluates the standard error
-/// from the error-free subtraction low terms instead. Distinct represented
-/// residuals therefore cannot become false zero uncertainty solely because each
-/// `recovered - truth` rounded to the same high part. Individual signed
-/// residuals must still be representable because their dispersion is itself
-/// part of the requested scientific result.
+/// from the error-free subtraction low terms instead. When rounded high parts
+/// differ but every anchor-relative high/low residual delta is itself exactly
+/// representable, TEPP evaluates the translation-invariant second moment of
+/// those exact deltas in O(n), preventing discarded subtraction mass from
+/// changing a nonzero uncertainty estimate. Cases that cannot prove those
+/// translated deltas representable retain the predecessor rounded-residual path.
+/// Individual signed residuals must still be representable because their
+/// dispersion is itself part of the requested scientific result.
 ///
 /// # Errors
 ///
@@ -196,6 +273,14 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
     if has_subtraction_roundoff && diffs.iter().all(|residual| *residual == diffs[0]) {
         let roundoff_mean = deterministic_representable_mean(&subtraction_roundoffs)?;
         return scaled_standard_error(&subtraction_roundoffs, roundoff_mean);
+    }
+
+    if has_subtraction_roundoff {
+        if let Some(standard_error) =
+            exact_translated_residual_standard_error(&diffs, &subtraction_roundoffs)?
+        {
+            return Ok(standard_error);
+        }
     }
 
     let mean = deterministic_representable_mean(&diffs)?;
