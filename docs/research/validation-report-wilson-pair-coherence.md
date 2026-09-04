@@ -26,7 +26,15 @@ For `p < 0.5`, TEPP evaluates the equivalent identity on the uncovered proportio
 
 Using the complementary form avoids needlessly squaring a tiny `p`. Every term is probability-scaled, so the admission comparison cannot overflow finite binary64 inputs. A `64 * EPSILON` absolute tolerance admits normal endpoint-rounding error while rejecting materially incoherent pairs such as `[0.2, 0.9]` at `p = 0.5`.
 
-This is a necessary, not sufficient, provenance check. The current report still does not retain the coverage denominator or the critical value `z`; therefore this repair does not claim full recomputation or denominator provenance. That remains a separate schema-level Validation Evidence gap rather than being inferred from unavailable data.
+This is a necessary, not sufficient, provenance check. The current report still does not retain the coverage denominator or the critical value `z`; therefore this repair does not claim full recomputation or denominator provenance. The existing producer can also admit a positive `z` whose squared binary64 representation underflows to zero, so this artifact-level identity is deliberately not strengthened into a non-degeneracy rule that the producer itself does not yet guarantee. Those are separate producer/schema questions rather than facts inferred from unavailable evidence.
+
+## Dependent-fixture review
+
+Adding a cross-field invariant changed the validity of old branch fixtures that used arbitrary Wilson-looking probabilities while testing unrelated RMSE/Monte Carlo behavior. Self-review therefore replaced those incidental values with the exactly coherent `p = 0.5`, `[0.2, 0.8]` pair, which corresponds to a positive finite `z² / n = 0.5625`. The intended RED condition in each test remains unchanged.
+
+The same review rechecked typed RMSE fixtures against the already-landed generic `MonteCarloSummary` moment contracts. Where an older typed test had become generic-invalid, its sample statistics were repaired so the generic carrier is valid and the typed RMSE boundary remains the sole reason for refusal. In particular, the nonnegative percentile RED now uses `n = 4`, `mean = 1`, `SD = 2`, `SE = 1`, and `upper = 4.1`: it fits the generic individual/joint moment support but exceeds the typed nonnegative RMSE sample-sum bound `n * mean = 4`.
+
+These fixture changes are test doctoring, not evidence-gate weakening. They remove confounding failure causes introduced by stronger predecessor contracts.
 
 ## Executable trace
 
@@ -34,6 +42,7 @@ This is a necessary, not sufficient, provenance check. The current report still 
 - Causal source repair: `38c5b8e83fe2433167afb6ece13e72b6608ceb03`, `crates/validation_core/src/report.rs`.
 - Complementary-identity coverage: `c1cb16a78499648c10d6d5a8dad5e212a267064a`.
 - Changelog trace: `6af0821bc2fca3e9f101cfa4ad36048ecfaa6ddd`.
+- Dependent fixture doctoring includes `acf573526f955a7700ebd753b83e0baad120628d`, `ccd30ede3b6e90e0ddff0c0c9ef764f320c2cec1`, `fee458966a9dfb64da2aba01f242fe9e2e613540`, `b9eb9465b155b0fd3f44d0ff88b429485f038c8e`, and `59e40b4f0ebbb3b991c84724ded157ffe974abcd`.
 - Owner: TEPP Validation Evidence. No reusable static psychometric estimator is introduced; fast-mlsirm remains untouched. No semantic LLM path is involved.
 
 ## Methodological trace
