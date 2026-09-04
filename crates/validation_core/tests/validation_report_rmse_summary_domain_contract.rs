@@ -37,7 +37,7 @@ fn validation_report_rejects_negative_monte_carlo_rmse_evidence() {
         mean: 0.02,
         standard_deviation: 0.03,
         standard_error: 0.006,
-        percentile_lower: -0.1,
+        percentile_lower: -0.01,
         percentile_upper: 0.07,
     });
     assert_eq!(
