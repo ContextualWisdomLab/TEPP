@@ -285,16 +285,89 @@ pub fn summarize_replications(
     summary.validate()
 }
 
+/// Decode a nonnegative finite binary64 magnitude into an exact integer significand and power-of-two exponent.
+fn binary64_magnitude_components(value: f64) -> (u64, i32) {
+    let bits = value.to_bits() & 0x7fff_ffff_ffff_ffff;
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & 0x000f_ffff_ffff_ffff;
+    if exponent_bits == 0 {
+        (fraction, -1074)
+    } else {
+        ((1_u64 << 52) | fraction, exponent_bits - 1023 - 52)
+    }
+}
+
+/// Compare two exact nonzero `significand * 2^exponent` values without floating-point rounding.
+fn scaled_u128_le(
+    lhs_significand: u128,
+    lhs_exponent: i32,
+    rhs_significand: u128,
+    rhs_exponent: i32,
+) -> bool {
+    let lhs_bits = 128_i32 - lhs_significand.leading_zeros() as i32;
+    let rhs_bits = 128_i32 - rhs_significand.leading_zeros() as i32;
+    let lhs_top_exponent = lhs_exponent + lhs_bits - 1;
+    let rhs_top_exponent = rhs_exponent + rhs_bits - 1;
+    if lhs_top_exponent != rhs_top_exponent {
+        return lhs_top_exponent < rhs_top_exponent;
+    }
+
+    let common_exponent = lhs_exponent.min(rhs_exponent);
+    let lhs_shift = (lhs_exponent - common_exponent) as u32;
+    let rhs_shift = (rhs_exponent - common_exponent) as u32;
+    debug_assert!(lhs_shift < 128);
+    debug_assert!(rhs_shift < 128);
+    (lhs_significand << lhs_shift) <= (rhs_significand << rhs_shift)
+}
+
+/// Compare the exact represented residual magnitude with `k * SE` after both direct operations overflow.
+fn both_overflow_acceptance(
+    estimate: f64,
+    target: f64,
+    standard_error: f64,
+    k: f64,
+) -> bool {
+    let (estimate_significand, estimate_exponent) =
+        binary64_magnitude_components(estimate.abs());
+    let (target_significand, target_exponent) = binary64_magnitude_components(target.abs());
+    let common_residual_exponent = estimate_exponent.min(target_exponent);
+    let estimate_shift = (estimate_exponent - common_residual_exponent) as u32;
+    let target_shift = (target_exponent - common_residual_exponent) as u32;
+
+    // Finite subtraction can overflow only for opposite signs whose magnitudes
+    // are close enough to the top of binary64 that exact alignment needs at most
+    // one 53-bit significand-width shift.
+    debug_assert!(estimate_shift <= 53);
+    debug_assert!(target_shift <= 53);
+    let residual_significand = ((estimate_significand as u128) << estimate_shift)
+        + ((target_significand as u128) << target_shift);
+
+    let (k_significand, k_exponent) = binary64_magnitude_components(k);
+    let (se_significand, se_exponent) = binary64_magnitude_components(standard_error);
+    let bound_significand = (k_significand as u128) * (se_significand as u128);
+    let bound_exponent = k_exponent + se_exponent;
+
+    scaled_u128_le(
+        residual_significand,
+        common_residual_exponent,
+        bound_significand,
+        bound_exponent,
+    )
+}
+
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
 ///
 /// Finite represented residuals and finite represented `k · se` bounds are
-/// compared before normalization. This preserves a positive acceptance bound
+/// compared before any normalization. This preserves a positive acceptance bound
 /// when dividing `se` by a much larger estimate/target scale would underflow to
-/// zero. Scale-normalized comparison is reserved for the only ambiguous binary64
-/// case: both the direct residual subtraction and direct bound multiplication
-/// overflow. A zero standard error or zero multiplier remains an exact-recovery
-/// gate and is compared before either path. Exact recovery uses numeric equality,
-/// for which IEEE `-0.0` and `+0.0` denote the same zero-valued scientific result.
+/// zero. If only the positive bound overflows, every finite residual is covered;
+/// if only the residual overflows, a finite bound cannot cover it. When both
+/// direct operations overflow, TEPP compares the exact binary64 input rationals
+/// by decoding their integer significands and powers of two, avoiding a false
+/// accept/reject caused by independently rounded normalization. A zero standard
+/// error or zero multiplier remains an exact-recovery gate and is compared before
+/// either path. Exact recovery uses numeric equality, for which IEEE `-0.0` and
+/// `+0.0` denote the same zero-valued scientific result.
 ///
 /// # Errors
 ///
@@ -335,14 +408,12 @@ pub fn accept_within_standard_errors(
         return Ok(false);
     }
 
-    let scale = estimate
-        .abs()
-        .max(target.abs())
-        .max(standard_error)
-        .max(1.0);
-    let scaled_error = (estimate / scale) - (target / scale);
-    let scaled_bound = k * (standard_error / scale);
-    Ok(scaled_error.abs() <= scaled_bound)
+    Ok(both_overflow_acceptance(
+        estimate,
+        target,
+        standard_error,
+        k,
+    ))
 }
 
 #[allow(clippy::cast_possible_truncation)]
