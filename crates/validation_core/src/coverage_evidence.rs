@@ -1,7 +1,9 @@
 //! Versioned provenance carrier for empirical interval-coverage evidence.
 
 use crate::ValidationError;
-use crate::coverage::{interval_covered_count, wilson_coverage_interval_from_counts};
+use crate::coverage::{
+    interval_covered_count, represented_coverage_from_counts, wilson_coverage_interval_from_counts,
+};
 use serde::{Deserialize, Serialize};
 
 const SCHEMA: &str = "tepp.wilson_coverage_evidence.v1";
@@ -10,19 +12,20 @@ const INTERVAL_SIDEDNESS: &str = "two_sided";
 
 /// Durable Wilson interval-coverage evidence with denominator and critical-value provenance.
 ///
-/// The carrier stores the retained sample denominator and covered count rather than only the
-/// projected empirical proportion, plus the caller-supplied standard-normal critical value used
-/// by TEPP's canonical two-sided Wilson producer. Serialization fixes the schema identifier,
-/// critical-value scale, and interval sidedness so a numeric `z` cannot later be reinterpreted as
-/// a Student-t value or a one-sided confidence claim. Validation recomputes the empirical coverage
-/// and both Wilson endpoints from the stored counts and `z`; tampered or internally inconsistent
-/// artifacts fail closed.
+/// The carrier stores fixed-width retained-sample and covered counts rather than only the projected
+/// empirical proportion, plus the caller-supplied standard-normal critical value used by TEPP's
+/// canonical two-sided Wilson producer. Serialization fixes the schema identifier, critical-value
+/// scale, and interval sidedness so a numeric `z` cannot later be reinterpreted as a Student-t value
+/// or a one-sided confidence claim. Validation recomputes represented empirical coverage and both
+/// Wilson endpoints from the stored counts and `z`; tampered or internally inconsistent artifacts
+/// fail closed. Near all-covered samples are evaluated from the smaller uncovered count so a real
+/// miss is not erased when integer counts exceed binary64's exact-integer range.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WilsonCoverageEvidenceV1 {
     /// Number of interval/truth triples admitted to the empirical coverage calculation.
-    pub sample_count: usize,
+    pub sample_count: u64,
     /// Number of admitted triples whose closed interval contains the corresponding truth value.
-    pub covered_count: usize,
+    pub covered_count: u64,
     /// Caller-supplied standard-normal critical value used by the Wilson score producer.
     pub normal_critical_value: f64,
     /// Empirical coverage projected from `covered_count / sample_count`.
@@ -50,8 +53,8 @@ impl WilsonCoverageEvidenceV1 {
         if !normal_critical_value.is_finite() || normal_critical_value <= 0.0 {
             return Err(ValidationError::InvalidConfiguration);
         }
-        let covered_count = interval_covered_count(truth, lower, upper)?;
-        let sample_count = truth.len();
+        let covered_count = interval_covered_count(truth, lower, upper)? as u64;
+        let sample_count = truth.len() as u64;
         let (wilson_lower, wilson_upper) = wilson_coverage_interval_from_counts(
             covered_count,
             sample_count,
@@ -61,7 +64,7 @@ impl WilsonCoverageEvidenceV1 {
             sample_count,
             covered_count,
             normal_critical_value,
-            empirical_coverage: covered_count as f64 / sample_count as f64,
+            empirical_coverage: represented_coverage_from_counts(covered_count, sample_count)?,
             wilson_lower,
             wilson_upper,
         };
@@ -97,7 +100,8 @@ impl WilsonCoverageEvidenceV1 {
             }
         }
 
-        let expected_coverage = self.covered_count as f64 / self.sample_count as f64;
+        let expected_coverage =
+            represented_coverage_from_counts(self.covered_count, self.sample_count)?;
         let (expected_lower, expected_upper) = wilson_coverage_interval_from_counts(
             self.covered_count,
             self.sample_count,
@@ -157,8 +161,8 @@ impl<'de> Deserialize<'de> for WilsonCoverageEvidenceV1 {
         #[serde(deny_unknown_fields)]
         struct Raw {
             schema: String,
-            sample_count: usize,
-            covered_count: usize,
+            sample_count: u64,
+            covered_count: u64,
             critical_value_kind: String,
             interval_sidedness: String,
             normal_critical_value: f64,
