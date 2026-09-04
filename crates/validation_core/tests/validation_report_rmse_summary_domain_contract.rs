@@ -49,7 +49,6 @@ fn validation_report_rejects_negative_monte_carlo_rmse_evidence() {
         "study_label":"rmse-domain-contract",
         "rmse":0.2,
         "rmse_standard_error":0.01,
-        "mean":0.0,
         "mean_bias":0.0,
         "bias_standard_error":0.01,
         "interval_coverage":0.5,
