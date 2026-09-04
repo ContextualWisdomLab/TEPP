@@ -15,6 +15,7 @@
 mod bias;
 mod claim;
 mod coverage;
+mod coverage_evidence;
 mod error;
 mod graph_metrics;
 mod input;
@@ -49,6 +50,8 @@ pub use claim::promote_scientific_recovery;
 pub use coverage::interval_coverage;
 /// Wilson bounds for coverage proportions.
 pub use coverage::wilson_coverage_interval;
+/// Versioned Wilson coverage evidence with denominator and critical-value provenance.
+pub use coverage_evidence::WilsonCoverageEvidenceV1;
 /// Fail-closed validation errors.
 pub use error::ValidationError;
 /// Undirected edge identity.
