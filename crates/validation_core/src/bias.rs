@@ -4,7 +4,7 @@ use crate::ValidationError;
 use crate::input::require_paired_finite;
 use crate::numeric::{
     deterministic_compensated_sum, deterministic_representable_mean,
-    deterministic_representable_sum_over_count,
+    deterministic_representable_sum_over_count, exact_power_of_two_scale,
 };
 
 fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, ValidationError> {
@@ -137,13 +137,18 @@ fn exact_translated_residual_standard_error(
         translated.push(delta);
     }
 
-    let scale = translated
+    let max_magnitude = translated
         .iter()
         .map(|value| value.abs())
         .fold(0.0, f64::max);
-    if scale == 0.0 {
+    if max_magnitude == 0.0 {
         return Ok(Some(0.0));
     }
+    // Keep the translated binary64 geometry on an exact dyadic scale. Using the
+    // largest translated value itself can turn an exactly represented gap d into
+    // rounded(1/3) * d after the square-root stage and move the final SE by one
+    // ULP. A power-of-two scale changes only exponents, so restoring it is exact.
+    let scale = exact_power_of_two_scale(max_magnitude);
 
     let normalized: Vec<_> = translated.iter().map(|value| *value / scale).collect();
     if translated
@@ -241,10 +246,13 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// residuals, TEPP uses the `high + low` decomposition and the same translated
 /// second moment whenever every anchor-relative high delta, low delta, and
 /// combined residual delta is exactly representable. That path avoids making a
-/// rounded residual mean authoritative before dispersion is evaluated. Cases
-/// that cannot prove those translated deltas representable retain the predecessor
-/// rounded-residual path. Individual signed residuals must still be representable
-/// because their dispersion is itself part of the requested scientific result.
+/// rounded residual mean authoritative before dispersion is evaluated. Its
+/// normalization uses an exact power-of-two scale so the translated geometry is
+/// not re-rounded through an arbitrary magnitude before the final SE is restored.
+/// Cases that cannot prove those translated deltas representable retain the
+/// predecessor rounded-residual path. Individual signed residuals must still be
+/// representable because their dispersion is itself part of the requested
+/// scientific result.
 ///
 /// # Errors
 ///
