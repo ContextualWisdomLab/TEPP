@@ -25,6 +25,8 @@ The direct subtraction and direct product round to the same finite binary64 valu
 
 The same contract contains an adjacent acceptance control with `estimate=0x01c3_f43e_c52b_4312`, subtraction correction `0x0000_0000_003b_9da9`, `k=0x20c8_7ace_8d72_9746`, and `standard_error=0x20ea_1585_cc49_24ca`. There the exact product correction lies above the subtraction correction, so a blanket rejection of equal nonzero projections would also be wrong.
 
+Edge commit `b463a991adc6ff98fa09f91eb428cda9e0ff1255` adds the sign-complementary projection boundary: both first-order corrections can be the same negative subnormal while the exact represented product remains slightly farther below the rounded bound than the exact residual. This keeps the comparator's signed ordering executable rather than testing only positive product roundoff.
+
 ## Causal repair
 
 Commit `7d597a18e043f3619b893981823b9be15ddb823c` keeps the existing decision hierarchy and changes only the unresolved equal-nonzero finite-tie branch. `represented_correction_le_exact_product_roundoff` decodes the represented factors and rounded product into integer significands and powers of two, forms the exact represented product and its exact signed roundoff in `u128`, and compares that exact roundoff with the represented subtraction correction.
@@ -45,6 +47,7 @@ The repair claims only the finite case where the directly rounded residual and b
 - Module/API: `crates/validation_core/src/monte_carlo.rs` / `accept_within_standard_errors`
 - Public RED: `35ea85ba5c049e3736e8549445bc799638cc6555`
 - Causal repair: `7d597a18e043f3619b893981823b9be15ddb823c`
+- Signed edge coverage: `b463a991adc6ff98fa09f91eb428cda9e0ff1255`
 - Contract test: `crates/validation_core/tests/standard_error_acceptance_equal_nonzero_correction_projection_contract.rs`
 - CHANGELOG fragment: `CHANGELOG.d/validation-standard-error-acceptance-equal-nonzero-correction-projection.md`
 - Landing vehicle: PR #488; only its current exact head after documentation commits is authoritative for hosted checks and review.
