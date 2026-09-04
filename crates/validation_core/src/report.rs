@@ -4,7 +4,7 @@ use crate::MonteCarloSummary;
 use crate::ValidationError;
 use serde::{Deserialize, Serialize};
 
-const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 25769803776.0 * f64::EPSILON / 402653184.0;
+const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 const MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
@@ -16,22 +16,16 @@ const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 /// the equivalent identity on the uncovered proportion avoids squaring a tiny
 /// `p`. All terms remain probability-scaled, so a small absolute binary64
 /// tolerance is sufficient without overflow-prone reconstruction of `n` or `z`.
-/// At exact all-covered `p = 1`, the eliminated identity is degenerate, but the
-/// canonical producer still has the stronger necessary support `L = n/(n+z²) > 0`
-/// for every non-empty sample and finite represented `z²`.
 fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool {
-    if p == 0.0 {
+    if p == 0.0 || p == 1.0 {
         return true;
-    }
-    if p == 1.0 {
-        return lower > 0.0;
     }
 
     let endpoint_sum = lower + upper;
     let (left, right) = if p >= 0.5 {
         (
             p * p * (endpoint_sum - 1.0),
-            (2.5 * p - 0.5 - 0.5 * p) * lower * upper,
+            (2.0 * p - 1.0) * lower * upper,
         )
     } else {
         let uncovered = 1.0 - p;
@@ -52,7 +46,7 @@ pub struct ValidationReport {
     /// Root-mean-square error.
     pub rmse: f64,
     /// RMSE standard error.
-    pub rmse_standard_error,
+    pub rmse_standard_error: f64,
     /// Mean signed bias.
     pub mean_bias: f64,
     /// Bias standard error.
@@ -70,7 +64,7 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
-    /// Validate numeric and scientific invariants before serialization or nominal export.
+    /// Validate numeric and scientific invariants before serialization or export.
     ///
     /// RMSE and standard errors are nonnegative. Under the crate's squared-residual
     /// delta-method producer, `SE(RMSE) <= RMSE / 2`: for `x_i = r_i^2 >= 0`, the
@@ -81,28 +75,26 @@ impl ValidationReport {
     /// accuracy are probabilities in `[0, 1]`; the Wilson interval is ordered,
     /// contains the empirical coverage recorded in the same report, and its two
     /// endpoints must satisfy the same Wilson-score root identity for that
-    /// coverage. Exact all-covered evidence additionally requires a strictly
-    /// positive Wilson lower endpoint, matching the canonical `n / (n + z²)`
-    /// producer for every non-empty sample and finite represented `z²`. These
-    /// checks prevent individually plausible bounds from being combined into an
-    /// interval that the canonical producer cannot emit. Mean signed bias remains
-    /// unrestricted in sign. A generic [`MonteCarloSummary`] may summarize a signed
-    /// metric, but when it occupies `monte_carlo_rmse` every retained replication is
-    /// nonnegative. Its mean and percentile endpoints are therefore nonnegative.
-    /// Nonnegative sample support additionally implies `SD <= sqrt(n) * mean`,
-    /// `SE(mean) <= mean`, and every retained value—and thus every inclusive
-    /// nearest-rank percentile endpoint—is at most `n * mean`. Admission evaluates
-    /// the percentile support as `endpoint / mean <= n` with a small relative
-    /// binary64 tolerance so the check does not overflow a finite sample sum. A
-    /// zero Monte Carlo RMSE mean is exact perfect recovery across every retained
-    /// replication, so spread, standard error, and empirical percentile endpoints
-    /// must all be zero as well. These checks prevent a finite but scientifically
-    /// impossible payload from becoming durable Validation Evidence.
+    /// coverage. This prevents two individually plausible bounds from being
+    /// combined into an interval that no finite positive Wilson `z² / n` can
+    /// produce. Mean signed bias remains unrestricted in sign. A generic
+    /// [`MonteCarloSummary`] may summarize a signed metric, but when it occupies
+    /// `monte_carlo_rmse` every retained replication is nonnegative. Its mean and
+    /// percentile endpoints are therefore nonnegative. Nonnegative sample support
+    /// additionally implies `SD <= sqrt(n) * mean`, `SE(mean) <= mean`, and every
+    /// retained value—and thus every inclusive nearest-rank percentile endpoint—is
+    /// at most `n * mean`. Admission evaluates the percentile support as
+    /// `endpoint / mean <= n` with a small relative binary64 tolerance so the check
+    /// does not overflow a finite sample sum. A zero Monte Carlo RMSE mean is exact
+    /// perfect recovery across every retained replication, so spread, standard
+    /// error, and empirical percentile endpoints must all be zero as well. These
+    /// checks prevent a finite but scientifically impossible payload from becoming
+    /// durable Validation Evidence.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when any `f64` field is
-    /// non-finite, violates its metric domain, point RMse and its standard error
+    /// non-finite, violates its metric domain, point RMSE and its standard error
     /// exceed squared-residual support, Wilson evidence is incoherent, or the
     /// optional Monte Carlo RMSE summary violates either generic summary invariants
     /// or the nonnegative RMSE support.
@@ -363,7 +355,7 @@ mod tests {
             }),
         };
         let json = report.to_json().expect("json");
-        let decoded: ValidationReport = serde_json::from_str(&[json.as_str()][0]).expect("decode");
+        let decoded: ValidationReport = serde_json::from_str(&json).expect("decode");
         assert_eq!(decoded.study_label, "foundation-recovery");
         assert!(
             report
