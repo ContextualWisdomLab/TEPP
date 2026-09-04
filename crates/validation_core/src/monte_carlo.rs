@@ -385,21 +385,21 @@ fn subtraction_roundoff(minuend: f64, subtrahend: f64, difference: f64) -> f64 {
 /// adjusted for the absolute residual) with the fused multiply-add product
 /// correction. Different correction projections preserve the represented-input
 /// ordering even when either direct operation rounded to the same binary64 value.
-/// When both projected corrections are zero at a subnormal rounded bound and the
-/// subtraction was exact, TEPP compares that represented residual with the exact
-/// dyadic product of the represented `k` and `se`; this prevents FMA-underflowed
-/// product error from turning a strict rejection into equality. Other equal
-/// correction projections remain on the ordinary rounded decision instead of
-/// claiming a broader exact comparator. This also preserves a positive acceptance
-/// bound when dividing `se` by a much larger estimate/target scale would underflow
-/// to zero. If only the positive bound overflows, every finite residual is covered;
-/// if only the residual overflows, a finite bound cannot cover it. When both direct
-/// operations overflow, TEPP compares the exact binary64 input rationals by
-/// decoding their integer significands and powers of two, avoiding a false
-/// accept/reject caused by independently rounded normalization. A zero standard
-/// error or zero multiplier remains an exact-recovery gate and is compared before
-/// either path. Exact recovery uses numeric equality, for which IEEE `-0.0` and
-/// `+0.0` denote the same zero-valued scientific result.
+/// If both projected corrections are zero, the subtraction is exact at the rounded
+/// residual while the product correction may still have underflowed below binary64
+/// resolution; TEPP therefore compares the represented residual with the exact
+/// dyadic product of represented `k` and `se`. Other equal nonzero correction
+/// projections remain on the ordinary rounded decision instead of claiming a
+/// broader exact comparator. This also preserves a positive acceptance bound when
+/// dividing `se` by a much larger estimate/target scale would underflow to zero. If
+/// only the positive bound overflows, every finite residual is covered; if only the
+/// residual overflows, a finite bound cannot cover it. When both direct operations
+/// overflow, TEPP compares the exact binary64 input rationals by decoding their
+/// integer significands and powers of two, avoiding a false accept/reject caused by
+/// independently rounded normalization. A zero standard error or zero multiplier
+/// remains an exact-recovery gate and is compared before either path. Exact recovery
+/// uses numeric equality, for which IEEE `-0.0` and `+0.0` denote the same zero-valued
+/// scientific result.
 ///
 /// # Errors
 ///
@@ -441,7 +441,7 @@ pub fn accept_within_standard_errors(
                 if residual_roundoff != product_roundoff {
                     return Ok(residual_roundoff < product_roundoff);
                 }
-                if residual_roundoff == 0.0 && direct_bound.is_subnormal() {
+                if residual_roundoff == 0.0 {
                     return Ok(represented_magnitude_le_exact_product(
                         residual,
                         k,
