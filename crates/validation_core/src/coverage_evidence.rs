@@ -6,15 +6,17 @@ use serde::{Deserialize, Serialize};
 
 const SCHEMA: &str = "tepp.wilson_coverage_evidence.v1";
 const CRITICAL_VALUE_KIND: &str = "standard_normal_z";
+const INTERVAL_SIDEDNESS: &str = "two_sided";
 
 /// Durable Wilson interval-coverage evidence with denominator and critical-value provenance.
 ///
 /// The carrier stores the retained sample denominator and covered count rather than only the
 /// projected empirical proportion, plus the caller-supplied standard-normal critical value used
-/// by TEPP's canonical Wilson producer. Serialization fixes the schema identifier and critical
-/// value semantics so a numeric `z` cannot later be reinterpreted as a Student-t or other scale.
-/// Validation recomputes the empirical coverage and both Wilson endpoints from the stored counts
-/// and `z`; tampered or internally inconsistent artifacts fail closed.
+/// by TEPP's canonical two-sided Wilson producer. Serialization fixes the schema identifier,
+/// critical-value scale, and interval sidedness so a numeric `z` cannot later be reinterpreted as
+/// a Student-t value or a one-sided confidence claim. Validation recomputes the empirical coverage
+/// and both Wilson endpoints from the stored counts and `z`; tampered or internally inconsistent
+/// artifacts fail closed.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WilsonCoverageEvidenceV1 {
     /// Number of interval/truth triples admitted to the empirical coverage calculation.
@@ -132,11 +134,12 @@ impl Serialize for WilsonCoverageEvidenceV1 {
         use serde::ser::SerializeStruct;
 
         self.validate().map_err(serde::ser::Error::custom)?;
-        let mut state = serializer.serialize_struct("WilsonCoverageEvidenceV1", 8)?;
+        let mut state = serializer.serialize_struct("WilsonCoverageEvidenceV1", 9)?;
         state.serialize_field("schema", SCHEMA)?;
         state.serialize_field("sample_count", &self.sample_count)?;
         state.serialize_field("covered_count", &self.covered_count)?;
         state.serialize_field("critical_value_kind", CRITICAL_VALUE_KIND)?;
+        state.serialize_field("interval_sidedness", INTERVAL_SIDEDNESS)?;
         state.serialize_field("normal_critical_value", &self.normal_critical_value)?;
         state.serialize_field("empirical_coverage", &self.empirical_coverage)?;
         state.serialize_field("wilson_lower", &self.wilson_lower)?;
@@ -157,6 +160,7 @@ impl<'de> Deserialize<'de> for WilsonCoverageEvidenceV1 {
             sample_count: usize,
             covered_count: usize,
             critical_value_kind: String,
+            interval_sidedness: String,
             normal_critical_value: f64,
             empirical_coverage: f64,
             wilson_lower: f64,
@@ -164,7 +168,10 @@ impl<'de> Deserialize<'de> for WilsonCoverageEvidenceV1 {
         }
 
         let raw = Raw::deserialize(deserializer)?;
-        if raw.schema != SCHEMA || raw.critical_value_kind != CRITICAL_VALUE_KIND {
+        if raw.schema != SCHEMA
+            || raw.critical_value_kind != CRITICAL_VALUE_KIND
+            || raw.interval_sidedness != INTERVAL_SIDEDNESS
+        {
             return Err(serde::de::Error::custom("unsupported Wilson coverage evidence schema"));
         }
         let evidence = Self {
