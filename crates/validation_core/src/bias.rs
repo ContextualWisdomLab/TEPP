@@ -23,13 +23,17 @@ fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, Valida
         .collect()
 }
 
-fn subtraction_has_roundoff(recovered: f64, truth: f64, residual: f64) -> bool {
+fn subtraction_roundoff(recovered: f64, truth: f64, residual: f64) -> f64 {
     let negated_truth = -truth;
     let truth_virtual = residual - recovered;
     let recovered_virtual = residual - truth_virtual;
     let recovered_roundoff = recovered - recovered_virtual;
     let truth_roundoff = negated_truth - truth_virtual;
-    recovered_roundoff + truth_roundoff != 0.0
+    recovered_roundoff + truth_roundoff
+}
+
+fn subtraction_has_roundoff(recovered: f64, truth: f64, residual: f64) -> bool {
+    subtraction_roundoff(recovered, truth, residual) != 0.0
 }
 
 fn standard_error_from_deviations(deviations: &[f64]) -> Result<f64, ValidationError> {
@@ -147,11 +151,14 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// directly without materializing an avoidably overflowing raw variance.
 /// For two finite represented residuals whose pairwise subtraction discarded
 /// low-order input mass, the exact two-observation identity `SE = |r₁-r₂| / 2`
-/// is evaluated from the expanded represented inputs so two distinct residuals
-/// cannot become false zero uncertainty merely because both rounded to the same
-/// binary64 subtraction result. Individual signed residuals must still be
-/// representable because their dispersion is itself part of the requested
-/// scientific result.
+/// is evaluated from the expanded represented inputs. For larger samples whose
+/// rounded residuals all collapse to the same binary64 value, the common high
+/// part cannot contribute to dispersion, so TEPP evaluates the standard error
+/// from the error-free subtraction low terms instead. Distinct represented
+/// residuals therefore cannot become false zero uncertainty solely because each
+/// `recovered - truth` rounded to the same high part. Individual signed
+/// residuals must still be representable because their dispersion is itself
+/// part of the requested scientific result.
 ///
 /// # Errors
 ///
@@ -163,20 +170,26 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
         return Err(ValidationError::InvalidInput);
     }
     let diffs = signed_residuals(truth, recovered)?;
+    let subtraction_roundoffs: Vec<_> = truth
+        .iter()
+        .zip(recovered)
+        .zip(&diffs)
+        .map(|((truth_value, recovered_value), residual)| {
+            subtraction_roundoff(*recovered_value, *truth_value, *residual)
+        })
+        .collect();
+    let has_subtraction_roundoff = subtraction_roundoffs.iter().any(|roundoff| *roundoff != 0.0);
 
-    if diffs.len() == 2
-        && truth
-            .iter()
-            .zip(recovered)
-            .zip(&diffs)
-            .any(|((truth_value, recovered_value), residual)| {
-                subtraction_has_roundoff(*recovered_value, *truth_value, *residual)
-            })
-    {
+    if diffs.len() == 2 && has_subtraction_roundoff {
         let expanded_difference = [recovered[0], -truth[0], -recovered[1], truth[1]];
         let half_difference =
             deterministic_representable_sum_over_count(&expanded_difference, 2)?;
         return Ok(half_difference.abs());
+    }
+
+    if has_subtraction_roundoff && diffs.iter().all(|residual| *residual == diffs[0]) {
+        let roundoff_mean = deterministic_representable_mean(&subtraction_roundoffs)?;
+        return scaled_standard_error(&subtraction_roundoffs, roundoff_mean);
     }
 
     let mean = deterministic_representable_mean(&diffs)?;
