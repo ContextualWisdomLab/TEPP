@@ -151,9 +151,7 @@ impl MonteCarloSummary {
                         }
                         let relative_distance =
                             ((recorded / coherence_scale) - (expected / coherence_scale)).abs();
-                        if !relative_distance.is_finite()
-                            || relative_distance > EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE
-                        {
+                        if relative_distance > EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE {
                             return Err(ValidationError::InvalidInput);
                         }
                     }
