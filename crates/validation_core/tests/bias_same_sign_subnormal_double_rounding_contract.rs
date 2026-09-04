@@ -21,3 +21,17 @@ fn mean_bias_does_not_double_round_same_sign_subnormal_mean() {
     let mirrored_bias = mean_bias(&truth, &mirrored).expect("mirrored subnormal mean bias");
     assert_eq!(mirrored_bias.to_bits(), (1_u64 << 63) | (minimum_normal_units - 21));
 }
+
+#[test]
+fn mean_bias_rounds_subnormal_halfway_cases_to_even_units() {
+    let truth = [0.0, 0.0];
+    let minimum_subnormal = f64::from_bits(1);
+
+    let odd_floor = [minimum_subnormal, f64::from_bits(2)];
+    let odd_floor_bias = mean_bias(&truth, &odd_floor).expect("odd-floor halfway mean");
+    assert_eq!(odd_floor_bias.to_bits(), 2);
+
+    let even_floor = [f64::from_bits(2), f64::from_bits(3)];
+    let even_floor_bias = mean_bias(&truth, &even_floor).expect("even-floor halfway mean");
+    assert_eq!(even_floor_bias.to_bits(), 2);
+}
