@@ -36,10 +36,12 @@ impl MonteCarloSummary {
     /// rule applies to the canonical singleton summary. For positive spread,
     /// nearest-rank percentile endpoints are retained observations and therefore
     /// must fit the support implied directly by the recorded sample spread:
-    /// `|x - mean| <= SD * sqrt(n - 1)`. This remains valid when the represented
-    /// binary64 mean is a rounded projection of the mathematical sample mean.
-    /// The comparison is scale-normalized so opposite-sign full-range finite
-    /// values do not create an overflowing validation-only subtraction or product.
+    /// `|x - mean| <= SD * sqrt(n - 1)`. Distinct lower and upper endpoints are
+    /// distinct retained values, so their squared deviations must also fit the
+    /// same total `(n - 1) * SD^2` deviation budget jointly. These rules remain
+    /// valid when the represented binary64 mean is a rounded projection of the
+    /// mathematical sample mean. Comparisons are scale-normalized so opposite-sign
+    /// full-range finite values do not create overflowing validation-only arithmetic.
     /// Numeric equality keeps IEEE `-0.0` and `+0.0` as one zero-valued scientific state.
     ///
     /// # Errors
@@ -104,6 +106,28 @@ impl MonteCarloSummary {
                 if !scaled_deviation.is_finite()
                     || !scaled_support.is_finite()
                     || scaled_deviation
+                        > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
+            }
+
+            if self.percentile_lower != self.percentile_upper {
+                let scale = self
+                    .mean
+                    .abs()
+                    .max(self.percentile_lower.abs())
+                    .max(self.percentile_upper.abs())
+                    .max(self.standard_deviation);
+                let scaled_mean = self.mean / scale;
+                let scaled_lower_deviation = (self.percentile_lower / scale) - scaled_mean;
+                let scaled_upper_deviation = (self.percentile_upper / scale) - scaled_mean;
+                let combined_scaled_deviation =
+                    scaled_lower_deviation.hypot(scaled_upper_deviation);
+                let scaled_support = (self.standard_deviation / scale) * moment_factor;
+                if !combined_scaled_deviation.is_finite()
+                    || !scaled_support.is_finite()
+                    || combined_scaled_deviation
                         > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
                 {
                     return Err(ValidationError::InvalidInput);
