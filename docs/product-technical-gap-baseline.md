@@ -89,7 +89,7 @@ GAP-070 and GAP-072 remain inherited: stored Wilson endpoints must be one cohere
 
 GAP-073 retains large-count identity/schema and exact-ratio projection. GAP-074 retains reciprocal-scale evaluation for sample counts that are not exactly representable in binary64. GAP-075 retains the inexact-count all-covered extreme-`z` scale switch and exact-oracle correction.
 
-GAP-076 records the exact-count all-covered near-one denominator-absorption defect. Public RED `e0c4ec81bb455d230259489dc71e23fe33704b1d` fixes `n=1` and represented `z=0x1.0000000000001p-27`; causal repair `c9dcb9df363999bbcbb6fffdc31b68922e8d01d2` performs the complementary miss calculation only after direct false-one collapse; boundary `6140080d2257d0550be479d71371d70e2255c3d0` preserves true exact one below binary64 resolution; changelog `09ebb482851fe7836e738a74395e6424621da9bf`; research predecessor `fe89c43803136ab979912fffa636d2a4f169a73e`.
+GAP-076 records the exact-count all-covered near-one denominator-absorption defect. Public RED `e0c4ec81bb455d230259489dc71e23fe33704b1d` fixes `n=1` and represented `z=0x1.0000000000001p-27`; causal repair `c9dcb9df363999bbcbb6fffdc8b6a6d9ae5e762c` performs the complementary miss calculation only after direct false-one collapse; boundary `6140080d2257d0550be479d71371d70e2255c3d0` preserves true exact one below binary64 resolution; changelog `09ebb482851fe7836e738a74395e6424621da9bf`; research predecessor `fe89c43803136ab979912fffa636d2a4f169a73e`.
 
 GAP-077 records the ordinary partial-denominator state left after the near-one and complete-absorption repairs. With `n=1` and represented `z=3*2^-28`, represented `z²=9*2^-56`; `1+z²` rounds upward before division, so predecessor direct evaluation emits `0x1.ffffffffffffep-1` although the represented-input rational lower endpoint rounds to `0x1.fffffffffffffp-1`. Public RED `06e556538e171e675c4d8a8287d75052ffc2c4c3` → causal TwoSum/FMA residual repair `6c084dbe607e6c415288c77fa41a4270947cd51e` → research `25cc19436085881602356e7f2609b697b575540c` → dedicated changelog `5acc894b8a4d42cd7af8cdc22a02b61a063f16aa` → predecessor changelog correction `f89e36d1f2a048befb983327c83f5696baf530cc` → correct-direct-rounding control `80a0a0ade16f516bf63907f2a8d5105dbcd9c438`.
 
@@ -113,7 +113,7 @@ Wilson (1927) remains the primary score-interval reference. AERA/APA/NCME (2014)
 
 ### #416 — Validation / Analysis Run consolidation
 
-#416 branch head is `aa730c63563eb4a33048d822b581036c8487bd47`; its body distinguishes current exact source repair from later metadata/docs commits. #458/#460/#482/#483/#484/#485/#487 remain fold children until every unique source/test/fixture/contract/doctoring delta is inherited by a conflict-resolving survivor. Child-head CI never transfers to #416.
+#416 branch head is `aa730c63563eb4a33048d822b581036c8487bd47`; its body distinguishes current exact source repair from later metadata/docs commits. #458/#460/#482/#483/#484/#485/#487 remain fold children until every unique source/test/fixture/contract/doctoring delta is inherited by a conflict-resolving survivor. Child-head evidence does not transfer to #416.
 
 ### #480 — contextual-orchestrator boundary
 
