@@ -59,12 +59,27 @@ fn finite_exact_tie_remains_accepted_when_product_has_no_roundoff() {
 }
 
 #[test]
-fn inexact_subtraction_tie_stays_on_the_conservative_rounded_path() {
+fn inexact_subtraction_tie_below_bound_remains_accepted() {
     let target = f64::from_bits(1);
     assert_eq!(1.0 - target, 1.0);
     assert_eq!(
         accept_within_standard_errors(1.0, target, 1.0, 1.0),
         Ok(true),
-        "this repair must not infer a product-only correction when subtraction itself rounded"
+        "the exact represented residual is below the exact unit bound"
+    );
+}
+
+#[test]
+fn inexact_subtraction_tie_above_bound_preserves_strict_rejection() {
+    let target = f64::from_bits(0xbc90_0000_0000_0000); // -2^-54
+    let represented_residual = 1.0 - target;
+    assert_eq!(represented_residual, 1.0);
+
+    // The exact represented residual is 1 + 2^-54, but the subtraction rounds
+    // to 1.0. The bound is exactly 1.0, so the scientific inequality is false.
+    assert_eq!(
+        accept_within_standard_errors(1.0, target, 1.0, 1.0),
+        Ok(false),
+        "subtraction rounding must not turn a strict represented-input rejection into equality"
     );
 }
