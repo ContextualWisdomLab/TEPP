@@ -4,6 +4,8 @@ use crate::MonteCarloSummary;
 use crate::ValidationError;
 use serde::{Deserialize, Serialize};
 
+const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+
 /// Machine-readable recovery report for a single study.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidationReport {
@@ -32,27 +34,30 @@ pub struct ValidationReport {
 impl ValidationReport {
     /// Validate numeric and scientific invariants before serialization or export.
     ///
-    /// RMSE and standard errors are nonnegative; an exact-zero RMSE is perfect
-    /// recovery and therefore requires an exact-zero RMSE standard error under
-    /// the crate's squared-residual delta-method definition. Empirical coverage,
-    /// Wilson endpoints, and temporal-order accuracy are probabilities in `[0, 1]`;
-    /// the Wilson interval is ordered and must contain the empirical coverage
-    /// recorded in the same report. Mean signed bias remains unrestricted in
-    /// sign. A generic [`MonteCarloSummary`] may summarize a signed metric, but
-    /// when it occupies `monte_carlo_rmse` its mean and percentile endpoints are
-    /// nonnegative because every RMSE replication is nonnegative. A zero Monte
-    /// Carlo RMSE mean is exact perfect recovery across every retained replication,
-    /// so spread, standard error, and empirical percentile endpoints must all be
-    /// zero as well. These checks prevent a finite but scientifically impossible
-    /// payload from becoming durable Validation Evidence.
+    /// RMSE and standard errors are nonnegative. Under the crate's squared-residual
+    /// delta-method producer, `SE(RMSE) <= RMSE / 2`: for `x_i = r_i^2 >= 0`, the
+    /// sample standard deviation satisfies `sd(x) <= sqrt(n) * mean(x)`. Admission
+    /// allows a small relative binary64 tolerance at that support boundary. Exact
+    /// zero RMSE is perfect recovery and therefore still requires exact-zero RMSE
+    /// standard error. Empirical coverage, Wilson endpoints, and temporal-order
+    /// accuracy are probabilities in `[0, 1]`; the Wilson interval is ordered and
+    /// must contain the empirical coverage recorded in the same report. Mean
+    /// signed bias remains unrestricted in sign. A generic [`MonteCarloSummary`]
+    /// may summarize a signed metric, but when it occupies `monte_carlo_rmse` its
+    /// mean and percentile endpoints are nonnegative because every RMSE replication
+    /// is nonnegative. A zero Monte Carlo RMSE mean is exact perfect recovery across
+    /// every retained replication, so spread, standard error, and empirical
+    /// percentile endpoints must all be zero as well. These checks prevent a finite
+    /// but scientifically impossible payload from becoming durable Validation
+    /// Evidence.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when any `f64` field is
     /// non-finite, violates its metric domain, point RMSE and its standard error
-    /// contradict exact recovery, Wilson evidence is incoherent, or the optional
-    /// Monte Carlo RMSE summary violates either generic summary invariants or the
-    /// nonnegative RMSE domain.
+    /// exceed squared-residual support, Wilson evidence is incoherent, or the
+    /// optional Monte Carlo RMSE summary violates either generic summary invariants
+    /// or the nonnegative RMSE domain.
     pub fn validate(&self) -> Result<(), ValidationError> {
         for value in [
             self.rmse,
@@ -72,8 +77,17 @@ impl ValidationReport {
         if self.rmse < 0.0 || self.rmse_standard_error < 0.0 || self.bias_standard_error < 0.0 {
             return Err(ValidationError::InvalidInput);
         }
-        if self.rmse == 0.0 && self.rmse_standard_error != 0.0 {
-            return Err(ValidationError::InvalidInput);
+        if self.rmse == 0.0 {
+            if self.rmse_standard_error != 0.0 {
+                return Err(ValidationError::InvalidInput);
+            }
+        } else {
+            let relative_standard_error = self.rmse_standard_error / self.rmse;
+            if !relative_standard_error.is_finite()
+                || relative_standard_error > 0.5 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
+            {
+                return Err(ValidationError::InvalidInput);
+            }
         }
         if !(0.0..=1.0).contains(&self.interval_coverage)
             || !(0.0..=1.0).contains(&self.coverage_wilson_lower)
