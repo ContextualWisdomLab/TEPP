@@ -333,6 +333,64 @@ fn represented_magnitude_le_exact_product(value: f64, factor_a: f64, factor_b: f
     )
 }
 
+/// Compare a represented correction with the exact rounding correction of a represented product.
+fn represented_correction_le_exact_product_roundoff(
+    correction: f64,
+    factor_a: f64,
+    factor_b: f64,
+    rounded_product: f64,
+) -> bool {
+    let (a_significand, a_exponent) = binary64_magnitude_components(factor_a);
+    let (b_significand, b_exponent) = binary64_magnitude_components(factor_b);
+    let product_significand = (a_significand as u128) * (b_significand as u128);
+    let product_exponent = a_exponent + b_exponent;
+    let (rounded_significand, rounded_exponent) =
+        binary64_magnitude_components(rounded_product);
+    let common_exponent = product_exponent.min(rounded_exponent);
+    let product_shift = (product_exponent - common_exponent) as u32;
+    let rounded_shift = (rounded_exponent - common_exponent) as u32;
+    debug_assert!(product_significand.leading_zeros() >= product_shift);
+    debug_assert!((rounded_significand as u128).leading_zeros() >= rounded_shift);
+    let exact_product = product_significand << product_shift;
+    let rounded_product = (rounded_significand as u128) << rounded_shift;
+    let (product_roundoff_negative, product_roundoff_significand) =
+        if exact_product < rounded_product {
+            (true, rounded_product - exact_product)
+        } else {
+            (false, exact_product - rounded_product)
+        };
+
+    if product_roundoff_significand == 0 {
+        return correction <= 0.0;
+    }
+    if correction == 0.0 {
+        return !product_roundoff_negative;
+    }
+
+    let correction_negative = correction.is_sign_negative();
+    if correction_negative != product_roundoff_negative {
+        return correction_negative;
+    }
+
+    let (correction_significand, correction_exponent) =
+        binary64_magnitude_components(correction.abs());
+    if correction_negative {
+        scaled_u128_le(
+            product_roundoff_significand,
+            common_exponent,
+            correction_significand as u128,
+            correction_exponent,
+        )
+    } else {
+        scaled_u128_le(
+            correction_significand as u128,
+            correction_exponent,
+            product_roundoff_significand,
+            common_exponent,
+        )
+    }
+}
+
 /// Compare the exact represented residual magnitude with `k * SE` after both direct operations overflow.
 fn both_overflow_acceptance(
     estimate: f64,
@@ -388,18 +446,21 @@ fn subtraction_roundoff(minuend: f64, subtrahend: f64, difference: f64) -> f64 {
 /// If both projected corrections are zero, the subtraction is exact at the rounded
 /// residual while the product correction may still have underflowed below binary64
 /// resolution; TEPP therefore compares the represented residual with the exact
-/// dyadic product of represented `k` and `se`. Other equal nonzero correction
-/// projections remain on the ordinary rounded decision instead of claiming a
-/// broader exact comparator. This also preserves a positive acceptance bound when
-/// dividing `se` by a much larger estimate/target scale would underflow to zero. If
-/// only the positive bound overflows, every finite residual is covered; if only the
-/// residual overflows, a finite bound cannot cover it. When both direct operations
-/// overflow, TEPP compares the exact binary64 input rationals by decoding their
-/// integer significands and powers of two, avoiding a false accept/reject caused by
-/// independently rounded normalization. A zero standard error or zero multiplier
-/// remains an exact-recovery gate and is compared before either path. Exact recovery
-/// uses numeric equality, for which IEEE `-0.0` and `+0.0` denote the same zero-valued
-/// scientific result.
+/// dyadic product of represented `k` and `se`. If the two nonzero correction
+/// projections are equal, the subtraction correction is already exact but the FMA
+/// projection may have rounded a finer exact product residual; TEPP compares that
+/// represented subtraction correction with the exact dyadic product roundoff before
+/// deciding the tie. This preserves the represented-input inequality without
+/// claiming a broader exact comparator for unequal rounded residuals and bounds.
+/// This also preserves a positive acceptance bound when dividing `se` by a much
+/// larger estimate/target scale would underflow to zero. If only the positive bound
+/// overflows, every finite residual is covered; if only the residual overflows, a
+/// finite bound cannot cover it. When both direct operations overflow, TEPP compares
+/// the exact binary64 input rationals by decoding their integer significands and
+/// powers of two, avoiding a false accept/reject caused by independently rounded
+/// normalization. A zero standard error or zero multiplier remains an exact-recovery
+/// gate and is compared before either path. Exact recovery uses numeric equality,
+/// for which IEEE `-0.0` and `+0.0` denote the same zero-valued scientific result.
 ///
 /// # Errors
 ///
@@ -448,6 +509,12 @@ pub fn accept_within_standard_errors(
                         standard_error,
                     ));
                 }
+                return Ok(represented_correction_le_exact_product_roundoff(
+                    residual_roundoff,
+                    k,
+                    standard_error,
+                    direct_bound,
+                ));
             }
             return Ok(residual <= direct_bound);
         }
