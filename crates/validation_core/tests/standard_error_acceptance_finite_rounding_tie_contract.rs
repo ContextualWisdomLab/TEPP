@@ -83,3 +83,18 @@ fn inexact_subtraction_tie_above_bound_preserves_strict_rejection() {
         "subtraction rounding must not turn a strict represented-input rejection into equality"
     );
 }
+
+#[test]
+fn negative_rounded_difference_uses_absolute_residual_correction_sign() {
+    let target = f64::from_bits(0x3c90_0000_0000_0000); // +2^-54
+    let represented_difference = -1.0 - target;
+    assert_eq!(represented_difference, -1.0);
+
+    // The exact difference is -1 - 2^-54, so the absolute residual is
+    // 1 + 2^-54 and remains strictly above the exact unit bound.
+    assert_eq!(
+        accept_within_standard_errors(-1.0, target, 1.0, 1.0),
+        Ok(false),
+        "the subtraction low term must flip sign when the rounded difference is negative"
+    );
+}
