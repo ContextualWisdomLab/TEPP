@@ -1,60 +1,73 @@
 # ADR 0011 — Standalone operation and modular CWL MSA boundary
 
-**Decision status:** Accepted  
-**Implementation maturity:** partial — Rust crates are independently usable; naruon HTTP interchange and loopback live listener (`POST /v1/analysis-runs` and `/v1/exports`, fail-closed table-access, NIM/proxy headers, RFC 3339 cutoff, stream deadline) is implemented-main; `service_tls` production rustls bind gates and orchestrator live-port refusal of loopback plaintext are on this active PR; the loopback consumer listener composition and terminal-result contract are composed on the active product branch; production TLS/`$PORT`, remaining live HTTP listeners, and remaining persistence integrations remain accepted-target The standalone loopback interpretation listener (`orchestrator_live`, `POST /v1/interpretation-runs`) is on this PR.  
+**Decision status:** Accepted
+**Implementation maturity:** partial
 **Date:** 2026-08-10
-**Date:** 2026-08-10  
-**Implementation maturity:** partial — Rust crates are independently usable; naruon HTTP interchange and loopback live listener (`POST /v1/analysis-runs` and `/v1/exports`, fail-closed table-access, NIM/proxy headers, RFC 3339 cutoff, stream deadline) are on the active PR (not implemented-main); production TLS/`$PORT` and remaining persistence integrations remain accepted-target
-**Date:** 2026-08-10
-**Supersedes:** The broad cross-service ownership wording in ADR 0001. ADR 0001 remains authoritative for Rust-first numerical architecture.
+**Supersedes:** The broad cross-service ownership wording in ADR 0001. ADR 0001 remains authoritative for Rust-first numerical/backend requirements.
 
 ## Context
 
-TEPP must be independently deployable while also composing with ContextualWisdomLab services such as `naruon`, `contextual-orchestrator`, and organization control-plane workflows. Hidden database coupling or implicit cross-repository authority would make the product difficult to deploy, audit, version, acquire, or reuse.
+TEPP must be independently deployable while also composing with ContextualWisdomLab services such as `naruon`, `contextual-orchestrator`, `fast-mlsirm`, and organization control-plane workflows. Hidden database coupling, copied scientific kernels, or implicit cross-repository authority would make the product difficult to deploy, audit, version, acquire, or reuse.
+
+The approved PRD defines TEPP's product and measurement target as multilingual temporal relational psychometrics. It does not require TEPP to duplicate reusable static psychometric kernels that have a separate canonical owner. The delivery recovery exposed both duplicated/static psychometric fragments in TEPP and an upstream `fast-mlsirm` model-specification/dependence contract under development. The ownership boundary therefore needs to be explicit without changing the approved measurement target.
 
 ## Decision
 
-TEPP owns its evidence-domain contracts, temporal/event/membership state, psychometric/statistical model authority, model/artifact registry, run provenance, and TEPP-owned persistence. Other services integrate only through stable versioned APIs or immutable artifacts. Direct cross-service application-table reads/writes are prohibited.
+TEPP owns its evidence-domain contracts, six-clock temporal semantics, event ontology and temporal graph, time-varying multilevel/cross-classified/multiple-membership composition, longitudinal invariance/drift, temporal state evolution, temporal recovery policy, TEPP model/run provenance, and TEPP-owned persistence.
 
-Standalone deployments may run CPU-only and may select local/private providers. Modular deployments preserve the same scientific and authorization contracts.
+`fast-mlsirm` owns reusable static/generalized-mixed/dependence-aware psychometric model specification and reusable numerical kernels, including reusable LSIRM, MLSIRM, and DLSJM computation. TEPP consumes only released/versioned `fast-mlsirm` contracts through an anti-corruption layer and composes TEPP-owned temporal/event semantics around the full upstream candidate identity. An open upstream PR or branch is not a production dependency.
+
+Reusable computation discovered in TEPP that belongs to the `fast-mlsirm` domain is migrated through the canonical-owner path: establish a versioned public contract, prove numerical/recovery parity, switch TEPP to the adapter, then remove the duplicate production source. TEPP does not keep a second canonical implementation merely to avoid cross-repository work.
+
+Standalone deployments may run CPU-only and may select local/private execution backends. Modular deployments preserve the same scientific, temporal, and authorization contracts.
 
 Authority boundaries:
 
+- `fast-mlsirm` owns reusable static/generalized-mixed/dependence model specification and reusable psychometric kernels; it does not own TEPP event ontology, six-clock semantics, knowledge-cutoff policy, temporal graph, or temporal state-composition policy.
 - `naruon` may submit authorized evidence/analysis work and consume versioned TEPP results; it does not replace TEPP inference with lexical heuristics or directly query TEPP tables.
-- `contextual-orchestrator` may execute approved model-routing/orchestration requests but does not own TEPP's source evidence, statistical truth, scientific gates, model registry, or release authority.
+- `contextual-orchestrator` owns model-provider execution, routing, fallback, verifier/adjudicator execution, credentials, and model-call provenance; it does not own TEPP source evidence, numerical scientific truth, claim promotion, or release authority.
 - organization `.github` workflows own CI/review/security/release-control functions only; they are not runtime scientific authority.
-- external PostgreSQL/object-storage/model providers remain separately authenticated trust domains.
+- external PostgreSQL, object-storage, accelerator, and model-provider systems remain separately authenticated trust domains.
 
 ## Alternatives considered
 
 1. **Shared organization database/schema** — rejected because it couples lifecycle, authorization, migrations, recovery, and acquisition boundaries.
-2. **Repository-specific bespoke adapters without a common contract** — rejected because semantics drift and become difficult to validate.
-3. **Standalone core plus versioned ports/artifacts** — accepted.
+2. **Copy reusable psychometric kernels into TEPP** — rejected because duplicated numerical authority drifts and makes parity, recovery, and maintenance ambiguous.
+3. **Repository-specific bespoke adapters without a common contract** — rejected because semantics drift and become difficult to validate.
+4. **Standalone TEPP temporal/event core plus released versioned owner ports/artifacts** — accepted.
 
 ## Consequences
 
-- Public contracts carry version, identity, provenance, error, bounded-resource, and compatibility semantics.
+- Public contracts carry version, identity, provenance, error, bounded-resource, compatibility, and owner semantics.
 - Each service owns its credentials, migrations, retention, and application persistence.
 - Cross-service workflows use opaque identifiers and explicit authorization rather than implicit shared state.
+- TEPP temporal dependence compilation is generic over the complete released upstream candidate identity rather than hard-coded LSIRM/MLSIRM/DLSJM family wrappers.
+- Auto-expansion does not imply activation: novel combined static/dependence/temporal formulations remain `research_candidate` until equations, identification, estimator, citations, and recovery evidence are complete.
 - Breaking contract changes require compatibility/migration notes and an ADR where product/scientific meaning changes.
-- Integration tests exercise both standalone and representative modular paths.
+- Integration tests exercise standalone and representative modular paths, including contract-version/digest refusal.
+
+This decision clarifies service authority without changing PRD v0.4's approved product or measurement target, so it does not itself require a PRD version increment under AGENTS contract 14.
 
 ## Failure and recovery
 
-If an integration service is unavailable, TEPP either uses an approved local/provider fallback or returns a bounded degraded/deferred state. It never fabricates external state or bypasses TEPP validation. Recovery revalidates artifact identity, authorization, temporal cutoff, and version compatibility before resuming.
+If an integration service is unavailable, TEPP either uses an approved local/backend fallback that preserves the same scientific contract or returns a bounded degraded/deferred state. It never fabricates external state, copies an unreleased owner implementation, or bypasses TEPP validation. Recovery revalidates artifact identity, authorization, temporal cutoff, contract version/digest, and owner provenance before resuming.
 
 ## Security/privacy
 
-Least-privilege service identities and purpose-bound access apply at every interface. A service receives only the evidence/artifact fields it is authorized to process. No service credential is reused as a model/reviewer/release credential simply because the services share an organization.
+Least-privilege service identities and purpose-bound access apply at every interface. A service receives only the evidence/artifact fields it is authorized to process. No service credential is reused as a model/reviewer/release credential simply because the services share an organization. Cross-service SQL is prohibited.
 
 ## Compatibility and migration
 
 Every public API/artifact contract is versioned. A breaking consumer/provider change requires migration/rollback guidance and dual-version or negotiated compatibility where necessary. Persistence migrations remain TEPP-owned under ADR 0013; consumers never migrate TEPP tables directly.
 
+Static-kernel migration follows: TEPP duplicate -> parity/recovery evidence -> released `fast-mlsirm` contract -> TEPP ACL/adaptor -> duplicate removal. Rollback restores the last released compatible adapter contract; it does not restore a divergent duplicate as canonical authority.
+
 ## Verification
 
-Required tests cover contract version negotiation, unauthorized cross-service access, idempotency, stale artifact/model identities, missing dependencies, standalone CPU operation, contextual-orchestrator optional integration, naruon consumer contracts, and absence of direct cross-service database coupling.
+Required tests cover contract version/digest negotiation, unauthorized cross-service access, idempotency, stale artifact/model identities, missing dependencies, standalone CPU operation, contextual-orchestrator integration boundaries, naruon consumer contracts, absence of direct cross-service database coupling, and parity/recovery before any duplicated static kernel is removed.
 
-## Rollback and supersession
+Architecture fitness tests must also reject dependency inversion in which `fast-mlsirm` imports TEPP temporal ontology or TEPP deployable behavior binds directly to an unreleased upstream PR head.
 
-Rollback removes/disables an integration adapter without breaking standalone TEPP or rewriting scientific artifacts. Supersede only through an ADR that establishes a clearer ownership model without reducing standalone deployability, scientific authority separation, migration safety, or auditability.
+## Rollback
+
+Rollback removes or disables an integration adapter without breaking standalone TEPP or rewriting scientific artifacts. A failed owner migration returns to the last released compatible contract while retaining parity/recovery evidence and migration provenance. Supersede this ADR only through a repository-wide unique ADR that establishes a clearer ownership model without reducing standalone deployability, scientific authority separation, migration safety, or auditability.
