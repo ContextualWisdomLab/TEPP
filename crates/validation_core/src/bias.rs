@@ -107,6 +107,36 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
     }
 }
 
+/// Return the exact power-of-two divisor implied by two-level sample counts.
+///
+/// For two exact residual levels with counts `m` and `n - m`,
+/// `SE(mean)^2 = gap^2 * m(n-m) / (n^2(n-1))`. If that count-only factor is
+/// exactly `1 / divisor^2` for a power-of-two `divisor`, scaling the represented
+/// gap by that divisor is exact apart from the final binary64 range boundary and
+/// avoids re-projecting the same geometry through rounded sums, squares and a
+/// square root.
+fn exact_two_level_power_of_two_divisor(first_count: usize, second_count: usize) -> Option<f64> {
+    let sample_count = (first_count as u128).checked_add(second_count as u128)?;
+    let count_product = (first_count as u128).checked_mul(second_count as u128)?;
+    let target = sample_count
+        .checked_mul(sample_count)?
+        .checked_mul(sample_count.checked_sub(1)?)?;
+
+    let mut divisor = 1_u128;
+    while divisor <= sample_count {
+        let scaled_product = count_product
+            .checked_mul(divisor.checked_mul(divisor)?)?;
+        if scaled_product == target {
+            return Some(divisor as f64);
+        }
+        if scaled_product > target {
+            return None;
+        }
+        divisor = divisor.checked_mul(2)?;
+    }
+    None
+}
+
 fn exact_translated_residual_standard_error(
     diffs: &[f64],
     roundoffs: &[f64],
@@ -163,20 +193,32 @@ fn exact_translated_residual_standard_error(
             gap_count = 1;
         }
     }
-    if exactly_two_levels
-        && (zero_count == 1 || gap_count == 1)
-        && let Some(gap) = repeated_gap
-    {
-        // For an exactly translated two-level sample where either level occurs
-        // once, SE(mean) simplifies to |gap| / n. Evaluate that identity directly
-        // instead of projecting the exact gap through square -> second moment ->
-        // sqrt, which can move the final binary64 result by one ULP.
-        let sample_count = translated.len() as f64;
-        let standard_error = gap.abs() / sample_count;
-        if standard_error == 0.0 && gap != 0.0 {
+    if exactly_two_levels && let Some(gap) = repeated_gap {
+        let standard_error = if zero_count == 1 || gap_count == 1 {
+            // For an exactly translated two-level sample where either level
+            // occurs once, SE(mean) simplifies to |gap| / n.
+            gap.abs() / translated.len() as f64
+        } else if let Some(divisor) =
+            exact_two_level_power_of_two_divisor(zero_count, gap_count)
+        {
+            // Some non-singleton count geometries also collapse to an exact
+            // dyadic scale. Preserve that algebra before rounded moment
+            // reconstruction can move the represented result by one ULP.
+            gap.abs() / divisor
+        } else {
+            0.0
+        };
+
+        if standard_error != 0.0 {
+            return Ok(Some(standard_error));
+        }
+        if (zero_count == 1
+            || gap_count == 1
+            || exact_two_level_power_of_two_divisor(zero_count, gap_count).is_some())
+            && gap != 0.0
+        {
             return Err(ValidationError::InvalidInput);
         }
-        return Ok(Some(standard_error));
     }
 
     // Keep the translated binary64 geometry on an exact dyadic scale. Using the
@@ -284,8 +326,9 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// second moment whenever every anchor-relative high delta, low delta, and
 /// combined residual delta is exactly representable. For an exactly translated
 /// two-level sample where either level occurs once, the algebraic identity
-/// `SE(mean) = |level_gap| / n` is evaluated directly so an exact gap is not
-/// needlessly re-rounded through a squared second moment and square root.
+/// `SE(mean) = |level_gap| / n` is evaluated directly. Non-singleton two-level
+/// count geometries that reduce exactly to a reciprocal power-of-two scale are
+/// likewise applied directly to the represented gap before moment reconstruction.
 /// The general translated path avoids making a rounded residual mean authoritative
 /// before dispersion is evaluated. Its normalization uses an exact power-of-two
 /// scale so the translated geometry is not re-rounded through an arbitrary
