@@ -215,16 +215,21 @@ fn exact_three_level_standard_error(
     // For a translated three-observation sample `[0, x, y]`,
     // `SE(mean)^2 = (x^2 + y^2 - xy) / 9`. Admit the direct identity only when
     // every binary64 product/addition is proven error-free and the numerator is
-    // itself an exact represented square. If raw products overflow, retry the
-    // same proof after an exactly reversible power-of-two normalization; this
-    // preserves the represented geometry instead of making proof admission depend
-    // on magnitude alone. Other failed proofs stay on the general translated path.
+    // itself an exact represented square. If raw products overflow or underflow
+    // to zero, retry the same proof after an exactly reversible power-of-two
+    // normalization; this preserves the represented geometry instead of making
+    // proof admission depend on magnitude alone. Other failed proofs stay on the
+    // general translated path.
     let first_square = first_offset * first_offset;
     let second_square = second_offset * second_offset;
     let cross_product = first_offset * second_offset;
-    let products_overflow =
-        !first_square.is_finite() || !second_square.is_finite() || !cross_product.is_finite();
-    if products_overflow {
+    let products_leave_represented_range = !first_square.is_finite()
+        || !second_square.is_finite()
+        || !cross_product.is_finite()
+        || (first_offset != 0.0 && first_square == 0.0)
+        || (second_offset != 0.0 && second_square == 0.0)
+        || (first_offset != 0.0 && second_offset != 0.0 && cross_product == 0.0);
+    if products_leave_represented_range {
         let max_magnitude = first_offset.abs().max(second_offset.abs());
         if max_magnitude == 0.0 || !max_magnitude.is_finite() {
             return Ok(None);
@@ -586,14 +591,15 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// through a second binary64 rounding boundary. An exactly translated three-level
 /// sample also uses `SE(mean)^2 = (x² + y² - xy) / 9` when every product and
 /// addition is proven error-free and that numerator is itself an exact represented
-/// square; if those raw products overflow, the same proof is retried on an exactly
-/// reversible power-of-two normalization so the identity is scale-invariant. The
-/// exact root is divided by three once instead of reconstructing the same rational
-/// square through rounded normalized moments. The general translated path avoids
-/// making a rounded residual mean authoritative before dispersion is evaluated.
-/// Its normalization uses an exact power-of-two scale so the translated geometry
-/// is not re-rounded through an arbitrary magnitude before the final SE is
-/// restored. Cases that cannot prove those translated deltas or exact three-level
+/// square; if those raw products overflow or underflow to zero, the same proof is
+/// retried on an exactly reversible power-of-two normalization so the identity is
+/// scale-invariant and a representable nonzero dispersion cannot be mistaken for
+/// zero. The exact root is divided by three once instead of reconstructing the
+/// same rational square through rounded normalized moments. The general translated
+/// path avoids making a rounded residual mean authoritative before dispersion is
+/// evaluated. Its normalization uses an exact power-of-two scale so the translated
+/// geometry is not re-rounded through an arbitrary magnitude before the final SE
+/// is restored. Cases that cannot prove those translated deltas or exact three-level
 /// identity representable retain the predecessor translated or rounded-residual
 /// path. Individual signed residuals must still be representable because their
 /// dispersion is itself part of the requested scientific result.
@@ -795,6 +801,11 @@ mod tests {
                 .expect("normalized rational-square path")
                 .to_bits(),
             0x64f9_5555_5555_5555
+        );
+        assert_eq!(
+            exact_three_level_standard_error(-f64::MIN_POSITIVE, f64::MIN_POSITIVE)
+                .expect("underflow-normalized fallback"),
+            None
         );
         assert_eq!(
             exact_three_level_standard_error(-1.0, 2.0).expect("fallback"),
