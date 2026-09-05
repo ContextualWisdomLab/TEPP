@@ -154,6 +154,58 @@ fn exact_two_level_rational_scale(
     Some((numerator as usize, denominator as usize))
 }
 
+/// Round `|gap| * numerator / denominator` directly in minimum-subnormal units
+/// when the exact rational result lies at or below the normal/subnormal boundary.
+///
+/// A normalized binary64 quotient can be correctly rounded in its working
+/// binade and still move by one ULP when an exact power-of-two restoration enters
+/// the subnormal range. The represented significand is at most 53 bits and a
+/// `usize` scale is at most the platform word width, so the exact unit numerator
+/// fits `u128` for every subnormal result that this bounded path admits.
+fn exact_subnormal_rational_scale(
+    gap: f64,
+    numerator: usize,
+    denominator: usize,
+) -> Option<Result<f64, ValidationError>> {
+    if !gap.is_finite() || gap == 0.0 || numerator == 0 || denominator == 0 {
+        return None;
+    }
+
+    let magnitude_bits = gap.abs().to_bits();
+    let exponent = ((magnitude_bits >> 52) & 0x7ff) as u32;
+    let fraction = magnitude_bits & 0x000f_ffff_ffff_ffff;
+    let significand = if exponent == 0 {
+        fraction as u128
+    } else {
+        ((1_u64 << 52) | fraction) as u128
+    };
+    let product = significand.checked_mul(numerator as u128)?;
+    let unit_shift = if exponent == 0 { 0 } else { exponent - 1 };
+    let scaled_numerator = product.checked_shl(unit_shift)?;
+    let denominator = denominator as u128;
+
+    let mut rounded_units = scaled_numerator / denominator;
+    let remainder = scaled_numerator % denominator;
+    let twice_remainder = remainder.checked_mul(2)?;
+    if twice_remainder > denominator
+        || (twice_remainder == denominator && rounded_units & 1 == 1)
+    {
+        rounded_units = rounded_units.checked_add(1)?;
+    }
+
+    if rounded_units == 0 {
+        return Some(Err(ValidationError::InvalidInput));
+    }
+    let minimum_normal_units = 1_u128 << 52;
+    if rounded_units > minimum_normal_units {
+        return None;
+    }
+    if rounded_units == minimum_normal_units {
+        return Some(Ok(f64::MIN_POSITIVE));
+    }
+    Some(Ok(f64::from_bits(rounded_units as u64)))
+}
+
 fn exact_translated_residual_standard_error(
     diffs: &[f64],
     roundoffs: &[f64],
@@ -217,12 +269,18 @@ fn exact_translated_residual_standard_error(
             // occurs once, SE(mean) simplifies to |gap| / n.
             gap.abs() / translated.len() as f64
         } else if let Some((numerator, denominator)) = rational_scale {
-            // Some non-singleton count geometries collapse to an exact rational
-            // scale. Reuse the represented-sum division primitive so factors
-            // such as 2/15 are rounded once without an avoidable square/root
-            // reconstruction or a multiply-first overflow.
-            let scaled_gap = vec![gap.abs(); numerator];
-            deterministic_representable_sum_over_count(&scaled_gap, denominator)?
+            // A normalized quotient can double-round when its exact power-of-two
+            // restoration lands in the subnormal range. Round exact represented
+            // minimum-subnormal units first when that bounded case applies;
+            // otherwise retain the existing overflow-safe sum-over-count path.
+            if let Some(subnormal_result) =
+                exact_subnormal_rational_scale(gap, numerator, denominator)
+            {
+                subnormal_result?
+            } else {
+                let scaled_gap = vec![gap.abs(); numerator];
+                deterministic_representable_sum_over_count(&scaled_gap, denominator)?
+            }
         } else {
             0.0
         };
@@ -342,14 +400,17 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// two-level sample where either level occurs once, the algebraic identity
 /// `SE(mean) = |level_gap| / n` is evaluated directly. Non-singleton two-level
 /// count geometries whose reduced count factor is an exact rational square are
-/// likewise applied as a represented rational scale before moment reconstruction.
-/// The general translated path avoids making a rounded residual mean authoritative
-/// before dispersion is evaluated. Its normalization uses an exact power-of-two
-/// scale so the translated geometry is not re-rounded through an arbitrary
-/// magnitude before the final SE is restored. Cases that cannot prove those
-/// translated deltas representable retain the predecessor rounded-residual path.
-/// Individual signed residuals must still be representable because their
-/// dispersion is itself part of the requested scientific result.
+/// likewise applied as a represented rational scale before moment reconstruction;
+/// if that exact rational result is subnormal, TEPP rounds once in represented
+/// minimum-subnormal units instead of normalizing and restoring through a second
+/// binary64 rounding boundary. The general translated path avoids making a
+/// rounded residual mean authoritative before dispersion is evaluated. Its
+/// normalization uses an exact power-of-two scale so the translated geometry is
+/// not re-rounded through an arbitrary magnitude before the final SE is restored.
+/// Cases that cannot prove those translated deltas representable retain the
+/// predecessor rounded-residual path. Individual signed residuals must still be
+/// representable because their dispersion is itself part of the requested
+/// scientific result.
 ///
 /// # Errors
 ///
