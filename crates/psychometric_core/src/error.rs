@@ -341,6 +341,31 @@ pub enum PsychometricError {
     /// Driver §7.2 `asymTIPREDEFFECT` was treated as the contemporaneous
     /// Dirac. `-B z / a` is not `M x`.
     AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse,
+    /// Driver p. 16 `asymTIPREDEFFECTstd` was requested without a
+    /// strictly positive `asymDIFFUSION`. Footnote 4 standardises
+    /// using only the relevant within-subject variance; zero `q`
+    /// has no positive process SD.
+    StandardisedAsymptoticTimeIndependentEffectRequiresPositiveWithinSubjectVariance,
+    /// Driver p. 16 `asymTIPREDEFFECTstd` was requested without a
+    /// strictly positive `TIPREDVAR`. Footnote 4 standardises using
+    /// the affecting predictor variance; zero `v` has no positive
+    /// predictor SD.
+    StandardisedAsymptoticTimeIndependentEffectRequiresPositivePredictorVariance,
+    /// Driver §7.2 unstandardised `asymTIPREDEFFECT` `-B / a` was
+    /// treated as `asymTIPREDEFFECTstd`. Unstandardised total change
+    /// is defined for a zero coefficient and for zero predictor
+    /// variance; standardised `asymTIPREDEFFECT` is not.
+    UnstandardisedAsymptoticTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect,
+    /// Driver p. 16 finite-interval
+    /// `A^{-1}[e^{A Δt} − I] B · √v / √p` was treated as
+    /// `asymTIPREDEFFECTstd`. The finite-interval map depends on
+    /// `Δt` and is not the `Δt → ∞` standardisation.
+    DiscreteStandardisedTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect,
+    /// `(-B / a) · √v / √(trait + p + added)` was treated as
+    /// `asymTIPREDEFFECTstd`. Footnote 4 uses only `asymDIFFUSION`,
+    /// not total variance. `TRAITVAR` is not the standardisation
+    /// variance.
+    TraitContaminatedAsymptoticTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect,
     /// Driver §7.2 `addedTIPREDVAR` was treated as `TRAITVAR`.
     /// `(B / a)² v` is between-subject variance accounted for by a
     /// time-independent predictor, not a zero-drift trait process.
@@ -987,6 +1012,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse => {
                 "asymptotic time-independent predictor effect is not the contemporaneous impulse"
+            }
+            Self::StandardisedAsymptoticTimeIndependentEffectRequiresPositiveWithinSubjectVariance => {
+                "standardised asymptotic time-independent predictor effect requires strictly positive stationary within-subject variance"
+            }
+            Self::StandardisedAsymptoticTimeIndependentEffectRequiresPositivePredictorVariance => {
+                "standardised asymptotic time-independent predictor effect requires strictly positive predictor variance"
+            }
+            Self::UnstandardisedAsymptoticTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect => {
+                "unstandardised asymptotic time-independent predictor effect is not standardised asymptotic time-independent predictor effect"
+            }
+            Self::DiscreteStandardisedTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect => {
+                "finite-interval standardised time-independent predictor effect is not standardised asymptotic time-independent predictor effect"
+            }
+            Self::TraitContaminatedAsymptoticTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect => {
+                "trait-contaminated asymptotic time-independent predictor effect is not standardised asymptotic time-independent predictor effect"
             }
             Self::AsymptoticTimeIndependentVarianceIsNotTraitVariance => {
                 "asymptotic time-independent predictor variance is not trait variance"
@@ -1734,6 +1774,35 @@ mod tests {
         assert_eq!(
             PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean.to_string(),
             "free first-occasion observed mean is not the stationary first-occasion observed mean"
+        );
+    }
+
+    #[test]
+    fn standardised_asymptotic_time_independent_effect_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticTimeIndependentEffectRequiresPositiveWithinSubjectVariance
+                .to_string(),
+            "standardised asymptotic time-independent predictor effect requires strictly positive stationary within-subject variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticTimeIndependentEffectRequiresPositivePredictorVariance
+                .to_string(),
+            "standardised asymptotic time-independent predictor effect requires strictly positive predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedAsymptoticTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect
+                .to_string(),
+            "unstandardised asymptotic time-independent predictor effect is not standardised asymptotic time-independent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteStandardisedTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect
+                .to_string(),
+            "finite-interval standardised time-independent predictor effect is not standardised asymptotic time-independent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedAsymptoticTimeIndependentEffectIsNotStandardisedAsymptoticTimeIndependentEffect
+                .to_string(),
+            "trait-contaminated asymptotic time-independent predictor effect is not standardised asymptotic time-independent predictor effect"
         );
     }
 
