@@ -145,26 +145,38 @@ fn exact_translated_residual_standard_error(
         return Ok(Some(0.0));
     }
 
-    if translated.len() == 3 {
-        let repeated_level_gap = if translated[0] == translated[1] {
-            Some(translated[2])
-        } else if translated[0] == translated[2] || translated[1] == translated[2] {
-            Some(translated[1])
-        } else {
-            None
-        };
-        if let Some(gap) = repeated_level_gap {
-            // With three observations and exactly two equal represented residual
-            // levels, SE(mean) simplifies to |gap| / 3. Evaluate that identity
-            // directly instead of projecting gap through square -> second moment
-            // -> sqrt, which can move the final binary64 result by one ULP even
-            // though the translated gap itself is exact.
-            let standard_error = gap.abs() / 3.0;
-            if standard_error == 0.0 && gap != 0.0 {
-                return Err(ValidationError::InvalidInput);
+    let mut zero_count = 0_usize;
+    let mut repeated_gap = None;
+    let mut gap_count = 0_usize;
+    let mut exactly_two_levels = true;
+    for &value in &translated {
+        if value == 0.0 {
+            zero_count += 1;
+        } else if let Some(gap) = repeated_gap {
+            if value != gap {
+                exactly_two_levels = false;
+                break;
             }
-            return Ok(Some(standard_error));
+            gap_count += 1;
+        } else {
+            repeated_gap = Some(value);
+            gap_count = 1;
         }
+    }
+    if exactly_two_levels
+        && (zero_count == 1 || gap_count == 1)
+        && let Some(gap) = repeated_gap
+    {
+        // For an exactly translated two-level sample where either level occurs
+        // once, SE(mean) simplifies to |gap| / n. Evaluate that identity directly
+        // instead of projecting the exact gap through square -> second moment ->
+        // sqrt, which can move the final binary64 result by one ULP.
+        let sample_count = translated.len() as f64;
+        let standard_error = gap.abs() / sample_count;
+        if standard_error == 0.0 && gap != 0.0 {
+            return Err(ValidationError::InvalidInput);
+        }
+        return Ok(Some(standard_error));
     }
 
     // Keep the translated binary64 geometry on an exact dyadic scale. Using the
@@ -269,9 +281,9 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// residuals, TEPP uses the `high + low` decomposition and the same translated
 /// second moment whenever every anchor-relative high delta, low delta, and
 /// combined residual delta is exactly representable. For an exactly translated
-/// three-observation sample with two equal residual levels, the algebraic
-/// identity `SE(mean) = |level_gap| / 3` is evaluated directly so an exact gap is
-/// not needlessly re-rounded through a squared second moment and square root.
+/// two-level sample where either level occurs once, the algebraic identity
+/// `SE(mean) = |level_gap| / n` is evaluated directly so an exact gap is not
+/// needlessly re-rounded through a squared second moment and square root.
 /// The general translated path avoids making a rounded residual mean authoritative
 /// before dispersion is evaluated. Its normalization uses an exact power-of-two
 /// scale so the translated geometry is not re-rounded through an arbitrary
