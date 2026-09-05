@@ -16,8 +16,11 @@ fn exact_three_level_rational_scale_preserves_correct_rounding() {
     let truth = [0.0; 3];
     let permutations = [
         [low, middle, high],
+        [low, high, middle],
         [middle, low, high],
+        [middle, high, low],
         [high, low, middle],
+        [high, middle, low],
     ];
 
     for recovered in permutations {
