@@ -20,6 +20,99 @@ const SEVENTEEN_OBSERVATION_FIXTURE: [u128; 17] = [
     1_805_452_085,
 ];
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Wide256 {
+    high: u128,
+    low: u128,
+}
+
+impl Wide256 {
+    fn multiply_u128(left: u128, right: u128) -> Self {
+        let mask = u128::from(u64::MAX);
+        let left_limbs = [
+            u64::try_from(left & mask).expect("masked low limb fits u64"),
+            u64::try_from(left >> 64).expect("high limb fits u64"),
+        ];
+        let right_limbs = [
+            u64::try_from(right & mask).expect("masked low limb fits u64"),
+            u64::try_from(right >> 64).expect("high limb fits u64"),
+        ];
+        let mut limbs = [0_u64; 4];
+
+        for (left_index, left_limb) in left_limbs.iter().copied().enumerate() {
+            let mut carry = 0_u128;
+            for (right_index, right_limb) in right_limbs.iter().copied().enumerate() {
+                let limb_index = left_index + right_index;
+                let accumulator = u128::from(left_limb)
+                    .checked_mul(u128::from(right_limb))
+                    .expect("64-bit limb product fits u128")
+                    .checked_add(u128::from(limbs[limb_index]))
+                    .expect("schoolbook partial sum fits u128")
+                    .checked_add(carry)
+                    .expect("schoolbook carry sum fits u128");
+                limbs[limb_index] = u64::try_from(accumulator & mask)
+                    .expect("masked schoolbook limb fits u64");
+                carry = accumulator >> 64;
+            }
+            limbs[left_index + 2] =
+                u64::try_from(carry).expect("schoolbook multiplication carry fits u64");
+        }
+
+        Self {
+            high: u128::from(limbs[2]) | (u128::from(limbs[3]) << 64),
+            low: u128::from(limbs[0]) | (u128::from(limbs[1]) << 64),
+        }
+    }
+
+    fn checked_sub(self, right: Self) -> Option<Self> {
+        let (low, borrow) = self.low.overflowing_sub(right.low);
+        let high = self
+            .high
+            .checked_sub(right.high)?
+            .checked_sub(u128::from(u8::from(borrow)))?;
+        Some(Self { high, low })
+    }
+
+    fn checked_shl(self, shift: u32) -> Option<Self> {
+        if shift == 0 {
+            return Some(self);
+        }
+        if shift >= 256 {
+            return None;
+        }
+        if shift >= 128 {
+            if self.high != 0 {
+                return None;
+            }
+            let high_shift = shift - 128;
+            if high_shift == 0 {
+                return Some(Self {
+                    high: self.low,
+                    low: 0,
+                });
+            }
+            if self.low >> (128 - high_shift) != 0 {
+                return None;
+            }
+            return Some(Self {
+                high: self.low << high_shift,
+                low: 0,
+            });
+        }
+        if self.high >> (128 - shift) != 0 {
+            return None;
+        }
+        Some(Self {
+            high: (self.high << shift) | (self.low >> (128 - shift)),
+            low: self.low << shift,
+        })
+    }
+
+    fn as_u128(self) -> Option<u128> {
+        (self.high == 0).then_some(self.low)
+    }
+}
+
 fn deterministic_compact_fixture(sample_count: usize) -> Vec<u128> {
     (0..sample_count)
         .map(|index| {
@@ -64,6 +157,31 @@ fn pair_square_sum_linear(values: &[u128]) -> Option<u128> {
         .checked_sub(coefficient_sum.checked_mul(coefficient_sum)?)?;
     let squared_unit = 1_u128.checked_shl(common_shift.checked_mul(2)?)?;
     normalized_sum.checked_mul(squared_unit)
+}
+
+fn pair_square_sum_linear_wide_product(values: &[u128]) -> Option<Wide256> {
+    let minimum = *values.iter().min()?;
+    let sample_count = u128::try_from(values.len()).ok()?;
+    let common_shift = values
+        .iter()
+        .filter_map(|value| {
+            let coefficient = value.checked_sub(minimum)?;
+            (coefficient != 0).then_some(coefficient.trailing_zeros())
+        })
+        .min()
+        .unwrap_or(0);
+
+    let mut coefficient_sum = 0_u128;
+    let mut square_sum = 0_u128;
+    for value in values {
+        let coefficient = value.checked_sub(minimum)? >> common_shift;
+        coefficient_sum = coefficient_sum.checked_add(coefficient)?;
+        square_sum = square_sum.checked_add(coefficient.checked_mul(coefficient)?)?;
+    }
+
+    let normalized_sum = Wide256::multiply_u128(sample_count, square_sum)
+        .checked_sub(Wide256::multiply_u128(coefficient_sum, coefficient_sum))?;
+    normalized_sum.checked_shl(common_shift.checked_mul(2)?)
 }
 
 fn greatest_common_divisor(mut left: u128, mut right: u128) -> u128 {
@@ -190,6 +308,35 @@ fn linear_checked_integer_kernel_is_not_admission_equivalent_to_pair_reference()
         pair_square_sum_linear(&pair_only),
         None,
         "odd diameter prevents dyadic rescaling, so n*sum(c_i^2) overflows before cancellation while the exact pair numerator still fits"
+    );
+}
+
+#[test]
+fn wide_product_reference_recovers_the_pair_only_odd_boundary() {
+    let diameter = (1_u128 << 58) + 1;
+    let mut pair_only = Vec::with_capacity(65);
+    pair_only.push(0);
+    pair_only.extend((0..64).map(|_| diameter));
+
+    let pairwise = pair_square_sum_quadratic(&pair_only)
+        .expect("65-sample pair numerator stays within u128");
+    assert_eq!(pair_square_sum_linear(&pair_only), None);
+    assert_eq!(
+        pair_square_sum_linear_wide_product(&pair_only).and_then(Wide256::as_u128),
+        Some(pairwise),
+        "two-limb intermediate products must distinguish a narrow-u128 refusal from an exact pair refusal"
+    );
+}
+
+#[test]
+fn wide_product_reference_preserves_full_width_u128_multiplication() {
+    let maximum = u128::MAX;
+    assert_eq!(
+        Wide256::multiply_u128(maximum, maximum),
+        Wide256 {
+            high: maximum - 1,
+            low: 1,
+        }
     );
 }
 
