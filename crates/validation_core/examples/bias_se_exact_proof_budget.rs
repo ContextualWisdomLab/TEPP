@@ -3,13 +3,13 @@
 //! This example compares checked-integer proof kernels on deterministic dyadic
 //! coefficients: a production-layout-shaped buffered O(n²) pair proof, an
 //! allocation-free two-pass O(n²) variant, an algebraically equivalent O(n)
-//! sufficient accumulator, and the viable hybrid shape that uses the O(n) path
-//! only when it admits and otherwise falls back to the buffered pair proof.
-//! The O(n) path first removes the shared power-of-two unit from anchor-relative
-//! coefficients so checked-intermediate refusal is evaluated on the canonical
-//! dyadic grid rather than on an arbitrary raw integer scale. It is
-//! characterization tooling, not production admission and not buyer-path latency
-//! evidence by itself.
+//! sufficient accumulator, a two-limb wider-product O(n) reference, and the
+//! viable hybrid shape that uses the narrow O(n) path only when it admits and
+//! otherwise falls back to the buffered pair proof. The O(n) paths first remove
+//! the shared power-of-two unit from anchor-relative coefficients so
+//! checked-intermediate refusal is evaluated on the canonical dyadic grid rather
+//! than on an arbitrary raw integer scale. This is characterization tooling, not
+//! production admission and not buyer-path latency evidence by itself.
 
 use std::hint::black_box;
 use std::mem::size_of;
@@ -22,6 +22,64 @@ struct KernelObservation {
     scratch_records: usize,
     scratch_payload_bytes: usize,
     used_pairwise_fallback: bool,
+}
+
+#[derive(Clone, Copy)]
+struct Wide256 {
+    high: u128,
+    low: u128,
+}
+
+impl Wide256 {
+    fn multiply_u128(left: u128, right: u128) -> Self {
+        let mask = u128::from(u64::MAX);
+        let left_limbs = [
+            u64::try_from(left & mask).expect("masked low limb fits u64"),
+            u64::try_from(left >> 64).expect("high limb fits u64"),
+        ];
+        let right_limbs = [
+            u64::try_from(right & mask).expect("masked low limb fits u64"),
+            u64::try_from(right >> 64).expect("high limb fits u64"),
+        ];
+        let mut limbs = [0_u64; 4];
+
+        for (left_index, left_limb) in left_limbs.iter().copied().enumerate() {
+            let mut carry = 0_u128;
+            for (right_index, right_limb) in right_limbs.iter().copied().enumerate() {
+                let limb_index = left_index + right_index;
+                let accumulator = u128::from(left_limb)
+                    .checked_mul(u128::from(right_limb))
+                    .expect("64-bit limb product fits u128")
+                    .checked_add(u128::from(limbs[limb_index]))
+                    .expect("schoolbook partial sum fits u128")
+                    .checked_add(carry)
+                    .expect("schoolbook carry sum fits u128");
+                limbs[limb_index] = u64::try_from(accumulator & mask)
+                    .expect("masked schoolbook limb fits u64");
+                carry = accumulator >> 64;
+            }
+            limbs[left_index + 2] =
+                u64::try_from(carry).expect("schoolbook multiplication carry fits u64");
+        }
+
+        Self {
+            high: u128::from(limbs[2]) | (u128::from(limbs[3]) << 64),
+            low: u128::from(limbs[0]) | (u128::from(limbs[1]) << 64),
+        }
+    }
+
+    fn checked_sub(self, right: Self) -> Option<Self> {
+        let (low, borrow) = self.low.overflowing_sub(right.low);
+        let high = self
+            .high
+            .checked_sub(right.high)?
+            .checked_sub(u128::from(u8::from(borrow)))?;
+        Some(Self { high, low })
+    }
+
+    fn as_u128(self) -> Option<u128> {
+        (self.high == 0).then_some(self.low)
+    }
 }
 
 type Kernel = fn(&[u128]) -> Option<KernelObservation>;
@@ -138,9 +196,8 @@ fn pair_square_sum_quadratic_two_pass(values: &[u128]) -> Option<KernelObservati
     })
 }
 
-fn pair_square_sum_linear(values: &[u128]) -> Option<KernelObservation> {
+fn normalized_linear_terms(values: &[u128]) -> Option<(u128, u128, u32)> {
     let minimum = *values.iter().min()?;
-    let sample_count = u128::try_from(values.len()).ok()?;
     let common_shift = values
         .iter()
         .filter_map(|value| {
@@ -157,9 +214,30 @@ fn pair_square_sum_linear(values: &[u128]) -> Option<KernelObservation> {
         coefficient_sum = coefficient_sum.checked_add(coefficient)?;
         square_sum = square_sum.checked_add(coefficient.checked_mul(coefficient)?)?;
     }
+    Some((coefficient_sum, square_sum, common_shift))
+}
+
+fn pair_square_sum_linear(values: &[u128]) -> Option<KernelObservation> {
+    let sample_count = u128::try_from(values.len()).ok()?;
+    let (coefficient_sum, square_sum, common_shift) = normalized_linear_terms(values)?;
     let pair_square_sum = sample_count
         .checked_mul(square_sum)?
         .checked_sub(coefficient_sum.checked_mul(coefficient_sum)?)?;
+    Some(KernelObservation {
+        aligned_pair_square_sum: pair_square_sum,
+        unit_exponent: i32::try_from(common_shift).ok()?,
+        scratch_records: 0,
+        scratch_payload_bytes: 0,
+        used_pairwise_fallback: false,
+    })
+}
+
+fn pair_square_sum_linear_wide_product(values: &[u128]) -> Option<KernelObservation> {
+    let sample_count = u128::try_from(values.len()).ok()?;
+    let (coefficient_sum, square_sum, common_shift) = normalized_linear_terms(values)?;
+    let pair_square_sum = Wide256::multiply_u128(sample_count, square_sum)
+        .checked_sub(Wide256::multiply_u128(coefficient_sum, coefficient_sum))?
+        .as_u128()?;
     Some(KernelObservation {
         aligned_pair_square_sum: pair_square_sum,
         unit_exponent: i32::try_from(common_shift).ok()?,
@@ -233,6 +311,8 @@ fn assert_and_measure_geometry(
         .expect("buffered quadratic result stays within u128");
     let two_pass = pair_square_sum_quadratic_two_pass(values)
         .expect("two-pass quadratic result stays within u128");
+    let wide_product = pair_square_sum_linear_wide_product(values)
+        .expect("wider-product linear reference stays within its declared budget");
     let hybrid = pair_square_sum_hybrid(values).expect("hybrid result stays within u128");
     let exact_pair_square_sum = restored_pair_square_sum(buffered)
         .expect("buffered result restores to exact pair-square sum");
@@ -240,6 +320,11 @@ fn assert_and_measure_geometry(
         restored_pair_square_sum(two_pass),
         Some(exact_pair_square_sum),
         "quadratic kernels must agree"
+    );
+    assert_eq!(
+        restored_pair_square_sum(wide_product),
+        Some(exact_pair_square_sum),
+        "wider-product linear reference must preserve the exact pair numerator"
     );
     assert_eq!(
         restored_pair_square_sum(hybrid),
@@ -266,6 +351,7 @@ fn assert_and_measure_geometry(
     let mut kernels: Vec<(&str, Kernel)> = vec![
         ("quadratic_buffered", pair_square_sum_quadratic_buffered),
         ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
+        ("linear_wide_product_reference", pair_square_sum_linear_wide_product),
         ("hybrid", pair_square_sum_hybrid),
     ];
     if expect_linear_admission {
