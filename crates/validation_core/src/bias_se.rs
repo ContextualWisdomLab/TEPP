@@ -173,10 +173,10 @@ fn exact_pair_distance_standard_error(
     recovered: &[f64],
 ) -> Option<Result<f64, ValidationError>> {
     // Keep this O(n²) reference proof deliberately bounded. n=2 and n=3 have
-    // cheaper exact identities in `bias.rs`; four and five observations are the
-    // smallest remaining sample sizes where the translated floating moment/sqrt
-    // path has demonstrated one-ULP errors.
-    if truth.len() != recovered.len() || !(4..=5).contains(&truth.len()) {
+    // cheaper exact identities in `bias.rs`; four through six observations are
+    // the smallest remaining sample sizes with demonstrated one-ULP errors in
+    // the translated floating moment/sqrt path.
+    if truth.len() != recovered.len() || !(4..=6).contains(&truth.len()) {
         return None;
     }
     let sample_count = truth.len();
@@ -259,10 +259,10 @@ fn exact_pair_distance_standard_error(
 
 /// Standard error of mean signed bias.
 ///
-/// Four- and five-observation samples whose represented residuals and pairwise
-/// differences are exact use the exact pair-distance identity when its reduced
-/// dyadic ratio fits the bounded integer proof. All other samples retain the
-/// established bias implementation and its existing fail-closed behavior.
+/// Four- through six-observation samples whose represented residuals and
+/// pairwise differences are exact use the exact pair-distance identity when its
+/// reduced dyadic ratio fits the bounded integer proof. All other samples retain
+/// the established bias implementation and its existing fail-closed behavior.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     if let Some(result) = exact_pair_distance_standard_error(truth, recovered) {
         return result;
@@ -306,6 +306,12 @@ mod tests {
                 .expect("five-observation reduced ratio remains bounded")
                 .to_bits(),
             0x4192_caf1_6406_5ad0
+        );
+        assert_eq!(
+            correctly_rounded_scaled_sqrt_ratio(621_603_287_214_182_303, 45, 0)
+                .expect("six-observation reduced ratio remains bounded")
+                .to_bits(),
+            0x419c_057d_42fc_5857
         );
     }
 
@@ -409,6 +415,26 @@ mod tests {
     }
 
     #[test]
+    fn six_observation_identity_keeps_exact_pair_distance_ratio_authoritative() {
+        let truth = [0.0; 6];
+        let recovered = [
+            1_120_315_269.0,
+            1_513_609_015.0,
+            1_569_037_659.0,
+            1_789_057_504.0,
+            1_807_936_669.0,
+            1_914_796_738.0,
+        ];
+        assert_eq!(
+            exact_pair_distance_standard_error(&truth, &recovered)
+                .expect("six-observation ratio admitted")
+                .expect("representable")
+                .to_bits(),
+            0x419c_057d_42fc_5857
+        );
+    }
+
+    #[test]
     fn bounded_pair_distance_identity_covers_exact_zero_and_fallbacks() {
         let truth = [0.0; 4];
         assert_eq!(
@@ -420,7 +446,7 @@ mod tests {
             None
         );
         assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 6], &[0.0; 6]),
+            exact_pair_distance_standard_error(&[0.0; 7], &[0.0; 7]),
             None
         );
         assert_eq!(
