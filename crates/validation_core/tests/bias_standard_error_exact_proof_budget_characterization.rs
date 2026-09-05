@@ -20,6 +20,15 @@ const SEVENTEEN_OBSERVATION_FIXTURE: [u128; 17] = [
     1_805_452_085,
 ];
 
+fn deterministic_compact_fixture(sample_count: usize) -> Vec<u128> {
+    (0..sample_count)
+        .map(|index| {
+            let value = u128::try_from(index).expect("fixture index fits u128");
+            (value * 1_000_003 + value * value * 97 + 17) % 4_000_000_001
+        })
+        .collect()
+}
+
 fn pair_square_sum_quadratic(values: &[u128]) -> Option<u128> {
     let mut sum = 0_u128;
     for left in 0..values.len() {
@@ -107,6 +116,52 @@ fn seventeen_observation_fixture_proves_linear_identity_matches_pair_reference()
             .expect("current bounded fallback remains representable")
             .to_bits(),
         0x41a0_dd77_9ac3_8e98
+    );
+}
+
+#[test]
+fn linear_checked_integer_kernel_matches_pair_reference_when_it_admits() {
+    for sample_count in [4_usize, 16, 17, 32, 64, 128, 256] {
+        let values = deterministic_compact_fixture(sample_count);
+        let pairwise = pair_square_sum_quadratic(&values)
+            .expect("compact-grid pair reference stays within u128");
+        let linear = pair_square_sum_linear(&values)
+            .expect("compact-grid linear kernel stays within u128");
+        assert_eq!(
+            linear, pairwise,
+            "linear sufficient proof must preserve the exact pair numerator at n={sample_count}"
+        );
+    }
+}
+
+#[test]
+fn linear_checked_integer_kernel_is_not_admission_equivalent_to_pair_reference() {
+    let diameter = 1_u128 << 58;
+
+    let mut fits_both = Vec::with_capacity(64);
+    fits_both.push(0);
+    fits_both.extend((0..63).map(|_| diameter));
+    let pairwise_64 = pair_square_sum_quadratic(&fits_both)
+        .expect("64-sample pair numerator stays within u128");
+    assert_eq!(
+        pair_square_sum_linear(&fits_both),
+        Some(pairwise_64),
+        "n=64 remains inside the minimum-shifted linear intermediate budget"
+    );
+
+    let mut pair_only = Vec::with_capacity(65);
+    pair_only.push(0);
+    pair_only.extend((0..64).map(|_| diameter));
+    let pairwise_65 = pair_square_sum_quadratic(&pair_only)
+        .expect("65-sample pair numerator still stays within u128");
+    let expected_pairwise_65 = 64_u128
+        .checked_mul(diameter.checked_mul(diameter).expect("diameter square fits"))
+        .expect("pair numerator fits");
+    assert_eq!(pairwise_65, expected_pairwise_65);
+    assert_eq!(
+        pair_square_sum_linear(&pair_only),
+        None,
+        "n*sum(c_i^2) overflows before cancellation even though the exact pair numerator fits"
     );
 }
 
