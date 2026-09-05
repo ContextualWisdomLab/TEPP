@@ -8,7 +8,7 @@ use crate::mode::OrchestrationMode;
 /// Supported interpretation-run contract version.
 pub const INTERPRETATION_RUN_CONTRACT_VERSION: u16 = 1;
 
-/// Versioned path contextual-orchestrator may POST.
+/// Versioned path contextual-orchestrator may POST or GET.
 pub const INTERPRETATION_RUN_PATH: &str = "/v1/interpretation-runs";
 
 /// Default maximum interpretation-run JSON payload size in bytes.

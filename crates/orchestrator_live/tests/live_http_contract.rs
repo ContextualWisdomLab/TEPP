@@ -8,9 +8,9 @@ use std::time::Duration;
 
 use orchestrator_live::{
     DEFAULT_INTERPRETATION_BYTE_LIMIT, INTERPRETATION_RUN_CONTRACT_VERSION,
-    INTERPRETATION_RUN_PATH, InterpretationRunAccepted, InterpretationRunRequest,
-    LIVE_HEADER_BYTE_LIMIT, LIVE_HEADER_COUNT_LIMIT, OrchestrationMode, OrchestratorLiveError,
-    OrchestratorLiveService,
+    INTERPRETATION_RUN_PATH, InterpretationRunAccepted, InterpretationRunCollection,
+    InterpretationRunRequest, LIVE_HEADER_BYTE_LIMIT, LIVE_HEADER_COUNT_LIMIT, OrchestrationMode,
+    OrchestratorLiveError, OrchestratorLiveService,
 };
 
 fn sample_request() -> InterpretationRunRequest {
@@ -35,6 +35,15 @@ fn orchestrator_headers(idempotency_key: &str) -> Vec<(String, String)> {
         ("tepp-consumer".into(), "contextual-orchestrator".into()),
         ("tepp-contract-version".into(), "1".into()),
         ("idempotency-key".into(), idempotency_key.to_owned()),
+    ]
+}
+
+fn collection_headers() -> Vec<(String, String)> {
+    vec![
+        ("Host".into(), "127.0.0.1".into()),
+        ("content-type".into(), "application/json".into()),
+        ("tepp-consumer".into(), "contextual-orchestrator".into()),
+        ("tepp-contract-version".into(), "1".into()),
     ]
 }
 
@@ -293,6 +302,174 @@ fn handle_http_refuses_methods_paths_and_table_hosts() {
         body.len()
     );
     assert_eq!(service.handle_http_request(&http10).status_code, 400);
+}
+
+#[test]
+fn handle_http_enumerates_interpretation_runs_on_collection_get() {
+    let mut service = OrchestratorLiveService::new();
+    let empty = service.handle_http_request(&http_request(
+        "GET",
+        INTERPRETATION_RUN_PATH,
+        &collection_headers(),
+        "",
+    ));
+    assert_eq!(empty.status_code, 200);
+    let empty_page = InterpretationRunCollection::from_json(&empty.body).expect("empty");
+    assert!(empty_page.items.is_empty());
+    assert_eq!(empty_page.next_cursor, None);
+
+    let first = sample_request();
+    assert_eq!(
+        service
+            .handle_http_request(&interpretation_http(&first))
+            .status_code,
+        202
+    );
+    let second = InterpretationRunRequest::new(
+        INTERPRETATION_RUN_CONTRACT_VERSION,
+        "orch-live-idem-002",
+        "orch-tenant-workspace-demo",
+        "tepp-snapshot-demo-001",
+        "2026-08-01T00:00:00Z",
+        OrchestrationMode::Verify,
+        2048,
+        vec!["span-001".into()],
+        false,
+    )
+    .expect("second");
+    assert_eq!(
+        service
+            .handle_http_request(&interpretation_http(&second))
+            .status_code,
+        202
+    );
+
+    let listed = service.handle_http_request(&http_request(
+        "GET",
+        INTERPRETATION_RUN_PATH,
+        &collection_headers(),
+        "",
+    ));
+    assert_eq!(listed.status_code, 200);
+    let page = InterpretationRunCollection::from_json(&listed.body).expect("page");
+    assert_eq!(page.items.len(), 2);
+    assert_eq!(page.items[0].idempotency_key, "orch-live-idem-001");
+    assert_eq!(page.items[1].idempotency_key, "orch-live-idem-002");
+    assert!(
+        page.items
+            .iter()
+            .all(|item| item.claim_status == "hypothetical")
+    );
+    assert!(page.items.iter().all(|item| !item.scientific_authority));
+    assert!(!listed.body.contains("rmse"));
+    assert!(!listed.body.contains("evidence_span_ids"));
+    assert!(!listed.body.contains("tepp.scientific_acceptance.v1"));
+
+    let mut limited_headers = collection_headers();
+    limited_headers.push(("tepp-page-limit".into(), "1".into()));
+    let limited = service.handle_http_request(&http_request(
+        "GET",
+        INTERPRETATION_RUN_PATH,
+        &limited_headers,
+        "",
+    ));
+    assert_eq!(limited.status_code, 200);
+    let limited_page = InterpretationRunCollection::from_json(&limited.body).expect("limited");
+    assert_eq!(limited_page.items.len(), 1);
+    assert_eq!(
+        limited_page.next_cursor.as_deref(),
+        Some("orch-live-idem-001")
+    );
+
+    let mut cursor_headers = collection_headers();
+    cursor_headers.push(("tepp-page-cursor".into(), "orch-live-idem-001".into()));
+    cursor_headers.push(("tepp-page-limit".into(), "1".into()));
+    let rest = service.handle_http_request(&http_request(
+        "GET",
+        INTERPRETATION_RUN_PATH,
+        &cursor_headers,
+        "",
+    ));
+    assert_eq!(rest.status_code, 200);
+    let rest_page = InterpretationRunCollection::from_json(&rest.body).expect("rest");
+    assert_eq!(rest_page.items.len(), 1);
+    assert_eq!(rest_page.items[0].idempotency_key, "orch-live-idem-002");
+    assert_eq!(rest_page.next_cursor, None);
+}
+
+#[test]
+fn handle_http_collection_get_refuses_foreign_consumers_and_hostile_headers() {
+    let mut service = OrchestratorLiveService::new();
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "GET",
+                "/v1/interpretation-runs/extra",
+                &collection_headers(),
+                "",
+            ))
+            .status_code,
+        400
+    );
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "GET",
+                INTERPRETATION_RUN_PATH,
+                &collection_headers(),
+                "{}",
+            ))
+            .status_code,
+        400
+    );
+    let mut with_idem = collection_headers();
+    with_idem.push(("idempotency-key".into(), "orch-live-idem-001".into()));
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "GET",
+                INTERPRETATION_RUN_PATH,
+                &with_idem,
+                "",
+            ))
+            .status_code,
+        400
+    );
+    for consumer in ["naruon", "lineageweave"] {
+        let mut foreign = collection_headers();
+        foreign.retain(|(name, _)| !name.eq_ignore_ascii_case("tepp-consumer"));
+        foreign.push(("tepp-consumer".into(), consumer.into()));
+        assert_eq!(
+            service
+                .handle_http_request(&http_request("GET", INTERPRETATION_RUN_PATH, &foreign, "",))
+                .status_code,
+            400,
+            "consumer={consumer}"
+        );
+    }
+    let mut slash_cursor = collection_headers();
+    slash_cursor.push(("tepp-page-cursor".into(), "idem/slash".into()));
+    assert_eq!(
+        service
+            .handle_http_request(&http_request(
+                "GET",
+                INTERPRETATION_RUN_PATH,
+                &slash_cursor,
+                "",
+            ))
+            .status_code,
+        400
+    );
+    let mut credential = collection_headers();
+    credential.push(("Authorization".into(), "Bearer review-agent".into()));
+    let denied = service.handle_http_request(&http_request(
+        "GET",
+        INTERPRETATION_RUN_PATH,
+        &credential,
+        "",
+    ));
+    assert_eq!(denied.status_code, 403);
+    assert_eq!(error_code(&denied.body), "authorization_denied");
 }
 
 #[test]

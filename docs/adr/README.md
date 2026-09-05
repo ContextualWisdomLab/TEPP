@@ -30,6 +30,9 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0022](0022-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
 | [0024](0024-lineage-pair-criterion-and-project-journey-posterior.md) | Independent Event Lineage pair criterion and posterior Project Journey | Proposed | active-PR | Strict artifacts preserve criterion/event-time draws, branches, ties, and CPU/GPU receipts without claiming the scientific estimator is complete. |
 | [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
+| [0064](0064-interpretation-run-cli.md) | Loopback `tepp-interpretation-runs create` is contextual-orchestrator POST /v1/interpretation-runs client | Accepted | active-PR | Complements ADR 0010/0011; does not supersede ADR 0014. Unique on protected main. Does not infer causality. |
+| [0069](0069-interpretation-run-collection-get.md) | Loopback `GET /v1/interpretation-runs` enumerates accepted hypothetical interpretation runs | Accepted | active-PR | Complements ADR 0010/0011/0064; does not supersede ADR 0014. Unique on this stack versus protected main (0026–0068 occupied). Does not infer causality. |
+| [0070](0070-interpretation-run-collection-cli.md) | Loopback `tepp-interpretation-runs list` is contextual-orchestrator GET /v1/interpretation-runs client | Accepted | active-PR | Complements ADR 0069; does not supersede ADR 0014. Unique on this interpretation stack versus protected main (0026–0069 occupied). Does not infer causality. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -140,6 +143,8 @@ Use the narrowest owning ADR when decisions overlap:
 - **accepted-run execution and terminal artifact production:** ADR 0022.
 - **independent lineage criterion and posterior Project Journey:** ADR 0023.
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
+- **contextual-orchestrator interpretation-run CLI:** ADR 0064.
+- **contextual-orchestrator interpretation-run collection GET:** ADR 0069.
 
 ## Change and supersession rule
 

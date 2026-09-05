@@ -17,5 +17,17 @@ publish = false
 serde = { workspace = true }
 serde_json = { workspace = true }
 
+[[bin]]
+name = "tepp-orchestrator-loopback"
+path = "src/bin/tepp_orchestrator_loopback.rs"
+test = false
+bench = false
+
+[[bin]]
+name = "tepp-interpretation-runs"
+path = "src/bin/tepp_interpretation_runs.rs"
+test = false
+bench = false
+
 [lints]
 workspace = true

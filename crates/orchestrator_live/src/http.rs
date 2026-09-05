@@ -195,6 +195,25 @@ pub(crate) fn split_header_line(line: &str) -> Result<(&str, &str), Orchestrator
 pub(crate) fn refuse_live_headers(
     headers: &HashMap<String, String>,
 ) -> Result<(), OrchestratorLiveError> {
+    refuse_common_live_headers(headers)?;
+    let _idempotency_key = header_value(headers, "idempotency-key")?;
+    Ok(())
+}
+
+/// Collection GET admits empty bodies and refuses `idempotency-key`.
+pub(crate) fn refuse_collection_get_headers(
+    headers: &HashMap<String, String>,
+) -> Result<(), OrchestratorLiveError> {
+    refuse_common_live_headers(headers)?;
+    if headers.contains_key("idempotency-key") {
+        return Err(OrchestratorLiveError::InvalidWirePayload);
+    }
+    Ok(())
+}
+
+fn refuse_common_live_headers(
+    headers: &HashMap<String, String>,
+) -> Result<(), OrchestratorLiveError> {
     for (name, value) in headers {
         if header_is_credential(name) || header_is_credential(value) {
             return Err(OrchestratorLiveError::AuthorizationDenied);
@@ -213,7 +232,6 @@ pub(crate) fn refuse_live_headers(
     if header_value(headers, "tepp-contract-version")? != "1" {
         return Err(OrchestratorLiveError::InvalidWirePayload);
     }
-    let _idempotency_key = header_value(headers, "idempotency-key")?;
     Ok(())
 }
 
@@ -262,7 +280,8 @@ pub(crate) fn status_for(error: OrchestratorLiveError) -> (u16, &'static str) {
 mod tests {
     use super::{
         declared_content_length, header_is_credential, map_io_error, parse_headers,
-        parse_request_line, refuse_live_headers, split_header_line, split_request, status_for,
+        parse_request_line, refuse_collection_get_headers, refuse_live_headers, split_header_line,
+        split_request, status_for,
     };
     use crate::error::OrchestratorLiveError;
     use std::collections::HashMap;
@@ -422,5 +441,37 @@ mod tests {
         assert!(header_is_credential("x-copilot"));
         assert!(header_is_credential("x-nvidia_nim_api_key"));
         assert!(!header_is_credential("x-safe-header"));
+    }
+
+    #[test]
+    fn collection_get_headers_refuse_idempotency_key_and_foreign_consumers() {
+        let mut headers = HashMap::new();
+        headers.insert("host".into(), "127.0.0.1".into());
+        headers.insert("content-type".into(), "application/json".into());
+        headers.insert("tepp-consumer".into(), "contextual-orchestrator".into());
+        headers.insert("tepp-contract-version".into(), "1".into());
+        headers.insert("idempotency-key".into(), "idem".into());
+        assert_eq!(
+            refuse_collection_get_headers(&headers),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        headers.remove("idempotency-key");
+        refuse_collection_get_headers(&headers).expect("collection headers");
+        headers.insert("tepp-consumer".into(), "naruon".into());
+        assert_eq!(
+            refuse_collection_get_headers(&headers),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        headers.insert("tepp-consumer".into(), "lineageweave".into());
+        assert_eq!(
+            refuse_collection_get_headers(&headers),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        headers.insert("tepp-consumer".into(), "contextual-orchestrator".into());
+        headers.insert("authorization".into(), "Bearer x".into());
+        assert_eq!(
+            refuse_collection_get_headers(&headers),
+            Err(OrchestratorLiveError::AuthorizationDenied)
+        );
     }
 }

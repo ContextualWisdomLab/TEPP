@@ -6,7 +6,14 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 use crate::error::OrchestratorLiveError;
 use crate::http::{
     OrchestratorLiveResponse, header_value, map_io_error, parse_headers, parse_request_line,
-    read_http_request, refuse_live_headers, split_request, status_for, write_response,
+    read_http_request, refuse_collection_get_headers, refuse_live_headers, split_request,
+    status_for, write_response,
+};
+use crate::interpretation_run_collection_http::{
+    InterpretationRunCollection, InterpretationRunCollectionItem,
+    is_interpretation_run_collection_path, page_interpretation_run_collection_items,
+    parse_interpretation_run_collection_page_cursor,
+    parse_interpretation_run_collection_page_limit,
 };
 use crate::request::{
     INTERPRETATION_RUN_PATH, InterpretationRunAccepted, InterpretationRunRequest, to_json,
@@ -17,6 +24,8 @@ use crate::request::{
 /// Production interchange remains optional and versioned. This listener binds
 /// loopback TCP so tests and standalone operation can prove request handling
 /// without TLS termination, table access, or scientific-authority promotion.
+/// `GET /v1/interpretation-runs` enumerates accepted hypothetical runs as
+/// metric-free identities.
 #[derive(Debug)]
 pub struct OrchestratorLiveService {
     listener: Option<TcpListener>,
@@ -162,12 +171,57 @@ impl OrchestratorLiveService {
         let mut lines = header_block.split("\r\n");
         let request_line = lines.next().unwrap_or("");
         let (method, path) = parse_request_line(request_line)?;
+        let headers = parse_headers(lines)?;
+        if method == "GET" {
+            return self.list_interpretation_runs(path, &headers, body);
+        }
         if method != "POST" || path != INTERPRETATION_RUN_PATH {
             return Err(OrchestratorLiveError::InvalidWirePayload);
         }
-        let headers = parse_headers(lines)?;
         refuse_live_headers(&headers)?;
         self.accept_interpretation_run(&headers, body)
+    }
+
+    fn list_interpretation_runs(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<OrchestratorLiveResponse, OrchestratorLiveError> {
+        if !is_interpretation_run_collection_path(path) {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
+        if !body.is_empty() {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
+        refuse_collection_get_headers(headers)?;
+        let limit = parse_interpretation_run_collection_page_limit(
+            headers.get("tepp-page-limit").map(String::as_str),
+        )?;
+        let cursor = parse_interpretation_run_collection_page_cursor(
+            headers.get("tepp-page-cursor").map(String::as_str),
+        )?;
+        let items = self
+            .accepted_runs
+            .values()
+            .map(|(_, accepted)| {
+                InterpretationRunCollectionItem::new(
+                    accepted.interpretation_run_id(),
+                    accepted.idempotency_key(),
+                    accepted.orchestration_mode(),
+                    accepted.claim_status(),
+                    accepted.scientific_authority(),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let (page, next_cursor) =
+            page_interpretation_run_collection_items(items, cursor.as_deref(), limit);
+        let collection = InterpretationRunCollection::new(page, next_cursor)?;
+        Ok(OrchestratorLiveResponse::json(
+            200,
+            "OK",
+            collection.to_json()?,
+        ))
     }
 
     fn accept_interpretation_run(
