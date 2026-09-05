@@ -36,17 +36,18 @@ use psychometric_core::{
     recover_manifest_observed_variance, recover_manifest_trait_plus_state_observed_variance,
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
-    recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
-    recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_discrete_continuous_intercept,
+    recover_standardised_discrete_time_independent_predictor_effect,
+    recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
+    recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
+    recover_standardised_manifest_variance, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -6538,5 +6539,116 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
     assert_eq!(
         recover_standardised_manifest_variance(0.4, non_event),
         Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn standardised_discrete_time_independent_effect_recovers_driver_page_sixteen_after_positive_p_and_v()
+ {
+    let coefficient = 0.3_f64;
+    let predictor_variance = 1.6_f64;
+    let diffusion = 0.8_f64;
+    let log_rate = -0.5_f64;
+    let event_delta = 1.0_f64;
+    let recovered = recover_standardised_discrete_time_independent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        diffusion,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("discreteTIPREDEFFECTstd");
+    let stationary =
+        recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime).expect("p");
+    let increment = recover_discrete_time_independent_predictor_effect(
+        coefficient,
+        1.0,
+        log_rate,
+        event_delta,
+        LagClock::EventTime,
+    )
+    .expect("discreteTIPREDEFFECT");
+    let error = (recovered - increment * predictor_variance.sqrt() / stationary.sqrt()).abs();
+    assert!(
+        error < 1e-15,
+        "Driver et al. (2017, p. 16 discreteTIPREDEFFECTstd): RMSE {error} for A^{{-1}}[e^{{A Δt}} − I] B · √v / √p"
+    );
+    let later = recover_standardised_discrete_time_independent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        diffusion,
+        log_rate,
+        2.0,
+        LagClock::EventTime,
+    )
+    .expect("later Δt");
+    assert!(
+        (later - recovered).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): a later event interval changes discreteTIPREDEFFECTstd"
+    );
+}
+
+#[test]
+fn standardised_discrete_time_independent_effect_refuses_non_event_clocks_and_does_not_keep_zero_q_or_v()
+ {
+    assert_eq!(
+        recover_standardised_discrete_time_independent_predictor_effect(
+            0.3,
+            1.6,
+            0.8,
+            -0.5,
+            1.0,
+            LagClock::AssertionTime
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_discrete_time_independent_predictor_effect(
+            0.3,
+            1.6,
+            0.8,
+            -0.5,
+            1.0,
+            LagClock::KnowledgeCutoff
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_discrete_time_independent_predictor_effect(
+            0.3,
+            1.6,
+            0.0,
+            -0.5,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(
+            PsychometricError::StandardisedDiscreteTimeIndependentEffectRequiresPositiveWithinSubjectVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_discrete_time_independent_predictor_effect(
+            0.3,
+            0.0,
+            0.8,
+            -0.5,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(
+            PsychometricError::StandardisedDiscreteTimeIndependentEffectRequiresPositivePredictorVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_discrete_time_independent_predictor_effect(
+            0.3,
+            1.6,
+            0.8,
+            0.5,
+            1.0,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
     );
 }
