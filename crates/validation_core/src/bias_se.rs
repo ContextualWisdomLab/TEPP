@@ -246,16 +246,58 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 
 #[cfg(test)]
 mod tests {
-    use super::{correctly_rounded_scaled_sqrt_ratio, exact_four_observation_standard_error};
+    use super::{
+        correctly_rounded_scaled_sqrt_ratio, exact_four_observation_standard_error,
+        exact_power_of_two, midpoint_dyadic, multiply_by_power_of_two, positive_dyadic,
+    };
 
     #[test]
-    fn exact_ratio_sqrt_rounds_against_binary64_midpoint() {
+    fn exact_ratio_sqrt_corrects_both_adjacent_rounding_directions() {
         assert_eq!(
             correctly_rounded_scaled_sqrt_ratio(116, 48, 0)
                 .expect("bounded exact ratio")
                 .to_bits(),
             0x3ff8_df7d_a2e6_6e88
         );
+        assert_eq!(
+            correctly_rounded_scaled_sqrt_ratio(136, 48, 0)
+                .expect("bounded exact ratio")
+                .to_bits(),
+            0x3ffa_ee98_6a40_25f8
+        );
+        assert_eq!(
+            correctly_rounded_scaled_sqrt_ratio(48, 48, 0),
+            Some(1.0)
+        );
+    }
+
+    #[test]
+    fn exact_ratio_sqrt_refuses_outside_bounded_proof() {
+        let too_large = (1_u128 << 53) + 1;
+        assert_eq!(correctly_rounded_scaled_sqrt_ratio(0, 48, 0), None);
+        assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 0, 0), None);
+        assert_eq!(correctly_rounded_scaled_sqrt_ratio(too_large, 48, 0), None);
+        assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, too_large, 0), None);
+        assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 48, 1024), None);
+        assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 48, -1075), None);
+    }
+
+    #[test]
+    fn dyadic_helpers_cover_normal_subnormal_and_refusal_boundaries() {
+        assert_eq!(positive_dyadic(1.0), Some((1, 0)));
+        assert_eq!(positive_dyadic(f64::from_bits(1)), Some((1, -1074)));
+        assert_eq!(positive_dyadic(0.0), None);
+        assert_eq!(positive_dyadic(-1.0), None);
+        assert_eq!(positive_dyadic(f64::INFINITY), None);
+        assert_eq!(exact_power_of_two(0), Some(1.0));
+        assert_eq!(exact_power_of_two(-1074), Some(f64::from_bits(1)));
+        assert_eq!(exact_power_of_two(1024), None);
+        assert_eq!(exact_power_of_two(-1075), None);
+        assert_eq!(multiply_by_power_of_two(3, 2), Some(12));
+        assert_eq!(multiply_by_power_of_two(1, 128), None);
+        assert_eq!(multiply_by_power_of_two(u128::MAX, 1), None);
+        assert!(midpoint_dyadic(1.0, f64::from_bits(1.0_f64.to_bits() + 1)).is_some());
+        assert_eq!(midpoint_dyadic(0.0, f64::from_bits(1)), None);
     }
 
     #[test]
@@ -278,6 +320,33 @@ mod tests {
                 .expect("scaled admitted")
                 .expect("scaled representable"),
             expected
+        );
+    }
+
+    #[test]
+    fn four_observation_identity_covers_exact_zero_and_fallbacks() {
+        let truth = [0.0; 4];
+        assert_eq!(
+            exact_four_observation_standard_error(&truth, &[3.0; 4]),
+            Some(Ok(0.0))
+        );
+        assert_eq!(
+            exact_four_observation_standard_error(&truth[..3], &[0.0; 3]),
+            None
+        );
+        assert_eq!(
+            exact_four_observation_standard_error(&truth, &[0.0, 1.0, f64::INFINITY, 2.0]),
+            None
+        );
+
+        let tiny = 2.0_f64.powi(-54);
+        assert_eq!(
+            exact_four_observation_standard_error(&truth, &[0.0, 1.0, tiny, 2.0]),
+            None
+        );
+        assert_eq!(
+            exact_four_observation_standard_error(&[1.0, 0.0, 0.0, 0.0], &[tiny, 0.0, 0.0, 0.0]),
+            None
         );
     }
 }
