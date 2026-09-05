@@ -64,13 +64,15 @@ Issue #491 owns the current bias-standard-error exact-proof budget. Production e
 
 The current characterization distinguishes three bounds that must not be collapsed into one cutoff. At aligned diameter `D=2^53`, the minimum-shifted O(n) distribution-independent intermediate envelope `n^2D^2` fits `u128` through `n=2_047`, while the exact pair-square numerator extremal bound `floor(n^2/4)D^2` fits through `n=4_095`. Separately, the unreduced scientific denominator `n^2(n-1)` exceeds `2^53` after `n=208_064`; production uses the reduced denominator after GCD, so that threshold is only an envelope marker. None of these values is a latency or memory budget, and the actual linear checked-intermediate admission also depends on coefficient distribution.
 
-The candidate O(n) accumulator is now characterized as a strict sufficient subset of the current pair reference under `u128`. With one coefficient at zero and every other coefficient at `D=2^58`, both kernels fit at `n=64`. At `n=65`, the exact pair numerator remains `64*D^2 = 2^122`, while the linear first term `65*64*D^2 = 4160*2^116` overflows `u128` before cancellation. A linear refusal therefore cannot become a scientific refusal. If the O(n) kernel is introduced, it must fall back to the existing pairwise proof or use a separately justified wider checked-integer representation.
+The candidate O(n) accumulator is characterized as a strict sufficient subset of the current pair reference under `u128`. With one coefficient at zero and every other coefficient at `D=2^58`, both kernels fit at `n=64`. At `n=65`, the exact pair numerator remains `64*D^2 = 2^122`, while the linear first term `65*64*D^2 = 4160*2^116` overflows `u128` before cancellation. A linear refusal therefore cannot become a scientific refusal. If the O(n) kernel is introduced, it must fall back to the existing pairwise proof or use a separately justified wider checked-integer representation.
+
+The current release-mode harness now encodes that viable hybrid shape without changing production behavior. `crates/validation_core/examples/bias_se_exact_proof_budget.rs` compares buffered O(n²), allocation-free two-pass O(n²), checked O(n), and `O(n) -> buffered pair fallback`. Before timing it requires exact restored-numerator equality. It exercises compact admitting geometries plus the `D=2^58` boundary pair where `n=64` must use the linear fast path and `n=65` must use the buffered pair fallback. CSV output records the geometry and `used_pairwise_fallback`, so an allegedly measured fallback cannot be inferred from sample count alone.
 
 Before changing the production boundary, retain:
 
 - release-mode raw timing samples and p95 from `crates/validation_core/examples/bias_se_exact_proof_budget.rs`, with exact commit, CPU, OS, Rust toolchain, build flags, timing sample count, and cold/warm procedure;
-- side-by-side buffered O(n²), allocation-free two-pass O(n²), and O(n) kernel evidence, with exact equality of restored pair-square numerators before timing;
-- timing for the viable hybrid shape—O(n) sufficient admission followed by pairwise fallback—covering both an admitting geometry and a checked-intermediate refusal geometry;
+- side-by-side buffered O(n²), allocation-free two-pass O(n²), O(n), and hybrid evidence, with exact equality of restored pair-square numerators before timing;
+- hybrid timing covering both the `n=64` admitting boundary and the `n=65` checked-intermediate-refusal/pair-fallback boundary, with `used_pairwise_fallback` recorded in the raw CSV;
 - target `size_of::<Option<(u128, i32)>>()`, actual scratch `Vec` capacity, scratch payload bytes, and allocator/RSS evidence rather than byte estimates inferred from field widths;
 - admitted/refused-set comparison between the existing pairwise proof and any stronger sufficient O(n) dyadic-grid proof, with proof refusal falling back rather than altering scientific meaning;
 - checked-`u128` overflow/refusal evidence across sample count, represented exponent spread, and coefficient distribution;
@@ -78,6 +80,8 @@ Before changing the production boundary, retain:
 - full service/API p95 when a buyer-facing path is affected, preserving the TEPP `p95 <= 20 ms` target without shrinking input, omitting proof work, or using an unrealistic cache-only setup.
 
 The exact pair-record count is `n(n-1)/2`; the current characterization locks 120 records at `n=16`, 136 at `n=17`, 2,096,128 at `n=2,048`, and 4,997,541 at `n=3,162`. A two-pass O(n²) implementation may remove pair-record storage while preserving pair-enumeration proof shape, but that optimization still requires exact-head Rust/rustdoc/coverage evidence before it replaces the current implementation. A stronger O(n) admission is not accepted merely because its checked arithmetic fits `u128`, and a checked O(n) refusal is not allowed to narrow the current exact pairwise admission set.
+
+No release-mode timing numbers are currently authoritative. The local automation environment for the hybrid commit did not provide a Rust toolchain, and hosted exact-head jobs had not produced a benchmark artifact at the time of this update. Unexecuted timing harnesses and branch-only resource characterization remain supporting evidence only.
 
 ## Model release/cutover
 
