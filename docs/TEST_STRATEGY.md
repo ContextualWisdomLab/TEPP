@@ -69,10 +69,11 @@ Validation Evidence numerical proofs that add asymptotic work or material alloca
 
 - retain realistic represented-input counterexamples and permutation/sign-mirror contracts for scientific correctness;
 - keep the existing exact residual/pairwise-subtraction, checked-integer, GCD-reduction, and exact midpoint authority fail-closed;
-- compare the current O(n²) pair-distance proof with an algebraically equivalent O(n) exact accumulator only under a proved sufficient admission condition, and compare a wider-integer/reference alternative separately;
+- compare three resource shapes before widening admission: the buffered O(n²) pair-record path, an allocation-free two-pass O(n²) reference, and an algebraically equivalent O(n) exact accumulator under a proved sufficient admission condition; compare a wider-integer/reference alternative separately;
 - characterize checked-`u128` refusal as a function of sample count and aligned dyadic diameter/exponent spread rather than treating an integer cutoff as a scientific boundary;
-- record allocation count and compiled layout measurements separately; field-width estimates are not allocation evidence;
-- run `crates/validation_core/examples/bias_se_exact_proof_budget.rs` in release mode on a recorded CPU/OS/Rust toolchain and retain raw samples plus p95; the harness is integer-kernel characterization, not an HTTP buyer-path result;
+- keep the minimum-shifted O(n) intermediate ceiling distinct from the exact pair-square numerator ceiling: at aligned diameter `2^53`, the characterized bounds are `n<=2_047` and `n<=4_095` respectively, and neither is a production budget;
+- record exact pair counts, target `size_of::<Option<(u128, i32)>>()`, actual scratch `Vec` capacity, scratch payload bytes, and allocator/RSS evidence separately; field-width estimates alone are not allocation evidence;
+- run `crates/validation_core/examples/bias_se_exact_proof_budget.rs` in release mode on a recorded CPU/OS/Rust toolchain and retain raw CSV plus p95; the harness is integer-kernel/layout characterization, not an HTTP buyer-path result;
 - if a service/API buyer path is affected, measure the full applicable path and retain the `p95 <= 20 ms` target without shrinking samples, omitting proof work, or relying on unrealistic warm-cache setup;
 - arithmetic representability alone does not authorize a production sample-count budget.
 
