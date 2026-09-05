@@ -32,7 +32,7 @@ The characterization test computes both sides with checked `u128` on the sevente
 
 That admission proof is the material constraint. A prospective linear path may choose the minimum represented residual as an anchor, prove every anchor-relative subtraction exact, align all offsets on the minimum dyadic exponent, and require its checked integer intermediates to remain representable. This condition is deliberately stronger than the current O(n²) reference unless a separate proof establishes equivalence; refusal must fall back rather than change scientific meaning.
 
-The new admission-set characterization proves that the present `u128` linear kernel is **sufficient but not admission-equivalent** to the pair reference. Let `D=2^58` and use one coefficient at zero with every remaining coefficient at `D`. At `n=64`, the linear first term is `64*63*D^2 = 4032*2^116`, so both kernels fit and return the same exact numerator `63*D^2`. At `n=65`, the exact pair numerator is still only `64*D^2 = 2^122`, but the unreduced linear first term becomes `65*64*D^2 = 4160*2^116`, which exceeds the `u128` range before subtracting `(sum c_i)^2`. The checked O(n) kernel therefore refuses a geometry that the checked O(n²) pair reference can still prove exactly.
+The admission-set characterization proves that the present `u128` linear kernel is **sufficient but not admission-equivalent** to the pair reference. Let `D=2^58` and use one coefficient at zero with every remaining coefficient at `D`. At `n=64`, the linear first term is `64*63*D^2 = 4032*2^116`, so both kernels fit and return the same exact numerator `63*D^2`. At `n=65`, the exact pair numerator is still only `64*D^2 = 2^122`, but the unreduced linear first term becomes `65*64*D^2 = 4160*2^116`, which exceeds the `u128` range before subtracting `(sum c_i)^2`. The checked O(n) kernel therefore refuses a geometry that the checked O(n²) pair reference can still prove exactly.
 
 This rules out a drop-in replacement of the current pair proof with the minimum-shifted `u128` identity. A production O(n) path can preserve current scientific admission only as a sufficient fast path followed by the existing pairwise proof on refusal, or by adopting a wider checked-integer representation with its own resource and supply-chain evidence. A refusal from the linear path is not evidence that the represented-input estimator is scientifically unprovable.
 
@@ -52,31 +52,34 @@ None of these arithmetic thresholds is a production sample-count budget. Product
 
 The current bounded O(n²) implementation stores every pair as `Option<(u128, i32)>` before the second accumulation pass. The number of stored pair records is exactly `n(n-1)/2`: 120 at `n=16`, 136 at `n=17`, 2,096,128 at `n=2,048`, and **4,997,541** at `n=3,162`. The predecessor note incorrectly recorded the last count as 4,997,500; the Rust characterization now locks the exact integer count.
 
-Exact byte cost is target-layout dependent and must not be inferred by adding field widths. The measurement harness now obtains `size_of::<Option<(u128, i32)>>()` on the executing target, records the actual `Vec` element capacity after `with_capacity`, and reports their product as scratch payload bytes. Allocator bookkeeping and whole-process RSS are still outside that number and must be recorded separately if they become release evidence.
+Exact byte cost is target-layout dependent and must not be inferred by adding field widths. The measurement harness obtains `size_of::<Option<(u128, i32)>>()` on the executing target, records the actual `Vec` element capacity after `with_capacity`, and reports their product as scratch payload bytes. Allocator bookkeeping and whole-process RSS are still outside that number and must be recorded separately if they become release evidence.
 
-A two-pass O(n²) reference can remove the pair-record allocation without changing the pair-enumeration proof shape: the first pass establishes the common dyadic unit, and the second recomputes each pair record and accumulates the checked square. The harness now measures this allocation-free quadratic alternative alongside the buffered pair layout. The O(n) identity removes pair enumeration as well, but the new admission-set characterization shows that its present checked-`u128` form must remain a sufficient fast path with pairwise fallback unless wider intermediates are justified.
+A two-pass O(n²) reference can remove the pair-record allocation without changing the pair-enumeration proof shape: the first pass establishes the common dyadic unit, and the second recomputes each pair record and accumulates the checked square. The harness measures this allocation-free quadratic alternative alongside the buffered pair layout. The O(n) identity removes pair enumeration as well, but the admission-set characterization shows that its present checked-`u128` form must remain a sufficient fast path with pairwise fallback unless wider intermediates are justified.
 
 ## Measurement harness
 
-`crates/validation_core/examples/bias_se_exact_proof_budget.rs` is a standard-library-only release-mode characterization harness. For deterministic compact-dyadic coefficients it compares three kernels:
+`crates/validation_core/examples/bias_se_exact_proof_budget.rs` is a standard-library-only release-mode characterization harness. It now compares four kernels:
 
 - `quadratic_buffered`: production-layout-shaped `Vec<Option<(u128, i32)>>` pair records plus aligned checked-square accumulation;
 - `quadratic_two_pass`: the same pair enumeration and dyadic alignment without pair-record storage;
-- `linear`: `n*sum(c_i^2) - (sum c_i)^2` on minimum-shifted coefficients.
+- `linear`: `n*sum(c_i^2) - (sum c_i)^2` on minimum-shifted coefficients;
+- `hybrid`: the viable resource shape, using the checked O(n) accumulator when it admits and otherwise falling back to the production-layout-shaped buffered pair proof.
 
-Before timing, the harness restores the buffered/two-pass unit exponent and requires all three kernels to equal the same exact pair-square numerator on the timed fixtures. It emits CSV columns
+Before timing, the harness restores the dyadic unit and requires every applicable kernel to equal the same exact pair-square numerator. The compact deterministic fixtures at 16, 64, 256, 1,024, and 2,047 observations must keep the hybrid on its O(n) fast path. A separate `D=2^58` boundary pair measures both sides of the characterized admission relation: `n=64` must keep the hybrid on the linear path, while `n=65` must make the linear kernel refuse and the hybrid use the buffered pair fallback while preserving the exact numerator `2^122`.
 
-`sample_count,kernel,p95_ns,timing_samples,unit_exponent,scratch_records,scratch_payload_bytes,pair_record_size_bytes`
+The CSV schema is now
 
-for 16, 64, 256, 1,024, and 2,047 observations. The buffered timing includes pair-vector allocation and consumption; the two-pass and linear rows report zero pair-record scratch payload. This is still a kernel harness, not the full public API: binary64 residual admission, endpoint serialization, networking, scheduler effects, allocator metadata/RSS, and the linear-refusal/pair-fallback hybrid are outside the current measurement.
+`geometry,sample_count,kernel,p95_ns,timing_samples,unit_exponent,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_pairwise_fallback`.
 
-No release-mode timing result is recorded in this document yet. A valid timing record must include CPU, OS, Rust toolchain, exact commit, release build mode, raw sample count, and raw CSV. It cannot substitute for an applicable API buyer-path p95 measurement.
+The `geometry` field distinguishes compact admitting fixtures, the `n=64` boundary-admitting fixture, and the `n=65` pair-fallback fixture. `used_pairwise_fallback` makes it observable whether a hybrid row actually exercised the expensive proof path instead of inferring that fact from sample count. The buffered and hybrid-fallback rows include pair-vector allocation and consumption; the two-pass and admitted linear/hybrid rows report zero pair-record scratch payload.
+
+The hybrid harness landed in commit `c6b237e0bb1388cccd7bcb71a0df5cbf837a07c5`. It remains measurement tooling only. No release-mode timing result is recorded in this document yet because the current execution environment does not provide a Rust toolchain and the hosted exact-head jobs have not produced measurement artifacts. A valid timing record must include CPU, OS, Rust toolchain, exact commit, release build mode, raw sample count, raw CSV, allocator/RSS evidence, and the cold/warm procedure. Kernel timing cannot substitute for an applicable API buyer-path p95 measurement.
 
 ## Decision and rejected alternatives
 
 Production admission stays `n=4..=16`. Extending to `n=17` alone is rejected because GAP-111 through GAP-125 plus the seventeen-observation evidence show that the integer cutoff is not a scientific boundary. Removing the cutoff entirely is rejected because the current production implementation still enumerates and stores O(n²) pair evidence. Treating `n<=2_047`, `n<=4_095`, or the unreduced denominator threshold as the production budget is rejected because arithmetic representability is not latency or memory evidence.
 
-A two-pass O(n²) allocation-removal path remains a candidate because it can preserve the current pair-proof admission shape while eliminating pair-record storage. The O(n) identity remains the stronger CPU-scaling candidate, but its checked-`u128` form is now proven to be a strict sufficient subset of the pair reference. Replacing the pair proof with that kernel alone is rejected because it would silently narrow exact-proof admission. The viable bounded designs are therefore O(n) fast admission with O(n²) fallback, an admission-equivalent wider-integer O(n) proof, or the allocation-free two-pass pair reference if measurements show it is adequate. Arbitrary-precision production arithmetic remains deferred pending measured benefit, supply-chain review, and an explicit owner/resource decision.
+A two-pass O(n²) allocation-removal path remains a candidate because it can preserve the current pair-proof admission shape while eliminating pair-record storage. The O(n) identity remains the stronger CPU-scaling candidate, but its checked-`u128` form is proven to be a strict sufficient subset of the pair reference. Replacing the pair proof with that kernel alone is rejected because it would silently narrow exact-proof admission. The hybrid harness now measures the viable bounded shape—O(n) fast admission with buffered O(n²) fallback—without making it production behavior. An admission-equivalent wider-integer O(n) proof or the allocation-free two-pass pair reference remain alternatives if measurements justify them. Arbitrary-precision production arithmetic remains deferred pending measured benefit, supply-chain review, and an explicit owner/resource decision.
 
 ## Traceability
 
@@ -88,10 +91,10 @@ A two-pass O(n²) allocation-removal path remains a candidate because it can pre
 | Current production module | `crates/validation_core/src/bias_se.rs` |
 | Public API | `validation_core::bias_standard_error` |
 | Exact characterization | `crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs` |
-| CPU/layout harness | `crates/validation_core/examples/bias_se_exact_proof_budget.rs` |
+| CPU/layout/hybrid harness | `crates/validation_core/examples/bias_se_exact_proof_budget.rs`; hybrid commit `c6b237e0bb1388cccd7bcb71a0df5cbf837a07c5` |
 | CHANGELOG evidence | `CHANGELOG.d/validation-bias-exact-proof-budget-characterization.md` |
 | Resource/merge rule | Production cutoff remains `n<=16` pending measured exact-proof budget |
 
 ## Follow-up evidence required by #491
 
-Run the harness in release mode on a recorded CPU/toolchain and retain raw timing CSV. Record allocator/RSS evidence in addition to the harness's exact pair-record payload layout. Extend the harness with the viable hybrid shape—O(n) sufficient admission followed by the existing pair reference on checked-intermediate refusal—and measure both admitting and refusing geometries. Evaluate a wider-integer/reference alternative without making it production authority. Only after those results establish a resource budget should production admission change; any such change needs a realistic public RED, exact-head Rust/rustdoc/coverage evidence, and applicable buyer-path p95 evidence.
+Run the current hybrid-capable harness in release mode on a recorded CPU/toolchain and retain raw timing CSV. Record allocator/RSS evidence in addition to the harness's exact pair-record payload layout. Evaluate a wider-integer/reference alternative without making it production authority. Only after those results establish a resource budget should production admission change; any such change needs a realistic public RED, exact-head Rust/rustdoc/coverage evidence, and applicable buyer-path p95 evidence.
