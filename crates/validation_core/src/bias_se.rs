@@ -2,8 +2,8 @@
 //!
 //! The general bias implementation remains the fallback authority. This module
 //! admits only a bounded four-observation identity whose residual and pairwise
-//! differences are proven exact in binary64 and whose dyadic pair-distance
-//! numerator fits `u128`; the exact rational square root is then rounded against
+//! differences are proven exact in binary64 and whose reduced dyadic pair-distance
+//! ratio fits `u128`; the exact rational square root is then rounded against
 //! binary64 midpoints without first rounding the ratio under the square root.
 
 use crate::ValidationError;
@@ -227,15 +227,32 @@ fn exact_four_observation_standard_error(
     }
 
     // For n=4, sum((ri-rj)^2, i<j) / 48 is exactly SE(mean)^2.
-    let standard_error = correctly_rounded_scaled_sqrt_ratio(pair_square_sum, 48, unit_exponent)?;
+    // Reduce that exact rational before applying the bounded binary64-integer
+    // admission. An unreduced numerator can exceed 2^53 even when the identical
+    // reduced ratio fits the proof and otherwise falls back to a double-rounded
+    // ratio/sqrt path.
+    let mut divisor_left = pair_square_sum;
+    let mut divisor_right = 48_u128;
+    while divisor_right != 0 {
+        let remainder = divisor_left % divisor_right;
+        divisor_left = divisor_right;
+        divisor_right = remainder;
+    }
+    let reduced_numerator = pair_square_sum / divisor_left;
+    let reduced_denominator = 48_u128 / divisor_left;
+    let standard_error = correctly_rounded_scaled_sqrt_ratio(
+        reduced_numerator,
+        reduced_denominator,
+        unit_exponent,
+    )?;
     Some(Ok(standard_error))
 }
 
 /// Standard error of mean signed bias.
 ///
 /// Four-observation samples whose represented residuals and pairwise differences
-/// are exact use the exact pair-distance identity when its dyadic numerator fits
-/// the bounded integer proof. All other samples retain the established bias
+/// are exact use the exact pair-distance identity when its reduced dyadic ratio
+/// fits the bounded integer proof. All other samples retain the established bias
 /// implementation and its existing fail-closed behavior.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     if let Some(result) = exact_four_observation_standard_error(truth, recovered) {
@@ -320,6 +337,19 @@ mod tests {
                 .expect("scaled admitted")
                 .expect("scaled representable"),
             expected
+        );
+    }
+
+    #[test]
+    fn four_observation_identity_reduces_the_exact_ratio_before_bounded_admission() {
+        let truth = [0.0; 4];
+        let recovered = [0.0, 14_099_687.0, 16_729_100.0, 94_045_527.0];
+        assert_eq!(
+            exact_four_observation_standard_error(&truth, &recovered)
+                .expect("reduced ratio admitted")
+                .expect("representable")
+                .to_bits(),
+            0x4174_46e5_76f8_7445
         );
     }
 
