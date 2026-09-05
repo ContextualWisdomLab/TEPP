@@ -6,7 +6,7 @@ use psychometric_core::{
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
     ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
     recover_asymptotic_time_independent_predictor_effect,
-    recover_asymptotic_time_independent_predictor_variance,
+    recover_asymptotic_time_independent_predictor_variance, recover_asymptotic_trait_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
     recover_discrete_lagged_latent_covariance, recover_discrete_latent_mean,
@@ -61,6 +61,9 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
+    refuse_asymptotic_trait_variance_as_added_time_independent_variance,
+    refuse_asymptotic_trait_variance_as_stationary_within_subject,
+    refuse_asymptotic_trait_variance_as_trait_variance,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -4503,6 +4506,71 @@ fn asymptotic_time_independent_variance_refuses_unstable_drift_and_non_event_clo
             -1e-308,
             LagClock::EventTime
         ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn asymptotic_trait_variance_recovers_commented_2017_era_map() {
+    let log_rate = -0.5_f64;
+    let recovered = recover_asymptotic_trait_variance(1.0, log_rate, LagClock::EventTime)
+        .expect("asymTRAITVAR");
+    let error = rmse(&[4.0], &[recovered]);
+    assert!(
+        error < 1e-12,
+        "2017-era commented asymTRAITVAR RMSE {error}: got {recovered}"
+    );
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let stationary = recover_stationary_latent_variance(0.4, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let trait_plus = recover_trait_plus_state_latent_variance(1.0, 0.0).expect("TRAITVAR");
+    assert!(
+        rmse(&[recovered], &[1.0]) > error,
+        "TRAITVAR is not asymTRAITVAR"
+    );
+    assert!(rmse(&[recovered], &[added]) > error);
+    assert!(rmse(&[recovered], &[stationary]) > error);
+    assert!(rmse(&[recovered], &[trait_plus]) > error);
+    assert_eq!(
+        refuse_asymptotic_trait_variance_as_trait_variance(recovered, trait_plus),
+        Err(PsychometricError::AsymptoticTraitVarianceIsNotTraitVariance)
+    );
+    assert_eq!(
+        refuse_asymptotic_trait_variance_as_added_time_independent_variance(recovered, added),
+        Err(PsychometricError::AsymptoticTraitVarianceIsNotAddedTimeIndependentVariance)
+    );
+    assert_eq!(
+        refuse_asymptotic_trait_variance_as_stationary_within_subject(recovered, stationary),
+        Err(PsychometricError::AsymptoticTraitVarianceIsNotStationaryWithinSubject)
+    );
+}
+
+#[test]
+fn asymptotic_trait_variance_refuses_unstable_drift_and_non_event_clocks() {
+    assert_eq!(
+        recover_asymptotic_trait_variance(1.0, -0.5, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_trait_variance(1.0, 0.1, LagClock::EventTime),
+        Err(PsychometricError::AsymptoticTraitVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotic_trait_variance(-1.0, -0.5, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_trait_variance(0.0, 0.0, LagClock::EventTime),
+        Ok(0.0)
+    );
+    assert_eq!(
+        recover_asymptotic_trait_variance(1.0, -1e-308, LagClock::EventTime),
         Err(PsychometricError::InvalidNumericInput)
     );
 }
