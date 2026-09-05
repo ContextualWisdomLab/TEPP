@@ -632,6 +632,31 @@ pub enum PsychometricError {
     /// p. 16 `TRAITVARstd`. Extra first-occasion TI variance is not
     /// the correlation form of between-subject `TRAITVAR`.
     InitialTimeIndependentVarianceIsNotStandardisedTraitVariance,
+    /// Driver Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with
+    /// `MANIFESTVAR` (`λ² t0_b² v + θ`) was treated as `TRAITVAR`.
+    /// Extra first-occasion observed TI variance is not latent trait
+    /// variance.
+    InitialTimeIndependentManifestObservedVarianceIsNotTraitVariance,
+    /// Driver Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with
+    /// `MANIFESTVAR` (`λ² t0_b² v + θ`) was treated as p. 16
+    /// `TRAITVARstd`. Extra first-occasion observed TI variance is
+    /// not the correlation form of between-subject `TRAITVAR`.
+    InitialTimeIndependentManifestObservedVarianceIsNotStandardisedTraitVariance,
+    /// Driver Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with
+    /// `MANIFESTVAR` (`λ² t0_b² v + θ`) was treated as §7.2
+    /// `addedTIPREDVAR` `(B / a)² v`. Free first-occasion
+    /// `T0TIPREDEFFECT` is not the asymptotic unit effect `-B / a`.
+    InitialTimeIndependentManifestObservedVarianceIsNotAsymptoticTimeIndependentVariance,
+    /// Driver Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with
+    /// `MANIFESTVAR` (`λ² t0_b² v + θ`) was treated as free
+    /// first-occasion `T0VAR`. Extra observed TI variance is not
+    /// the latent process initial variance.
+    InitialTimeIndependentManifestObservedVarianceIsNotInitialLatentVariance,
+    /// Driver Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with
+    /// `MANIFESTVAR` (`λ² t0_b² v + θ`) was treated as
+    /// `MANIFESTVAR` `θ`. Measurement error is not the observed
+    /// composition of extra first-occasion TI variance.
+    InitialTimeIndependentManifestObservedVarianceIsNotMeasurementError,
 
     /// Driver p. 16 `discreteCINTstd` was requested without a strictly
     /// positive `asymDIFFUSION`. Footnote 4 standardises using only the
@@ -1182,6 +1207,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance => {
                 "initial time-independent predictor variance is not standardised trait variance"
+            }
+            Self::InitialTimeIndependentManifestObservedVarianceIsNotTraitVariance => {
+                "initial time-independent manifest observed variance is not trait variance"
+            }
+            Self::InitialTimeIndependentManifestObservedVarianceIsNotStandardisedTraitVariance => {
+                "initial time-independent manifest observed variance is not standardised trait variance"
+            }
+            Self::InitialTimeIndependentManifestObservedVarianceIsNotAsymptoticTimeIndependentVariance => {
+                "initial time-independent manifest observed variance is not asymptotic time-independent predictor variance"
+            }
+            Self::InitialTimeIndependentManifestObservedVarianceIsNotInitialLatentVariance => {
+                "initial time-independent manifest observed variance is not initial latent variance"
+            }
+            Self::InitialTimeIndependentManifestObservedVarianceIsNotMeasurementError => {
+                "initial time-independent manifest observed variance is not measurement-error variance"
             }
 
 
@@ -1999,6 +2039,31 @@ mod tests {
             PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance
                 .to_string(),
             "initial time-independent predictor variance is not standardised trait variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentManifestObservedVarianceIsNotTraitVariance
+                .to_string(),
+            "initial time-independent manifest observed variance is not trait variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentManifestObservedVarianceIsNotStandardisedTraitVariance
+                .to_string(),
+            "initial time-independent manifest observed variance is not standardised trait variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentManifestObservedVarianceIsNotAsymptoticTimeIndependentVariance
+                .to_string(),
+            "initial time-independent manifest observed variance is not asymptotic time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentManifestObservedVarianceIsNotInitialLatentVariance
+                .to_string(),
+            "initial time-independent manifest observed variance is not initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentManifestObservedVarianceIsNotMeasurementError
+                .to_string(),
+            "initial time-independent manifest observed variance is not measurement-error variance"
         );
     }
 
