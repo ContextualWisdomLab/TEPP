@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-05T22:08:00Z  
+**Snapshot:** 2026-09-05T22:11:00Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
@@ -34,7 +34,7 @@ Passing, queued, skipped, or predecessor-head checks on an open PR never promote
 | #491 | open | Replace the sample-count staircase with a measured exact-proof budget. Wider-product characterization proves one real 129-bit-intermediate cancellation without narrowing scientific admission; release-mode CPU/raw CSV, allocator/RSS, broader admitted/refused-set comparison, exact-head gates/review, and applicable buyer-path p95 remain required. |
 | #416 | `aa730c63563eb4a33048d822b581036c8487bd47`, Draft | Validation / Analysis Run landing vehicle. Generic cutoff-before-identity repair remains inherited; fold children keep unique source/tests/doctoring until conflict-resolving inheritance is verified. |
 | #310 | `c6680450152b1e0a2c9abb553772d74a23923335`, Draft | Longitudinal Modeling vehicle. Stable `Between` recovery is unit-level with canonical occasion `0`; `Within` retains actual occasion identity. Older base remains a non-destructive restack finding. |
-| #480 | `5b2637f7b6142573ba1385a652c56632ecc9faa5`, Draft | contextual-orchestrator released-contract fail-closed integration vehicle. Fresh owner evidence in the PR identifies contextual-orchestrator protected main `2e414d15ba58f28597751b625a8a2f00fc9fadcf` with zero GitHub releases; mutable owner main remains evidence only. |
+| #480 | `5b2637f7b6142573ba1385a652c56632ecc9faa5`, Draft | contextual-orchestrator released-contract fail-closed integration vehicle. Fresh direct owner ref is contextual-orchestrator `main@a080297d2546bb61e89520d637cabc202db331ec` with zero GitHub releases; a predecessor PR-body observation of `2e414d15...` was stale and is superseded. Mutable owner main remains evidence only. |
 
 Exact-head evidence becomes stale after any source push.
 
