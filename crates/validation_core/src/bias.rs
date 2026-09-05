@@ -243,16 +243,31 @@ fn translated_residuals_from_anchor(
 }
 
 fn canonical_exact_translated_residuals(diffs: &[f64], roundoffs: &[f64]) -> Option<Vec<f64>> {
-    let mut anchor_indices: Vec<_> = (0..diffs.len()).collect();
-    anchor_indices.sort_by(|left, right| {
-        diffs[*left]
-            .total_cmp(&diffs[*right])
-            .then_with(|| roundoffs[*left].total_cmp(&roundoffs[*right]))
-    });
+    let mut best: Option<(usize, f64, Vec<f64>)> = None;
 
-    anchor_indices
-        .into_iter()
-        .find_map(|anchor_index| translated_residuals_from_anchor(diffs, roundoffs, anchor_index))
+    for anchor_index in 0..diffs.len() {
+        let Some(translated) = translated_residuals_from_anchor(diffs, roundoffs, anchor_index) else {
+            continue;
+        };
+        let max_magnitude = translated
+            .iter()
+            .map(|value| value.abs())
+            .fold(0.0, f64::max);
+
+        let should_replace = match &best {
+            None => true,
+            Some((best_index, best_max_magnitude, _)) => max_magnitude
+                .total_cmp(best_max_magnitude)
+                .then_with(|| diffs[anchor_index].total_cmp(&diffs[*best_index]))
+                .then_with(|| roundoffs[anchor_index].total_cmp(&roundoffs[*best_index]))
+                .is_lt(),
+        };
+        if should_replace {
+            best = Some((anchor_index, max_magnitude, translated));
+        }
+    }
+
+    best.map(|(_, _, translated)| translated)
 }
 
 fn exact_translated_residual_standard_error(
@@ -260,10 +275,11 @@ fn exact_translated_residual_standard_error(
     roundoffs: &[f64],
 ) -> Result<Option<f64>, ValidationError> {
     // A translated second moment is order-invariant, so admission must not depend
-    // on whichever observation happened to arrive first. Search candidate anchors
-    // in a canonical represented `(high, low)` order and use the first anchor for
-    // which every high, low and recombined delta is exact. If no exact anchor
-    // exists, retain the predecessor rounded-residual fallback.
+    // on whichever observation happened to arrive first. Search every candidate
+    // anchor that preserves exact high, low and recombined deltas, prefer the one
+    // with the smallest maximum translated magnitude, then break ties in canonical
+    // represented `(high, low)` order. This keeps the choice permutation-invariant
+    // while minimizing the dynamic range exposed to the later square/sqrt path.
     let Some(translated) = canonical_exact_translated_residuals(diffs, roundoffs) else {
         return Ok(None);
     };
@@ -428,24 +444,24 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// rounded-low-term mean path. For other larger samples, including exact pairwise
 /// residuals, TEPP uses the `high + low` decomposition and the same translated
 /// second moment whenever every anchor-relative high delta, low delta, and
-/// combined residual delta is exactly representable. Candidate translation
-/// anchors are considered in canonical represented `(high, low)` order so
-/// admission and the resulting standard error do not depend on observation
-/// order when an exact anchor exists. For an exactly translated two-level sample
-/// where either level occurs once, the algebraic identity
-/// `SE(mean) = |level_gap| / n` is evaluated directly. Non-singleton two-level
-/// count geometries whose reduced count factor is an exact rational square are
-/// likewise applied as a represented rational scale before moment reconstruction;
-/// if that exact rational result is subnormal, TEPP rounds once in represented
-/// minimum-subnormal units instead of normalizing and restoring through a second
-/// binary64 rounding boundary. The general translated path avoids making a
-/// rounded residual mean authoritative before dispersion is evaluated. Its
-/// normalization uses an exact power-of-two scale so the translated geometry is
-/// not re-rounded through an arbitrary magnitude before the final SE is restored.
-/// Cases that cannot prove those translated deltas representable retain the
-/// predecessor rounded-residual path. Individual signed residuals must still be
-/// representable because their dispersion is itself part of the requested
-/// scientific result.
+/// combined residual delta is exactly representable. Exact candidate translation
+/// anchors are compared by their maximum translated magnitude first and canonical
+/// represented `(high, low)` order second, preserving permutation invariance while
+/// avoiding an unnecessarily wide square/sqrt working range. For an exactly
+/// translated two-level sample where either level occurs once, the algebraic
+/// identity `SE(mean) = |level_gap| / n` is evaluated directly. Non-singleton
+/// two-level count geometries whose reduced count factor is an exact rational
+/// square are likewise applied as a represented rational scale before moment
+/// reconstruction; if that exact rational result is subnormal, TEPP rounds once
+/// in represented minimum-subnormal units instead of normalizing and restoring
+/// through a second binary64 rounding boundary. The general translated path
+/// avoids making a rounded residual mean authoritative before dispersion is
+/// evaluated. Its normalization uses an exact power-of-two scale so the
+/// translated geometry is not re-rounded through an arbitrary magnitude before
+/// the final SE is restored. Cases that cannot prove those translated deltas
+/// representable retain the predecessor rounded-residual path. Individual signed
+/// residuals must still be representable because their dispersion is itself part
+/// of the requested scientific result.
 ///
 /// # Errors
 ///
