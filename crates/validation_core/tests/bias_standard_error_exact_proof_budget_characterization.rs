@@ -135,6 +135,23 @@ fn linear_checked_integer_kernel_matches_pair_reference_when_it_admits() {
 }
 
 #[test]
+fn linear_checked_integer_kernel_must_normalize_a_common_power_of_two_unit() {
+    let diameter = 1_u128 << 58;
+    let mut values = Vec::with_capacity(65);
+    values.push(0);
+    values.extend((0..64).map(|_| diameter));
+
+    let pairwise = pair_square_sum_quadratic(&values)
+        .expect("common-power pair numerator stays within u128");
+    assert_eq!(pairwise, 1_u128 << 122);
+    assert_eq!(
+        pair_square_sum_linear(&values),
+        Some(pairwise),
+        "a shared 2^58 dyadic unit must be removed before checked O(n) intermediates are judged"
+    );
+}
+
+#[test]
 fn linear_checked_integer_kernel_is_not_admission_equivalent_to_pair_reference() {
     let diameter = 1_u128 << 58;
 
