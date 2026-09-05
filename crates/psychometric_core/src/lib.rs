@@ -75,6 +75,20 @@
 //! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
 //! `u ≠ t0`; `τ + λ(μ_t + e^{a Δt} t0_b z)` is not that observed
 //! mean),
+//! recovers the Driver 2017-era `T0TRAITEFFECT` Eq. 3 first-summand
+//! carry `e^{a Δt} t0_trait·trait` and Eq. 5 of that carry as
+//! `τ + λ(μ_t + e^{a Δt} t0_trait·trait)` (`T0TRAITEFFECT` is not in
+//! Table 2/3; `ctFit.R` 695–696 places it in `OpenMx` `A` from trait
+//! latents to process latents at `T0`; `ctGenerate.R` 113–116 does
+//! `T0MEANS += T0TRAITEFFECT %*% traits`; stationary `T0TRAITEFFECT`
+//! is identity; `τ + λ μ_t` is not that observed mean;
+//! `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not that observed
+//! mean; `τ + λ(μ_t + m x)` is not that observed mean;
+//! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
+//! `u ≠ t0`; `τ + λ(μ_t + e^{a Δt} t0_b z)` is not that observed
+//! mean; `τ + λ(μ_t + e^{a Δt} t0_m x0)` is not that observed mean;
+//! same numbers as T0TIPRED/T0TDPRED Eq. 5 yield the same product
+//! and remain distinct named quantities),
 //! recovers the Driver §7.2 level-change `CINT` setting `κ = −a m x`
 //! (`a < 0` so `−κ / a = m x`; not the dissipating Dirac `m x`, not
 //! a free `CINT`, not `A^{-1}[e^{A Δt} − I] B z`, and not the extra
@@ -341,6 +355,8 @@ pub use event_time::recover_discrete_latent_mean_with_impulse_carry;
 pub use event_time::recover_discrete_latent_mean_with_initial_time_dependent_predictor;
 /// Exact scalar evolved latent mean plus a first-occasion TI predictor.
 pub use event_time::recover_discrete_latent_mean_with_initial_time_independent_predictor;
+/// Exact scalar evolved latent mean plus a first-occasion trait effect.
+pub use event_time::recover_discrete_latent_mean_with_initial_trait_effect;
 /// Exact scalar evolved latent mean plus a time-independent predictor.
 pub use event_time::recover_discrete_latent_mean_with_time_independent_predictor;
 /// Exact scalar discrete latent variance `A_Δt P A_Δt⊤ + Q_Δt`.
@@ -359,6 +375,8 @@ pub use event_time::recover_discrete_observed_mean_with_impulse_carry;
 pub use event_time::recover_discrete_observed_mean_with_initial_time_dependent_predictor;
 /// Exact scalar discrete observed mean of a first-occasion TI predictor.
 pub use event_time::recover_discrete_observed_mean_with_initial_time_independent_predictor;
+/// Exact scalar discrete observed mean of a first-occasion trait effect.
+pub use event_time::recover_discrete_observed_mean_with_initial_trait_effect;
 /// Exact scalar discrete observed mean of a time-independent predictor.
 pub use event_time::recover_discrete_observed_mean_with_time_independent_predictor;
 /// Exact scalar discrete process noise `Q_Δt` on event time.
@@ -504,6 +522,8 @@ pub use event_time::refuse_evolved_observed_mean_as_impulse_observed_mean;
 pub use event_time::refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating evolved `τ + λ μ_t` as the first-occasion trait-effect observed mean.
+pub use event_time::refuse_evolved_observed_mean_as_initial_trait_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as Eq. 5 of §4.3 stationary `T0MEANS`.
 pub use event_time::refuse_evolved_observed_mean_as_stationary_initial_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the time-independent-predictor observed mean.
@@ -524,6 +544,8 @@ pub use event_time::refuse_impulse_carry_observed_mean_as_after_extra_process_ob
 pub use event_time::refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the first-occasion trait-effect observed mean.
+pub use event_time::refuse_impulse_carry_observed_mean_as_initial_trait_observed_mean;
 /// Refuse treating impulse-carry `τ + λ(μ_t + e^{a(t−u)} m x)` as the time-independent-predictor observed mean.
 pub use event_time::refuse_impulse_carry_observed_mean_as_time_independent_observed_mean;
 /// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the extra-process observed mean.
@@ -534,6 +556,8 @@ pub use event_time::refuse_impulse_observed_mean_as_impulse_carry_observed_mean;
 pub use event_time::refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_impulse_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the first-occasion trait-effect observed mean.
+pub use event_time::refuse_impulse_observed_mean_as_initial_trait_observed_mean;
 /// Refuse treating contemporaneous `τ + λ(μ_t + m x)` as the time-independent-predictor observed mean.
 pub use event_time::refuse_impulse_observed_mean_as_time_independent_observed_mean;
 /// Refuse treating Driver Table 2 `T0MEANS` as the evolved latent mean.
@@ -558,6 +582,8 @@ pub use event_time::refuse_initial_time_dependent_effect_as_continuous_intercept
 pub use event_time::refuse_initial_time_dependent_effect_as_initial_time_independent_effect;
 /// Refuse treating the Table 3 first-occasion TD shift as the Eq. 3 process increment.
 pub use event_time::refuse_initial_time_dependent_effect_as_process_increment;
+/// Refuse treating first-occasion TD observed mean as the first-occasion trait-effect observed mean.
+pub use event_time::refuse_initial_time_dependent_observed_mean_as_initial_trait_observed_mean;
 /// Refuse treating the Eq. 3 `T0TIPREDEFFECT` carry as the first-occasion shift.
 pub use event_time::refuse_initial_time_independent_carry_as_initial_effect;
 /// Refuse treating Driver Table 3 `T0TIPREDEFFECT` as the first-occasion shift.
@@ -570,6 +596,8 @@ pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
 pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_impulse;
 /// Refuse treating first-occasion TI observed mean as the first-occasion TD observed mean.
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
+/// Refuse treating first-occasion TI observed mean as the first-occasion trait-effect observed mean.
+pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_trait_observed_mean;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
@@ -715,6 +743,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion trait-effect observed mean.
+pub use event_time::refuse_time_independent_observed_mean_as_initial_trait_observed_mean;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
