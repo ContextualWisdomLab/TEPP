@@ -173,10 +173,10 @@ fn exact_pair_distance_standard_error(
     recovered: &[f64],
 ) -> Option<Result<f64, ValidationError>> {
     // Keep this O(n²) reference proof deliberately bounded. n=2 and n=3 have
-    // cheaper exact identities in `bias.rs`; four through eight observations are
+    // cheaper exact identities in `bias.rs`; four through nine observations are
     // the smallest remaining sample sizes with demonstrated one-ULP errors in
     // the translated floating moment/sqrt path.
-    if truth.len() != recovered.len() || !(4..=8).contains(&truth.len()) {
+    if truth.len() != recovered.len() || !(4..=9).contains(&truth.len()) {
         return None;
     }
     let sample_count = truth.len();
@@ -259,7 +259,7 @@ fn exact_pair_distance_standard_error(
 
 /// Standard error of mean signed bias.
 ///
-/// Four- through eight-observation samples whose represented residuals and
+/// Four- through nine-observation samples whose represented residuals and
 /// pairwise differences are exact use the exact pair-distance identity when its
 /// reduced dyadic ratio fits the bounded integer proof. All other samples retain
 /// the established bias implementation and its existing fail-closed behavior.
@@ -446,11 +446,11 @@ mod tests {
             None
         );
         assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 8], &[0.0; 8]),
+            exact_pair_distance_standard_error(&[0.0; 9], &[0.0; 9]),
             Some(Ok(0.0))
         );
         assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 9], &[0.0; 9]),
+            exact_pair_distance_standard_error(&[0.0; 10], &[0.0; 10]),
             None
         );
         assert_eq!(
