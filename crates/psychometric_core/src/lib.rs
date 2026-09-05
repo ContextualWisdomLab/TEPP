@@ -261,6 +261,19 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era `T0TRAITEFFECT` as `t0_trait · trait`
+//! after finite `t0_trait` and finite trait score (`ctFit.R` places
+//! that matrix in the `OpenMx` `A` block from traits to latents at
+//! `T0`; default `stationary` includes `'T0TRAITEFFECT'` and fixes
+//! free cells to the identity; `ctGenerate.R` writes
+//! `T0MEANS + T0TRAITEFFECT %*% traits`; Table 2 / Table 3 do not
+//! print `T0TRAITEFFECT`; `t0_b z` is `T0TIPREDEFFECT` and is not
+//! that shift; `t0_m x0` is `T0TDPREDEFFECT` and is not that shift;
+//! `t0_trait` is the coefficient, not the shift; commented
+//! `T0TRAITVAR` `t0_trait² · TRAITVAR` is not that shift; this
+//! crate does not invent `T0TRAITVAR`; a non-event clock fails
+//! closed; free `T0TRAITEFFECT` does not require `a < 0`; JSS PDF
+//! re-opened 2026-08-30T17:45Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -379,6 +392,8 @@ pub use event_time::recover_initial_time_dependent_predictor_effect;
 pub use event_time::recover_initial_time_independent_predictor_carry;
 /// Exact scalar first-occasion `T0TIPREDEFFECT` shift `t0_b z`.
 pub use event_time::recover_initial_time_independent_predictor_effect;
+/// Exact scalar 2017-era `T0TRAITEFFECT` shift `t0_trait · trait`.
+pub use event_time::recover_initial_trait_effect;
 /// Mean exact log-rate on already-centered irregular residuals.
 pub use event_time::recover_irregular_centered_residual_log_rate;
 /// Exact scalar §7.2 level-change `CINT` `κ = −a m x`.
@@ -556,6 +571,8 @@ pub use event_time::refuse_initial_time_dependent_effect_as_contemporaneous_impu
 pub use event_time::refuse_initial_time_dependent_effect_as_continuous_intercept;
 /// Refuse treating the Table 3 first-occasion TD shift as the Table 3 TI shift.
 pub use event_time::refuse_initial_time_dependent_effect_as_initial_time_independent_effect;
+/// Refuse treating the Table 3 first-occasion TD shift as 2017-era `T0TRAITEFFECT`.
+pub use event_time::refuse_initial_time_dependent_effect_as_initial_trait_effect;
 /// Refuse treating the Table 3 first-occasion TD shift as the Eq. 3 process increment.
 pub use event_time::refuse_initial_time_dependent_effect_as_process_increment;
 /// Refuse treating the Eq. 3 `T0TIPREDEFFECT` carry as the first-occasion shift.
@@ -564,6 +581,8 @@ pub use event_time::refuse_initial_time_independent_carry_as_initial_effect;
 pub use event_time::refuse_initial_time_independent_coefficient_as_initial_effect;
 /// Refuse treating the Table 3 first-occasion TI shift as `CINT`.
 pub use event_time::refuse_initial_time_independent_effect_as_continuous_intercept;
+/// Refuse treating the Table 3 first-occasion TI shift as 2017-era `T0TRAITEFFECT`.
+pub use event_time::refuse_initial_time_independent_effect_as_initial_trait_effect;
 /// Refuse treating the Table 3 first-occasion TI shift as the Eq. 3 process increment.
 pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
 /// Refuse treating the Table 3 first-occasion TI shift as `M x`.
@@ -572,6 +591,10 @@ pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_imp
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
+/// Refuse treating 2017-era `T0TRAITEFFECT` as the first-occasion trait shift.
+pub use event_time::refuse_initial_trait_coefficient_as_initial_trait_effect;
+/// Refuse treating commented 2017-era `T0TRAITVAR` as `T0TRAITEFFECT`.
+pub use event_time::refuse_initial_trait_extra_variance_as_initial_trait_effect;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.
