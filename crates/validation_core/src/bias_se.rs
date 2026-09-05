@@ -100,16 +100,16 @@ fn correctly_rounded_scaled_sqrt_ratio(
     denominator: u128,
     unit_exponent: i32,
 ) -> Option<f64> {
-    const MAX_EXACT_BINARY64_INTEGER: u128 = 1_u128 << 53;
-    if numerator == 0
-        || denominator == 0
-        || numerator > MAX_EXACT_BINARY64_INTEGER
-        || denominator > MAX_EXACT_BINARY64_INTEGER
-    {
+    const MAX_EXACT_BINARY64_DENOMINATOR: u128 = 1_u128 << 53;
+    if numerator == 0 || denominator == 0 || denominator > MAX_EXACT_BINARY64_DENOMINATOR {
         return None;
     }
     let unit = exact_power_of_two(unit_exponent)?;
     let denominator_f64 = denominator as f64;
+    // The binary64 numerator conversion is only a seed. The returned value is
+    // admitted solely after the exact u128 dyadic-square and midpoint comparisons
+    // below. This lets the four-observation proof retain exact reduced numerators
+    // above 2^53 without pretending that their seed conversion is exact.
     let mut candidate = ((numerator as f64) / denominator_f64).sqrt() * unit;
     if !candidate.is_finite() || candidate <= 0.0 {
         return None;
@@ -227,10 +227,10 @@ fn exact_four_observation_standard_error(
     }
 
     // For n=4, sum((ri-rj)^2, i<j) / 48 is exactly SE(mean)^2.
-    // Reduce that exact rational before applying the bounded binary64-integer
-    // admission. An unreduced numerator can exceed 2^53 even when the identical
-    // reduced ratio fits the proof and otherwise falls back to a double-rounded
-    // ratio/sqrt path.
+    // Reduce that exact rational before the bounded midpoint proof. The reduced
+    // numerator need not itself be exactly representable in binary64: it remains
+    // an exact u128 authority and only seeds the floating candidate. Exact
+    // candidate/neighbor midpoint comparisons decide the final rounded result.
     let mut divisor_left = pair_square_sum;
     let mut divisor_right = 48_u128;
     while divisor_right != 0 {
@@ -286,15 +286,23 @@ mod tests {
             correctly_rounded_scaled_sqrt_ratio(48, 48, 0),
             Some(1.0)
         );
+        assert_eq!(
+            correctly_rounded_scaled_sqrt_ratio(1_739_374_438_758_325_417, 16, 0)
+                .expect("large exact numerator remains bounded by u128 midpoint proof")
+                .to_bits(),
+            0x41b3_a706_d408_9e32
+        );
     }
 
     #[test]
     fn exact_ratio_sqrt_refuses_outside_bounded_proof() {
-        let too_large = (1_u128 << 53) + 1;
+        let too_large_denominator = (1_u128 << 53) + 1;
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(0, 48, 0), None);
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 0, 0), None);
-        assert_eq!(correctly_rounded_scaled_sqrt_ratio(too_large, 48, 0), None);
-        assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, too_large, 0), None);
+        assert_eq!(
+            correctly_rounded_scaled_sqrt_ratio(1, too_large_denominator, 0),
+            None
+        );
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 48, 1024), None);
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 48, -1075), None);
     }
@@ -350,6 +358,19 @@ mod tests {
                 .expect("representable")
                 .to_bits(),
             0x4174_46e5_76f8_7445
+        );
+    }
+
+    #[test]
+    fn four_observation_identity_keeps_large_reduced_numerator_in_bounded_proof() {
+        let truth = [0.0; 4];
+        let recovered = [19_274_968.0, 693_729_138.0, 711_353_557.0, 1_625_519_116.0];
+        assert_eq!(
+            exact_four_observation_standard_error(&truth, &recovered)
+                .expect("large reduced ratio admitted")
+                .expect("representable")
+                .to_bits(),
+            0x41b3_a706_d408_9e32
         );
     }
 
