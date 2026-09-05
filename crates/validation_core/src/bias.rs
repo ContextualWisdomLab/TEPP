@@ -107,14 +107,27 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
     }
 }
 
-/// Return an exact integer divisor implied by two-level sample counts.
+fn greatest_common_divisor(mut left: u128, mut right: u128) -> u128 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left
+}
+
+/// Return the exact rational scale implied by two-level sample counts.
 ///
 /// For two exact residual levels with counts `m` and `n - m`,
-/// `SE(mean)^2 = gap^2 * m(n-m) / (n^2(n-1))`. If that count-only factor is
-/// exactly `1 / divisor^2` for an integer `divisor` that binary64 represents
-/// exactly, one final division of the represented gap preserves the algebraic
-/// identity without reconstructing it through rounded sums, squares and sqrt.
-fn exact_two_level_integer_divisor(first_count: usize, second_count: usize) -> Option<f64> {
+/// `SE(mean)^2 = gap^2 * m(n-m) / (n^2(n-1))`. If the reduced count-only
+/// factor is exactly the square of a rational `numerator / denominator` whose
+/// roots fit the platform's exact integer count representation, callers can
+/// preserve that algebraic scale without reconstructing it through rounded
+/// sums, squares and sqrt.
+fn exact_two_level_rational_scale(
+    first_count: usize,
+    second_count: usize,
+) -> Option<(usize, usize)> {
     let sample_count = (first_count as u128).checked_add(second_count as u128)?;
     let count_product = (first_count as u128).checked_mul(second_count as u128)?;
     if count_product == 0 {
@@ -123,21 +136,22 @@ fn exact_two_level_integer_divisor(first_count: usize, second_count: usize) -> O
     let target = sample_count
         .checked_mul(sample_count)?
         .checked_mul(sample_count.checked_sub(1)?)?;
-    if target % count_product != 0 {
-        return None;
-    }
 
-    let squared_divisor = target / count_product;
-    let divisor = squared_divisor.isqrt();
-    if divisor.checked_mul(divisor)? != squared_divisor {
+    let divisor = greatest_common_divisor(count_product, target);
+    let reduced_numerator = count_product / divisor;
+    let reduced_denominator = target / divisor;
+    let numerator = reduced_numerator.isqrt();
+    let denominator = reduced_denominator.isqrt();
+    if numerator.checked_mul(numerator)? != reduced_numerator
+        || denominator.checked_mul(denominator)? != reduced_denominator
+        || numerator == 0
+        || denominator == 0
+        || numerator > usize::MAX as u128
+        || denominator > usize::MAX as u128
+    {
         return None;
     }
-
-    let binary64_divisor = divisor as f64;
-    if binary64_divisor as u128 != divisor {
-        return None;
-    }
-    Some(binary64_divisor)
+    Some((numerator as usize, denominator as usize))
 }
 
 fn exact_translated_residual_standard_error(
@@ -197,16 +211,18 @@ fn exact_translated_residual_standard_error(
         }
     }
     if exactly_two_levels && let Some(gap) = repeated_gap {
-        let integer_divisor = exact_two_level_integer_divisor(zero_count, gap_count);
+        let rational_scale = exact_two_level_rational_scale(zero_count, gap_count);
         let standard_error = if zero_count == 1 || gap_count == 1 {
             // For an exactly translated two-level sample where either level
             // occurs once, SE(mean) simplifies to |gap| / n.
             gap.abs() / translated.len() as f64
-        } else if let Some(divisor) = integer_divisor {
-            // Some non-singleton count geometries also collapse to an exact
-            // reciprocal-integer scale. Preserve that algebra before rounded
-            // moment reconstruction can move the represented result by one ULP.
-            gap.abs() / divisor
+        } else if let Some((numerator, denominator)) = rational_scale {
+            // Some non-singleton count geometries collapse to an exact rational
+            // scale. Reuse the represented-sum division primitive so factors
+            // such as 2/15 are rounded once without an avoidable square/root
+            // reconstruction or a multiply-first overflow.
+            let scaled_gap = vec![gap.abs(); numerator];
+            deterministic_representable_sum_over_count(&scaled_gap, denominator)?
         } else {
             0.0
         };
@@ -214,7 +230,7 @@ fn exact_translated_residual_standard_error(
         if standard_error != 0.0 {
             return Ok(Some(standard_error));
         }
-        if (zero_count == 1 || gap_count == 1 || integer_divisor.is_some()) && gap != 0.0 {
+        if (zero_count == 1 || gap_count == 1 || rational_scale.is_some()) && gap != 0.0 {
             return Err(ValidationError::InvalidInput);
         }
     }
@@ -325,16 +341,15 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// combined residual delta is exactly representable. For an exactly translated
 /// two-level sample where either level occurs once, the algebraic identity
 /// `SE(mean) = |level_gap| / n` is evaluated directly. Non-singleton two-level
-/// count geometries whose count factor is exactly the reciprocal square of an
-/// exactly representable integer divisor are likewise applied by one division
-/// of the represented gap before moment reconstruction. The general translated
-/// path avoids making a rounded residual mean authoritative before dispersion is
-/// evaluated. Its normalization uses an exact power-of-two scale so the
-/// translated geometry is not re-rounded through an arbitrary magnitude before
-/// the final SE is restored. Cases that cannot prove those translated deltas
-/// representable retain the predecessor rounded-residual path. Individual signed
-/// residuals must still be representable because their dispersion is itself part
-/// of the requested scientific result.
+/// count geometries whose reduced count factor is an exact rational square are
+/// likewise applied as a represented rational scale before moment reconstruction.
+/// The general translated path avoids making a rounded residual mean authoritative
+/// before dispersion is evaluated. Its normalization uses an exact power-of-two
+/// scale so the translated geometry is not re-rounded through an arbitrary
+/// magnitude before the final SE is restored. Cases that cannot prove those
+/// translated deltas representable retain the predecessor rounded-residual path.
+/// Individual signed residuals must still be representable because their
+/// dispersion is itself part of the requested scientific result.
 ///
 /// # Errors
 ///
