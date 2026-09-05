@@ -21,7 +21,7 @@ Public RED `4386d9ace83cd54aa129067ddc589b1a628147a2` adds `crates/validation_co
 
 ## Causal repair
 
-Repair `79ad03fae4364d6c364915a062eb0fc8615eaa43` remains inside `exact_translated_residual_standard_error` after the existing exact anchor-relative translation proof. If the translated sample has exactly two represented levels and either level occurs once, the sample standard error simplifies for any supported `n` to `|level_gap| / n`; the implementation evaluates that identity directly and retains fail-closed behavior when a nonzero represented gap would divide below binary64 range.
+Repair `79ad03fae4364d6c364915a062eb0fc8615eaa43` remains inside `exact_translated_residual_standard_error` after the existing exact anchor-relative translation proof. If the translated sample has exactly two represented levels and either level occurs once, the sample standard error simplifies for any supported `n` to `|level_gap| / n`; the implementation evaluates that identity directly and retains fail-closed behavior when a nonzero represented gap would divide below binary64 range. Edge commit `7fe4117c5666af08adbfda5d32beb12648f579c6` fixes that underflow refusal in the public contract using a minimum-subnormal nonzero gap.
 
 The repair intentionally does not claim globally correctly rounded `n > 2` standard errors. Samples with three or more represented levels, two-level samples without a singleton, and cases that fail the exact translation admission continue through the existing bounded second-moment or fallback paths and require their own represented-input counterexample before any broader change.
 
@@ -37,6 +37,7 @@ Applying arbitrary-precision arithmetic to every Validation metric was rejected 
 - Public regression: `crates/validation_core/tests/bias_standard_error_singleton_level_rounding_contract.rs`.
 - RED: `4386d9ace83cd54aa129067ddc589b1a628147a2`.
 - Causal repair: `79ad03fae4364d6c364915a062eb0fc8615eaa43`.
+- Edge coverage: `7fe4117c5666af08adbfda5d32beb12648f579c6`.
 - CHANGELOG: `017ad11ad974219a5a0e1cf91c1ecf55c44524c2`.
 - Landing vehicle: PR #488.
 
