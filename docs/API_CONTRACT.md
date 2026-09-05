@@ -69,6 +69,7 @@ GET    /v1/analysis-runs/{run_id}
 POST   /v1/analysis-runs/{run_id}/cancel
 GET    /v1/model-artifacts/{artifact_id}
 GET    /v1/exports/{export_id}
+GET    /v1/project-histories
 ```
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.
@@ -90,6 +91,17 @@ only events whose availability time is at or before `knowledge_cutoff`, orders
 them by event time and opaque event ID, and emits adjacent forward temporal
 associations plus `candidate_not_causal` transition gaps. It does not infer
 causality, mutate TEPP state, or return a completed psychometric result.
+
+`GET /v1/project-histories` enumerates accepted cutoff-safe project-history
+projections on `tepp-loopback`. Collection rows stay metric-free identities
+(`project_key`, `idempotency_key`, `knowledge_cutoff`,
+`inference_status=temporal_association_only`). `tepp.scientific_acceptance.v1`,
+evidence text, findings, and causal scores never appear.
+
+`tepp-project-histories list` is the operator-visible client of that collection
+GET. It mints a typed `LineageWeave` exchange onto spawned `tepp-loopback` TCP.
+Empty stdin is admitted. Naruon is refused. Process exit 0 is not a scientific
+claim and does not infer causality.
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
