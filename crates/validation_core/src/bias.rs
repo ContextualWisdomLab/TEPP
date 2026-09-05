@@ -159,9 +159,11 @@ fn exact_two_level_rational_scale(
 ///
 /// A normalized binary64 quotient can be correctly rounded in its working
 /// binade and still move by one ULP when an exact power-of-two restoration enters
-/// the subnormal range. The represented significand is at most 53 bits and a
-/// `usize` scale is at most the platform word width, so the exact unit numerator
-/// fits `u128` for every subnormal result that this bounded path admits.
+/// the subnormal range. On supported targets a represented significand is at
+/// most 53 bits and a `usize` factor at most 64 bits. The only potentially large
+/// operation is the exponent shift; if it cannot fit `u128`, the exact result is
+/// necessarily above this bounded subnormal path and the caller keeps its normal
+/// overflow-safe implementation.
 fn exact_subnormal_rational_scale(
     gap: f64,
     numerator: usize,
@@ -179,18 +181,18 @@ fn exact_subnormal_rational_scale(
     } else {
         ((1_u64 << 52) | fraction) as u128
     };
-    let product = significand.checked_mul(numerator as u128)?;
+    let product = significand * numerator as u128;
     let unit_shift = if exponent == 0 { 0 } else { exponent - 1 };
     let scaled_numerator = product.checked_shl(unit_shift)?;
     let denominator = denominator as u128;
 
     let mut rounded_units = scaled_numerator / denominator;
     let remainder = scaled_numerator % denominator;
-    let twice_remainder = remainder.checked_mul(2)?;
+    let twice_remainder = remainder * 2;
     if twice_remainder > denominator
         || (twice_remainder == denominator && rounded_units & 1 == 1)
     {
-        rounded_units = rounded_units.checked_add(1)?;
+        rounded_units += 1;
     }
 
     if rounded_units == 0 {
@@ -468,7 +470,9 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 
 #[cfg(test)]
 mod tests {
-    use super::{bias_standard_error, mean_bias};
+    use super::{
+        bias_standard_error, exact_subnormal_rational_scale, mean_bias,
+    };
     use crate::ValidationError;
 
     #[test]
@@ -560,5 +564,32 @@ mod tests {
         .expect("scaled deviation path");
         assert!(standard_error.is_finite());
         assert!(standard_error > 0.0);
+    }
+
+    #[test]
+    fn exact_subnormal_rational_scale_covers_projection_boundaries() {
+        assert_eq!(exact_subnormal_rational_scale(0.0, 1, 1), None);
+        assert_eq!(exact_subnormal_rational_scale(f64::INFINITY, 1, 1), None);
+        assert_eq!(exact_subnormal_rational_scale(1.0, 0, 1), None);
+        assert_eq!(exact_subnormal_rational_scale(1.0, 1, 0), None);
+
+        assert_eq!(
+            exact_subnormal_rational_scale(f64::from_bits(22), 3, 44),
+            Some(Ok(f64::from_bits(2)))
+        );
+        assert_eq!(
+            exact_subnormal_rational_scale(f64::from_bits(66), 3, 44),
+            Some(Ok(f64::from_bits(4)))
+        );
+        assert_eq!(
+            exact_subnormal_rational_scale(f64::from_bits(1), 3, 44),
+            Some(Err(ValidationError::InvalidInput))
+        );
+        assert_eq!(
+            exact_subnormal_rational_scale(f64::from_bits(0x004d_5555_5555_5555), 3, 44),
+            Some(Ok(f64::MIN_POSITIVE))
+        );
+        assert_eq!(exact_subnormal_rational_scale(f64::MIN_POSITIVE * 2.0, 1, 1), None);
+        assert_eq!(exact_subnormal_rational_scale(f64::MAX, 1, 1), None);
     }
 }
