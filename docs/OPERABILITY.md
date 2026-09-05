@@ -62,19 +62,22 @@ A numerical proof boundary is an operational resource contract when it changes a
 
 Issue #491 owns the current bias-standard-error exact-proof budget. Production exact pair-distance admission stays bounded to `n<=16` while the current implementation is O(n²) in pair enumeration and stores `n(n-1)/2` pair records. The characterization on PR #488 records a seventeen-observation counterexample and an algebraically equivalent O(n) checked-integer numerator, but arithmetic representability alone does not authorize a wider production budget.
 
-The current characterization distinguishes three bounds that must not be collapsed into one cutoff. At aligned diameter `D=2^53`, the minimum-shifted O(n) intermediate bound `n^2D^2` fits `u128` through `n=2_047`, while the exact pair-square numerator extremal bound `floor(n^2/4)D^2` fits through `n=4_095`. Separately, the unreduced scientific denominator `n^2(n-1)` exceeds `2^53` after `n=208_064`; production uses the reduced denominator after GCD, so that threshold is only an envelope marker. None of these values is a latency or memory budget.
+The current characterization distinguishes three bounds that must not be collapsed into one cutoff. At aligned diameter `D=2^53`, the minimum-shifted O(n) distribution-independent intermediate envelope `n^2D^2` fits `u128` through `n=2_047`, while the exact pair-square numerator extremal bound `floor(n^2/4)D^2` fits through `n=4_095`. Separately, the unreduced scientific denominator `n^2(n-1)` exceeds `2^53` after `n=208_064`; production uses the reduced denominator after GCD, so that threshold is only an envelope marker. None of these values is a latency or memory budget, and the actual linear checked-intermediate admission also depends on coefficient distribution.
+
+The candidate O(n) accumulator is now characterized as a strict sufficient subset of the current pair reference under `u128`. With one coefficient at zero and every other coefficient at `D=2^58`, both kernels fit at `n=64`. At `n=65`, the exact pair numerator remains `64*D^2 = 2^122`, while the linear first term `65*64*D^2 = 4160*2^116` overflows `u128` before cancellation. A linear refusal therefore cannot become a scientific refusal. If the O(n) kernel is introduced, it must fall back to the existing pairwise proof or use a separately justified wider checked-integer representation.
 
 Before changing the production boundary, retain:
 
 - release-mode raw timing samples and p95 from `crates/validation_core/examples/bias_se_exact_proof_budget.rs`, with exact commit, CPU, OS, Rust toolchain, build flags, timing sample count, and cold/warm procedure;
 - side-by-side buffered O(n²), allocation-free two-pass O(n²), and O(n) kernel evidence, with exact equality of restored pair-square numerators before timing;
+- timing for the viable hybrid shape—O(n) sufficient admission followed by pairwise fallback—covering both an admitting geometry and a checked-intermediate refusal geometry;
 - target `size_of::<Option<(u128, i32)>>()`, actual scratch `Vec` capacity, scratch payload bytes, and allocator/RSS evidence rather than byte estimates inferred from field widths;
 - admitted/refused-set comparison between the existing pairwise proof and any stronger sufficient O(n) dyadic-grid proof, with proof refusal falling back rather than altering scientific meaning;
-- checked-`u128` overflow/refusal evidence across sample count and represented exponent spread;
+- checked-`u128` overflow/refusal evidence across sample count, represented exponent spread, and coefficient distribution;
 - a wider-integer/reference alternative assessment kept separate from production authority unless its dependency/security/performance cost is explicitly accepted;
 - full service/API p95 when a buyer-facing path is affected, preserving the TEPP `p95 <= 20 ms` target without shrinking input, omitting proof work, or using an unrealistic cache-only setup.
 
-The exact pair-record count is `n(n-1)/2`; the current characterization locks 120 records at `n=16`, 136 at `n=17`, 2,096,128 at `n=2,048`, and 4,997,541 at `n=3,162`. A two-pass O(n²) implementation may remove pair-record storage while preserving pair-enumeration proof shape, but that optimization still requires exact-head Rust/rustdoc/coverage evidence before it replaces the current implementation. A stronger O(n) admission is not accepted merely because its checked arithmetic fits `u128`.
+The exact pair-record count is `n(n-1)/2`; the current characterization locks 120 records at `n=16`, 136 at `n=17`, 2,096,128 at `n=2,048`, and 4,997,541 at `n=3,162`. A two-pass O(n²) implementation may remove pair-record storage while preserving pair-enumeration proof shape, but that optimization still requires exact-head Rust/rustdoc/coverage evidence before it replaces the current implementation. A stronger O(n) admission is not accepted merely because its checked arithmetic fits `u128`, and a checked O(n) refusal is not allowed to narrow the current exact pairwise admission set.
 
 ## Model release/cutover
 
