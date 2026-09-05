@@ -5,8 +5,11 @@
 //! allocation-free two-pass O(n²) variant, an algebraically equivalent O(n)
 //! sufficient accumulator, and the viable hybrid shape that uses the O(n) path
 //! only when it admits and otherwise falls back to the buffered pair proof.
-//! It is characterization tooling, not production admission and not buyer-path
-//! latency evidence by itself.
+//! The O(n) path first removes the shared power-of-two unit from anchor-relative
+//! coefficients so checked-intermediate refusal is evaluated on the canonical
+//! dyadic grid rather than on an arbitrary raw integer scale. It is
+//! characterization tooling, not production admission and not buyer-path latency
+//! evidence by itself.
 
 use std::hint::black_box;
 use std::mem::size_of;
@@ -136,10 +139,19 @@ fn pair_square_sum_quadratic_two_pass(values: &[u128]) -> Option<KernelObservati
 fn pair_square_sum_linear(values: &[u128]) -> Option<KernelObservation> {
     let minimum = *values.iter().min()?;
     let sample_count = u128::try_from(values.len()).ok()?;
+    let common_shift = values
+        .iter()
+        .filter_map(|value| {
+            let coefficient = value.checked_sub(minimum)?;
+            (coefficient != 0).then_some(coefficient.trailing_zeros())
+        })
+        .min()
+        .unwrap_or(0);
+
     let mut coefficient_sum = 0_u128;
     let mut square_sum = 0_u128;
     for value in values {
-        let coefficient = value.checked_sub(minimum)?;
+        let coefficient = value.checked_sub(minimum)? >> common_shift;
         coefficient_sum = coefficient_sum.checked_add(coefficient)?;
         square_sum = square_sum.checked_add(coefficient.checked_mul(coefficient)?)?;
     }
@@ -148,7 +160,7 @@ fn pair_square_sum_linear(values: &[u128]) -> Option<KernelObservation> {
         .checked_sub(coefficient_sum.checked_mul(coefficient_sum)?)?;
     Some(KernelObservation {
         aligned_pair_square_sum: pair_square_sum,
-        unit_exponent: 0,
+        unit_exponent: i32::try_from(common_shift).ok()?,
         scratch_records: 0,
         scratch_payload_bytes: 0,
         used_pairwise_fallback: false,
@@ -212,6 +224,68 @@ fn emit(
     );
 }
 
+fn assert_and_measure_geometry(
+    geometry: &str,
+    values: &[u128],
+    samples: usize,
+    expect_linear_admission: bool,
+    expect_hybrid_fallback: bool,
+) {
+    let buffered = pair_square_sum_quadratic_buffered(values)
+        .expect("buffered quadratic result stays within u128");
+    let two_pass = pair_square_sum_quadratic_two_pass(values)
+        .expect("two-pass quadratic result stays within u128");
+    let hybrid = pair_square_sum_hybrid(values).expect("hybrid result stays within u128");
+    let exact_pair_square_sum = restored_pair_square_sum(buffered)
+        .expect("buffered result restores to exact pair-square sum");
+    assert_eq!(
+        restored_pair_square_sum(two_pass),
+        Some(exact_pair_square_sum),
+        "quadratic kernels must agree"
+    );
+    assert_eq!(
+        restored_pair_square_sum(hybrid),
+        Some(exact_pair_square_sum),
+        "hybrid must preserve the exact pair numerator"
+    );
+    assert_eq!(hybrid.used_pairwise_fallback, expect_hybrid_fallback);
+
+    match pair_square_sum_linear(values) {
+        Some(linear) => {
+            assert!(expect_linear_admission, "linear admission was not expected");
+            assert_eq!(
+                restored_pair_square_sum(linear),
+                Some(exact_pair_square_sum),
+                "linear identity must agree with pair reference"
+            );
+        }
+        None => assert!(!expect_linear_admission, "linear refusal was not expected"),
+    }
+
+    let mut kernels: Vec<(
+        &str,
+        fn(&[u128]) -> Option<KernelObservation>,
+    )> = vec![
+        ("quadratic_buffered", pair_square_sum_quadratic_buffered),
+        ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
+        ("hybrid", pair_square_sum_hybrid),
+    ];
+    if expect_linear_admission {
+        kernels.push(("linear", pair_square_sum_linear));
+    }
+    for (kernel_name, kernel) in kernels {
+        let (p95, observation) = measure(values, samples, kernel);
+        emit(
+            geometry,
+            values.len(),
+            kernel_name,
+            p95,
+            samples,
+            observation,
+        );
+    }
+}
+
 fn main() {
     let samples = std::env::args()
         .nth(1)
@@ -224,105 +298,28 @@ fn main() {
     );
     for sample_count in [16_usize, 64, 256, 1_024, 2_047] {
         let values = fixture(sample_count);
-        let buffered = pair_square_sum_quadratic_buffered(&values)
-            .expect("buffered quadratic result stays within u128");
-        let two_pass = pair_square_sum_quadratic_two_pass(&values)
-            .expect("two-pass quadratic result stays within u128");
-        let linear = pair_square_sum_linear(&values).expect("linear result stays within u128");
-        let hybrid = pair_square_sum_hybrid(&values).expect("hybrid result stays within u128");
-        let exact_pair_square_sum = restored_pair_square_sum(buffered)
-            .expect("buffered result restores to exact pair-square sum");
-        assert_eq!(
-            restored_pair_square_sum(two_pass),
-            Some(exact_pair_square_sum),
-            "quadratic kernels must agree"
-        );
-        assert_eq!(
-            restored_pair_square_sum(linear),
-            Some(exact_pair_square_sum),
-            "linear identity must agree with pair reference"
-        );
-        assert_eq!(
-            restored_pair_square_sum(hybrid),
-            Some(exact_pair_square_sum),
-            "hybrid fast path must agree with pair reference"
-        );
-        assert!(
-            !hybrid.used_pairwise_fallback,
-            "compact fixture is an admitting geometry for the linear fast path"
-        );
-
-        for (kernel_name, kernel) in [
-            (
-                "quadratic_buffered",
-                pair_square_sum_quadratic_buffered as fn(&[u128]) -> Option<KernelObservation>,
-            ),
-            ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
-            ("linear", pair_square_sum_linear),
-            ("hybrid", pair_square_sum_hybrid),
-        ] {
-            let (p95, observation) = measure(&values, samples, kernel);
-            emit("compact_admit", sample_count, kernel_name, p95, samples, observation);
-        }
+        assert_and_measure_geometry("compact_admit", &values, samples, true, false);
     }
 
-    let diameter = 1_u128 << 58;
-    for sample_count in [64_usize, 65] {
-        let values = boundary_fixture(sample_count, diameter);
-        let buffered = pair_square_sum_quadratic_buffered(&values)
-            .expect("boundary pair numerator stays within u128");
-        let two_pass = pair_square_sum_quadratic_two_pass(&values)
-            .expect("boundary two-pass numerator stays within u128");
-        let hybrid = pair_square_sum_hybrid(&values)
-            .expect("hybrid preserves pair fallback for the boundary geometry");
-        let exact_pair_square_sum = restored_pair_square_sum(buffered)
-            .expect("boundary buffered result restores to exact pair-square sum");
-        assert_eq!(
-            restored_pair_square_sum(two_pass),
-            Some(exact_pair_square_sum),
-            "boundary quadratic kernels must agree"
-        );
-        assert_eq!(
-            restored_pair_square_sum(hybrid),
-            Some(exact_pair_square_sum),
-            "hybrid must preserve exact pair numerator"
-        );
+    let power_of_two_values = boundary_fixture(65, 1_u128 << 58);
+    assert_and_measure_geometry(
+        "power_of_two_normalized_admit",
+        &power_of_two_values,
+        samples,
+        true,
+        false,
+    );
 
-        let geometry = if sample_count == 64 {
-            let linear = pair_square_sum_linear(&values)
-                .expect("n=64 remains an admitting geometry for the linear fast path");
-            assert_eq!(
-                restored_pair_square_sum(linear),
-                Some(exact_pair_square_sum),
-                "n=64 linear boundary result must equal the pair reference"
-            );
-            assert!(
-                !hybrid.used_pairwise_fallback,
-                "n=64 hybrid must use the linear fast path"
-            );
-            "boundary_admit"
-        } else {
-            assert!(
-                pair_square_sum_linear(&values).is_none(),
-                "n=65 must exercise checked-intermediate refusal"
-            );
-            assert!(
-                hybrid.used_pairwise_fallback,
-                "n=65 hybrid must preserve the buffered pair fallback"
-            );
-            "boundary_pair_fallback"
-        };
+    let odd_diameter = (1_u128 << 58) + 1;
+    let odd_64 = boundary_fixture(64, odd_diameter);
+    assert_and_measure_geometry("odd_boundary_admit", &odd_64, samples, true, false);
 
-        for (kernel_name, kernel) in [
-            (
-                "quadratic_buffered",
-                pair_square_sum_quadratic_buffered as fn(&[u128]) -> Option<KernelObservation>,
-            ),
-            ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
-            ("hybrid", pair_square_sum_hybrid),
-        ] {
-            let (p95, observation) = measure(&values, samples, kernel);
-            emit(geometry, sample_count, kernel_name, p95, samples, observation);
-        }
-    }
+    let odd_65 = boundary_fixture(65, odd_diameter);
+    assert_and_measure_geometry(
+        "odd_boundary_pair_fallback",
+        &odd_65,
+        samples,
+        false,
+        true,
+    );
 }
