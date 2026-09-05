@@ -208,12 +208,13 @@ fn exact_subnormal_rational_scale(
     Some(Ok(f64::from_bits(rounded_units as u64)))
 }
 
-fn exact_translated_residual_standard_error(
+fn translated_residuals_from_anchor(
     diffs: &[f64],
     roundoffs: &[f64],
-) -> Result<Option<f64>, ValidationError> {
-    let anchor_high = diffs[0];
-    let anchor_low = roundoffs[0];
+    anchor_index: usize,
+) -> Option<Vec<f64>> {
+    let anchor_high = diffs[anchor_index];
+    let anchor_low = roundoffs[anchor_index];
     let mut translated = Vec::with_capacity(diffs.len());
 
     for (&high, &low) in diffs.iter().zip(roundoffs) {
@@ -221,22 +222,51 @@ fn exact_translated_residual_standard_error(
         if !high_delta.is_finite()
             || subtraction_roundoff(high, anchor_high, high_delta) != 0.0
         {
-            return Ok(None);
+            return None;
         }
 
         let low_delta = low - anchor_low;
         if !low_delta.is_finite()
             || subtraction_roundoff(low, anchor_low, low_delta) != 0.0
         {
-            return Ok(None);
+            return None;
         }
 
         let delta = high_delta + low_delta;
         if !delta.is_finite() || subtraction_roundoff(high_delta, -low_delta, delta) != 0.0 {
-            return Ok(None);
+            return None;
         }
         translated.push(delta);
     }
+
+    Some(translated)
+}
+
+fn canonical_exact_translated_residuals(diffs: &[f64], roundoffs: &[f64]) -> Option<Vec<f64>> {
+    let mut anchor_indices: Vec<_> = (0..diffs.len()).collect();
+    anchor_indices.sort_by(|left, right| {
+        diffs[*left]
+            .total_cmp(&diffs[*right])
+            .then_with(|| roundoffs[*left].total_cmp(&roundoffs[*right]))
+    });
+
+    anchor_indices
+        .into_iter()
+        .find_map(|anchor_index| translated_residuals_from_anchor(diffs, roundoffs, anchor_index))
+}
+
+fn exact_translated_residual_standard_error(
+    diffs: &[f64],
+    roundoffs: &[f64],
+) -> Result<Option<f64>, ValidationError> {
+    // A translated second moment is order-invariant, so admission must not depend
+    // on whichever observation happened to arrive first. Search candidate anchors
+    // in a canonical represented `(high, low)` order and use the first anchor for
+    // which every high, low and recombined delta is exact. If no exact anchor
+    // exists, retain the predecessor rounded-residual fallback.
+    let Some(translated) = canonical_exact_translated_residuals(diffs, roundoffs) else {
+        return Ok(None);
+    };
 
     let max_magnitude = translated
         .iter()
@@ -398,8 +428,11 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// rounded-low-term mean path. For other larger samples, including exact pairwise
 /// residuals, TEPP uses the `high + low` decomposition and the same translated
 /// second moment whenever every anchor-relative high delta, low delta, and
-/// combined residual delta is exactly representable. For an exactly translated
-/// two-level sample where either level occurs once, the algebraic identity
+/// combined residual delta is exactly representable. Candidate translation
+/// anchors are considered in canonical represented `(high, low)` order so
+/// admission and the resulting standard error do not depend on observation
+/// order when an exact anchor exists. For an exactly translated two-level sample
+/// where either level occurs once, the algebraic identity
 /// `SE(mean) = |level_gap| / n` is evaluated directly. Non-singleton two-level
 /// count geometries whose reduced count factor is an exact rational square are
 /// likewise applied as a represented rational scale before moment reconstruction;
