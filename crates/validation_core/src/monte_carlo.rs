@@ -2,6 +2,10 @@
 
 use crate::ValidationError;
 use crate::input::require_finite;
+use crate::numeric::{deterministic_compensated_sum, deterministic_representable_mean};
+
+const STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+const EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
 /// Summary of Monte Carlo replications for a scalar metric.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -21,12 +25,34 @@ pub struct MonteCarloSummary {
 }
 
 impl MonteCarloSummary {
-    /// Validate structural invariants for a Monte Carlo summary payload.
+    /// Validate structural and uncertainty-domain invariants for a Monte Carlo summary payload.
+    ///
+    /// `standard_error` is the standard error of the retained-replication mean,
+    /// so a positive sample SD must agree numerically with `SD / sqrt(n)`.
+    /// Admission allows a small relative binary64 tolerance rather than requiring
+    /// cross-language bit-for-bit equality, but rejects materially understated or
+    /// overstated uncertainty. Zero spread requires zero SE and degenerate
+    /// empirical percentile support at the represented mean; the same support
+    /// rule applies to the canonical singleton summary. For positive spread,
+    /// nearest-rank percentile endpoints are retained observations and therefore
+    /// must fit the support implied directly by the recorded sample spread:
+    /// `|x - mean| <= SD * sqrt(n - 1)`. Distinct lower and upper endpoints are
+    /// distinct retained values, so their squared deviations must also fit the
+    /// same total `(n - 1) * SD^2` deviation budget jointly. With exactly two
+    /// replications, two distinct nearest-rank endpoint values exhaust the sample;
+    /// the recorded mean and sample SD must therefore agree with the summary of
+    /// those two endpoint values themselves. These rules remain valid when the
+    /// represented binary64 mean is a rounded projection of the mathematical
+    /// sample mean. Comparisons are scale-normalized so opposite-sign full-range
+    /// finite values do not create overflowing validation-only arithmetic.
+    /// Numeric equality keeps IEEE `-0.0` and `+0.0` as one zero-valued scientific state.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when counts or numeric fields
-    /// violate the summary contract.
+    /// violate the summary contract, empirical percentile support is impossible
+    /// for the represented mean/sample spread/count, or the standard-error field
+    /// is incoherent with the represented sample spread/count.
     pub fn validate(self) -> Result<Self, ValidationError> {
         if self.replication_count == 0 {
             return Err(ValidationError::InvalidInput);
@@ -48,20 +74,175 @@ impl MonteCarloSummary {
         if self.percentile_lower > self.percentile_upper {
             return Err(ValidationError::InvalidInput);
         }
+        if self.standard_deviation == 0.0 {
+            if self.standard_error != 0.0
+                || self.percentile_lower != self.mean
+                || self.percentile_upper != self.mean
+            {
+                return Err(ValidationError::InvalidInput);
+            }
+        } else {
+            if self.replication_count == 1 || self.standard_error == 0.0 {
+                return Err(ValidationError::InvalidInput);
+            }
+            let expected_standard_error =
+                self.standard_deviation / (self.replication_count as f64).sqrt();
+            if expected_standard_error == 0.0 {
+                return Err(ValidationError::InvalidInput);
+            }
+            let relative_error =
+                (self.standard_error / expected_standard_error - 1.0).abs();
+            if !relative_error.is_finite() || relative_error > STANDARD_ERROR_RELATIVE_TOLERANCE {
+                return Err(ValidationError::InvalidInput);
+            }
+
+            let moment_factor = ((self.replication_count - 1) as f64).sqrt();
+            for endpoint in [self.percentile_lower, self.percentile_upper] {
+                let scale = self
+                    .mean
+                    .abs()
+                    .max(endpoint.abs())
+                    .max(self.standard_deviation)
+                    .max(1.0);
+                let scaled_deviation = ((endpoint / scale) - (self.mean / scale)).abs();
+                let scaled_support = (self.standard_deviation / scale) * moment_factor;
+                if !scaled_deviation.is_finite()
+                    || !scaled_support.is_finite()
+                    || scaled_deviation
+                        > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
+            }
+
+            if self.percentile_lower != self.percentile_upper {
+                let scale = self
+                    .mean
+                    .abs()
+                    .max(self.percentile_lower.abs())
+                    .max(self.percentile_upper.abs())
+                    .max(self.standard_deviation);
+                let scaled_mean = self.mean / scale;
+                let scaled_lower_deviation = (self.percentile_lower / scale) - scaled_mean;
+                let scaled_upper_deviation = (self.percentile_upper / scale) - scaled_mean;
+                let combined_scaled_deviation =
+                    scaled_lower_deviation.hypot(scaled_upper_deviation);
+                let scaled_support = (self.standard_deviation / scale) * moment_factor;
+                if !combined_scaled_deviation.is_finite()
+                    || !scaled_support.is_finite()
+                    || combined_scaled_deviation
+                        > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
+
+                if self.replication_count == 2 {
+                    let endpoint_samples = [self.percentile_lower, self.percentile_upper];
+                    let expected_mean = deterministic_representable_mean(&endpoint_samples)?;
+                    let expected_standard_deviation =
+                        scaled_sample_standard_deviation(&endpoint_samples, expected_mean)?;
+                    for (recorded, expected) in [
+                        (self.mean, expected_mean),
+                        (self.standard_deviation, expected_standard_deviation),
+                    ] {
+                        let coherence_scale = recorded.abs().max(expected.abs());
+                        if coherence_scale == 0.0 {
+                            continue;
+                        }
+                        let relative_distance =
+                            ((recorded / coherence_scale) - (expected / coherence_scale)).abs();
+                        if relative_distance > EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE {
+                            return Err(ValidationError::InvalidInput);
+                        }
+                    }
+                }
+            }
+        }
         Ok(self)
+    }
+}
+
+fn standard_deviation_from_deviations(deviations: &[f64]) -> Result<f64, ValidationError> {
+    let scale = deviations
+        .iter()
+        .map(|deviation| deviation.abs())
+        .fold(0.0, f64::max);
+    if scale == 0.0 {
+        return Ok(0.0);
+    }
+
+    let normalized_squares = deviations
+        .iter()
+        .map(|deviation| {
+            let normalized = *deviation / scale;
+            normalized * normalized
+        })
+        .collect();
+    let square_sum = deterministic_compensated_sum(normalized_squares);
+    let normalized_standard_deviation =
+        (square_sum / (deviations.len() as f64 - 1.0)).sqrt();
+    let standard_deviation = scale * normalized_standard_deviation;
+    if !standard_deviation.is_finite()
+        || (standard_deviation == 0.0 && normalized_standard_deviation != 0.0)
+    {
+        Err(ValidationError::InvalidInput)
+    } else if standard_deviation == 0.0 {
+        Ok(0.0)
+    } else {
+        Ok(standard_deviation)
+    }
+}
+
+fn scaled_sample_standard_deviation(samples: &[f64], mean: f64) -> Result<f64, ValidationError> {
+    let direct_deviations: Option<Vec<f64>> = samples
+        .iter()
+        .map(|value| {
+            let deviation = *value - mean;
+            deviation.is_finite().then_some(deviation)
+        })
+        .collect();
+    if let Some(deviations) = direct_deviations {
+        return standard_deviation_from_deviations(&deviations);
+    }
+
+    let outer_scale = samples.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    if outer_scale == 0.0 {
+        return Ok(0.0);
+    }
+    let normalized_mean = mean / outer_scale;
+    let normalized_deviations: Vec<_> = samples
+        .iter()
+        .map(|value| (*value / outer_scale) - normalized_mean)
+        .collect();
+    let normalized_standard_deviation =
+        standard_deviation_from_deviations(&normalized_deviations)?;
+    let standard_deviation = outer_scale * normalized_standard_deviation;
+    if !standard_deviation.is_finite()
+        || (standard_deviation == 0.0 && normalized_standard_deviation != 0.0)
+    {
+        Err(ValidationError::InvalidInput)
+    } else if standard_deviation == 0.0 {
+        Ok(0.0)
+    } else {
+        Ok(standard_deviation)
     }
 }
 
 /// Aggregate Monte Carlo metric replications with percentile bounds.
 ///
 /// Percentiles use the inclusive nearest-rank method on sorted finite samples.
-/// Mean and variance use Welford accumulation so large finite samples do not
-/// overflow intermediate sums.
+/// Mean and sampling uncertainty use deterministic cancellation-safe/scaled
+/// binary64 references so an avoidable raw sum, Welford delta product, or raw
+/// square cannot reject a representable summary. A mathematically nonzero
+/// standard deviation or standard error that becomes exact zero only at the
+/// binary64 projection boundary fails closed rather than reporting no Monte
+/// Carlo uncertainty.
 ///
 /// # Errors
 ///
-/// Returns input errors for empty/non-finite samples or non-finite summaries,
-/// and configuration errors for invalid percentile bounds.
+/// Returns input errors for empty/non-finite samples, an unrepresentable mean,
+/// standard deviation, standard error, or summary; and configuration errors for
+/// invalid percentile bounds.
 ///
 /// # Panics
 ///
@@ -81,18 +262,21 @@ pub fn summarize_replications(
         return Err(ValidationError::InvalidConfiguration);
     }
     let mut sorted = samples.to_vec();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let (mean, m2, count) = welford_moments(&sorted)?;
-    let n = count as f64;
-    let standard_deviation = if count == 1 {
+    sorted.sort_by(f64::total_cmp);
+    let mean = deterministic_representable_mean(&sorted)?;
+    let n = sorted.len() as f64;
+    let standard_deviation = if sorted.len() == 1 {
         0.0
     } else {
-        require_finite((m2 / (n - 1.0)).sqrt())?
+        scaled_sample_standard_deviation(&sorted, mean)?
     };
     let standard_error = require_finite(standard_deviation / n.sqrt())?;
+    if standard_error == 0.0 && standard_deviation != 0.0 {
+        return Err(ValidationError::InvalidInput);
+    }
     let summary = MonteCarloSummary {
         replication_count: sorted.len(),
-        mean: require_finite(mean)?,
+        mean,
         standard_deviation,
         standard_error,
         percentile_lower: nearest_rank(&sorted, lower_percentile),
@@ -101,10 +285,181 @@ pub fn summarize_replications(
     summary.validate()
 }
 
+/// Decode a nonnegative finite binary64 magnitude into an exact integer significand and power-of-two exponent.
+fn binary64_magnitude_components(value: f64) -> (u64, i32) {
+    let bits = value.to_bits() & 0x7fff_ffff_ffff_ffff;
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & 0x000f_ffff_ffff_ffff;
+    if exponent_bits == 0 {
+        (fraction, -1074)
+    } else {
+        ((1_u64 << 52) | fraction, exponent_bits - 1023 - 52)
+    }
+}
+
+/// Compare two exact nonzero `significand * 2^exponent` values without floating-point rounding.
+fn scaled_u128_le(
+    lhs_significand: u128,
+    lhs_exponent: i32,
+    rhs_significand: u128,
+    rhs_exponent: i32,
+) -> bool {
+    let lhs_bits = 128_i32 - lhs_significand.leading_zeros() as i32;
+    let rhs_bits = 128_i32 - rhs_significand.leading_zeros() as i32;
+    let lhs_top_exponent = lhs_exponent + lhs_bits - 1;
+    let rhs_top_exponent = rhs_exponent + rhs_bits - 1;
+    if lhs_top_exponent != rhs_top_exponent {
+        return lhs_top_exponent < rhs_top_exponent;
+    }
+
+    let common_exponent = lhs_exponent.min(rhs_exponent);
+    let lhs_shift = (lhs_exponent - common_exponent) as u32;
+    let rhs_shift = (rhs_exponent - common_exponent) as u32;
+    debug_assert!(lhs_shift < 128);
+    debug_assert!(rhs_shift < 128);
+    (lhs_significand << lhs_shift) <= (rhs_significand << rhs_shift)
+}
+
+/// Compare one represented nonnegative binary64 magnitude with an exact product of two represented factors.
+fn represented_magnitude_le_exact_product(value: f64, factor_a: f64, factor_b: f64) -> bool {
+    let (value_significand, value_exponent) = binary64_magnitude_components(value);
+    let (a_significand, a_exponent) = binary64_magnitude_components(factor_a);
+    let (b_significand, b_exponent) = binary64_magnitude_components(factor_b);
+    scaled_u128_le(
+        value_significand as u128,
+        value_exponent,
+        (a_significand as u128) * (b_significand as u128),
+        a_exponent + b_exponent,
+    )
+}
+
+/// Compare an equal nonzero projected correction with the exact product roundoff.
+fn represented_correction_le_exact_product_roundoff(
+    correction: f64,
+    factor_a: f64,
+    factor_b: f64,
+    rounded_product: f64,
+) -> bool {
+    debug_assert!(correction.is_finite() && correction != 0.0);
+    debug_assert!(rounded_product.is_finite() && rounded_product > 0.0);
+    debug_assert_eq!(
+        factor_a.mul_add(factor_b, -rounded_product),
+        correction,
+        "caller must provide the equal nonzero projected product correction"
+    );
+
+    let (a_significand, a_exponent) = binary64_magnitude_components(factor_a);
+    let (b_significand, b_exponent) = binary64_magnitude_components(factor_b);
+    let product_significand = (a_significand as u128) * (b_significand as u128);
+    let product_exponent = a_exponent + b_exponent;
+    let (rounded_significand, rounded_exponent) =
+        binary64_magnitude_components(rounded_product);
+    let common_exponent = product_exponent.min(rounded_exponent);
+    let product_shift = (product_exponent - common_exponent) as u32;
+    let rounded_shift = (rounded_exponent - common_exponent) as u32;
+    debug_assert!(product_significand.leading_zeros() >= product_shift);
+    debug_assert!((rounded_significand as u128).leading_zeros() >= rounded_shift);
+    let exact_product = product_significand << product_shift;
+    let rounded_product_significand = (rounded_significand as u128) << rounded_shift;
+    let (product_roundoff_negative, product_roundoff_significand) =
+        if exact_product < rounded_product_significand {
+            (true, rounded_product_significand - exact_product)
+        } else {
+            (false, exact_product - rounded_product_significand)
+        };
+
+    debug_assert_ne!(product_roundoff_significand, 0);
+    let correction_negative = correction.is_sign_negative();
+    debug_assert_eq!(correction_negative, product_roundoff_negative);
+    let (correction_significand, correction_exponent) =
+        binary64_magnitude_components(correction.abs());
+    if correction_negative {
+        scaled_u128_le(
+            product_roundoff_significand,
+            common_exponent,
+            correction_significand as u128,
+            correction_exponent,
+        )
+    } else {
+        scaled_u128_le(
+            correction_significand as u128,
+            correction_exponent,
+            product_roundoff_significand,
+            common_exponent,
+        )
+    }
+}
+
+/// Compare the exact represented residual magnitude with `k * SE` after both direct operations overflow.
+fn both_overflow_acceptance(
+    estimate: f64,
+    target: f64,
+    standard_error: f64,
+    k: f64,
+) -> bool {
+    let (estimate_significand, estimate_exponent) =
+        binary64_magnitude_components(estimate.abs());
+    let (target_significand, target_exponent) = binary64_magnitude_components(target.abs());
+    let common_residual_exponent = estimate_exponent.min(target_exponent);
+    let estimate_shift = (estimate_exponent - common_residual_exponent) as u32;
+    let target_shift = (target_exponent - common_residual_exponent) as u32;
+
+    // Finite subtraction can overflow only for opposite signs whose magnitudes
+    // are close enough to the top of binary64 that exact alignment needs at most
+    // one 53-bit significand-width shift.
+    debug_assert!(estimate_shift <= 53);
+    debug_assert!(target_shift <= 53);
+    let residual_significand = ((estimate_significand as u128) << estimate_shift)
+        + ((target_significand as u128) << target_shift);
+
+    let (k_significand, k_exponent) = binary64_magnitude_components(k);
+    let (se_significand, se_exponent) = binary64_magnitude_components(standard_error);
+    let bound_significand = (k_significand as u128) * (se_significand as u128);
+    let bound_exponent = k_exponent + se_exponent;
+
+    scaled_u128_le(
+        residual_significand,
+        common_residual_exponent,
+        bound_significand,
+        bound_exponent,
+    )
+}
+
+/// Return the error-free low term of a finite binary64 subtraction.
+fn subtraction_roundoff(minuend: f64, subtrahend: f64, difference: f64) -> f64 {
+    let virtual_subtrahend = minuend - difference;
+    let virtual_minuend = difference + virtual_subtrahend;
+    let subtrahend_roundoff = virtual_subtrahend - subtrahend;
+    let minuend_roundoff = minuend - virtual_minuend;
+    minuend_roundoff + subtrahend_roundoff
+}
+
 /// SE-aware acceptance: accept when `|estimate − target| ≤ k · se`.
 ///
-/// Comparison scales all terms by a shared finite magnitude so opposite-sign
-/// extremes do not overflow both sides of the inequality to infinity.
+/// Finite represented residuals and finite represented `k · se` bounds are
+/// compared before any normalization. If both rounded finite quantities are equal
+/// and nonzero, TEPP compares the error-free subtraction correction (with its sign
+/// adjusted for the absolute residual) with the fused multiply-add product
+/// correction. Different correction projections preserve the represented-input
+/// ordering even when either direct operation rounded to the same binary64 value.
+/// If both projected corrections are zero, the subtraction is exact at the rounded
+/// residual while the product correction may still have underflowed below binary64
+/// resolution; TEPP therefore compares the represented residual with the exact
+/// dyadic product of represented `k` and `se`. If the two nonzero correction
+/// projections are equal, TEPP compares the represented subtraction correction with
+/// the exact dyadic product roundoff before deciding the tie; only the two signed
+/// orderings reachable from that equal-projection branch are implemented. This
+/// preserves the represented-input inequality without adding dead generic branches
+/// or claiming a broader exact comparator for unequal rounded residuals and bounds.
+/// This also preserves a positive acceptance bound when dividing `se` by a much
+/// larger estimate/target scale would underflow to zero. If only the positive bound
+/// overflows, every finite residual is covered; if only the residual overflows, a
+/// finite bound cannot cover it. When both direct operations overflow, TEPP compares
+/// the exact binary64 input rationals by decoding their integer significands and
+/// powers of two, avoiding a false accept/reject caused by independently rounded
+/// normalization. A zero standard error or zero multiplier remains an exact-recovery
+/// gate and is compared before either path. Exact recovery uses numeric equality,
+/// for which IEEE `-0.0` and `+0.0` denote the same zero-valued scientific result.
 ///
 /// # Errors
 ///
@@ -125,37 +480,58 @@ pub fn accept_within_standard_errors(
     if k < 0.0 || standard_error < 0.0 {
         return Err(ValidationError::InvalidConfiguration);
     }
-    if standard_error == 0.0 {
-        // Exact recovery only: zero SE admits no estimation residual.
-        return Ok(estimate.total_cmp(&target).is_eq());
+    if standard_error == 0.0 || k == 0.0 {
+        // Exact recovery is numerical equality; signed zero is one zero value.
+        return Ok(estimate == target);
     }
-    let scale = estimate
-        .abs()
-        .max(target.abs())
-        .max(standard_error)
-        .max(1.0);
-    let scaled_error = (estimate / scale) - (target / scale);
-    let scaled_bound = k * (standard_error / scale);
-    // scale is at least 1.0 and all inputs are finite, so scaled terms are finite.
-    Ok(scaled_error.abs() <= scaled_bound)
-}
 
-/// Welford one-pass mean and sum of squared deviations.
-fn welford_moments(samples: &[f64]) -> Result<(f64, f64, usize), ValidationError> {
-    let mut mean = 0.0_f64;
-    let mut m2 = 0.0_f64;
-    let mut count = 0_usize;
-    for value in samples {
-        count += 1;
-        let delta = value - mean;
-        mean += delta / count as f64;
-        if !mean.is_finite() {
-            return Err(ValidationError::InvalidInput);
+    let direct_error = estimate - target;
+    let direct_bound = k * standard_error;
+    if direct_error.is_finite() {
+        if direct_bound.is_finite() {
+            let residual = direct_error.abs();
+            if residual == direct_bound && residual != 0.0 {
+                let difference_roundoff = subtraction_roundoff(estimate, target, direct_error);
+                let residual_roundoff = if direct_error.is_sign_negative() {
+                    -difference_roundoff
+                } else {
+                    difference_roundoff
+                };
+                let product_roundoff = k.mul_add(standard_error, -direct_bound);
+                if residual_roundoff != product_roundoff {
+                    return Ok(residual_roundoff < product_roundoff);
+                }
+                if residual_roundoff == 0.0 {
+                    return Ok(represented_magnitude_le_exact_product(
+                        residual,
+                        k,
+                        standard_error,
+                    ));
+                }
+                return Ok(represented_correction_le_exact_product_roundoff(
+                    residual_roundoff,
+                    k,
+                    standard_error,
+                    direct_bound,
+                ));
+            }
+            return Ok(residual <= direct_bound);
         }
-        let delta2 = value - mean;
-        m2 += delta * delta2;
+        // A finite residual is necessarily inside a positive bound whose
+        // represented multiplication overflowed beyond binary64's finite range.
+        return Ok(true);
     }
-    Ok((mean, m2, count))
+    if direct_bound.is_finite() {
+        // The represented residual overflowed while the positive bound did not.
+        return Ok(false);
+    }
+
+    Ok(both_overflow_acceptance(
+        estimate,
+        target,
+        standard_error,
+        k,
+    ))
 }
 
 #[allow(clippy::cast_possible_truncation)]

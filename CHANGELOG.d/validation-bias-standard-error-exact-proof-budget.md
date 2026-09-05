@@ -1,0 +1,2 @@
+- Add exact-proof budget characterization for mean-bias standard error: a seventeen-observation represented-input fixture, O(n²) versus algebraically equivalent O(n) checked-`u128` numerator evidence, and the compact-dyadic `n<=2_047` worst-case arithmetic envelope.
+- Add a reproducible standard-library timing harness for the quadratic and linear integer kernels while keeping production exact pair-distance admission bounded at `n<=16` until release-mode CPU/allocation and applicable buyer-path p95 evidence establish a resource budget.

@@ -4,8 +4,78 @@ use crate::MonteCarloSummary;
 use crate::ValidationError;
 use serde::{Deserialize, Serialize};
 
+const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+const MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
+
+fn minority_zero_lower_is_rounding_feasible(p: f64, upper: f64) -> bool {
+    debug_assert!(p > 0.0 && p < 0.5);
+    debug_assert!(upper >= p && upper <= 1.0);
+
+    // Solving the Wilson root identity for the lower endpoint avoids the
+    // cancellation that makes the complement-form residual insensitive near
+    // p = 0. The multiplication order keeps p² from underflowing before the
+    // final represented lower root itself would round to zero.
+    let p_squared = p * p;
+    let denominator = p_squared + (1.0 - 2.0 * p) * upper;
+    debug_assert!(denominator.is_finite() && denominator > 0.0);
+    let implied_lower = p * ((p / denominator) * (1.0 - upper));
+    implied_lower == 0.0
+}
+
+/// Check whether a stored Wilson endpoint pair can arise from one Wilson score interval.
+///
+/// For empirical coverage `p` and `a = z² / n`, the Wilson roots satisfy
+/// `L * U = p² / (1 + a)` and `L + U = 1 + (2p - 1) / (1 + a)`. Eliminating
+/// the unrecorded `a` gives a necessary endpoint-pair identity. For `p < 0.5`,
+/// the equivalent identity on the uncovered proportion avoids squaring a tiny
+/// `p`. All terms remain probability-scaled, so a small absolute binary64
+/// tolerance is sufficient for ordinary interior pairs without overflow-prone
+/// reconstruction of `n` or `z`. A boundary endpoint needs one additional
+/// peer-root check: the eliminated identity can lose all sensitivity to a
+/// representable minority lower root when the stored lower endpoint is exact
+/// zero. The complement-symmetric case applies to an exact-one upper endpoint
+/// above `p = 0.5`. At exact all-covered `p = 1`, the eliminated identity is
+/// degenerate, while the canonical producer still requires the lower endpoint
+/// `n / (n + z²)` to be strictly positive for every non-empty sample and finite
+/// represented `z²`.
+fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool {
+    if p == 0.0 {
+        return true;
+    }
+    if p == 1.0 {
+        return lower > 0.0;
+    }
+
+    if p < 0.5 && lower == 0.0 && !minority_zero_lower_is_rounding_feasible(p, upper) {
+        return false;
+    }
+    if p > 0.5
+        && upper == 1.0
+        && !minority_zero_lower_is_rounding_feasible(1.0 - p, 1.0 - lower)
+    {
+        return false;
+    }
+
+    let endpoint_sum = lower + upper;
+    let (left, right) = if p >= 0.5 {
+        (
+            p * p * (endpoint_sum - 1.0),
+            (2.0 * p - 1.0) * lower * upper,
+        )
+    } else {
+        let uncovered = 1.0 - p;
+        (
+            uncovered * uncovered * (1.0 - endpoint_sum),
+            (1.0 - 2.0 * p) * (1.0 - lower) * (1.0 - upper),
+        )
+    };
+
+    (left - right).abs() <= WILSON_PAIR_ABSOLUTE_TOLERANCE
+}
+
 /// Machine-readable recovery report for a single study.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ValidationReport {
     /// Study label (not free-form PII).
     pub study_label: String,
@@ -30,12 +100,41 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
-    /// Reject non-finite numeric fields before serialization or export.
+    /// Validate numeric and scientific invariants before serialization or export.
+    ///
+    /// RMSE and standard errors are nonnegative. Under the crate's squared-residual
+    /// delta-method producer, `SE(RMSE) <= RMSE / 2`: for `x_i = r_i^2 >= 0`, the
+    /// sample standard deviation satisfies `sd(x) <= sqrt(n) * mean(x)`. Admission
+    /// allows a small relative binary64 tolerance at that support boundary. Exact
+    /// zero RMSE is perfect recovery and therefore still requires exact-zero RMSE
+    /// standard error. Empirical coverage, Wilson endpoints, and temporal-order
+    /// accuracy are probabilities in `[0, 1]`; the Wilson interval is ordered,
+    /// contains the empirical coverage recorded in the same report, and its two
+    /// endpoints must satisfy the same Wilson-score root identity for that
+    /// coverage. A stored zero/one endpoint is additionally refused when the peer
+    /// endpoint implies a representable non-boundary Wilson root. This prevents two
+    /// individually plausible bounds from being combined into an interval that no
+    /// finite positive Wilson `z² / n` can produce. Mean signed bias remains
+    /// unrestricted in sign. A generic [`MonteCarloSummary`] may summarize a signed
+    /// metric, but when it occupies `monte_carlo_rmse` every retained replication is
+    /// nonnegative. Its mean and percentile endpoints are therefore nonnegative.
+    /// Nonnegative sample support additionally implies `SD <= sqrt(n) * mean`,
+    /// `SE(mean) <= mean`, and every retained value—and thus every inclusive
+    /// nearest-rank percentile endpoint—is at most `n * mean`. Admission evaluates
+    /// the percentile support as `endpoint / mean <= n` with a small relative
+    /// binary64 tolerance so the check does not overflow a finite sample sum. A
+    /// zero Monte Carlo RMSE mean is exact perfect recovery across every retained
+    /// replication, so spread, standard error, and empirical percentile endpoints
+    /// must all be zero as well. These checks prevent a finite but scientifically
+    /// impossible payload from becoming durable Validation Evidence.
     ///
     /// # Errors
     ///
-    /// Returns [`ValidationError::InvalidInput`] when any `f64` field or the
-    /// optional Monte Carlo summary violates finiteness / summary invariants.
+    /// Returns [`ValidationError::InvalidInput`] when any `f64` field is
+    /// non-finite, violates its metric domain, point RMSE and its standard error
+    /// exceed squared-residual support, Wilson evidence is incoherent, or the
+    /// optional Monte Carlo RMSE summary violates either generic summary invariants
+    /// or the nonnegative RMSE support.
     pub fn validate(&self) -> Result<(), ValidationError> {
         for value in [
             self.rmse,
@@ -51,8 +150,76 @@ impl ValidationReport {
                 return Err(ValidationError::InvalidInput);
             }
         }
+
+        if self.rmse < 0.0 || self.rmse_standard_error < 0.0 || self.bias_standard_error < 0.0 {
+            return Err(ValidationError::InvalidInput);
+        }
+        if self.rmse == 0.0 {
+            if self.rmse_standard_error != 0.0 {
+                return Err(ValidationError::InvalidInput);
+            }
+        } else {
+            let relative_standard_error = self.rmse_standard_error / self.rmse;
+            if !relative_standard_error.is_finite()
+                || relative_standard_error > 0.5 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
+            {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+        if !(0.0..=1.0).contains(&self.interval_coverage)
+            || !(0.0..=1.0).contains(&self.coverage_wilson_lower)
+            || !(0.0..=1.0).contains(&self.coverage_wilson_upper)
+            || !(0.0..=1.0).contains(&self.temporal_order_accuracy)
+        {
+            return Err(ValidationError::InvalidInput);
+        }
+        if self.coverage_wilson_lower > self.coverage_wilson_upper
+            || self.interval_coverage < self.coverage_wilson_lower
+            || self.interval_coverage > self.coverage_wilson_upper
+            || !wilson_pair_is_algebraically_coherent(
+                self.interval_coverage,
+                self.coverage_wilson_lower,
+                self.coverage_wilson_upper,
+            )
+        {
+            return Err(ValidationError::InvalidInput);
+        }
+
         if let Some(summary) = self.monte_carlo_rmse {
-            summary.validate()?;
+            let summary = summary.validate()?;
+            if summary.mean < 0.0
+                || summary.percentile_lower < 0.0
+                || summary.percentile_upper < 0.0
+            {
+                return Err(ValidationError::InvalidInput);
+            }
+            if summary.mean == 0.0 {
+                if summary.standard_deviation != 0.0
+                    || summary.standard_error != 0.0
+                    || summary.percentile_lower != 0.0
+                    || summary.percentile_upper != 0.0
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
+            } else {
+                let relative_standard_error = summary.standard_error / summary.mean;
+                if !relative_standard_error.is_finite()
+                    || relative_standard_error
+                        > 1.0 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
+
+                let relative_upper_percentile = summary.percentile_upper / summary.mean;
+                let replication_support = summary.replication_count as f64;
+                if !relative_upper_percentile.is_finite()
+                    || relative_upper_percentile
+                        > replication_support
+                            * (1.0 + MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE)
+                {
+                    return Err(ValidationError::InvalidInput);
+                }
+            }
         }
         Ok(())
     }
@@ -61,17 +228,23 @@ impl ValidationReport {
     ///
     /// # Errors
     ///
-    /// Returns [`ValidationError::InvalidInput`] when fields are non-finite or
-    /// serialization fails.
+    /// Returns [`ValidationError::InvalidInput`] when fields violate report
+    /// invariants or serialization fails.
     pub fn to_json(&self) -> Result<String, ValidationError> {
         self.validate()?;
         serde_json::to_string(self).map_err(|_| ValidationError::InvalidInput)
     }
 
-    /// Render a short human-readable summary line.
-    #[must_use]
-    pub fn to_human_summary(&self) -> String {
-        format!(
+    /// Render a short human-readable summary line after validating the report.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] when the report violates its
+    /// numeric or scientific invariants. Human-readable projection is therefore
+    /// subject to the same fail-closed boundary as JSON ingress and egress.
+    pub fn to_human_summary(&self) -> Result<String, ValidationError> {
+        self.validate()?;
+        Ok(format!(
             "study={} rmse={:.6} (se={:.6}) bias={:.6} (se={:.6}) coverage={:.3} temporal_order={:.3}",
             self.study_label,
             self.rmse,
@@ -80,7 +253,67 @@ impl ValidationReport {
             self.bias_standard_error,
             self.interval_coverage,
             self.temporal_order_accuracy
-        )
+        ))
+    }
+}
+
+impl Serialize for ValidationReport {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        self.validate().map_err(serde::ser::Error::custom)?;
+        let mut state = serializer.serialize_struct("ValidationReport", 10)?;
+        state.serialize_field("study_label", &self.study_label)?;
+        state.serialize_field("rmse", &self.rmse)?;
+        state.serialize_field("rmse_standard_error", &self.rmse_standard_error)?;
+        state.serialize_field("mean_bias", &self.mean_bias)?;
+        state.serialize_field("bias_standard_error", &self.bias_standard_error)?;
+        state.serialize_field("interval_coverage", &self.interval_coverage)?;
+        state.serialize_field("coverage_wilson_lower", &self.coverage_wilson_lower)?;
+        state.serialize_field("coverage_wilson_upper", &self.coverage_wilson_upper)?;
+        state.serialize_field("temporal_order_accuracy", &self.temporal_order_accuracy)?;
+        state.serialize_field("monte_carlo_rmse", &self.monte_carlo_rmse)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for ValidationReport {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        struct Raw {
+            study_label: String,
+            rmse: f64,
+            rmse_standard_error: f64,
+            mean_bias: f64,
+            bias_standard_error: f64,
+            interval_coverage: f64,
+            coverage_wilson_lower: f64,
+            coverage_wilson_upper: f64,
+            temporal_order_accuracy: f64,
+            monte_carlo_rmse: Option<MonteCarloSummary>,
+        }
+
+        let raw = Raw::deserialize(deserializer)?;
+        let report = Self {
+            study_label: raw.study_label,
+            rmse: raw.rmse,
+            rmse_standard_error: raw.rmse_standard_error,
+            mean_bias: raw.mean_bias,
+            bias_standard_error: raw.bias_standard_error,
+            interval_coverage: raw.interval_coverage,
+            coverage_wilson_lower: raw.coverage_wilson_lower,
+            coverage_wilson_upper: raw.coverage_wilson_upper,
+            temporal_order_accuracy: raw.temporal_order_accuracy,
+            monte_carlo_rmse: raw.monte_carlo_rmse,
+        };
+        report.validate().map_err(serde::de::Error::custom)?;
+        Ok(report)
     }
 }
 
@@ -91,6 +324,8 @@ impl Serialize for MonteCarloSummary {
         S: serde::Serializer,
     {
         use serde::ser::SerializeStruct;
+
+        (*self).validate().map_err(serde::ser::Error::custom)?;
         let mut state = serializer.serialize_struct("MonteCarloSummary", 6)?;
         state.serialize_field("replication_count", &self.replication_count)?;
         state.serialize_field("mean", &self.mean)?;
@@ -143,15 +378,15 @@ mod tests {
             rmse_standard_error: 0.01,
             mean_bias: 0.0,
             bias_standard_error: 0.02,
-            interval_coverage: 0.95,
-            coverage_wilson_lower: 0.9,
-            coverage_wilson_upper: 0.98,
+            interval_coverage: 0.5,
+            coverage_wilson_lower: 0.2,
+            coverage_wilson_upper: 0.8,
             temporal_order_accuracy: 1.0,
             monte_carlo_rmse: Some(MonteCarloSummary {
                 replication_count: 10,
                 mean: 0.11,
                 standard_deviation: 0.01,
-                standard_error: 0.003,
+                standard_error: 0.01 / 10.0_f64.sqrt(),
                 percentile_lower: 0.09,
                 percentile_upper: 0.13,
             }),
@@ -159,7 +394,12 @@ mod tests {
         let json = report.to_json().expect("json");
         let decoded: ValidationReport = serde_json::from_str(&json).expect("decode");
         assert_eq!(decoded.study_label, "foundation-recovery");
-        assert!(report.to_human_summary().contains("rmse=0.100000"));
+        assert!(
+            report
+                .to_human_summary()
+                .expect("human summary")
+                .contains("rmse=0.100000")
+        );
         let none_report = ValidationReport {
             monte_carlo_rmse: None,
             ..report.clone()

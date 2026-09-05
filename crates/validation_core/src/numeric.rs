@@ -1,0 +1,465 @@
+//! Deterministic binary64 accumulation shared by validation metrics.
+
+use crate::ValidationError;
+
+fn deterministic_compensated_parts(mut values: Vec<f64>) -> (f64, f64) {
+    values.sort_by(f64::total_cmp);
+    let mut sum = 0.0_f64;
+    let mut correction = 0.0_f64;
+    for value in values {
+        let next = sum + value;
+        if sum.abs() >= value.abs() {
+            correction += (sum - next) + value;
+        } else {
+            correction += (value - next) + sum;
+        }
+        sum = next;
+    }
+    (sum, correction)
+}
+
+fn deterministic_compensated_parts_with_tail(mut values: Vec<f64>) -> (f64, f64, f64) {
+    values.sort_by(f64::total_cmp);
+    let mut sum = 0.0_f64;
+    let mut correction = 0.0_f64;
+    let mut correction_tail = 0.0_f64;
+    for value in values {
+        let next = sum + value;
+        let increment = if sum.abs() >= value.abs() {
+            (sum - next) + value
+        } else {
+            (value - next) + sum
+        };
+        let (next_correction, correction_roundoff) = error_free_sum(correction, increment);
+        let (next_tail, tail_roundoff) = error_free_sum(correction_tail, correction_roundoff);
+        correction = next_correction;
+        correction_tail = next_tail + tail_roundoff;
+        sum = next;
+    }
+    (sum, correction, correction_tail)
+}
+
+/// Sum finite values in a canonical order with Neumaier compensation.
+///
+/// Callers own domain validation and any scale normalization needed to keep the
+/// final sum representable. Canonical ordering keeps equivalent metric inputs
+/// from changing only because transport order changed.
+pub(crate) fn deterministic_compensated_sum(values: Vec<f64>) -> f64 {
+    let (sum, correction) = deterministic_compensated_parts(values);
+    sum + correction
+}
+
+pub(crate) fn exact_power_of_two_scale(max_magnitude: f64) -> f64 {
+    let bits = max_magnitude.to_bits();
+    let exponent = (bits >> 52) & 0x7ff;
+    if exponent == 0 {
+        let significand = bits & 0x000f_ffff_ffff_ffff;
+        let highest_bit = 63 - significand.leading_zeros();
+        f64::from_bits(1_u64 << highest_bit)
+    } else {
+        f64::from_bits(exponent << 52)
+    }
+}
+
+fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, ValidationError> {
+    let max_magnitude = values
+        .iter()
+        .map(|value| value.abs())
+        .fold(0.0, f64::max);
+
+    if max_magnitude < f64::MIN_POSITIVE && total_count >= values.len() {
+        // Subnormal values are exact integer multiples of 2^-1074. With a divisor
+        // at least as large as the term count, the exact mean remains subnormal;
+        // summing 52-bit units over any supported `usize` length fits in `u128`.
+        // Round those represented units once instead of normalizing and then
+        // rounding again while restoring a subnormal power-of-two scale.
+        let negative = values.iter().any(|value| *value < 0.0);
+        let total_units: u128 = values
+            .iter()
+            .map(|value| (value.to_bits() & 0x000f_ffff_ffff_ffff) as u128)
+            .sum();
+        let denominator = total_count as u128;
+        let mut rounded_units = total_units / denominator;
+        let remainder = total_units % denominator;
+        let twice_remainder = remainder * 2;
+        if twice_remainder > denominator
+            || (twice_remainder == denominator && rounded_units & 1 == 1)
+        {
+            rounded_units += 1;
+        }
+        if rounded_units == 0 {
+            return Err(ValidationError::InvalidInput);
+        }
+
+        let sign = if negative { 1_u64 << 63 } else { 0 };
+        return Ok(f64::from_bits(sign | rounded_units as u64));
+    }
+
+    let scale = exact_power_of_two_scale(max_magnitude);
+    let normalized = values.iter().map(|value| *value / scale).collect();
+    let (normalized_sum, normalized_correction) = deterministic_compensated_parts(normalized);
+    let denominator = total_count as f64;
+    let leading_mean = normalized_sum / denominator;
+    let division_residual = (-leading_mean).mul_add(denominator, normalized_sum);
+    let normalized_mean = leading_mean + (division_residual + normalized_correction) / denominator;
+    let mean = normalized_mean * scale;
+    if !mean.is_finite() || mean == 0.0 {
+        Err(ValidationError::InvalidInput)
+    } else {
+        Ok(mean)
+    }
+}
+
+fn error_free_sum(left: f64, right: f64) -> (f64, f64) {
+    let sum = left + right;
+    let right_virtual = sum - left;
+    let left_virtual = sum - right_virtual;
+    let left_roundoff = left - left_virtual;
+    let right_roundoff = right - right_virtual;
+    (sum, left_roundoff + right_roundoff)
+}
+
+fn adjacent_float(value: f64, upward: bool) -> f64 {
+    if value == 0.0 {
+        return if upward {
+            f64::from_bits(1)
+        } else {
+            f64::from_bits((1_u64 << 63) | 1)
+        };
+    }
+
+    let bits = value.to_bits();
+    if upward {
+        if value.is_sign_positive() {
+            f64::from_bits(bits + 1)
+        } else {
+            f64::from_bits(bits - 1)
+        }
+    } else if value.is_sign_positive() {
+        f64::from_bits(bits - 1)
+    } else {
+        f64::from_bits(bits + 1)
+    }
+}
+
+fn round_candidate_with_tail(candidate: f64, tail_head: f64, tail_tail: f64) -> f64 {
+    let (tail, tail_roundoff) = error_free_sum(tail_head, tail_tail);
+    if tail == 0.0 && tail_roundoff == 0.0 {
+        return candidate;
+    }
+
+    let upward = if tail != 0.0 {
+        tail.is_sign_positive()
+    } else {
+        tail_roundoff.is_sign_positive()
+    };
+    let neighbor = adjacent_float(candidate, upward);
+    if !neighbor.is_finite() {
+        return neighbor;
+    }
+
+    let half_gap = ((neighbor - candidate).abs()) * 0.5;
+    if half_gap == 0.0 {
+        return neighbor;
+    }
+
+    let tail_magnitude = tail.abs();
+    let beyond_midpoint = if tail_magnitude > half_gap {
+        true
+    } else if tail_magnitude < half_gap {
+        false
+    } else if tail_roundoff == 0.0 {
+        candidate.to_bits() & 1 == 1
+    } else if upward {
+        tail_roundoff > 0.0
+    } else {
+        tail_roundoff < 0.0
+    };
+
+    if beyond_midpoint { neighbor } else { candidate }
+}
+
+fn mixed_remainder_mean_over_total(
+    values: &[f64],
+    total_count: usize,
+) -> Result<f64, ValidationError> {
+    let max_magnitude = values
+        .iter()
+        .map(|value| value.abs())
+        .fold(0.0, f64::max);
+    if max_magnitude == 0.0 {
+        return Ok(0.0);
+    }
+
+    let scale = exact_power_of_two_scale(max_magnitude);
+    let normalized = values.iter().map(|value| *value / scale).collect();
+    let (normalized_sum, normalized_correction, normalized_correction_tail) =
+        deterministic_compensated_parts_with_tail(normalized);
+    if normalized_sum == 0.0
+        && normalized_correction == 0.0
+        && normalized_correction_tail == 0.0
+    {
+        return Ok(0.0);
+    }
+
+    let denominator = total_count as f64;
+    let leading_mean = normalized_sum / denominator;
+    let division_residual = (-leading_mean).mul_add(denominator, normalized_sum);
+    let (correction_numerator, correction_numerator_roundoff) =
+        error_free_sum(division_residual, normalized_correction);
+    let correction_mean = correction_numerator / denominator;
+    let correction_division_residual =
+        (-correction_mean).mul_add(denominator, correction_numerator) / denominator;
+    let (candidate, addition_roundoff) = error_free_sum(leading_mean, correction_mean);
+    let (tail_head, tail_tail) = deterministic_compensated_parts(vec![
+        addition_roundoff,
+        correction_division_residual,
+        correction_numerator_roundoff / denominator,
+        normalized_correction_tail / denominator,
+    ]);
+    let normalized_mean = round_candidate_with_tail(candidate, tail_head, tail_tail);
+    let mean = normalized_mean * scale;
+    if !mean.is_finite() || mean == 0.0 {
+        Err(ValidationError::InvalidInput)
+    } else {
+        Ok(mean)
+    }
+}
+
+/// Deterministically divide the represented sum of finite binary64 values by an explicit count.
+///
+/// Opposite signs cancel before exact power-of-two scale reduction. Each
+/// opposite-sign addition also retains its error-free low term so repeated
+/// sub-ULP contributions cannot disappear one at a time before they collectively
+/// become representable. When those retained terms remain material after
+/// normalization, their compensation is carried through the scientific divisor
+/// instead of being rounded into a single numerator first. The divisor is
+/// independent of `values.len()`, which lets callers preserve an original
+/// scientific denominator when an algebraically equivalent expanded term set is
+/// needed to avoid overflowing intermediate differences. Exact cancellation
+/// returns canonical zero; a nonzero quotient outside or below binary64 range
+/// fails closed.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] for an empty value set, a zero
+/// divisor, non-finite input, or an unrepresentable nonzero quotient.
+pub(crate) fn deterministic_representable_sum_over_count(
+    values: &[f64],
+    total_count: usize,
+) -> Result<f64, ValidationError> {
+    if values.is_empty() || total_count == 0 || values.iter().any(|value| !value.is_finite()) {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    let mut positives = Vec::new();
+    let mut negatives = Vec::new();
+    for &value in values {
+        if value > 0.0 {
+            positives.push(value);
+        } else if value < 0.0 {
+            negatives.push(value);
+        }
+    }
+
+    if positives.is_empty() && negatives.is_empty() {
+        return Ok(0.0);
+    }
+    if positives.is_empty() || negatives.is_empty() {
+        return same_sign_mean_over_total(values, total_count);
+    }
+
+    positives.sort_by(|left, right| right.total_cmp(left));
+    negatives.sort_by(|left, right| left.total_cmp(right));
+
+    let mut positive_index = 0_usize;
+    let mut negative_index = 0_usize;
+    let mut positive = positives[0];
+    let mut negative = negatives[0];
+    let mut residuals = Vec::with_capacity(values.len());
+    let mut roundoff_terms = Vec::new();
+
+    loop {
+        let (residual, roundoff) = error_free_sum(positive, negative);
+        if roundoff != 0.0 {
+            roundoff_terms.push(roundoff);
+        }
+
+        if residual > 0.0 {
+            positive = residual;
+            negative_index += 1;
+            if negative_index == negatives.len() {
+                residuals.push(positive);
+                residuals.extend_from_slice(&positives[positive_index + 1..]);
+                break;
+            }
+            negative = negatives[negative_index];
+        } else if residual < 0.0 {
+            negative = residual;
+            positive_index += 1;
+            if positive_index == positives.len() {
+                residuals.push(negative);
+                residuals.extend_from_slice(&negatives[negative_index + 1..]);
+                break;
+            }
+            positive = positives[positive_index];
+        } else {
+            positive_index += 1;
+            negative_index += 1;
+            if positive_index == positives.len() || negative_index == negatives.len() {
+                residuals.extend_from_slice(&positives[positive_index..]);
+                residuals.extend_from_slice(&negatives[negative_index..]);
+                break;
+            }
+            positive = positives[positive_index];
+            negative = negatives[negative_index];
+        }
+    }
+
+    if roundoff_terms.is_empty() {
+        if residuals.is_empty() {
+            return Ok(0.0);
+        }
+        return same_sign_mean_over_total(&residuals, total_count);
+    }
+
+    residuals.extend(roundoff_terms);
+    mixed_remainder_mean_over_total(&residuals, total_count)
+}
+
+/// Deterministic mean of finite binary64 values with cancellation before scale reduction.
+///
+/// Opposite signs cancel at represented magnitude before the remaining mass is
+/// normalized by an exact power of two. Error-free low terms from cancellation
+/// are retained so several individually sub-ULP contributions can still affect
+/// the represented mean when their combined mass is large enough, and retained
+/// compensation is carried through the original sample-count division before the
+/// final scale is restored. Exact all-zero input and exact mixed-sign cancellation
+/// return canonical zero; a mathematically nonzero mean that falls below
+/// binary64 range fails closed.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] for empty or non-finite input, or
+/// when a nonzero represented mass has no nonzero binary64 mean.
+pub(crate) fn deterministic_representable_mean(values: &[f64]) -> Result<f64, ValidationError> {
+    deterministic_representable_sum_over_count(values, values.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        deterministic_compensated_sum, deterministic_representable_mean,
+        deterministic_representable_sum_over_count,
+    };
+    use crate::ValidationError;
+
+    #[test]
+    fn canonical_compensated_sum_is_order_stable() {
+        let left = deterministic_compensated_sum(vec![1.0, 1e-100, -1.0]);
+        let right = deterministic_compensated_sum(vec![-1.0, 1.0, 1e-100]);
+        assert_eq!(left.to_bits(), right.to_bits());
+    }
+
+    #[test]
+    fn representable_mean_preserves_full_range_cancellation() {
+        let minimum_subnormal = f64::from_bits(1);
+        let twice_minimum_subnormal = f64::from_bits(2);
+        let positive = [
+            f64::MAX,
+            twice_minimum_subnormal,
+            twice_minimum_subnormal,
+            -f64::MAX,
+        ];
+        let negative = [
+            -f64::MAX,
+            -twice_minimum_subnormal,
+            -twice_minimum_subnormal,
+            f64::MAX,
+        ];
+        assert_eq!(
+            deterministic_representable_mean(&positive)
+                .expect("positive")
+                .to_bits(),
+            minimum_subnormal.to_bits()
+        );
+        assert_eq!(
+            deterministic_representable_mean(&negative)
+                .expect("negative")
+                .to_bits(),
+            (-minimum_subnormal).to_bits()
+        );
+        assert_eq!(
+            deterministic_representable_mean(&[f64::MAX, -f64::MAX]),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn representable_mean_retains_accumulated_opposite_sign_roundoff() {
+        let quarter_ulp_at_one = 2.0_f64.powi(-54);
+        let mean = deterministic_representable_mean(&[
+            1.0,
+            -quarter_ulp_at_one,
+            -quarter_ulp_at_one,
+            -quarter_ulp_at_one,
+            -quarter_ulp_at_one,
+        ])
+        .expect("representable mixed-sign mean");
+        assert_eq!(mean.to_bits(), 0x3fc9_9999_9999_9998);
+    }
+
+    #[test]
+    fn explicit_denominator_preserves_representable_expanded_sum() {
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(
+            deterministic_representable_sum_over_count(
+                &[f64::MAX, -f64::MAX, f64::from_bits(3)],
+                3,
+            )
+            .expect("explicit denominator")
+            .to_bits(),
+            minimum_subnormal.to_bits()
+        );
+        assert_eq!(
+            deterministic_representable_sum_over_count(&[f64::MAX, f64::MAX], 1),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            deterministic_representable_sum_over_count(&[0.0], 0),
+            Err(ValidationError::InvalidInput)
+        );
+    }
+
+    #[test]
+    fn representable_mean_covers_admission_and_residual_paths() {
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(
+            deterministic_representable_mean(&[]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            deterministic_representable_mean(&[f64::NAN]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(deterministic_representable_mean(&[0.0, -0.0]), Ok(0.0));
+        assert_eq!(deterministic_representable_mean(&[1.0, 1.0]), Ok(1.0));
+        assert_eq!(deterministic_representable_mean(&[-1.0, -1.0]), Ok(-1.0));
+        assert_eq!(
+            deterministic_representable_mean(&[minimum_subnormal, 0.0]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            deterministic_representable_mean(&[3.0, -1.0, -1.0]),
+            Ok(1.0 / 3.0)
+        );
+        assert_eq!(
+            deterministic_representable_mean(&[-3.0, 1.0, 1.0]),
+            Ok(-1.0 / 3.0)
+        );
+        assert_eq!(
+            deterministic_representable_mean(&[3.0, -1.0, -1.0, -1.0]),
+            Ok(0.0)
+        );
+    }
+}

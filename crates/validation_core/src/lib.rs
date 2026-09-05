@@ -13,19 +13,23 @@
 //! Metrics are pure `f64` CPU reference implementations.
 
 mod bias;
+mod bias_se;
 mod claim;
 mod coverage;
+mod coverage_evidence;
 mod error;
 mod graph_metrics;
 mod input;
 mod matching;
 mod monte_carlo;
+mod numeric;
 mod report;
 mod rmse;
 mod temporal_order;
+mod validation_evidence;
 
 /// Standard error of mean signed bias.
-pub use bias::bias_standard_error;
+pub use bias_se::bias_standard_error;
 /// Mean signed bias.
 pub use bias::mean_bias;
 /// Four ADR 0014 claim authorities.
@@ -48,6 +52,8 @@ pub use claim::promote_scientific_recovery;
 pub use coverage::interval_coverage;
 /// Wilson bounds for coverage proportions.
 pub use coverage::wilson_coverage_interval;
+/// Versioned Wilson coverage evidence with denominator and critical-value provenance.
+pub use coverage_evidence::WilsonCoverageEvidenceV1;
 /// Fail-closed validation errors.
 pub use error::ValidationError;
 /// Undirected edge identity.
@@ -74,3 +80,5 @@ pub use rmse::rmse_standard_error;
 pub use rmse::root_mean_square_error;
 /// Pairwise temporal-order accuracy.
 pub use temporal_order::temporal_order_accuracy;
+/// Versioned durable validation envelope binding projections to scientific provenance.
+pub use validation_evidence::ValidationEvidenceV1;

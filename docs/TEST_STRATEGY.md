@@ -1,7 +1,7 @@
 # TEPP Test and Scientific Validation Strategy
 
 **Status:** Accepted quality baseline aligned to PRD v0.4  
-**Last reviewed:** 2026-08-12
+**Last reviewed:** 2026-09-06
 
 ## Mandatory repository gates
 
@@ -57,15 +57,34 @@ CPU `f64` is reference. Required accelerator lanes execute real kernels; skipped
 
 ## LLM tests
 
-Deterministic schema/security tests are primary. Bounded live tests use `NVIDIA_NIM_API_KEY` only when model conformance is material. Treat documents as prompt-injection data, require evidence-span grounding, test unsupported-claim rejection, record provider/model/prompt/reasoning hashes, and compare model/human agreement where the LLM acts as a rater.
+Deterministic schema/security tests are primary. Bounded live tests use released contextual-orchestrator contracts when model conformance is material. Treat documents as prompt-injection data, require evidence-span grounding, test unsupported-claim rejection, record provider/model/prompt/reasoning hashes, and compare model/human agreement where the LLM acts as a rater. Model-backed Actions must use the approved `orchestrator/free` route and must not make an LLM authoritative for numerical or scientific acceptance.
 
 ## Monte Carlo acceptance
 
 Simulation thresholds account for Monte Carlo standard error and interval uncertainty. Do not require an observed replication proportion to exceed the nominal target exactly when sampling variability makes that scientifically invalid.
 
+## Exact-proof resource budgeting
+
+Validation Evidence numerical proofs that add asymptotic work or material allocation require a measured resource contract before a production admission boundary is widened. For the bias-standard-error exact pair-distance path tracked by issue #491:
+
+- retain realistic represented-input counterexamples and permutation/sign-mirror contracts for scientific correctness;
+- keep the existing exact residual/pairwise-subtraction, checked-integer, GCD-reduction, and exact midpoint authority fail-closed;
+- compare the buffered O(n²) pair-record path, an allocation-free two-pass O(n²) reference, an algebraically equivalent O(n) exact accumulator under a proved sufficient admission condition, and the viable O(n)-fast-path/buffered-pair-fallback hybrid; compare a wider-integer/reference alternative separately;
+- require an admitted/refused-set contract for any O(n) candidate. The current checked-`u128` minimum-shifted kernel is a strict sufficient subset, not a drop-in equivalent: with one coefficient at zero and the rest at `D=2^58`, both pair and linear kernels fit at `n=64`, while at `n=65` the exact pair numerator still fits (`2^122`) but `n*sum(c_i^2)` overflows before cancellation;
+- therefore an O(n) production optimization must either fall back to the current pairwise proof on checked-intermediate refusal or use a separately justified wider checked-integer representation; linear refusal must never silently narrow scientific admission;
+- characterize checked-`u128` refusal as a function of sample count, aligned dyadic diameter/exponent spread, and coefficient distribution rather than treating an integer cutoff as a scientific boundary;
+- keep the minimum-shifted O(n) distribution-independent intermediate envelope distinct from the exact pair-square numerator envelope: at aligned diameter `2^53`, the characterized sufficient bounds are `n<=2_047` and `n<=4_095` respectively, and neither is a production budget;
+- record exact pair counts, target `size_of::<Option<(u128, i32)>>()`, actual scratch `Vec` capacity, scratch payload bytes, and allocator/RSS evidence separately; field-width estimates alone are not allocation evidence;
+- use `crates/validation_core/examples/bias_se_exact_proof_budget.rs` to prove exact restored-numerator equality before timing and to exercise both the `n=64` linear-admitting boundary and the `n=65` checked-intermediate-refusal/pair-fallback boundary. The CSV must identify the geometry and whether hybrid fallback was actually used;
+- run that harness in release mode on a recorded CPU/OS/Rust toolchain and retain raw CSV plus p95; unexecuted harness code is not performance evidence;
+- if a service/API buyer path is affected, measure the full applicable path and retain the `p95 <= 20 ms` target without shrinking samples, omitting proof work, or relying on unrealistic warm-cache setup;
+- arithmetic representability alone does not authorize a production sample-count budget.
+
+Until those measurements and exact-head gates exist, the `n<=16` production bias-SE exact pair-distance admission remains unchanged even when a larger represented-input counterexample is known.
+
 ## Release acceptance
 
-A release requires one integrated protected head with all relevant scientific, numerical, security, migration, packaging, SBOM/provenance, accessibility, operational, and independent-review evidence passing. Planning validation, superseded-branch results, and local-only results are supporting evidence, not release proof.
+A release requires one integrated protected head with all relevant scientific, numerical, security, migration, packaging, SBOM/provenance, accessibility, operational, and independent-review evidence passing. Planning validation, superseded-branch results, local-only results, and unexecuted benchmark tooling are supporting evidence, not release proof.
 
 ## References
 

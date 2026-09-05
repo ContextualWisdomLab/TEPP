@@ -1,0 +1,3 @@
+### Fixed
+
+- Preserve represented low-order mass when a finite `recovered - truth` subtraction rounds before mean-bias aggregation. `mean_bias` now detects nonzero error-free subtraction roundoff and switches that case to the existing recovered-plus-negated-truth numerator, while mixed-sign mean restoration retains a second-order compensation tail through the scientific denominator and final binary64 midpoint decision. This prevents pairwise subtraction and compensation rounding from moving a representable bias by one ULP without changing the exact-subtraction fast path, overflow refusal policy, or `bias_standard_error` contract.
