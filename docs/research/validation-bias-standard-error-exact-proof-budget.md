@@ -20,7 +20,7 @@ For `n=17`, the scientific denominator is `17^2(17-1)=4_624`. `gcd(N,4_624)=2`, 
 
 The current public API intentionally remains on the established translated floating fallback at `n=17`; for this fixture it returns bits `0x41a0_dd77_9ac3_8e98`. Independent high-precision rational-square-root evaluation gives the adjacent correctly rounded binary64 target `0x41a0_dd77_9ac3_8e99`. This extends the demonstrated failure class beyond the current cutoff, but it is evidence for a systemic budget decision rather than justification for another one-count production patch.
 
-`crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs` fixes the exact pair-square sum, reduced ratio, current fallback boundary, algebraic equivalence, pair-record counts, and the distinct checked-integer envelopes below. The test intentionally makes any future widening of production admission update this characterization rather than silently inheriting a stale fallback assumption.
+`crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs` fixes the exact pair-square sum, reduced ratio, current fallback boundary, algebraic equivalence, pair-record counts, distinct checked-integer envelopes, and the admitted/refused-set relation between the current pair reference and the candidate O(n) accumulator. The test intentionally makes any future widening of production admission update this characterization rather than silently inheriting a stale fallback assumption.
 
 ## O(n²) reference versus O(n) exact accumulator
 
@@ -28,17 +28,21 @@ For exact dyadic coefficients `c_i` on one shared unit,
 
 `sum_{i<j} (c_i-c_j)^2 = n * sum_i c_i^2 - (sum_i c_i)^2`.
 
-The characterization test computes both sides with checked `u128` on the seventeen-observation fixture and requires exact equality to `N`. This demonstrates that an O(n) integer accumulator is algebraically capable of preserving the same pair-distance numerator once its admission proof establishes a common exact dyadic grid and exact represented-input geometry.
+The characterization test computes both sides with checked `u128` on the seventeen-observation fixture and requires exact equality to `N`. It also checks deterministic compact grids at `n=4,16,17,32,64,128,256`. Whenever the minimum-shifted O(n) kernel admits those grids, it must equal the O(n²) pair numerator exactly. This demonstrates that an O(n) integer accumulator is algebraically capable of preserving the same pair-distance numerator once its admission proof establishes a common exact dyadic grid and its checked intermediates remain representable.
 
-That admission proof is the material constraint. A prospective linear path may choose the minimum represented residual as an anchor, prove every anchor-relative subtraction exact, align all offsets on the minimum dyadic exponent, and require the aligned diameter to remain within a checked-integer budget. This condition is deliberately stronger than the current O(n²) reference unless a separate proof establishes that enumerated pairwise exactness is unnecessary; refusal must fall back rather than change scientific meaning.
+That admission proof is the material constraint. A prospective linear path may choose the minimum represented residual as an anchor, prove every anchor-relative subtraction exact, align all offsets on the minimum dyadic exponent, and require its checked integer intermediates to remain representable. This condition is deliberately stronger than the current O(n²) reference unless a separate proof establishes equivalence; refusal must fall back rather than change scientific meaning.
+
+The new admission-set characterization proves that the present `u128` linear kernel is **sufficient but not admission-equivalent** to the pair reference. Let `D=2^58` and use one coefficient at zero with every remaining coefficient at `D`. At `n=64`, the linear first term is `64*63*D^2 = 4032*2^116`, so both kernels fit and return the same exact numerator `63*D^2`. At `n=65`, the exact pair numerator is still only `64*D^2 = 2^122`, but the unreduced linear first term becomes `65*64*D^2 = 4160*2^116`, which exceeds the `u128` range before subtracting `(sum c_i)^2`. The checked O(n) kernel therefore refuses a geometry that the checked O(n²) pair reference can still prove exactly.
+
+This rules out a drop-in replacement of the current pair proof with the minimum-shifted `u128` identity. A production O(n) path can preserve current scientific admission only as a sufficient fast path followed by the existing pairwise proof on refusal, or by adopting a wider checked-integer representation with its own resource and supply-chain evidence. A refusal from the linear path is not evidence that the represented-input estimator is scientifically unprovable.
 
 ## Checked-u128 envelopes
 
 Two different `u128` bounds must not be conflated.
 
-For the current minimum-shifted O(n) identity, both `n * sum(c_i^2)` and `(sum c_i)^2` are bounded above by `n^2 D^2` for aligned diameter `D`. With `D = 2^53`, that **implementation-intermediate** bound fits through `n=2_047` and reaches the unrepresentable `2^128` boundary at `n=2_048`.
+For the current minimum-shifted O(n) identity, both `n * sum(c_i^2)` and `(sum c_i)^2` are bounded above by `n^2 D^2` for aligned diameter `D`. With `D = 2^53`, that **distribution-independent sufficient intermediate envelope** fits through `n=2_047` and reaches the unrepresentable `2^128` boundary at `n=2_048`. It is not the exact admission frontier for every coefficient distribution; the `D=2^58`, `n=64/65` characterization above shows that actual checked-intermediate admission depends on the coefficient distribution as well as `n` and diameter.
 
-The exact pair-square numerator itself has the tighter extremal bound `floor(n^2/4) D^2`, attained by placing the represented coefficients at the two diameter endpoints as evenly as possible. At the same `D = 2^53`, that final exact numerator can still fit `u128` through `n=4_095` and crosses the `2^128` boundary at `n=4_096`. Therefore `2_047` is not an intrinsic exact-pair numerator ceiling; it is a ceiling of the presently characterized minimum-shifted linear intermediate.
+The exact pair-square numerator itself has the tighter extremal bound `floor(n^2/4) D^2`, attained by placing the represented coefficients at the two diameter endpoints as evenly as possible. At the same `D = 2^53`, that final exact numerator can still fit `u128` through `n=4_095` and crosses the `2^128` boundary at `n=4_096`. Therefore `2_047` is not an intrinsic exact-pair numerator ceiling; it is only the conservative all-distribution envelope of the presently characterized minimum-shifted linear intermediates.
 
 The scientific denominator `n^2(n-1)` is a separate bounded-proof input. Its unreduced value remains at or below the exact binary64-integer bound `2^53` through `n=208_064` and exceeds it at `n=208_065`. The production midpoint proof checks the **reduced** denominator after GCD reduction, so this unreduced threshold is a sufficient envelope marker rather than a universal refusal count.
 
@@ -50,7 +54,7 @@ The current bounded O(n²) implementation stores every pair as `Option<(u128, i3
 
 Exact byte cost is target-layout dependent and must not be inferred by adding field widths. The measurement harness now obtains `size_of::<Option<(u128, i32)>>()` on the executing target, records the actual `Vec` element capacity after `with_capacity`, and reports their product as scratch payload bytes. Allocator bookkeeping and whole-process RSS are still outside that number and must be recorded separately if they become release evidence.
 
-A two-pass O(n²) reference can remove the pair-record allocation without changing the pair-enumeration proof shape: the first pass establishes the common dyadic unit, and the second recomputes each pair record and accumulates the checked square. The harness now measures this allocation-free quadratic alternative alongside the buffered pair layout. The O(n) identity removes pair enumeration as well, but production activation still requires its admitted/refused-set proof and exact-head verification.
+A two-pass O(n²) reference can remove the pair-record allocation without changing the pair-enumeration proof shape: the first pass establishes the common dyadic unit, and the second recomputes each pair record and accumulates the checked square. The harness now measures this allocation-free quadratic alternative alongside the buffered pair layout. The O(n) identity removes pair enumeration as well, but the new admission-set characterization shows that its present checked-`u128` form must remain a sufficient fast path with pairwise fallback unless wider intermediates are justified.
 
 ## Measurement harness
 
@@ -60,11 +64,11 @@ A two-pass O(n²) reference can remove the pair-record allocation without changi
 - `quadratic_two_pass`: the same pair enumeration and dyadic alignment without pair-record storage;
 - `linear`: `n*sum(c_i^2) - (sum c_i)^2` on minimum-shifted coefficients.
 
-Before timing, the harness restores the buffered/two-pass unit exponent and requires all three kernels to equal the same exact pair-square numerator. It emits CSV columns
+Before timing, the harness restores the buffered/two-pass unit exponent and requires all three kernels to equal the same exact pair-square numerator on the timed fixtures. It emits CSV columns
 
 `sample_count,kernel,p95_ns,timing_samples,unit_exponent,scratch_records,scratch_payload_bytes,pair_record_size_bytes`
 
-for 16, 64, 256, 1,024, and 2,047 observations. The buffered timing includes pair-vector allocation and consumption; the two-pass and linear rows report zero pair-record scratch payload. This is still a kernel harness, not the full public API: binary64 residual admission, endpoint serialization, networking, scheduler effects, and allocator metadata/RSS remain outside the measurement.
+for 16, 64, 256, 1,024, and 2,047 observations. The buffered timing includes pair-vector allocation and consumption; the two-pass and linear rows report zero pair-record scratch payload. This is still a kernel harness, not the full public API: binary64 residual admission, endpoint serialization, networking, scheduler effects, allocator metadata/RSS, and the linear-refusal/pair-fallback hybrid are outside the current measurement.
 
 No release-mode timing result is recorded in this document yet. A valid timing record must include CPU, OS, Rust toolchain, exact commit, release build mode, raw sample count, and raw CSV. It cannot substitute for an applicable API buyer-path p95 measurement.
 
@@ -72,7 +76,7 @@ No release-mode timing result is recorded in this document yet. A valid timing r
 
 Production admission stays `n=4..=16`. Extending to `n=17` alone is rejected because GAP-111 through GAP-125 plus the seventeen-observation evidence show that the integer cutoff is not a scientific boundary. Removing the cutoff entirely is rejected because the current production implementation still enumerates and stores O(n²) pair evidence. Treating `n<=2_047`, `n<=4_095`, or the unreduced denominator threshold as the production budget is rejected because arithmetic representability is not latency or memory evidence.
 
-A two-pass O(n²) allocation-removal path remains a candidate because it can preserve the current pair-proof shape while eliminating pair-record storage. The O(n) identity remains the stronger candidate for CPU scaling, subject to an admitted/refused-set proof. Arbitrary-precision production arithmetic is deferred: it may be useful as an independent wider reference, but adding it to the production dependency surface requires measured benefit, supply-chain review, and an explicit owner/resource decision.
+A two-pass O(n²) allocation-removal path remains a candidate because it can preserve the current pair-proof admission shape while eliminating pair-record storage. The O(n) identity remains the stronger CPU-scaling candidate, but its checked-`u128` form is now proven to be a strict sufficient subset of the pair reference. Replacing the pair proof with that kernel alone is rejected because it would silently narrow exact-proof admission. The viable bounded designs are therefore O(n) fast admission with O(n²) fallback, an admission-equivalent wider-integer O(n) proof, or the allocation-free two-pass pair reference if measurements show it is adequate. Arbitrary-precision production arithmetic remains deferred pending measured benefit, supply-chain review, and an explicit owner/resource decision.
 
 ## Traceability
 
@@ -90,4 +94,4 @@ A two-pass O(n²) allocation-removal path remains a candidate because it can pre
 
 ## Follow-up evidence required by #491
 
-Run the harness in release mode on a recorded CPU/toolchain and retain raw timing CSV. Record allocator/RSS evidence in addition to the harness's exact pair-record payload layout. Prototype the stronger O(n) dyadic-grid admission behind tests and compare its admitted/refused set against the existing pairwise proof. Evaluate a wider-integer/reference alternative without making it production authority. Only after those results establish a resource budget should production admission change; any such change needs a realistic public RED, exact-head Rust/rustdoc/coverage evidence, and applicable buyer-path p95 evidence.
+Run the harness in release mode on a recorded CPU/toolchain and retain raw timing CSV. Record allocator/RSS evidence in addition to the harness's exact pair-record payload layout. Extend the harness with the viable hybrid shape—O(n) sufficient admission followed by the existing pair reference on checked-intermediate refusal—and measure both admitting and refusing geometries. Evaluate a wider-integer/reference alternative without making it production authority. Only after those results establish a resource budget should production admission change; any such change needs a realistic public RED, exact-head Rust/rustdoc/coverage evidence, and applicable buyer-path p95 evidence.
