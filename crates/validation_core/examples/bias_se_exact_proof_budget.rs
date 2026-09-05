@@ -24,6 +24,8 @@ struct KernelObservation {
     used_pairwise_fallback: bool,
 }
 
+type Kernel = fn(&[u128]) -> Option<KernelObservation>;
+
 fn fixture(sample_count: usize) -> Vec<u128> {
     (0..sample_count)
         .map(|index| {
@@ -187,11 +189,7 @@ fn percentile_95(mut durations: Vec<Duration>) -> Duration {
     durations[rank.saturating_sub(1)]
 }
 
-fn measure(
-    values: &[u128],
-    samples: usize,
-    kernel: fn(&[u128]) -> Option<KernelObservation>,
-) -> (Duration, KernelObservation) {
+fn measure(values: &[u128], samples: usize, kernel: Kernel) -> (Duration, KernelObservation) {
     for _ in 0..3 {
         black_box(kernel(black_box(values)).expect("fixture must remain within u128"));
     }
@@ -248,7 +246,10 @@ fn assert_and_measure_geometry(
         Some(exact_pair_square_sum),
         "hybrid must preserve the exact pair numerator"
     );
-    assert_eq!(hybrid.used_pairwise_fallback, expect_hybrid_fallback);
+    assert!(
+        hybrid.used_pairwise_fallback == expect_hybrid_fallback,
+        "hybrid fallback observation must match the declared geometry"
+    );
 
     match pair_square_sum_linear(values) {
         Some(linear) => {
@@ -262,10 +263,7 @@ fn assert_and_measure_geometry(
         None => assert!(!expect_linear_admission, "linear refusal was not expected"),
     }
 
-    let mut kernels: Vec<(
-        &str,
-        fn(&[u128]) -> Option<KernelObservation>,
-    )> = vec![
+    let mut kernels: Vec<(&str, Kernel)> = vec![
         ("quadratic_buffered", pair_square_sum_quadratic_buffered),
         ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
         ("hybrid", pair_square_sum_hybrid),
