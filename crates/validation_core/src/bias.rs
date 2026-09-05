@@ -215,15 +215,83 @@ fn exact_three_level_standard_error(
     // For a translated three-observation sample `[0, x, y]`,
     // `SE(mean)^2 = (x^2 + y^2 - xy) / 9`. Admit the direct identity only when
     // every binary64 product/addition is proven error-free and the numerator is
-    // itself an exact represented square. Otherwise keep the general translated
-    // second-moment path rather than broadening the numerical claim.
+    // itself an exact represented square. If raw products overflow, retry the
+    // same proof after an exactly reversible power-of-two normalization; this
+    // preserves the represented geometry instead of making proof admission depend
+    // on magnitude alone. Other failed proofs stay on the general translated path.
     let first_square = first_offset * first_offset;
     let second_square = second_offset * second_offset;
     let cross_product = first_offset * second_offset;
-    if !first_square.is_finite()
-        || !second_square.is_finite()
-        || !cross_product.is_finite()
-        || first_offset.mul_add(first_offset, -first_square) != 0.0
+    let products_overflow =
+        !first_square.is_finite() || !second_square.is_finite() || !cross_product.is_finite();
+    if products_overflow {
+        let max_magnitude = first_offset.abs().max(second_offset.abs());
+        if max_magnitude == 0.0 || !max_magnitude.is_finite() {
+            return Ok(None);
+        }
+        let scale = exact_power_of_two_scale(max_magnitude);
+        let normalized_first = first_offset / scale;
+        let normalized_second = second_offset / scale;
+        if !normalized_first.is_finite()
+            || !normalized_second.is_finite()
+            || (first_offset != 0.0 && normalized_first == 0.0)
+            || (second_offset != 0.0 && normalized_second == 0.0)
+            || normalized_first * scale != first_offset
+            || normalized_second * scale != second_offset
+        {
+            return Ok(None);
+        }
+
+        let normalized_first_square = normalized_first * normalized_first;
+        let normalized_second_square = normalized_second * normalized_second;
+        let normalized_cross_product = normalized_first * normalized_second;
+        if !normalized_first_square.is_finite()
+            || !normalized_second_square.is_finite()
+            || !normalized_cross_product.is_finite()
+            || normalized_first.mul_add(normalized_first, -normalized_first_square) != 0.0
+            || normalized_second.mul_add(normalized_second, -normalized_second_square) != 0.0
+            || normalized_first.mul_add(normalized_second, -normalized_cross_product) != 0.0
+        {
+            return Ok(None);
+        }
+
+        let normalized_square_sum = normalized_first_square + normalized_second_square;
+        if !normalized_square_sum.is_finite()
+            || subtraction_roundoff(
+                normalized_first_square,
+                -normalized_second_square,
+                normalized_square_sum,
+            ) != 0.0
+        {
+            return Ok(None);
+        }
+        let normalized_radicand = normalized_square_sum - normalized_cross_product;
+        if !normalized_radicand.is_finite()
+            || subtraction_roundoff(
+                normalized_square_sum,
+                normalized_cross_product,
+                normalized_radicand,
+            ) != 0.0
+        {
+            return Ok(None);
+        }
+
+        let normalized_exact_root = normalized_radicand.sqrt();
+        if normalized_exact_root.mul_add(normalized_exact_root, -normalized_radicand) != 0.0 {
+            return Ok(None);
+        }
+        let normalized_standard_error =
+            deterministic_representable_sum_over_count(&[normalized_exact_root], 3)?;
+        let standard_error = scale * normalized_standard_error;
+        if !standard_error.is_finite()
+            || (standard_error == 0.0 && normalized_standard_error != 0.0)
+        {
+            return Err(ValidationError::InvalidInput);
+        }
+        return Ok(Some(standard_error));
+    }
+
+    if first_offset.mul_add(first_offset, -first_square) != 0.0
         || second_offset.mul_add(second_offset, -second_square) != 0.0
         || first_offset.mul_add(second_offset, -cross_product) != 0.0
     {
@@ -518,15 +586,17 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// through a second binary64 rounding boundary. An exactly translated three-level
 /// sample also uses `SE(mean)^2 = (x² + y² - xy) / 9` when every product and
 /// addition is proven error-free and that numerator is itself an exact represented
-/// square; the exact root is divided by three once instead of reconstructing the
-/// same rational square through rounded normalized moments. The general translated
-/// path avoids making a rounded residual mean authoritative before dispersion is
-/// evaluated. Its normalization uses an exact power-of-two scale so the
-/// translated geometry is not re-rounded through an arbitrary magnitude before
-/// the final SE is restored. Cases that cannot prove those translated deltas or
-/// exact three-level identity representable retain the predecessor translated or
-/// rounded-residual path. Individual signed residuals must still be representable
-/// because their dispersion is itself part of the requested scientific result.
+/// square; if those raw products overflow, the same proof is retried on an exactly
+/// reversible power-of-two normalization so the identity is scale-invariant. The
+/// exact root is divided by three once instead of reconstructing the same rational
+/// square through rounded normalized moments. The general translated path avoids
+/// making a rounded residual mean authoritative before dispersion is evaluated.
+/// Its normalization uses an exact power-of-two scale so the translated geometry
+/// is not re-rounded through an arbitrary magnitude before the final SE is
+/// restored. Cases that cannot prove those translated deltas or exact three-level
+/// identity representable retain the predecessor translated or rounded-residual
+/// path. Individual signed residuals must still be representable because their
+/// dispersion is itself part of the requested scientific result.
 ///
 /// # Errors
 ///
@@ -717,6 +787,14 @@ mod tests {
                 .expect("exact rational-square path")
                 .to_bits(),
             0x3f79_5555_5555_5555
+        );
+        let large_unit = 2.0_f64.powi(590);
+        assert_eq!(
+            exact_three_level_standard_error(-5.0 * large_unit, 16.0 * large_unit)
+                .expect("scale-invariant exact identity")
+                .expect("normalized rational-square path")
+                .to_bits(),
+            0x64f9_5555_5555_5555
         );
         assert_eq!(
             exact_three_level_standard_error(-1.0, 2.0).expect("fallback"),
