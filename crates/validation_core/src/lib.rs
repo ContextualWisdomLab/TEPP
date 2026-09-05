@@ -13,6 +13,7 @@
 //! Metrics are pure `f64` CPU reference implementations.
 
 mod bias;
+mod bias_standard_error;
 mod claim;
 mod coverage;
 mod coverage_evidence;
@@ -28,7 +29,7 @@ mod temporal_order;
 mod validation_evidence;
 
 /// Standard error of mean signed bias.
-pub use bias::bias_standard_error;
+pub use bias_standard_error::bias_standard_error;
 /// Mean signed bias.
 pub use bias::mean_bias;
 /// Four ADR 0014 claim authorities.
