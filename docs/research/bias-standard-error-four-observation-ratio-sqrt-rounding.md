@@ -43,7 +43,7 @@ The repair remains inside TEPP's Validation Evidence bounded context. `crates/va
 
 The pair-distance identity then supplies the exact rational radicand without a rounded `numerator / 48` becoming authoritative. A binary64 `sqrt` of the rounded ratio is used only as a candidate. The implementation compares the exact rational radicand with the square of the adjacent-float midpoint and chooses the correctly rounded neighbor, including ties-to-even. Failure to prove any precondition returns to the predecessor `bias.rs` implementation rather than widening admission.
 
-Source lineage for the repair is `3de7a73781576b3ad2b58d0c5bd5341ebf2300c2` → `ea609474a102dbf0ed3cd544c200f542a59e2760` → role-naming/refinement `2c68909557a62d09d9719df20e8ffd1e644ea7a1` → `622d1681a10006d2a67ed9c615626014c7253b92` → `170f77eec2f9d72dedea1f932f9be687e7849f8b`. CHANGELOG lineage starts at `49c46aa4ec80a006a5d265a2a9c7c2281e989697`.
+Source lineage for the repair is `3de7a73781576b3ad2b58d0c5bd5341ebf2300c2` → `ea609474a102dbf0ed3cd544c200f542a59e2760` → role-naming/refinement `2c68909557a62d09d9719df20e8ffd1e644ea7a1` → `622d1681a10006d2a67ed9c615626014c7253b92` → `170f77eec2f9d72dedea1f932f9be687e7849f8b` → proof-edge coverage `b92a4d63e850a589ae7067ed236d9efe7382e198` → `c80324930fe462f50424a5f8f03ac5088406e2c9`. CHANGELOG lineage starts at `49c46aa4ec80a006a5d265a2a9c7c2281e989697`.
 
 ## Alternatives rejected
 
@@ -78,7 +78,7 @@ Morris, T. P., White, I. R., & Crowther, M. J. (2019). Using simulation studies 
 - implementation admission: `crates/validation_core/src/bias_se.rs`;
 - established fallback: `crates/validation_core/src/bias.rs`;
 - public RED: `crates/validation_core/tests/bias_standard_error_four_observation_ratio_sqrt_rounding_contract.rs` at `978c422cbdccff02605b5d220bd2564900a830d5`;
-- repair lineage: `3de7a737...` through `170f77ee...`;
-- CHANGELOG: `CHANGELOG.d/validation-bias-standard-error-four-observation-ratio-sqrt-rounding.md`;
+- source/test lineage: `3de7a737...` through `c8032493...`;
+- CHANGELOG: `CHANGELOG.d/validation-bias-standard-error-four-observation-ratio-sqrt-rounding.md` at `49c46aa4...`;
 - landing vehicle: PR #488;
 - predecessor retained: GAP-110 and all inherited Validation Evidence lineages remain in ancestry.
