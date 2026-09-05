@@ -1,7 +1,7 @@
 # TEPP Test and Scientific Validation Strategy
 
 **Status:** Accepted quality baseline aligned to PRD v0.4  
-**Last reviewed:** 2026-08-12
+**Last reviewed:** 2026-09-06
 
 ## Mandatory repository gates
 
@@ -57,15 +57,30 @@ CPU `f64` is reference. Required accelerator lanes execute real kernels; skipped
 
 ## LLM tests
 
-Deterministic schema/security tests are primary. Bounded live tests use `NVIDIA_NIM_API_KEY` only when model conformance is material. Treat documents as prompt-injection data, require evidence-span grounding, test unsupported-claim rejection, record provider/model/prompt/reasoning hashes, and compare model/human agreement where the LLM acts as a rater.
+Deterministic schema/security tests are primary. Bounded live tests use released contextual-orchestrator contracts when model conformance is material. Treat documents as prompt-injection data, require evidence-span grounding, test unsupported-claim rejection, record provider/model/prompt/reasoning hashes, and compare model/human agreement where the LLM acts as a rater. Model-backed Actions must use the approved `orchestrator/free` route and must not make an LLM authoritative for numerical or scientific acceptance.
 
 ## Monte Carlo acceptance
 
 Simulation thresholds account for Monte Carlo standard error and interval uncertainty. Do not require an observed replication proportion to exceed the nominal target exactly when sampling variability makes that scientifically invalid.
 
+## Exact-proof resource budgeting
+
+Validation Evidence numerical proofs that add asymptotic work or material allocation require a measured resource contract before a production admission boundary is widened. For the bias-standard-error exact pair-distance path tracked by issue #491:
+
+- retain realistic represented-input counterexamples and permutation/sign-mirror contracts for scientific correctness;
+- keep the existing exact residual/pairwise-subtraction, checked-integer, GCD-reduction, and exact midpoint authority fail-closed;
+- compare the current O(n²) pair-distance proof with an algebraically equivalent O(n) exact accumulator only under a proved sufficient admission condition, and compare a wider-integer/reference alternative separately;
+- characterize checked-`u128` refusal as a function of sample count and aligned dyadic diameter/exponent spread rather than treating an integer cutoff as a scientific boundary;
+- record allocation count and compiled layout measurements separately; field-width estimates are not allocation evidence;
+- run `crates/validation_core/examples/bias_se_exact_proof_budget.rs` in release mode on a recorded CPU/OS/Rust toolchain and retain raw samples plus p95; the harness is integer-kernel characterization, not an HTTP buyer-path result;
+- if a service/API buyer path is affected, measure the full applicable path and retain the `p95 <= 20 ms` target without shrinking samples, omitting proof work, or relying on unrealistic warm-cache setup;
+- arithmetic representability alone does not authorize a production sample-count budget.
+
+Until those measurements and exact-head gates exist, the `n<=16` production bias-SE exact pair-distance admission remains unchanged even when a larger represented-input counterexample is known.
+
 ## Release acceptance
 
-A release requires one integrated protected head with all relevant scientific, numerical, security, migration, packaging, SBOM/provenance, accessibility, operational, and independent-review evidence passing. Planning validation, superseded-branch results, and local-only results are supporting evidence, not release proof.
+A release requires one integrated protected head with all relevant scientific, numerical, security, migration, packaging, SBOM/provenance, accessibility, operational, and independent-review evidence passing. Planning validation, superseded-branch results, local-only results, and unexecuted benchmark tooling are supporting evidence, not release proof.
 
 ## References
 
