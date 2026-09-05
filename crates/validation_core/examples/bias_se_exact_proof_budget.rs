@@ -3,13 +3,13 @@
 //! This example compares checked-integer proof kernels on deterministic dyadic
 //! coefficients: a production-layout-shaped buffered O(n²) pair proof, an
 //! allocation-free two-pass O(n²) variant, an algebraically equivalent O(n)
-//! sufficient accumulator, a two-limb wider-product O(n) reference, and the
-//! viable hybrid shape that uses the narrow O(n) path only when it admits and
-//! otherwise falls back to the buffered pair proof. The O(n) paths first remove
-//! the shared power-of-two unit from anchor-relative coefficients so
-//! checked-intermediate refusal is evaluated on the canonical dyadic grid rather
-//! than on an arbitrary raw integer scale. This is characterization tooling, not
-//! production admission and not buyer-path latency evidence by itself.
+//! sufficient accumulator, a two-limb wider-product O(n) reference, the existing
+//! narrow-to-pair hybrid, and a candidate narrow-to-wide-to-pair hybrid. The O(n)
+//! paths first remove the shared power-of-two unit from anchor-relative
+//! coefficients so checked-intermediate refusal is evaluated on the canonical
+//! dyadic grid rather than on an arbitrary raw integer scale. This is
+//! characterization tooling, not production admission and not buyer-path latency
+//! evidence by itself.
 
 use std::hint::black_box;
 use std::mem::size_of;
@@ -21,6 +21,7 @@ struct KernelObservation {
     unit_exponent: i32,
     scratch_records: usize,
     scratch_payload_bytes: usize,
+    used_wide_product: bool,
     used_pairwise_fallback: bool,
 }
 
@@ -150,6 +151,7 @@ fn pair_square_sum_quadratic_buffered(values: &[u128]) -> Option<KernelObservati
             unit_exponent: 0,
             scratch_records,
             scratch_payload_bytes,
+            used_wide_product: false,
             used_pairwise_fallback: false,
         });
     }
@@ -159,6 +161,7 @@ fn pair_square_sum_quadratic_buffered(values: &[u128]) -> Option<KernelObservati
         unit_exponent,
         scratch_records,
         scratch_payload_bytes,
+        used_wide_product: false,
         used_pairwise_fallback: false,
     })
 }
@@ -178,6 +181,7 @@ fn pair_square_sum_quadratic_two_pass(values: &[u128]) -> Option<KernelObservati
             unit_exponent: 0,
             scratch_records: 0,
             scratch_payload_bytes: 0,
+            used_wide_product: false,
             used_pairwise_fallback: false,
         });
     }
@@ -192,6 +196,7 @@ fn pair_square_sum_quadratic_two_pass(values: &[u128]) -> Option<KernelObservati
         unit_exponent,
         scratch_records: 0,
         scratch_payload_bytes: 0,
+        used_wide_product: false,
         used_pairwise_fallback: false,
     })
 }
@@ -228,6 +233,7 @@ fn pair_square_sum_linear(values: &[u128]) -> Option<KernelObservation> {
         unit_exponent: i32::try_from(common_shift).ok()?,
         scratch_records: 0,
         scratch_payload_bytes: 0,
+        used_wide_product: false,
         used_pairwise_fallback: false,
     })
 }
@@ -243,12 +249,25 @@ fn pair_square_sum_linear_wide_product(values: &[u128]) -> Option<KernelObservat
         unit_exponent: i32::try_from(common_shift).ok()?,
         scratch_records: 0,
         scratch_payload_bytes: 0,
+        used_wide_product: true,
         used_pairwise_fallback: false,
     })
 }
 
 fn pair_square_sum_hybrid(values: &[u128]) -> Option<KernelObservation> {
     if let Some(observation) = pair_square_sum_linear(values) {
+        return Some(observation);
+    }
+    let mut observation = pair_square_sum_quadratic_buffered(values)?;
+    observation.used_pairwise_fallback = true;
+    Some(observation)
+}
+
+fn pair_square_sum_wide_hybrid(values: &[u128]) -> Option<KernelObservation> {
+    if let Some(observation) = pair_square_sum_linear(values) {
+        return Some(observation);
+    }
+    if let Some(observation) = pair_square_sum_linear_wide_product(values) {
         return Some(observation);
     }
     let mut observation = pair_square_sum_quadratic_buffered(values)?;
@@ -290,12 +309,13 @@ fn emit(
     observation: KernelObservation,
 ) {
     println!(
-        "{geometry},{sample_count},{kernel_name},{},{samples},{},{},{},{},{}",
+        "{geometry},{sample_count},{kernel_name},{},{samples},{},{},{},{},{},{}",
         p95.as_nanos(),
         observation.unit_exponent,
         observation.scratch_records,
         observation.scratch_payload_bytes,
         size_of::<Option<(u128, i32)>>(),
+        observation.used_wide_product,
         observation.used_pairwise_fallback
     );
 }
@@ -306,6 +326,8 @@ fn assert_and_measure_geometry(
     samples: usize,
     expect_linear_admission: bool,
     expect_hybrid_fallback: bool,
+    expect_wide_hybrid_wide_product: bool,
+    expect_wide_hybrid_pair_fallback: bool,
 ) {
     let buffered = pair_square_sum_quadratic_buffered(values)
         .expect("buffered quadratic result stays within u128");
@@ -331,16 +353,27 @@ fn assert_and_measure_geometry(
     assert_eq!(
         restored_pair_square_sum(hybrid),
         Some(exact_pair_square_sum),
-        "hybrid must preserve the exact pair numerator"
+        "narrow-pair hybrid must preserve the exact pair numerator"
     );
     assert_eq!(
         restored_pair_square_sum(wide_hybrid),
         Some(exact_pair_square_sum),
         "narrow-wide-pair hybrid must preserve the exact pair numerator"
     );
-    assert!(
-        hybrid.used_pairwise_fallback == expect_hybrid_fallback,
-        "hybrid fallback observation must match the declared geometry"
+    assert_eq!(
+        hybrid.used_pairwise_fallback,
+        expect_hybrid_fallback,
+        "narrow-pair fallback observation must match the declared geometry"
+    );
+    assert_eq!(
+        wide_hybrid.used_wide_product,
+        expect_wide_hybrid_wide_product,
+        "wide-route observation must match the declared geometry"
+    );
+    assert_eq!(
+        wide_hybrid.used_pairwise_fallback,
+        expect_wide_hybrid_pair_fallback,
+        "wide-hybrid pair fallback observation must match the declared geometry"
     );
 
     match pair_square_sum_linear(values) {
@@ -359,7 +392,7 @@ fn assert_and_measure_geometry(
         ("quadratic_buffered", pair_square_sum_quadratic_buffered),
         ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
         ("linear_wide_product_reference", pair_square_sum_linear_wide_product),
-        ("hybrid", pair_square_sum_hybrid),
+        ("hybrid_narrow_pair", pair_square_sum_hybrid),
         ("hybrid_narrow_wide_pair", pair_square_sum_wide_hybrid),
     ];
     if expect_linear_admission {
@@ -386,11 +419,19 @@ fn main() {
         .max(1);
 
     println!(
-        "geometry,sample_count,kernel,p95_ns,timing_samples,unit_exponent,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_pairwise_fallback"
+        "geometry,sample_count,kernel,p95_ns,timing_samples,unit_exponent,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_wide_product,used_pairwise_fallback"
     );
     for sample_count in [16_usize, 64, 256, 1_024, 2_047] {
         let values = fixture(sample_count);
-        assert_and_measure_geometry("compact_admit", &values, samples, true, false);
+        assert_and_measure_geometry(
+            "compact_admit",
+            &values,
+            samples,
+            true,
+            false,
+            false,
+            false,
+        );
     }
 
     let power_of_two_values = boundary_fixture(65, 1_u128 << 58);
@@ -400,18 +441,30 @@ fn main() {
         samples,
         true,
         false,
+        false,
+        false,
     );
 
     let odd_diameter = (1_u128 << 58) + 1;
     let odd_64 = boundary_fixture(64, odd_diameter);
-    assert_and_measure_geometry("odd_boundary_admit", &odd_64, samples, true, false);
+    assert_and_measure_geometry(
+        "odd_boundary_admit",
+        &odd_64,
+        samples,
+        true,
+        false,
+        false,
+        false,
+    );
 
     let odd_65 = boundary_fixture(65, odd_diameter);
     assert_and_measure_geometry(
-        "odd_boundary_pair_fallback",
+        "odd_boundary_wide_recovery",
         &odd_65,
         samples,
         false,
         true,
+        true,
+        false,
     );
 }
