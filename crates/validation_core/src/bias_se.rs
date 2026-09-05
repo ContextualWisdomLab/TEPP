@@ -338,6 +338,13 @@ mod tests {
             exact_four_observation_standard_error(&truth, &[0.0, 1.0, f64::INFINITY, 2.0]),
             None
         );
+        assert_eq!(
+            exact_four_observation_standard_error(
+                &truth,
+                &[f64::MAX, -f64::MAX, 0.0, 0.0]
+            ),
+            None
+        );
 
         let tiny = 2.0_f64.powi(-54);
         assert_eq!(
@@ -346,6 +353,10 @@ mod tests {
         );
         assert_eq!(
             exact_four_observation_standard_error(&[1.0, 0.0, 0.0, 0.0], &[tiny, 0.0, 0.0, 0.0]),
+            None
+        );
+        assert_eq!(
+            exact_four_observation_standard_error(&truth, &[0.0, 1.0, 2.0, 67_108_864.0]),
             None
         );
     }
