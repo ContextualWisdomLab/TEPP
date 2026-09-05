@@ -269,11 +269,13 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// scaling by their largest magnitude, and the standard error is formed from
 /// `sqrt(sum(d²) / (n * (n - 1)))` so an avoidable intermediate variance or
 /// separately rounded `sqrt(n)` cannot change the final represented result.
-/// For two finite represented residuals whose pairwise subtraction discarded
-/// low-order input mass, the exact two-observation identity `SE = |r₁-r₂| / 2`
-/// is evaluated from the expanded represented inputs. For larger samples whose
-/// rounded residuals all collapse to the same binary64 value, the common high
-/// part cannot contribute to dispersion. TEPP therefore first evaluates a
+/// For any two finite represented residuals, the exact two-observation identity
+/// `SE = |r₁-r₂| / 2` is evaluated before a rounded residual mean can distort
+/// dispersion. If either pairwise residual subtraction discarded represented
+/// low-order input mass, the same identity is evaluated from the expanded
+/// recovered/truth inputs instead of the rounded residuals. For larger samples
+/// whose rounded residuals all collapse to the same binary64 value, the common
+/// high part cannot contribute to dispersion. TEPP therefore first evaluates a
 /// translation-invariant second moment directly from the error-free subtraction
 /// low terms when their anchor-relative differences are exactly representable;
 /// only cases that cannot prove that exact translation retain the predecessor
@@ -312,10 +314,14 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
         .collect();
     let has_subtraction_roundoff = subtraction_roundoffs.iter().any(|roundoff| *roundoff != 0.0);
 
-    if diffs.len() == 2 && has_subtraction_roundoff {
-        let expanded_difference = [recovered[0], -truth[0], -recovered[1], truth[1]];
-        let half_difference =
-            deterministic_representable_sum_over_count(&expanded_difference, 2)?;
+    if diffs.len() == 2 {
+        let half_difference = if has_subtraction_roundoff {
+            let expanded_difference = [recovered[0], -truth[0], -recovered[1], truth[1]];
+            deterministic_representable_sum_over_count(&expanded_difference, 2)?
+        } else {
+            let represented_difference = [diffs[0], -diffs[1]];
+            deterministic_representable_sum_over_count(&represented_difference, 2)?
+        };
         return Ok(half_difference.abs());
     }
 
