@@ -2,122 +2,87 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-05T17:08:59Z  
+**Snapshot:** 2026-09-05T17:35:00Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
-**Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md). Historical exact source/test/fixture/contract/ADR evidence remains in repository ancestry, `docs/research/`, `docs/TRACEABILITY.md`, and the surviving landing vehicles; this live register is an operator-oriented current-state index rather than a second copy of every predecessor narrative.
+**Delivery authority:** issue [#175](https://github.com/ContextualWisdomLab/TEPP/issues/175), PR [#435](https://github.com/ContextualWisdomLab/TEPP/pull/435), and [`docs/delivery/pr-queue-authority-2026-09-01.md`](delivery/pr-queue-authority-2026-09-01.md). Historical exact source/test/fixture/contract/ADR evidence remains in repository ancestry, `docs/research/`, `docs/TRACEABILITY.md`, and the surviving landing vehicles. This file is the current operator register, not a second copy of every predecessor narrative.
 
 ## Delivery truth
 
-A planning document, mergeable branch, local/source inspection, predecessor-head result, queued/skipped check, ADR number, or LLM judgment does not make a capability shipped. Only protected-main integration plus current required evidence establishes delivery.
+A planning document, mergeable branch, local/source inspection, predecessor-head result, queued/skipped check, ADR number, bot status, or LLM judgment does not make a capability shipped. Only protected-main integration plus current required evidence establishes delivery.
 
 | Signal | Fresh evidence | Delivery implication |
 | --- | ---: | --- |
-| Protected `main` | `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0` | #490 remains integrated; capability claims are bounded to this signed protected head until main advances. |
+| Protected `main` | `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0` | #490 remains integrated; product claims are bounded to this protected head until main advances. |
 | Open pull requests | **134** | WIP circuit breaker remains active; consolidate into existing bounded-context vehicles. |
-| Draft pull requests | **134** | Every current open PR is Draft. |
-| Non-Draft pull requests | **0** | No PR is eligible for normal merge until deliberately made Ready after exact-head evidence. |
-| Open issues | **16** | ADR normalization, orchestration admission, evaluation drift, and scientific recovery remain open. |
-| GitHub releases | **0** | No TEPP open head is a released contract. |
-| Organization ruleset | `18156473` | One approval, stale-review dismissal after push, resolved threads, extra approval for unattributed changes, and central required workflows remain delivery gates. |
+| Draft pull requests | **134** | Every open PR is Draft. |
+| Non-Draft pull requests | **0** | No PR is normal-merge eligible. |
+| Open issues | **17** | #491 now tracks systemic Validation Evidence exact-proof budgeting in addition to the existing architecture/release/scientific work. |
+| TEPP GitHub releases | **0** | No open TEPP head is a released contract. |
+| Organization ruleset | `18156473` | Current required workflows, review/thread requirements, stale-review handling, and non-fast-forward prohibition remain delivery gates. |
 
-Passing, queued, skipped, or predecessor-head Checks on an open PR never promote that PR to implemented-main. Organization-admin bypass is not normal delivery evidence and is not used by this writer.
+Passing, queued, skipped, or predecessor-head checks on an open PR never promote that PR to implemented-main. Organization-admin bypass is not normal delivery evidence.
 
 ## Current priority open pull-request evidence
 
 #435 intentionally omits its own mutable branch SHA from this file.
 
-| PR | Exact current head | Draft | Base | Disposition |
-| ---: | --- | :---: | --- | --- |
-| #488 | `93f0ea9d945ce0a19fd7f06c0b90bd5b41c8b1fa` | true | `main` | Validation Evidence landing vehicle on protected #490. GAP-121–124 restore/extend demonstrated exact `n=12..15` pair-distance radicands; the bounded checked midpoint proof now extends only through `n=15`, while `n=16` remains fallback. Fresh exact-head hosted gates and independent review remain required. |
-| #487 | `e07b2ff9f78ef456ff911b8643710af20921fe54` | true | #416 | Validation / Analysis Run fold child; unique evidence must be inherited by a conflict-resolving survivor and child-head CI does not transfer. |
-| #485 | `f71591864efc2beff336ced7ef35d5a013305c36` | true | #416 | Analysis Run fold child; preserve support-edge source/tests/doctoring. |
-| #484 | `9a1be78b5342ff65e3cf2aac1e9331c68943f246` | true | #416 | Analysis Run fold child; preserve summarizes-edge source/tests/doctoring. |
-| #483 | `847d96f913bb261803ac0bd751ad7e4f51324cee` | true | #416 | Analysis Run fold child; preserve unique evidence. |
-| #482 | `506dbae236a4484301b704b6c6a05b20faf0fe69` | true | #416 | Analysis Run fold child; preserve unique evidence. |
-| #480 | `5b2637f7b6142573ba1385a652c56632ecc9faa5` | true | `main` | Released contextual-orchestrator boundary repair vehicle; mutable owner main remains evidence only and branch still needs non-force inheritance of #489/#490. |
-| #460 | `dfab4eab5ff733731e565a9348072b8dab2e4912` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
-| #458 | `08165e3b3c929b4ae77396689549f72723ff8ff5` | true | #416 | Analysis Run fold child; typed cutoff equality and terminal-validation separation. |
-| #416 | `aa730c63563eb4a33048d822b581036c8487bd47` | true | `main` | Validation / Analysis Run landing vehicle; generic cutoff-before-identity repair remains inherited and branch requires non-destructive #489/#490 consolidation. |
-| #310 | `c6680450152b1e0a2c9abb553772d74a23923335` | true | `main` | Longitudinal Modeling vehicle; stable `Between` recovery is unit-level with canonical occasion `0`, `Within` retains actual occasion identity, and wrong-base restack remains a repair finding. |
+| PR / issue | Exact current evidence | Disposition |
+| --- | --- | --- |
+| #488 | `757fb0e4770b24f73f301b336adfcf7f656dcea5`, Draft, base `main` | Validation Evidence landing vehicle on protected #490. GAP-125 extends the bounded exact pair-distance proof through `n=16`. Current #491 characterization proves the failure class continues at `n=17`, compares O(n²) and O(n) exact numerator identities, and leaves production admission unchanged pending measured resource evidence. |
+| #491 | open | Replace the sample-count staircase with a measured exact-proof budget. Requires reproducible CPU/allocation evidence, checked-`u128` envelope, O(n²)/O(n)/wider-reference comparison, realistic scientific fixtures, exact-head gates, and applicable buyer-path p95 evidence. |
+| #416 | `aa730c63563eb4a33048d822b581036c8487bd47`, Draft | Validation / Analysis Run landing vehicle. Generic cutoff-before-identity repair remains inherited; fold children keep unique source/tests/doctoring until conflict-resolving inheritance is verified. |
+| #310 | `c6680450152b1e0a2c9abb553772d74a23923335`, Draft | Longitudinal Modeling vehicle. Stable `Between` recovery is unit-level with canonical occasion `0`; `Within` retains actual occasion identity. Older base remains a non-destructive restack finding. |
+| #480 | `5b2637f7b6142573ba1385a652c56632ecc9faa5`, Draft | contextual-orchestrator released-contract fail-closed integration vehicle. Mutable owner main remains evidence only. |
 
 Exact-head evidence becomes stale after any source push.
 
 ## Domain ownership
 
-TEPP owns temporal/event composition, irregular time, time-varying multilevel/cross-classified/multiple-membership semantics, longitudinal invariance/drift/alignment, leakage-safe knowledge cutoff, temporal recovery, Validation Evidence, and Projection policy. `longitudinal_modeling` is the bounded context and `longitudinal_core` is its current Rust implementation path.
+TEPP owns Temporal Semantics, Event Ontology, Temporal Graph composition, irregular event time, time-varying multilevel/cross-classified/multiple-membership semantics, Longitudinal Modeling, leakage-safe knowledge cutoff, temporal recovery, Validation Evidence, and Projection policy. `longitudinal_core` is the current Rust implementation path for Longitudinal Modeling.
 
-fast-mlsirm owns reusable static/generalized-mixed/dependence-aware psychometric specification and arithmetic. TEPP consumes only immutable released/versioned contracts through an ACL; source copying and mutable sibling-head dependencies are prohibited. contextual-orchestrator owns provider/model routing and semantic LLM execution; TEPP requires an immutable released compatible contract and uses `orchestrator/free` for model-backed Actions. Context Graph contracts are contract-only integration authority; EA Core owns enterprise-architecture decisions. No cross-service SQL.
+fast-mlsirm owns reusable static/generalized-mixed/dependence-aware psychometric specification and arithmetic. TEPP consumes only immutable released/versioned contracts through an ACL; source copying and mutable sibling-head dependencies are prohibited. contextual-orchestrator owns provider/model routing and semantic LLM execution; TEPP requires an immutable released compatible contract and uses `orchestrator/free` for model-backed Actions. Context Graph contracts remain contract-only integration authority, EA Core owns enterprise-architecture decisions, and cross-service SQL is prohibited.
 
 The clock contract separates event/valid time, assertion time, document time, system time, availability time, and knowledge cutoff. Retrospective evidence may describe an earlier event but cannot enter an earlier knowledge cutoff. Forward state/transition edges remain distinct from retrospective/citation/revision/provenance relations.
 
 ## Scientific invariants
 
 - Rasch remains distinct from generic 1PL; formulation-qualified 2PLM–5PLM, MIRT, ideal-point/GGUM, testlet/rater/facet/generalized-mixed identity is preserved.
-- A nominal unit identifier is not repeated-measures evidence; singleton units cannot satisfy a longitudinal multilevel floor. Stable `Between` known truth is unit-level with canonical `occasion_index = 0`; `Within` retains actual `(unit, occasion)` identity.
+- A nominal unit identifier is not repeated-measures evidence. Stable `Between` known truth is unit-level with canonical `occasion_index = 0`; `Within` retains actual `(unit, occasion)` identity.
 - Row arrival order is not scientific evidence. Fixed admitted observations must produce bit-identical results under permutation wherever the deterministic CPU `f64` contract claims it.
-- A representable final scientific estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. False exact endpoints, erased finite bounds, cancellation residues, and avoidable double-rounding are repair findings.
-- Mean signed bias and bias SE are TEPP Validation Evidence performance measures. For `n=2`, the exact represented residual-difference identity remains authoritative. For `n=3`, proved two-level/rational-square identities and translated-residual rules from GAP-092–110 remain inherited. For exact represented residuals with `n=4..=15`, GAP-111–124 admit `SE(mean)^2 = Σ_{i<j}(r_i-r_j)^2 / [n²(n-1)]` only when every residual and pairwise subtraction is error-free, dyadic integer construction fits checked `u128`, the exact ratio is GCD-reduced, and exact candidate-square/adjacent-midpoint comparisons authorize the returned binary64 value. Floating ratio/`sqrt` is only a candidate seed. GAP-121–124 extend the demonstrated bounded O(n²) admission from eleven to fifteen observations; `n=16` and larger remain on the established translated path until separate numerical and performance evidence justifies another extension or a broader cost-bounded design. Proof failure falls back; this is not a global correctly-rounded `n>2` claim.
-- Generic Validation Evidence RMSE, Monte Carlo, Wilson, SE-aware acceptance, matching, durable evidence/provenance, serde and human projection retain their GAP-045–091 contracts. Scientific failures are never hidden with skip/xfail/source rewriting/coverage exclusions.
+- A representable final estimand is not rejected solely because an avoidable intermediate binary64 operation overflows/underflows. False exact endpoints, erased finite bounds, cancellation residues, and avoidable double-rounding are repair findings.
+- Mean signed bias and bias SE are TEPP Validation Evidence performance measures. `n=2` and proved `n=3` identities remain inherited from GAP-092–110. For exact represented residuals with `n=4..=16`, GAP-111–125 admit `SE(mean)^2 = Σ_{i<j}(r_i-r_j)^2 / [n²(n-1)]` only when residual and pairwise subtraction are error-free, dyadic integer construction fits checked `u128`, the exact ratio is GCD-reduced, and exact candidate-square/adjacent-midpoint comparison authorizes the returned binary64 value. Floating ratio/`sqrt` is only a candidate seed. Proof failure falls back; this is not a global correctly-rounded `n>2` claim.
+- The `n=16` cutoff is an implementation/resource boundary, not a scientific boundary. #491 evidence demonstrates an exact `n=17` counterexample and an algebraically equivalent O(n) pair-square numerator. Production admission remains `n<=16` until release-mode CPU/allocation and applicable buyer-path p95 evidence establish a budget.
+- Generic Validation Evidence RMSE, Monte Carlo, Wilson, SE-aware acceptance, matching, durable evidence/provenance, serde and human projection retain GAP-045–091 contracts. Scientific failures are never hidden with skip/xfail/source rewriting/coverage exclusions.
 - Historical-cutoff admission occurs before duplicate-identity checks. Future-unavailable evidence cannot change an earlier run's conflicts, counts, or terminal state.
 - Supported temporal estimators require state/trajectory and claimed-structure recovery, bias/RMSE, interval coverage, convergence, uncertainty calibration, reproducibility, and leakage-safe rolling-origin evidence. CPU/GPU parity counts only when the relevant accelerator path actually runs.
 
-## Current repairs and blockers
+## Current Validation Evidence repair and resource finding
 
-### #488 — Validation Evidence
+#488 exact head `757fb0e4770b24f73f301b336adfcf7f656dcea5` inherits the full GAP-045–124 source/test/fixture/contract lineage and GAP-125's sixteen-observation repair.
 
-#488 is the generic Validation Evidence landing vehicle at exact head `93f0ea9d945ce0a19fd7f06c0b90bd5b41c8b1fa`, based on protected #490. GAP-121 RED `b6ac111731a53b5d8d67d0222292542617432478` and repair `035cf392b5e9f115c7b5a2589ebbeadb311d7a45` cover twelve observations; GAP-122 RED `369af46de7e0719cfb4db04fedf4d2775e04f62c` and repair `0b8727e7550022ad5f89b2e5b48129f5b2f520eb` cover thirteen; GAP-123 RED `db40397603e2514cf3be25783dc65018aab64f10` and repair `58efe80da3c4a57e2b69860f5d4178894f769420` cover fourteen. Their exact algebra and doctoring are carried by ancestor `05e97b3ad2f5ad2b64dd4922c68b28752a13af47`.
+GAP-125 public RED `5da82b2d651706c191ca191c6c077d916cbfda25` uses exact represented residuals `[314270929,327661307,371854441,398522837,413483290,416184956,565808551,682627163,724514517,731058943,740662035,970233120,1141566755,1320628283,1526331271,1992574092]`. Its 120 exact squared pair distances sum to `56_762_922_330_032_131_548`; denominator `16²×15=3_840`; gcd `12`; reduced radicand `4_730_243_527_502_677_629/320`. The predecessor translated floating moment/`sqrt` fallback returns adjacent lower `0x419c_fcbb_b78d_2ad4`, while exact midpoint comparison returns `0x419c_fcbb_b78d_2ad5`. Causal repair `a509ae9e46c8ffc2cc3ef4f0e904774ad2516e1f` advances only the existing bounded proof to `n=4..=16`.
 
-GAP-124 RED `1c8a7cedd4ff846d3f3ab226cb4fa25b79650c58` uses exact fifteen-observation residuals `[224611356,291740781,326373353,461196594,686313913,812468689,889538573,1089098727,1093012981,1094199400,1387143595,1412604591,1556072759,1847457618,1990087657]`. The 105 exact squared pair distances sum to `65163338527647814596`; denominator `15²×14=3150`; gcd `18`; reduced radicand `3620185473758211922/175`. The predecessor translated floating moment/`sqrt` fallback returns adjacent lower `0x41a1_254f_de99_720c`, while exact midpoint comparison returns `0x41a1_254f_de99_720d`. Causal repair `3cc041ee1aa5f9871619c483059f5930a056f41a` advances only the existing admission to `n=4..=15`; current CHANGELOG/research/TRACEABILITY head is `93f0ea9d945ce0a19fd7f06c0b90bd5b41c8b1fa`.
+Issue #491 characterization commit `757fb0e4770b24f73f301b336adfcf7f656dcea5` adds an exactly represented `n=17` fixture `[38557579,48779805,63558649,106352599,139863777,142786819,267163239,275103292,375678558,454709869,484300224,623646610,989643121,1027595814,1520220488,1569903156,1805452085]`. Its 136 exact pair squares sum to `92_549_865_125_191_410_206`; denominator `4_624`; gcd `2`; reduced radicand `46_274_932_562_595_705_103/2_312`. Current fallback returns `0x41a0_dd77_9ac3_8e98`; exact-rational evaluation gives adjacent `0x41a0_dd77_9ac3_8e99`.
 
-Residual/pairwise exactness, checked dyadic/`u128` construction, `n²(n-1)` denominator, GCD reduction, exact candidate/adjacent-midpoint comparison, and fail-closed fallback remain mandatory. GAP-120 and all earlier source/test/fixture/contract/ADR histories remain inherited. Fresh exact-head Rust, documentation, security/SAST and independent review evidence are still required; `mergeable=true` is not GREEN.
+The same commit adds `crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs`, which verifies that the O(n²) pair-distance sum equals `n*Σc_i²-(Σc_i)²` exactly on the n=17 fixture and fixes a compact-dyadic checked-`u128` worst-case envelope: for aligned diameter `D<=2^53`, `n²D²` fits through `n=2047` and reaches the unrepresentable `2^128` bound at `n=2048`. This arithmetic ceiling is not a production budget.
 
-### #310, #416, #480
+`crates/validation_core/examples/bias_se_exact_proof_budget.rs` supplies a standard-library timing harness for the quadratic and linear checked-integer kernels at 16, 64, 256, 1024, and 2047 observations. It emits kernel p95 timing rows and checks algebraic equality before timing. No release-mode result is recorded yet. `docs/research/validation-bias-standard-error-exact-proof-budget.md` also records that the current pair-record allocation count is exactly `n(n-1)/2` and distinguishes a semantics-preserving two-pass O(n²) allocation-removal option from a stronger sufficient-admission O(n) path.
 
-#310 remains Longitudinal Modeling authority at `c6680450152b1e0a2c9abb553772d74a23923335`; its older base is a non-force restack finding. #416 remains Validation/Analysis Run consolidation at `aa730c63563eb4a33048d822b581036c8487bd47`; children #458/#460/#482/#483/#484/#485/#487 remain open until unique evidence is inherited. #480 remains the owner-correct contextual-orchestrator fail-closed integration vehicle and must not consume mutable owner main.
+The next source decision must be based on measured evidence, not the next integer sample count. Required evidence: release-mode CPU and allocation/layout results on a recorded toolchain/CPU; comparison of the O(n) sufficient-admission accepted/refused set against the existing pairwise proof; a wider-integer/reference alternative assessment; realistic public scientific acceptance fixtures with permutation/sign mirrors; and applicable buyer-path `p95<=20 ms` evidence before widening production admission.
 
 ## Gap register
 
-GAP-001–GAP-044 retain their existing domain/release identities and exact source/test/ADR ancestry. GAP-045–GAP-091 retain the established Validation Evidence mean-bias, RMSE/SE, Monte Carlo, Wilson, matching, acceptance, provenance, serde and projection repairs. The current represented-input bias-SE sequence is restated because #488 is its single writer.
-
-| ID | Gap | Maturity | Closure evidence |
-| --- | --- | --- | --- |
-| GAP-001–044 | Existing product/domain/DDD/release gaps and Longitudinal repairs | mixed, inherited | Exact histories remain in repository ancestry, surviving landing vehicles, ADRs/tests, and prior research/TRACEABILITY; no source/test/fixture/contract delta is discarded by this live-register compaction. |
-| GAP-045–091 | Established Validation Evidence mean-bias, RMSE/SE, Monte Carlo, Wilson, matching, acceptance, provenance/serde/projection repair sequence | `verification-pending` / inherited | Exact histories remain on #488 ancestry and their public tests/research records; protected-main integration still requires exact-head gates and review. |
-| GAP-092 | two represented residuals could collapse to false-zero bias SE | `verification-pending` | RED `c9c55ea5...` + n=2 expanded-difference repair `f6d7da96...`; inherited by #488. |
-| GAP-093 | n>2 distinct represented residuals could collapse to one rounded high | `verification-pending` | RED `06a70e1c...` + common-high/error-free-low repair `04c62514...`; inherited by #488. |
-| GAP-094 | separately rounded square roots could shift bias SE by one ULP | `verification-pending` | corrected RED `62243204...` + direct normalized-SE repair `8b8f0a21...`; inherited by #488. |
-| GAP-095 | subtraction roundoff could materially overstate uncertainty | `verification-pending` | RED `ae906ad6...` + exact translated-residual repair `d59b9c30...`; inherited. |
-| GAP-096 | exact residuals could be re-centered on a rounded mean | `verification-pending` | RED `9265b34a...` + exact-residual translated repair `2fa266b2...`; inherited. |
-| GAP-097 | common-high path could round low-term mean before centering | `verification-pending` | RED `d48e2515...` + exact low-term translated-second-moment repair `a63b8d7a...`; inherited. |
-| GAP-098 | non-power normalization could double-round exact translated bias SE | `verification-pending` | RED `426fc5af...` + dyadic-scale prerequisite `d8b411f5...` + causal repair `d536e3b1...`; inherited. |
-| GAP-099 | exact n=3 two-level bias SE could re-round an exact gap | `verification-pending` | RED `fbcdb7fa...` + causal repair `e0f2445d...`; inherited. |
-| GAP-100 | exact two-level singleton geometry remained wrong beyond n=3 | `verification-pending` | RED `4386d9ac...` + causal repair `79ad03fa...`; inherited. |
-| GAP-101 | exact n=2 residuals could be re-centered on rounded midpoint mean | `verification-pending` | RED `d3dcd918...` + causal repair `02b0a178...`; inherited. |
-| GAP-102 | non-singleton two-level dyadic count identity could be re-rounded | `verification-pending` | RED `3bc43da2...` + causal repair `77ba1002...`; inherited. |
-| GAP-103 | reciprocal-integer non-power-of-two count factor could be re-rounded | `verification-pending` | RED `d793f7f9...` + causal repair `0a4bfcd5...`; inherited. |
-| GAP-104 | non-unit rational-square count factor could be re-rounded | `verification-pending` | RED `6dc8116c...` + causal repair `8f2803c8...`; inherited. |
-| GAP-105 | exact rational-square result could double-round into subnormal range | `verification-pending` | RED `8b7995d2...` + causal repair `ab0f0df1...`; inherited. |
-| GAP-106 | numerical path depended on first-observation anchor | `verification-pending` | RED `5cb45a4f...` + causal repair `159659a9...`; permutation/sign-mirror contract inherited. |
-| GAP-107 | several exact anchors had different conditioning | `verification-pending` | RED `49343ab6...` + causal repair `0fc3ea97...`; conditioning contract inherited. |
-| GAP-108 | exact n=3 three-level rational-square dispersion re-rounded through moments | `verification-pending` | RED `32dcab84...` + causal repair `bee85e3d...`; all-permutation/sign-mirror contract inherited. |
-| GAP-109 | exact dyadic scale overflow could reject the same n=3 proof | `verification-pending` | RED `67fa4852...` + causal repair `dcaf25b3...`; inherited. |
-| GAP-110 | nonzero raw product underflow could be mistaken for exact zero | `verification-pending` | RED `fe013e7d...` + causal repair `d3660d44...`; inherited. |
-| GAP-111 | exact n=4 pair-distance radicand was rounded before `sqrt` | `verification-pending` | RED `978c422c...` + bounded pair-distance/midpoint repair lineage `3de7a737...` → `c8032493...`; inherited. |
-| GAP-112 | unreduced n=4 rational could select a different bounded path | `verification-pending` | RED `4f223135...` + causal GCD-reduction repair `ed1a8763...`; inherited. |
-| GAP-113 | exact reduced `u128` numerator above `2^53` was unnecessarily rejected | `verification-pending` | RED `50153a1c...` + causal repair `dbf6b409...`; inherited. |
-| GAP-114 | exact n=5 pair-distance dispersion remained one ULP wrong | `verification-pending` | RED `5878ec10...` + causal repair `41298270...`; inherited. |
-| GAP-115 | exact n=6 pair-distance dispersion remained one ULP wrong | `verification-pending` | RED `cb07b89b...` + causal repair `8e194dc1...`; inherited. |
-| GAP-116 | exact n=7 pair-distance dispersion remained one ULP wrong | `verification-pending` | RED `a1de7ae9...` + causal repair `2907e468...` + CHANGELOG `78d5ed3f...` + research ancestor `4efe2421...`; inherited. |
-| GAP-117 | exact n=8 pair-distance dispersion remained one ULP high on the predecessor translated floating path | `verification-pending` | RED `40413dc9...` + causal repair `26ca2d68...` extends only the bounded proof through `n=8` + CHANGELOG `2641b261...` + research ancestor `52fa2c87...`; permutations/sign mirrors fixed at `0x41ac_8601_97ac_cd4c`; inherited. |
-| GAP-118 | exact n=9 pair-distance dispersion remained one ULP low on the predecessor translated floating path | `verification-pending` | RED `c7b65377...` + causal repair `bcd2ab5e...` extends only the bounded proof through `n=9` + CHANGELOG `f575fa21...` + research ancestor `c76f0021...`; permutations/sign mirrors fixed at `0x41a7_5f1f_6489_5d36`; inherited by #488. |
-| GAP-119 | exact n=10 pair-distance dispersion remained one ULP low on the predecessor translated floating path | `verification-pending` | RED `813c97e8...` + causal repair `1bff5033...` extends only the bounded proof through `n=10` + CHANGELOG `2dacce55...` + research ancestor `bf32b509...`; permutations/sign mirrors fixed at `0x41a5_e8a1_0795_bf6c`; inherited by #488. |
-| GAP-120 | exact n=11 pair-distance dispersion remained one ULP low on the predecessor translated floating path | `verification-pending` | RED `967e1e09...` + causal repair `59c5a4ef...` extends only the bounded proof through `n=11` + CHANGELOG `2e9c6a54...`; inherited by #488. |
-| GAP-121 | exact n=12 pair-distance dispersion remained one ULP high on the predecessor translated floating path | `verification-pending` | RED `b6ac1117...` + causal repair `035cf392...` extends only the bounded proof through `n=12`; CHANGELOG/research doctoring restored by `05e97b3a...`; permutations/sign mirrors fixed at `0x41a6_5ddb_5161_045f`. |
-| GAP-122 | exact n=13 pair-distance dispersion remained one ULP high on the predecessor translated floating path | `verification-pending` | RED `369af46d...` + causal repair `0b8727e7...` extends only the bounded proof through `n=13`; CHANGELOG/research doctoring restored by `05e97b3a...`; permutations/sign mirrors fixed at `0x41a2_9a8e_6db8_cb76`. |
-| GAP-123 | exact n=14 pair-distance dispersion remained one ULP low on the predecessor translated floating path | `verification-pending` | RED `db403976...` + causal repair `58efe80d...` extends only the bounded proof through `n=14` + CHANGELOG/research ancestor `05e97b3a...`; permutations/sign mirrors fixed at `0x41a2_3df9_5954_fb0b`; inherited. |
-| GAP-124 | exact n=15 pair-distance dispersion remained one ULP low on the predecessor translated floating path | `verification-pending` | RED `1c8a7ced...` + causal repair `3cc041ee...` extends only the bounded proof through `n=15` + CHANGELOG/research/current #488 `93f0ea9d...`; permutations/sign mirrors fixed at `0x41a1_254f_de99_720d`; hosted exact-head GREEN/review/main integration pending. |
+| ID | Gap / state | Current closure evidence |
+| --- | --- | --- |
+| GAP-001–044 | Existing product/domain/DDD/release and Longitudinal gaps; mixed/inherited | Exact histories remain in ancestry, surviving landing vehicles, ADRs/tests, and research/TRACEABILITY. |
+| GAP-045–091 | Validation Evidence bias, RMSE/SE, Monte Carlo, Wilson, matching, acceptance, provenance/serde/projection repairs; verification pending | Exact source/tests/research remain inherited on #488; protected-main integration still requires current-head gates/review. |
+| GAP-092–110 | Represented residual subtraction, translated-moment, rational-scale, anchor, three-level and subnormal correctness sequence; verification pending | Exact RED→repair lineages and public contracts remain inherited on #488. |
+| GAP-111–120 | Exact pair-distance/midpoint proof introduced and extended through `n=11`; verification pending | Exact RED→repair/test/research lineages remain inherited. |
+| GAP-121–124 | Exact pair-distance proof extended through `n=12..15`; verification pending | REDs `b6ac1117...`, `369af46d...`, `db403976...`, `1c8a7ced...` with causal repairs `035cf392...`, `0b8727e7...`, `58efe80d...`, `3cc041ee...`; doctoring inherited. |
+| GAP-125 | Exact `n=16` pair-distance result remained one ULP low on translated fallback; verification pending | RED `5da82b2d...` → repair `a509ae9e...` → CHANGELOG/research `3d2297c6...`; production bounded proof is now `n=4..=16`. |
+| #491 | Hard sample-count cutoff is an unmeasured resource budget; open | Characterization `757fb0e4...` proves an n=17 counterexample, O(n²)/O(n) exact numerator equivalence, compact-dyadic `u128` envelope, and adds timing tooling. Production cutoff deliberately unchanged pending measured CPU/allocation/API evidence. |
 
 ## Release gate
 
