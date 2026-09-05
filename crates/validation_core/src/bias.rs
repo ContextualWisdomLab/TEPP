@@ -208,6 +208,53 @@ fn exact_subnormal_rational_scale(
     Some(Ok(f64::from_bits(rounded_units as u64)))
 }
 
+fn exact_three_level_standard_error(
+    first_offset: f64,
+    second_offset: f64,
+) -> Result<Option<f64>, ValidationError> {
+    // For a translated three-observation sample `[0, x, y]`,
+    // `SE(mean)^2 = (x^2 + y^2 - xy) / 9`. Admit the direct identity only when
+    // every binary64 product/addition is proven error-free and the numerator is
+    // itself an exact represented square. Otherwise keep the general translated
+    // second-moment path rather than broadening the numerical claim.
+    let first_square = first_offset * first_offset;
+    let second_square = second_offset * second_offset;
+    let cross_product = first_offset * second_offset;
+    if !first_square.is_finite()
+        || !second_square.is_finite()
+        || !cross_product.is_finite()
+        || first_offset.mul_add(first_offset, -first_square) != 0.0
+        || second_offset.mul_add(second_offset, -second_square) != 0.0
+        || first_offset.mul_add(second_offset, -cross_product) != 0.0
+    {
+        return Ok(None);
+    }
+
+    let square_sum = first_square + second_square;
+    if !square_sum.is_finite()
+        || subtraction_roundoff(first_square, -second_square, square_sum) != 0.0
+    {
+        return Ok(None);
+    }
+    let radicand = square_sum - cross_product;
+    if !radicand.is_finite() || subtraction_roundoff(square_sum, cross_product, radicand) != 0.0 {
+        return Ok(None);
+    }
+
+    let exact_root = radicand.sqrt();
+    if exact_root.mul_add(exact_root, -radicand) != 0.0 {
+        return Ok(None);
+    }
+
+    let standard_error =
+        if let Some(subnormal_result) = exact_subnormal_rational_scale(exact_root, 1, 3) {
+            subnormal_result?
+        } else {
+            deterministic_representable_sum_over_count(&[exact_root], 3)?
+        };
+    Ok(Some(standard_error))
+}
+
 fn translated_residuals_from_anchor(
     diffs: &[f64],
     roundoffs: &[f64],
@@ -341,6 +388,20 @@ fn exact_translated_residual_standard_error(
         }
     }
 
+    if translated.len() == 3 {
+        let nonzero_offsets: Vec<_> = translated
+            .iter()
+            .copied()
+            .filter(|value| *value != 0.0)
+            .collect();
+        if nonzero_offsets.len() == 2
+            && let Some(standard_error) =
+                exact_three_level_standard_error(nonzero_offsets[0], nonzero_offsets[1])?
+        {
+            return Ok(Some(standard_error));
+        }
+    }
+
     // Keep the translated binary64 geometry on an exact dyadic scale. Using the
     // largest translated value itself can turn an exactly represented gap d into
     // rounded(1/3) * d after the square-root stage and move the final SE by one
@@ -454,14 +515,18 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// square are likewise applied as a represented rational scale before moment
 /// reconstruction; if that exact rational result is subnormal, TEPP rounds once
 /// in represented minimum-subnormal units instead of normalizing and restoring
-/// through a second binary64 rounding boundary. The general translated path
-/// avoids making a rounded residual mean authoritative before dispersion is
+/// through a second binary64 rounding boundary. An exactly translated three-level
+/// sample also uses `SE(mean)^2 = (x² + y² - xy) / 9` when every product and
+/// addition is proven error-free and that numerator is itself an exact represented
+/// square; the exact root is divided by three once instead of reconstructing the
+/// same rational square through rounded normalized moments. The general translated
+/// path avoids making a rounded residual mean authoritative before dispersion is
 /// evaluated. Its normalization uses an exact power-of-two scale so the
 /// translated geometry is not re-rounded through an arbitrary magnitude before
-/// the final SE is restored. Cases that cannot prove those translated deltas
-/// representable retain the predecessor rounded-residual path. Individual signed
-/// residuals must still be representable because their dispersion is itself part
-/// of the requested scientific result.
+/// the final SE is restored. Cases that cannot prove those translated deltas or
+/// exact three-level identity representable retain the predecessor translated or
+/// rounded-residual path. Individual signed residuals must still be representable
+/// because their dispersion is itself part of the requested scientific result.
 ///
 /// # Errors
 ///
@@ -520,7 +585,8 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 #[cfg(test)]
 mod tests {
     use super::{
-        bias_standard_error, exact_subnormal_rational_scale, mean_bias,
+        bias_standard_error, exact_subnormal_rational_scale, exact_three_level_standard_error,
+        mean_bias,
     };
     use crate::ValidationError;
 
@@ -640,5 +706,34 @@ mod tests {
         );
         assert_eq!(exact_subnormal_rational_scale(f64::MIN_POSITIVE * 2.0, 1, 1), None);
         assert_eq!(exact_subnormal_rational_scale(f64::MAX, 1, 1), None);
+    }
+
+    #[test]
+    fn exact_three_level_standard_error_is_bounded_by_error_free_identity() {
+        let unit = 2.0_f64.powi(-10);
+        assert_eq!(
+            exact_three_level_standard_error(-5.0 * unit, 16.0 * unit)
+                .expect("exact identity")
+                .expect("exact rational-square path")
+                .to_bits(),
+            0x3f79_5555_5555_5555
+        );
+        assert_eq!(
+            exact_three_level_standard_error(-1.0, 2.0).expect("fallback"),
+            None
+        );
+        assert_eq!(
+            exact_three_level_standard_error(f64::MAX, -f64::MAX).expect("overflow fallback"),
+            None
+        );
+        assert_eq!(
+            exact_three_level_standard_error(0.1, 0.2).expect("inexact-product fallback"),
+            None
+        );
+        assert_eq!(
+            exact_three_level_standard_error(1.0, 2.0_f64.powi(-27))
+                .expect("inexact-sum fallback"),
+            None
+        );
     }
 }
