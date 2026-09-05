@@ -55,10 +55,28 @@ fn greatest_common_divisor(mut left: u128, mut right: u128) -> u128 {
     left
 }
 
+fn pair_record_count(sample_count: u128) -> Option<u128> {
+    sample_count
+        .checked_mul(sample_count.checked_sub(1)?)?
+        .checked_div(2)
+}
+
 fn worst_case_linear_intermediate(sample_count: u128, diameter: u128) -> Option<u128> {
     sample_count
         .checked_mul(sample_count)?
         .checked_mul(diameter.checked_mul(diameter)?)
+}
+
+fn worst_case_pair_square_numerator(sample_count: u128, diameter: u128) -> Option<u128> {
+    let split_product = (sample_count / 2)
+        .checked_mul(sample_count.checked_sub(sample_count / 2)?)?;
+    split_product.checked_mul(diameter.checked_mul(diameter)?)
+}
+
+fn scientific_denominator(sample_count: u128) -> Option<u128> {
+    sample_count
+        .checked_mul(sample_count)?
+        .checked_mul(sample_count.checked_sub(1)?)
 }
 
 #[test]
@@ -93,11 +111,39 @@ fn seventeen_observation_fixture_proves_linear_identity_matches_pair_reference()
 }
 
 #[test]
-fn compact_dyadic_worst_case_u128_ceiling_is_2047_samples() {
+fn pair_record_counts_are_exact_resource_evidence() {
+    assert_eq!(pair_record_count(16), Some(120));
+    assert_eq!(pair_record_count(17), Some(136));
+    assert_eq!(pair_record_count(2_048), Some(2_096_128));
+    assert_eq!(pair_record_count(3_162), Some(4_997_541));
+}
+
+#[test]
+fn compact_dyadic_linear_intermediate_ceiling_is_2047_samples() {
     let exact_integer_diameter = 1_u128 << 53;
     assert!(worst_case_linear_intermediate(2_047, exact_integer_diameter).is_some());
     assert!(worst_case_linear_intermediate(2_048, exact_integer_diameter).is_none());
 
-    let maximum_safe_denominator = 2_047_u128 * 2_047 * 2_046;
+    let maximum_safe_denominator = scientific_denominator(2_047).expect("bounded denominator");
     assert!(maximum_safe_denominator < (1_u128 << 53));
+}
+
+#[test]
+fn exact_pair_square_numerator_has_a_wider_u128_envelope_than_linear_intermediates() {
+    let exact_integer_diameter = 1_u128 << 53;
+    assert!(worst_case_pair_square_numerator(4_095, exact_integer_diameter).is_some());
+    assert!(worst_case_pair_square_numerator(4_096, exact_integer_diameter).is_none());
+}
+
+#[test]
+fn unreduced_scientific_denominator_crosses_binary64_integer_bound_after_208064() {
+    let maximum_exact_binary64_integer = 1_u128 << 53;
+    assert!(
+        scientific_denominator(208_064).expect("denominator fits u128")
+            <= maximum_exact_binary64_integer
+    );
+    assert!(
+        scientific_denominator(208_065).expect("denominator fits u128")
+            > maximum_exact_binary64_integer
+    );
 }
