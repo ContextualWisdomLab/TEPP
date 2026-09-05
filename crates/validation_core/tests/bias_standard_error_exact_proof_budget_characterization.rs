@@ -43,16 +43,26 @@ fn pair_square_sum_quadratic(values: &[u128]) -> Option<u128> {
 fn pair_square_sum_linear(values: &[u128]) -> Option<u128> {
     let minimum = *values.iter().min()?;
     let sample_count = u128::try_from(values.len()).ok()?;
+    let common_shift = values
+        .iter()
+        .filter_map(|value| {
+            let coefficient = value.checked_sub(minimum)?;
+            (coefficient != 0).then_some(coefficient.trailing_zeros())
+        })
+        .min()
+        .unwrap_or(0);
+
     let mut coefficient_sum = 0_u128;
     let mut square_sum = 0_u128;
     for value in values {
-        let coefficient = value.checked_sub(minimum)?;
+        let coefficient = value.checked_sub(minimum)? >> common_shift;
         coefficient_sum = coefficient_sum.checked_add(coefficient)?;
         square_sum = square_sum.checked_add(coefficient.checked_mul(coefficient)?)?;
     }
-    sample_count
+    let normalized_sum = sample_count
         .checked_mul(square_sum)?
-        .checked_sub(coefficient_sum.checked_mul(coefficient_sum)?)
+        .checked_sub(coefficient_sum.checked_mul(coefficient_sum)?)?;
+    normalized_sum.checked_shl(common_shift.checked_mul(2)?)
 }
 
 fn greatest_common_divisor(mut left: u128, mut right: u128) -> u128 {
@@ -135,7 +145,7 @@ fn linear_checked_integer_kernel_matches_pair_reference_when_it_admits() {
 }
 
 #[test]
-fn linear_checked_integer_kernel_must_normalize_a_common_power_of_two_unit() {
+fn linear_checked_integer_kernel_normalizes_a_common_power_of_two_unit() {
     let diameter = 1_u128 << 58;
     let mut values = Vec::with_capacity(65);
     values.push(0);
@@ -153,7 +163,7 @@ fn linear_checked_integer_kernel_must_normalize_a_common_power_of_two_unit() {
 
 #[test]
 fn linear_checked_integer_kernel_is_not_admission_equivalent_to_pair_reference() {
-    let diameter = 1_u128 << 58;
+    let diameter = (1_u128 << 58) + 1;
 
     let mut fits_both = Vec::with_capacity(64);
     fits_both.push(0);
@@ -163,7 +173,7 @@ fn linear_checked_integer_kernel_is_not_admission_equivalent_to_pair_reference()
     assert_eq!(
         pair_square_sum_linear(&fits_both),
         Some(pairwise_64),
-        "n=64 remains inside the minimum-shifted linear intermediate budget"
+        "n=64 remains inside the normalized linear intermediate budget"
     );
 
     let mut pair_only = Vec::with_capacity(65);
@@ -178,7 +188,7 @@ fn linear_checked_integer_kernel_is_not_admission_equivalent_to_pair_reference()
     assert_eq!(
         pair_square_sum_linear(&pair_only),
         None,
-        "n*sum(c_i^2) overflows before cancellation even though the exact pair numerator fits"
+        "odd diameter prevents dyadic rescaling, so n*sum(c_i^2) overflows before cancellation while the exact pair numerator still fits"
     );
 }
 
