@@ -710,6 +710,22 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// 2017-era `T0TRAITEFFECT` first-occasion shift was treated as
+    /// the Eq. 3 first-summand carry. `t0_trait · trait` is not
+    /// `e^{A Δt} t0_trait · trait`.
+    InitialTraitEffectIsNotInitialTraitCarry,
+    /// Driver Eq. 3 carry of Table 3 `T0TIPREDEFFECT` was treated as
+    /// the Eq. 3 carry of 2017-era `T0TRAITEFFECT`. `e^{A Δt} t0_b z`
+    /// is not `e^{A Δt} t0_trait · trait`.
+    InitialTimeIndependentCarryIsNotInitialTraitCarry,
+    /// Driver Eq. 3 carry of Table 3 `T0TDPREDEFFECT` was treated as
+    /// the Eq. 3 carry of 2017-era `T0TRAITEFFECT`. `e^{A Δt} t0_m x0`
+    /// is not `e^{A Δt} t0_trait · trait`.
+    InitialTimeDependentCarryIsNotInitialTraitCarry,
+    /// Driver Eq. 3 second-summand `TIPREDEFFECT` increment was treated
+    /// as the Eq. 3 carry of 2017-era `T0TRAITEFFECT`.
+    /// `A^{-1}[e^{A Δt} − I] B z` is not `e^{A Δt} t0_trait · trait`.
+    TimeIndependentIncrementIsNotInitialTraitCarry,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1250,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::InitialTraitEffectIsNotInitialTraitCarry => {
+                "first-occasion trait effect is not the first-occasion trait carry"
+            }
+            Self::InitialTimeIndependentCarryIsNotInitialTraitCarry => {
+                "first-occasion time-independent predictor carry is not the first-occasion trait carry"
+            }
+            Self::InitialTimeDependentCarryIsNotInitialTraitCarry => {
+                "first-occasion time-dependent predictor carry is not the first-occasion trait carry"
+            }
+            Self::TimeIndependentIncrementIsNotInitialTraitCarry => {
+                "time-independent predictor increment is not the first-occasion trait carry"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2099,26 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn initial_trait_carry_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::InitialTraitEffectIsNotInitialTraitCarry.to_string(),
+            "first-occasion trait effect is not the first-occasion trait carry"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentCarryIsNotInitialTraitCarry.to_string(),
+            "first-occasion time-independent predictor carry is not the first-occasion trait carry"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentCarryIsNotInitialTraitCarry.to_string(),
+            "first-occasion time-dependent predictor carry is not the first-occasion trait carry"
+        );
+        assert_eq!(
+            PsychometricError::TimeIndependentIncrementIsNotInitialTraitCarry.to_string(),
+            "time-independent predictor increment is not the first-occasion trait carry"
         );
     }
 }
