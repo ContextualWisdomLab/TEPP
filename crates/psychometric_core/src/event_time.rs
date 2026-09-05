@@ -153,7 +153,14 @@
 //! carry is not `t0_m x0`, not `M x`, not `e^{A(t−u)} M x` for
 //! `t0 < u < t`, not `t0_b z`, not `A^{-1}[e^{A Δt} − I] B z`, and
 //! not `CINT`. An impulse at `u ≤ t0` that used `M` is already in
-//! `η(t0)` as `TDPREDEFFECT`, not as `T0TDPREDEFFECT`. Equation 5 of
+//! `η(t0)` as `TDPREDEFFECT`, not as `T0TDPREDEFFECT`. Table 2
+//! names `T0TDPREDCOV` the covariance between latents at `T0` and
+//! time-dependent predictors. The 2017-era `OpenMx` path places that
+//! matrix in `S`; Table 3 `T0TDPREDEFFECT` is the regression. The
+//! scalar covariance is `t0_m · v`. `t0_m` is not that covariance;
+//! analog extra `t0_m² v` is not that covariance; `t0_b · v` is
+//! not that covariance; process `m · v` is not that covariance.
+//! Equation 5 of
 //! that carried first-occasion TD shift is
 //! `τ + λ(μ_t + e^{a Δt} t0_m x0)` (`τ + λ μ_t` is not that
 //! observed mean; `τ + λ(μ_t + e^{a Δt} t0_b z)` is not that
@@ -5888,6 +5895,155 @@ pub fn recover_initial_time_dependent_predictor_effect(
     require_finite(initial_time_dependent_effect * time_dependent_predictor)
 }
 
+/// Exact scalar Table 2 `T0TDPREDCOV`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12 `T0TDPREDCOV`;
+/// Table 3, p. 13 `T0TDPREDEFFECT`; 2017-era ctsem `ctModel.R` /
+/// `ctFit.R`; JSS PDF re-opened 2026-08-30T16:40Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `T0TDPREDCOV` the `n.latent × (Tpoints × n.TDpred)`
+/// covariance matrix between latents at `T0` and time-dependent
+/// predictors. The 2017-era `ctModel.R` default `"auto"` restricts
+/// that covariance to 0. The 2017-era `ctFit.R` places
+/// `T0TDPREDCOV` in the `OpenMx` `S` covariance block between the
+/// first-occasion latents and the TD predictors. Table 3 names
+/// `T0TDPREDEFFECT` the first-occasion TD *effect* (a regression).
+/// The SEM conversion is `T0TDPREDEFFECT = T0TDPREDCOV
+/// solve(TDPREDVAR)`, so the scalar covariance is `t0_m · v` after
+/// finite `t0_m` and predictor variance `v ≥ 0`. Form `t0_m` first,
+/// then multiply by `v`. A zero coefficient or zero predictor
+/// variance is exactly zero. A signed coefficient is a signed
+/// covariance. `v < 0` fails closed. `T0` is an event-time
+/// occasion, so a non-event clock fails closed. Free first-occasion
+/// covariance does not require stable `a < 0`. `t0_m` is
+/// `T0TDPREDEFFECT`, not this covariance; equal numbers when
+/// `v = 1` remain distinct named quantities. The analog extra
+/// `t0_m² v` is the analog of `addedT0TIPREDVAR`; Table 2 names
+/// `T0TDPREDCOV` the covariance, not that extra. The 2017-era
+/// `summary.ctsemFit.R` comments out `TDPREDVAR` / `TDPREDVARstd`
+/// and does not form `T0TDPREDCOV` or `addedT0TDPREDVAR` in
+/// summary. `t0_b · v` is the TI analog covariance and is not this
+/// map even when `t0_m = t0_b`. Process `m · v` is
+/// `TDPREDEFFECT × TDPREDVAR` and is not this first-occasion map
+/// even when `t0_m = m`. This crate does not invent `TDPREDVARstd`.
+/// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
+/// not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock and [`PsychometricError::InvalidNumericInput`]
+/// when an input is non-finite, the predictor variance is negative,
+/// or the product overflows.
+pub fn recover_initial_time_dependent_predictor_covariance(
+    initial_time_dependent_effect: f64,
+    predictor_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !initial_time_dependent_effect.is_finite()
+        || !predictor_variance.is_finite()
+        || predictor_variance < 0.0
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_time_dependent_effect == 0.0 || predictor_variance == 0.0 {
+        return Ok(0.0);
+    }
+    require_finite(initial_time_dependent_effect * predictor_variance)
+}
+
+/// Refuse treating Table 3 `T0TDPREDEFFECT` as Table 2
+/// `T0TDPREDCOV`.
+///
+/// `t0_m` is the first-occasion TD coefficient. `T0TDPREDCOV` is
+/// `t0_m · v`. Equal numbers when `v = 1` remain distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeDependentEffectIsNotInitialTimeDependentCovariance`].
+pub fn refuse_initial_time_dependent_effect_as_initial_time_dependent_covariance(
+    initial_time_dependent_effect: f64,
+    initial_time_dependent_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_time_dependent_effect,
+        initial_time_dependent_covariance,
+    );
+    Err(PsychometricError::InitialTimeDependentEffectIsNotInitialTimeDependentCovariance)
+}
+
+/// Refuse treating analog extra `t0_m² v` as Table 2
+/// `T0TDPREDCOV`.
+///
+/// `t0_m² v` is the analog of 2017-era `addedT0TIPREDVAR`. Table 2
+/// names `T0TDPREDCOV` the covariance, not that extra variance.
+/// The 2017-era source does not form `addedT0TDPREDVAR`. Equal
+/// numbers when `t0_m = 1` remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance`].
+pub fn refuse_initial_time_dependent_extra_variance_as_initial_time_dependent_covariance(
+    extra_first_occasion_variance: f64,
+    initial_time_dependent_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        extra_first_occasion_variance,
+        initial_time_dependent_covariance,
+    );
+    Err(PsychometricError::InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance)
+}
+
+/// Refuse treating the first-occasion TI analog covariance as
+/// Table 2 `T0TDPREDCOV`.
+///
+/// `t0_b · v` uses Table 3 `T0TIPREDEFFECT`. `T0TDPREDCOV` is the
+/// TD first-occasion covariance. Equal numbers when `t0_m = t0_b`
+/// remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentCovarianceIsNotInitialTimeDependentCovariance`].
+pub fn refuse_initial_time_independent_covariance_as_initial_time_dependent_covariance(
+    initial_time_independent_covariance: f64,
+    initial_time_dependent_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_time_independent_covariance,
+        initial_time_dependent_covariance,
+    );
+    Err(PsychometricError::InitialTimeIndependentCovarianceIsNotInitialTimeDependentCovariance)
+}
+
+/// Refuse treating process `TDPREDEFFECT × TDPREDVAR` as Table 2
+/// `T0TDPREDCOV`.
+///
+/// `m · v` is the process-dynamics analog. `T0TDPREDCOV` is the
+/// first occasion. Equal numbers when `t0_m = m` remain distinct
+/// named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TimeDependentEffectCovarianceIsNotInitialTimeDependentCovariance`].
+pub fn refuse_time_dependent_effect_covariance_as_initial_time_dependent_covariance(
+    time_dependent_effect_covariance: f64,
+    initial_time_dependent_covariance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        time_dependent_effect_covariance,
+        initial_time_dependent_covariance,
+    );
+    Err(PsychometricError::TimeDependentEffectCovarianceIsNotInitialTimeDependentCovariance)
+}
+
 /// Exact scalar carried first-occasion time-dependent predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; Table 3, p. 13; JSS
@@ -6878,6 +7034,7 @@ mod tests {
         recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
         recover_event_time_discrete_lag_and_log_rate,
         recover_initial_time_dependent_predictor_carry,
+        recover_initial_time_dependent_predictor_covariance,
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_predictor_carry,
         recover_initial_time_independent_predictor_effect,
@@ -6951,10 +7108,13 @@ mod tests {
         refuse_initial_time_dependent_coefficient_as_initial_effect,
         refuse_initial_time_dependent_effect_as_contemporaneous_impulse,
         refuse_initial_time_dependent_effect_as_continuous_intercept,
+        refuse_initial_time_dependent_effect_as_initial_time_dependent_covariance,
         refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
         refuse_initial_time_dependent_effect_as_process_increment,
+        refuse_initial_time_dependent_extra_variance_as_initial_time_dependent_covariance,
         refuse_initial_time_independent_carry_as_initial_effect,
         refuse_initial_time_independent_coefficient_as_initial_effect,
+        refuse_initial_time_independent_covariance_as_initial_time_dependent_covariance,
         refuse_initial_time_independent_effect_as_continuous_intercept,
         refuse_initial_time_independent_effect_as_process_increment,
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
@@ -7013,6 +7173,7 @@ mod tests {
         refuse_stationary_later_latent_variance_as_observed_variance,
         refuse_stationary_later_latent_variance_as_process_noise,
         refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance,
+        refuse_time_dependent_effect_covariance_as_initial_time_dependent_covariance,
         refuse_time_dependent_impulse_as_continuous_intercept,
         refuse_time_dependent_impulse_as_time_independent_effect,
         refuse_time_dependent_impulse_as_time_varying_discrete_effect,
@@ -16351,6 +16512,168 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn initial_time_dependent_covariance_recovers_driver_table_two_product() {
+        // Driver et al. (2017, Table 2 T0TDPREDCOV; Table 3
+        // T0TDPREDEFFECT; 2017-era ctFit.R places T0TDPREDCOV in S):
+        // T0TDPREDCOV = t0_m · v. Form t0_m first, then multiply by v.
+        // JSS PDF re-opened 2026-08-30T16:40Z.
+        let effect = 0.3_f64;
+        let predictor_variance = 4.0_f64;
+        let recovered = recover_initial_time_dependent_predictor_covariance(
+            effect,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("T0TDPREDCOV");
+        let expected = effect * predictor_variance;
+        assert!((recovered - expected).abs() < 1e-15);
+        let doubled =
+            recover_initial_time_dependent_predictor_covariance(effect, 8.0, LagClock::EventTime)
+                .expect("T0TDPREDCOV v=8");
+        assert!((doubled - 2.0 * recovered).abs() < 1e-15);
+        let signed = recover_initial_time_dependent_predictor_covariance(
+            -effect,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("T0TDPREDCOV signed");
+        assert!((signed + recovered).abs() < 1e-15);
+        let extra = effect * effect * predictor_variance;
+        assert!((extra - recovered).abs() > 1e-3);
+        let unit_variance =
+            recover_initial_time_dependent_predictor_covariance(effect, 1.0, LagClock::EventTime)
+                .expect("T0TDPREDCOV v=1");
+        assert!((unit_variance - effect).abs() < 1e-15);
+        let unit_effect = recover_initial_time_dependent_predictor_covariance(
+            1.0,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("T0TDPREDCOV t0_m=1");
+        let extra_unit = 1.0 * predictor_variance;
+        assert!((unit_effect - extra_unit).abs() < 1e-15);
+        let zero_effect = recover_initial_time_dependent_predictor_covariance(
+            0.0,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("zero t0_m");
+        assert_eq!(zero_effect.to_bits(), 0.0_f64.to_bits());
+        let zero_variance =
+            recover_initial_time_dependent_predictor_covariance(effect, 0.0, LagClock::EventTime)
+                .expect("zero v");
+        assert_eq!(zero_variance.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(
+            refuse_initial_time_dependent_effect_as_initial_time_dependent_covariance(
+                effect, recovered
+            ),
+            Err(PsychometricError::InitialTimeDependentEffectIsNotInitialTimeDependentCovariance)
+        );
+        assert_eq!(
+            refuse_initial_time_dependent_extra_variance_as_initial_time_dependent_covariance(
+                extra, recovered
+            ),
+            Err(
+                PsychometricError::InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance
+            )
+        );
+        assert_eq!(
+            refuse_initial_time_independent_covariance_as_initial_time_dependent_covariance(
+                recovered, recovered
+            ),
+            Err(
+                PsychometricError::InitialTimeIndependentCovarianceIsNotInitialTimeDependentCovariance
+            )
+        );
+        assert_eq!(
+            refuse_time_dependent_effect_covariance_as_initial_time_dependent_covariance(
+                recovered, recovered
+            ),
+            Err(
+                PsychometricError::TimeDependentEffectCovarianceIsNotInitialTimeDependentCovariance
+            )
+        );
+        assert_eq!(
+            refuse_initial_time_dependent_effect_as_initial_time_dependent_covariance(
+                unit_variance,
+                unit_variance
+            ),
+            Err(PsychometricError::InitialTimeDependentEffectIsNotInitialTimeDependentCovariance)
+        );
+        assert_eq!(
+            refuse_initial_time_dependent_extra_variance_as_initial_time_dependent_covariance(
+                extra_unit, unit_effect
+            ),
+            Err(
+                PsychometricError::InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance
+            )
+        );
+    }
+
+    #[test]
+    fn initial_time_dependent_covariance_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(0.3, 4.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(0.3, 4.0, LagClock::AssertionTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(
+                0.3,
+                4.0,
+                LagClock::KnowledgeCutoff
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(-0.3, -4.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(0.3, -4.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(f64::NAN, 4.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(0.3, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(
+                0.3,
+                f64::INFINITY,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn initial_time_dependent_covariance_clock_path_is_runtime_opaque() {
+        let clocks = [
+            LagClock::SystemTime,
+            LagClock::DocumentTime,
+            LagClock::AssertionTime,
+        ];
+        let non_event_index = std::process::id() as usize % clocks.len();
+        let non_event = clocks[non_event_index];
+        assert_eq!(
+            recover_initial_time_dependent_predictor_covariance(0.3, 4.0, non_event),
+            Err(PsychometricError::EventTimeRequired)
         );
     }
 }
