@@ -314,6 +314,8 @@ fn assert_and_measure_geometry(
     let wide_product = pair_square_sum_linear_wide_product(values)
         .expect("wider-product linear reference stays within its declared budget");
     let hybrid = pair_square_sum_hybrid(values).expect("hybrid result stays within u128");
+    let wide_hybrid = pair_square_sum_wide_hybrid(values)
+        .expect("narrow-wide-pair hybrid result stays within u128");
     let exact_pair_square_sum = restored_pair_square_sum(buffered)
         .expect("buffered result restores to exact pair-square sum");
     assert_eq!(
@@ -330,6 +332,11 @@ fn assert_and_measure_geometry(
         restored_pair_square_sum(hybrid),
         Some(exact_pair_square_sum),
         "hybrid must preserve the exact pair numerator"
+    );
+    assert_eq!(
+        restored_pair_square_sum(wide_hybrid),
+        Some(exact_pair_square_sum),
+        "narrow-wide-pair hybrid must preserve the exact pair numerator"
     );
     assert!(
         hybrid.used_pairwise_fallback == expect_hybrid_fallback,
@@ -353,6 +360,7 @@ fn assert_and_measure_geometry(
         ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
         ("linear_wide_product_reference", pair_square_sum_linear_wide_product),
         ("hybrid", pair_square_sum_hybrid),
+        ("hybrid_narrow_wide_pair", pair_square_sum_wide_hybrid),
     ];
     if expect_linear_admission {
         kernels.push(("linear", pair_square_sum_linear));
