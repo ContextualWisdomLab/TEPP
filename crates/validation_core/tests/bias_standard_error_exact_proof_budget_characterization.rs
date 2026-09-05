@@ -62,7 +62,8 @@ fn pair_square_sum_linear(values: &[u128]) -> Option<u128> {
     let normalized_sum = sample_count
         .checked_mul(square_sum)?
         .checked_sub(coefficient_sum.checked_mul(coefficient_sum)?)?;
-    normalized_sum.checked_shl(common_shift.checked_mul(2)?)
+    let squared_unit = 1_u128.checked_shl(common_shift.checked_mul(2)?)?;
+    normalized_sum.checked_mul(squared_unit)
 }
 
 fn greatest_common_divisor(mut left: u128, mut right: u128) -> u128 {
