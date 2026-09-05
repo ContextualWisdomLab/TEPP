@@ -20,7 +20,7 @@ For `n=17`, the scientific denominator is `17^2(17-1)=4_624`. `gcd(N,4_624)=2`, 
 
 The current public API intentionally remains on the established translated floating fallback at `n=17`; for this fixture it returns bits `0x41a0_dd77_9ac3_8e98`. Independent high-precision rational-square-root evaluation gives the adjacent correctly rounded binary64 target `0x41a0_dd77_9ac3_8e99`. This extends the demonstrated failure class beyond the current cutoff, but it is evidence for a systemic budget decision rather than justification for another one-count production patch.
 
-`crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs` fixes the exact pair-square sum, reduced ratio, current fallback boundary, algebraic equivalence, pair-record counts, distinct checked-integer envelopes, dyadic-unit normalization, and the admitted/refused-set relation between the current pair reference and the candidate O(n) accumulator. The test intentionally makes any future widening of production admission update this characterization rather than silently inheriting a stale fallback assumption.
+`crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs` fixes the exact pair-square sum, reduced ratio, current fallback boundary, algebraic equivalence, pair-record counts, distinct checked-integer envelopes, dyadic-unit normalization, the admitted/refused-set relation between the current pair reference and the candidate O(n) accumulator, and a dependency-free wider-product reference for the narrow-intermediate refusal boundary. The test intentionally makes any future widening of production admission update this characterization rather than silently inheriting a stale fallback assumption.
 
 ## O(n²) reference versus O(n) exact accumulator
 
@@ -42,9 +42,11 @@ which is a 123-bit `u128` value, while the first O(n) intermediate
 
 `65 * 64 * (2^58 + 1)^2 = 345_599_278_904_078_129_353_066_565_255_131_304_000`
 
-requires 129 bits and therefore refuses before cancellation. The pair reference can still prove the exact numerator. Linear refusal remains distinct from scientific refusal, but the evidence now survives canonical dyadic normalization.
+requires 129 bits and therefore refuses before cancellation. The companion square `(64D)^2 = 340_282_366_920_938_465_824_557_848_866_590_822_400` also requires 129 bits. Their exact difference is the 123-bit pair numerator above. Linear refusal remains distinct from scientific refusal, but the evidence now survives canonical dyadic normalization.
 
-This rules out a drop-in replacement of the current pair proof with the normalized checked-`u128` identity. A production O(n) path can preserve current scientific admission only as a sufficient fast path followed by the existing pairwise proof on refusal, or by adopting a wider checked-integer representation with its own resource and supply-chain evidence.
+Commit `081000289f5a52e94863026d55696ee2a4daf923` adds a dependency-free `Wide256` characterization reference using four 64-bit limbs for exact `u128 × u128` products, checked two-limb subtraction, and checked dyadic restoration. It proves two separate facts: `(2^128-1)^2` is represented exactly as high limb `2^128-2` and low limb `1`, and the odd `D=2^58+1,n=65` geometry that the narrow O(n) kernel refuses is recovered exactly after 129-bit intermediate cancellation. The wider reference deliberately keeps coefficient and square accumulation in checked `u128`; it is therefore a bounded intermediate-width experiment, not arbitrary precision and not a production implementation.
+
+This rules out a drop-in replacement of the current pair proof with the normalized checked-`u128` identity. A production O(n) path can preserve current scientific admission only as a sufficient fast path followed by the existing pairwise proof on refusal, or by adopting a wider checked-integer representation with its own resource and supply-chain evidence. The two-limb reference shows that wider products can recover at least one real narrow-intermediate refusal without adding a dependency; it does not yet prove admission equivalence over the complete represented-input domain.
 
 ## Checked-u128 envelopes
 
@@ -68,26 +70,27 @@ A two-pass O(n²) reference can remove the pair-record allocation without changi
 
 ## Measurement harness
 
-`crates/validation_core/examples/bias_se_exact_proof_budget.rs` is a standard-library-only release-mode characterization harness. It compares four kernels:
+`crates/validation_core/examples/bias_se_exact_proof_budget.rs` is a standard-library-only release-mode characterization harness. It compares five kernels:
 
 - `quadratic_buffered`: production-layout-shaped `Vec<Option<(u128, i32)>>` pair records plus aligned checked-square accumulation;
 - `quadratic_two_pass`: the same pair enumeration and dyadic alignment without pair-record storage;
-- `linear`: minimum-anchor coefficients, normalized by their largest shared power-of-two unit, then `n*sum(c_i^2) - (sum c_i)^2`;
-- `hybrid`: the viable resource shape, using the normalized checked O(n) accumulator when it admits and otherwise falling back to the production-layout-shaped buffered pair proof.
+- `linear`: minimum-anchor coefficients, normalized by their largest shared power-of-two unit, then checked-`u128` `n*sum(c_i^2) - (sum c_i)^2`;
+- `linear_wide_product_reference`: the same normalized coefficient/square accumulators, but the two final products and cancellation use dependency-free two-limb 256-bit arithmetic before the exact result is required to fit the existing `u128` pair-numerator domain;
+- `hybrid`: the viable production-shape candidate, using the narrow normalized checked O(n) accumulator when it admits and otherwise falling back to the production-layout-shaped buffered pair proof.
 
-Before timing, the harness restores the dyadic unit and requires every applicable kernel to equal the same exact pair-square numerator. Compact deterministic fixtures at 16, 64, 256, 1,024, and 2,047 observations exercise ordinary admitting geometry. Three boundary geometries separate normalization from true refusal:
+Before timing, the harness restores the dyadic unit and requires every applicable kernel to equal the same exact pair-square numerator. Compact deterministic fixtures at 16, 64, 256, 1,024, and 2,047 observations exercise ordinary admitting geometry. Three boundary geometries separate normalization from true narrow-intermediate refusal:
 
-1. `power_of_two_normalized_admit`: `n=65`, `D=2^58`. The linear and hybrid paths must factor the common dyadic unit and admit; pair fallback here would reproduce the predecessor characterization defect.
-2. `odd_boundary_admit`: `n=64`, `D=2^58+1`. With no removable common dyadic factor, normalized O(n) still fits.
-3. `odd_boundary_pair_fallback`: `n=65`, `D=2^58+1`. The exact pair numerator fits, normalized O(n) checked intermediates refuse, and the hybrid must execute the buffered pair fallback.
+1. `power_of_two_normalized_admit`: `n=65`, `D=2^58`. The narrow linear, wider-product reference, and hybrid paths must factor the common dyadic unit and admit; pair fallback here would reproduce the predecessor characterization defect.
+2. `odd_boundary_admit`: `n=64`, `D=2^58+1`. With no removable common dyadic factor, normalized narrow O(n) still fits.
+3. `odd_boundary_pair_fallback`: `n=65`, `D=2^58+1`. The exact pair numerator fits, normalized narrow O(n) checked intermediates refuse, the wider-product reference still recovers the exact numerator, and the production-shape hybrid must execute the buffered pair fallback.
 
 The CSV schema remains
 
 `geometry,sample_count,kernel,p95_ns,timing_samples,unit_exponent,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_pairwise_fallback`.
 
-`unit_exponent` is material evidence in the corrected harness: it distinguishes the common-power geometry, where the linear path reports exponent 58 and a small aligned numerator, from the odd-diameter geometry, where the canonical unit exponent is zero. `used_pairwise_fallback` records whether a hybrid row actually exercised the expensive proof path instead of inferring that fact from sample count.
+`unit_exponent` is material evidence in the corrected harness: it distinguishes the common-power geometry, where the linear path reports exponent 58 and a small aligned numerator, from the odd-diameter geometry, where the canonical unit exponent is zero. `used_pairwise_fallback` records whether a hybrid row actually exercised the expensive proof path instead of inferring that fact from sample count. The `kernel` field now makes the wider-product reference directly comparable to the narrow O(n), pair, and hybrid timing rows in the same release-mode run.
 
-The original hybrid harness landed in `c6b237e0bb1388cccd7bcb71a0df5cbf837a07c5`; the dyadic-normalization correction is `4a3d988702593b2b8d59be6dcfb1601ca1a0d610`. It remains measurement tooling only. No release-mode timing result is recorded in this document yet because the current execution environment does not provide Rust 1.98.0 and the hosted exact-head jobs have not produced measurement artifacts. A valid timing record must include CPU, OS, Rust toolchain, exact commit, release build mode, raw sample count, raw CSV, allocator/RSS evidence, and the cold/warm procedure. Kernel timing cannot substitute for an applicable API buyer-path p95 measurement.
+The original hybrid harness landed in `c6b237e0bb1388cccd7bcb71a0df5cbf837a07c5`; the dyadic-normalization correction is `4a3d988702593b2b8d59be6dcfb1601ca1a0d610`; the wider-product measurement extension is `0bd805d4b0304cf1f76344ae14b7f079b3dade17`. It remains measurement tooling only. No release-mode timing result is recorded in this document yet because the current execution environment does not provide Rust 1.98.0 and the hosted exact-head jobs have not produced measurement artifacts. A valid timing record must include CPU, OS, Rust toolchain, exact commit, release build mode, raw sample count, raw CSV, allocator/RSS evidence, and the cold/warm procedure. Kernel timing cannot substitute for an applicable API buyer-path p95 measurement.
 
 ## Decision and rejected alternatives
 
@@ -95,7 +98,9 @@ Production admission stays `n=4..=16`. Extending to `n=17` alone is rejected bec
 
 The former `D=2^58, n=65` raw-scale refusal is explicitly rejected as admission evidence because it disappears under the same common-power dyadic normalization already required by the proposed O(n) proof. Retaining it would make the resource budget representation-dependent. The odd `D=2^58+1` boundary replaces it as the normalized refusal fixture.
 
-Treating `n<=2_047`, `n<=4_095`, or the unreduced denominator threshold as the production budget is also rejected because arithmetic representability is not latency or memory evidence. A two-pass O(n²) allocation-removal path remains a candidate because it can preserve the current pair-proof admission shape while eliminating pair-record storage. The normalized O(n) identity remains the stronger CPU-scaling candidate, but its checked-`u128` form is still a strict sufficient subset of the pair reference. Replacing the pair proof with that kernel alone is rejected because it would silently narrow exact-proof admission. The hybrid harness measures the viable bounded shape—normalized O(n) fast admission with buffered O(n²) fallback—without making it production behavior. An admission-equivalent wider-integer O(n) proof or the allocation-free two-pass pair reference remain alternatives if measurements justify them. Arbitrary-precision production arithmetic remains deferred pending measured benefit, supply-chain review, and an explicit owner/resource decision.
+Treating `n<=2_047`, `n<=4_095`, or the unreduced denominator threshold as the production budget is also rejected because arithmetic representability is not latency or memory evidence. A two-pass O(n²) allocation-removal path remains a candidate because it can preserve the current pair-proof admission shape while eliminating pair-record storage. The normalized O(n) identity remains the stronger CPU-scaling candidate, but its checked-`u128` form is still a strict sufficient subset of the pair reference. Replacing the pair proof with that kernel alone is rejected because it would silently narrow exact-proof admission. The hybrid harness measures the viable bounded shape—normalized O(n) fast admission with buffered O(n²) fallback—without making it production behavior.
+
+The new two-limb wider-product reference is retained only as characterization evidence. Promoting it directly to production is rejected for now because its bounded construction deliberately assumes the normalized coefficient sum and sum of squares already fit `u128`, and because no Rust 1.98.0 release-mode timing, broader admitted/refused-set sweep, coverage evidence, or independent review exists for it yet. Arbitrary-precision production arithmetic remains deferred pending measured benefit, supply-chain review, and an explicit owner/resource decision.
 
 ## Traceability
 
@@ -106,14 +111,16 @@ Treating `n<=2_047`, `n<=4_095`, or the unreduced denominator threshold as the p
 | Predecessor scientific repair | GAP-125; RED `5da82b2d651706c191ca191c6c077d916cbfda25`; repair `a509ae9e46c8ffc2cc3ef4f0e904774ad2516e1f` |
 | Characterization RED | `4f1bd2c343cf2d54905a07c257a570a89dc575d3` — common `2^58` scale must normalize before O(n) overflow admission |
 | Characterization repair | `d423b57797b6f7f127e61e0679f9ee9841525c77` — normalized test kernel plus odd-diameter refusal fixture |
-| Harness repair | `4a3d988702593b2b8d59be6dcfb1601ca1a0d610` — normalized O(n)/hybrid measurement geometries |
+| Narrow-reference overflow hardening | `96f17c02edba0792f61e0e92167703a6ae4e40d0` — checked restored-scale multiplication |
+| Wider-product characterization | `081000289f5a52e94863026d55696ee2a4daf923` — dependency-free two-limb products/cancellation and odd-boundary recovery |
+| Wider-product harness | `0bd805d4b0304cf1f76344ae14b7f079b3dade17` — release-mode comparison row for the wider intermediate reference |
+| CHANGELOG fragment | `8ec2092872edc2867652ce98313ebad9deabd5ba` |
 | Current production module | `crates/validation_core/src/bias_se.rs` |
 | Public API | `validation_core::bias_standard_error` |
 | Exact characterization | `crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs` |
 | CPU/layout/hybrid harness | `crates/validation_core/examples/bias_se_exact_proof_budget.rs` |
-| CHANGELOG evidence | `CHANGELOG.d/validation-bias-exact-proof-budget-characterization.md` |
 | Resource/merge rule | Production cutoff remains `n<=16` pending measured exact-proof budget |
 
 ## Follow-up evidence required by #491
 
-Run the corrected hybrid-capable harness in release mode on a recorded CPU/toolchain and retain raw timing CSV. Record allocator/RSS evidence in addition to the harness's exact pair-record payload layout. Evaluate a wider-integer/reference alternative without making it production authority. Only after those results establish a resource budget should production admission change; any such change needs a realistic public RED, exact-head Rust/rustdoc/coverage evidence, and applicable buyer-path p95 evidence.
+Run the five-kernel harness in release mode on a recorded CPU/toolchain and retain raw timing CSV. Record allocator/RSS evidence in addition to the harness's exact pair-record payload layout. Extend the wider-product comparison across sample count, canonical dyadic exponent spread/diameter, and coefficient distributions so a narrower refusal cannot be mistaken for scientific refusal and a wider-product admission cannot be mistaken for full-domain equivalence. Only after those results establish a resource budget should production admission change; any such change needs a realistic public RED, exact-head Rust/rustdoc/coverage/security evidence, independent current-head review, and applicable buyer-path p95 evidence.
