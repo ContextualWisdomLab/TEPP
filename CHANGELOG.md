@@ -2,6 +2,12 @@
 
 All notable changes to TEPP are documented here. The format follows Keep a Changelog and semantic versioning once the first implementation release is cut.
 
+## [Unreleased]
+
+### Added
+
+- **Irregular event-time analysis-run profile**: cutoff-safe `irregular_event_time_v1` binds `recover_event_series_mean_log_rate`, maps pooled discrete lags across unequal intervals, and maps a reference-interval lag through `a` (`analysis_engine`). Not DSEM and not implemented-main.
+
 ## [0.2.0] - 2026-08-25
 
 ### Fixed
