@@ -1,7 +1,7 @@
 //! Exact represented-input admission for mean-bias standard error.
 //!
 //! The general bias implementation remains the fallback authority. This module
-//! admits only a bounded four-observation identity whose residual and pairwise
+//! admits a bounded small-sample pair-distance identity whose residual and pairwise
 //! differences are proven exact in binary64 and whose reduced dyadic pair-distance
 //! ratio fits `u128`; the exact rational square root is then rounded against
 //! binary64 midpoints without first rounding the ratio under the square root.
@@ -108,8 +108,8 @@ fn correctly_rounded_scaled_sqrt_ratio(
     let denominator_f64 = denominator as f64;
     // The binary64 numerator conversion is only a seed. The returned value is
     // admitted solely after the exact u128 dyadic-square and midpoint comparisons
-    // below. This lets the four-observation proof retain exact reduced numerators
-    // above 2^53 without pretending that their seed conversion is exact.
+    // below. This lets the bounded proof retain exact reduced numerators above
+    // 2^53 without pretending that their seed conversion is exact.
     let mut candidate = ((numerator as f64) / denominator_f64).sqrt() * unit;
     if !candidate.is_finite() || candidate <= 0.0 {
         return None;
@@ -168,16 +168,21 @@ fn correctly_rounded_scaled_sqrt_ratio(
     None
 }
 
-fn exact_four_observation_standard_error(
+fn exact_pair_distance_standard_error(
     truth: &[f64],
     recovered: &[f64],
 ) -> Option<Result<f64, ValidationError>> {
-    if truth.len() != 4 || recovered.len() != 4 {
+    // Keep this O(n²) reference proof deliberately bounded. n=2 and n=3 have
+    // cheaper exact identities in `bias.rs`; four and five observations are the
+    // smallest remaining sample sizes where the translated floating moment/sqrt
+    // path has demonstrated one-ULP errors.
+    if truth.len() != recovered.len() || !(4..=5).contains(&truth.len()) {
         return None;
     }
+    let sample_count = truth.len();
 
-    let mut residuals = [0.0; 4];
-    for index in 0..4 {
+    let mut residuals = Vec::with_capacity(sample_count);
+    for index in 0..sample_count {
         let truth_value = truth[index];
         let recovered_value = recovered[index];
         if !truth_value.is_finite() || !recovered_value.is_finite() {
@@ -189,13 +194,14 @@ fn exact_four_observation_standard_error(
         {
             return None;
         }
-        residuals[index] = residual;
+        residuals.push(residual);
     }
 
-    let mut pair_dyadics = Vec::with_capacity(6);
+    let pair_count = sample_count.checked_mul(sample_count.checked_sub(1)?)? / 2;
+    let mut pair_dyadics = Vec::with_capacity(pair_count);
     let mut unit_exponent = i32::MAX;
-    for left in 0..4 {
-        for right in left + 1..4 {
+    for left in 0..sample_count {
+        for right in left + 1..sample_count {
             let difference = residuals[left] - residuals[right];
             if !difference.is_finite()
                 || subtraction_roundoff(residuals[left], residuals[right], difference) != 0.0
@@ -226,20 +232,23 @@ fn exact_four_observation_standard_error(
         return Some(Ok(0.0));
     }
 
-    // For n=4, sum((ri-rj)^2, i<j) / 48 is exactly SE(mean)^2.
-    // Reduce that exact rational before the bounded midpoint proof. The reduced
-    // numerator need not itself be exactly representable in binary64: it remains
-    // an exact u128 authority and only seeds the floating candidate. Exact
-    // candidate/neighbor midpoint comparisons decide the final rounded result.
+    // For n observations, sum((ri-rj)^2, i<j) / [n²(n-1)] is exactly
+    // SE(mean)^2. Reduce that rational before the bounded midpoint proof. The
+    // reduced numerator remains an exact u128 authority; its binary64 conversion
+    // is only the candidate seed.
+    let sample_count_u128 = sample_count as u128;
+    let denominator = sample_count_u128
+        .checked_mul(sample_count_u128)?
+        .checked_mul(sample_count_u128.checked_sub(1)?)?;
     let mut divisor_left = pair_square_sum;
-    let mut divisor_right = 48_u128;
+    let mut divisor_right = denominator;
     while divisor_right != 0 {
         let remainder = divisor_left % divisor_right;
         divisor_left = divisor_right;
         divisor_right = remainder;
     }
     let reduced_numerator = pair_square_sum / divisor_left;
-    let reduced_denominator = 48_u128 / divisor_left;
+    let reduced_denominator = denominator / divisor_left;
     let standard_error = correctly_rounded_scaled_sqrt_ratio(
         reduced_numerator,
         reduced_denominator,
@@ -250,12 +259,12 @@ fn exact_four_observation_standard_error(
 
 /// Standard error of mean signed bias.
 ///
-/// Four-observation samples whose represented residuals and pairwise differences
-/// are exact use the exact pair-distance identity when its reduced dyadic ratio
-/// fits the bounded integer proof. All other samples retain the established bias
-/// implementation and its existing fail-closed behavior.
+/// Four- and five-observation samples whose represented residuals and pairwise
+/// differences are exact use the exact pair-distance identity when its reduced
+/// dyadic ratio fits the bounded integer proof. All other samples retain the
+/// established bias implementation and its existing fail-closed behavior.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
-    if let Some(result) = exact_four_observation_standard_error(truth, recovered) {
+    if let Some(result) = exact_pair_distance_standard_error(truth, recovered) {
         return result;
     }
     crate::bias::bias_standard_error(truth, recovered)
@@ -264,7 +273,7 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 #[cfg(test)]
 mod tests {
     use super::{
-        correctly_rounded_scaled_sqrt_ratio, exact_four_observation_standard_error,
+        correctly_rounded_scaled_sqrt_ratio, exact_pair_distance_standard_error,
         exact_power_of_two, midpoint_dyadic, multiply_by_power_of_two, positive_dyadic,
     };
 
@@ -291,6 +300,12 @@ mod tests {
                 .expect("large exact numerator remains bounded by u128 midpoint proof")
                 .to_bits(),
             0x41b3_a706_d408_9e32
+        );
+        assert_eq!(
+            correctly_rounded_scaled_sqrt_ratio(155_324_619_328_335_851, 25, 0)
+                .expect("five-observation reduced ratio remains bounded")
+                .to_bits(),
+            0x4192_caf1_6406_5ad0
         );
     }
 
@@ -330,7 +345,7 @@ mod tests {
         let truth = [0.0; 4];
         let recovered = [0.0, 1.0, 2.0, 7.0];
         assert_eq!(
-            exact_four_observation_standard_error(&truth, &recovered)
+            exact_pair_distance_standard_error(&truth, &recovered)
                 .expect("admitted")
                 .expect("representable")
                 .to_bits(),
@@ -341,7 +356,7 @@ mod tests {
         let scaled = recovered.map(|value| value * unit);
         let expected = f64::from_bits(0x58f8_df7d_a2e6_6e88);
         assert_eq!(
-            exact_four_observation_standard_error(&truth, &scaled)
+            exact_pair_distance_standard_error(&truth, &scaled)
                 .expect("scaled admitted")
                 .expect("scaled representable"),
             expected
@@ -353,7 +368,7 @@ mod tests {
         let truth = [0.0; 4];
         let recovered = [0.0, 14_099_687.0, 16_729_100.0, 94_045_527.0];
         assert_eq!(
-            exact_four_observation_standard_error(&truth, &recovered)
+            exact_pair_distance_standard_error(&truth, &recovered)
                 .expect("reduced ratio admitted")
                 .expect("representable")
                 .to_bits(),
@@ -366,7 +381,7 @@ mod tests {
         let truth = [0.0; 4];
         let recovered = [19_274_968.0, 693_729_138.0, 711_353_557.0, 1_625_519_116.0];
         assert_eq!(
-            exact_four_observation_standard_error(&truth, &recovered)
+            exact_pair_distance_standard_error(&truth, &recovered)
                 .expect("large reduced ratio admitted")
                 .expect("representable")
                 .to_bits(),
@@ -375,39 +390,59 @@ mod tests {
     }
 
     #[test]
-    fn four_observation_identity_covers_exact_zero_and_fallbacks() {
+    fn five_observation_identity_keeps_exact_pair_distance_ratio_authoritative() {
+        let truth = [0.0; 5];
+        let recovered = [
+            1_342_748_146.0,
+            1_434_848_064.0,
+            1_525_257_611.0,
+            1_685_877_224.0,
+            1_771_341_094.0,
+        ];
+        assert_eq!(
+            exact_pair_distance_standard_error(&truth, &recovered)
+                .expect("five-observation ratio admitted")
+                .expect("representable")
+                .to_bits(),
+            0x4192_caf1_6406_5ad0
+        );
+    }
+
+    #[test]
+    fn bounded_pair_distance_identity_covers_exact_zero_and_fallbacks() {
         let truth = [0.0; 4];
         assert_eq!(
-            exact_four_observation_standard_error(&truth, &[3.0; 4]),
+            exact_pair_distance_standard_error(&truth, &[3.0; 4]),
             Some(Ok(0.0))
         );
         assert_eq!(
-            exact_four_observation_standard_error(&truth[..3], &[0.0; 3]),
+            exact_pair_distance_standard_error(&truth[..3], &[0.0; 3]),
             None
         );
         assert_eq!(
-            exact_four_observation_standard_error(&truth, &[0.0, 1.0, f64::INFINITY, 2.0]),
+            exact_pair_distance_standard_error(&[0.0; 6], &[0.0; 6]),
             None
         );
         assert_eq!(
-            exact_four_observation_standard_error(
-                &truth,
-                &[f64::MAX, -f64::MAX, 0.0, 0.0]
-            ),
+            exact_pair_distance_standard_error(&truth, &[0.0, 1.0, f64::INFINITY, 2.0]),
+            None
+        );
+        assert_eq!(
+            exact_pair_distance_standard_error(&truth, &[f64::MAX, -f64::MAX, 0.0, 0.0]),
             None
         );
 
         let tiny = 2.0_f64.powi(-54);
         assert_eq!(
-            exact_four_observation_standard_error(&truth, &[0.0, 1.0, tiny, 2.0]),
+            exact_pair_distance_standard_error(&truth, &[0.0, 1.0, tiny, 2.0]),
             None
         );
         assert_eq!(
-            exact_four_observation_standard_error(&[1.0, 0.0, 0.0, 0.0], &[tiny, 0.0, 0.0, 0.0]),
+            exact_pair_distance_standard_error(&[1.0, 0.0, 0.0, 0.0], &[tiny, 0.0, 0.0, 0.0]),
             None
         );
         assert_eq!(
-            exact_four_observation_standard_error(&truth, &[0.0, 1.0, 2.0, 67_108_864.0]),
+            exact_pair_distance_standard_error(&truth, &[0.0, 1.0, 2.0, 67_108_864.0]),
             None
         );
     }
