@@ -1,4 +1,4 @@
-use validation_core::bias_standard_error;
+use validation_core::{ValidationError, bias_standard_error};
 
 #[test]
 fn bias_standard_error_preserves_singleton_repeated_level_identity_beyond_three_rows() {
@@ -23,4 +23,13 @@ fn bias_standard_error_preserves_singleton_repeated_level_identity_beyond_three_
     let mirrored_standard_error = bias_standard_error(&[0.0; 4], &mirrored)
         .expect("mirrored represented-input standard error");
     assert_eq!(mirrored_standard_error.to_bits(), 0x3fcf_ffff_ffff_ffff);
+
+    let minimum_subnormal = f64::from_bits(1);
+    assert_eq!(
+        bias_standard_error(
+            &[0.0; 4],
+            &[0.0, minimum_subnormal, minimum_subnormal, minimum_subnormal],
+        ),
+        Err(ValidationError::InvalidInput)
+    );
 }
