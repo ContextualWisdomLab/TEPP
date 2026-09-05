@@ -89,7 +89,10 @@ not a substitute for approved topic or psychometric estimators.
 only events whose availability time is at or before `knowledge_cutoff`, orders
 them by event time and opaque event ID, and emits adjacent forward temporal
 associations plus `candidate_not_causal` transition gaps. It does not infer
-causality, mutate TEPP state, or return a completed psychometric result.
+causality, mutate TEPP state, or return a completed psychometric result. The
+loopback `tepp-temporal-context query` CLI is the operator-visible client for
+that POST; stdout stays metric-free with `claim_boundary` `association_not_causal`,
+and `tepp.scientific_acceptance.v1` never appears.
 
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
 `failed`. Accepted and running statuses contain no measurement result. A
