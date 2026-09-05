@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-05T17:35:00Z  
+**Snapshot:** 2026-09-05T17:41:00Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
@@ -30,7 +30,7 @@ Passing, queued, skipped, or predecessor-head checks on an open PR never promote
 
 | PR / issue | Exact current evidence | Disposition |
 | --- | --- | --- |
-| #488 | `757fb0e4770b24f73f301b336adfcf7f656dcea5`, Draft, base `main` | Validation Evidence landing vehicle on protected #490. GAP-125 extends the bounded exact pair-distance proof through `n=16`. Current #491 characterization proves the failure class continues at `n=17`, compares O(n²) and O(n) exact numerator identities, and leaves production admission unchanged pending measured resource evidence. |
+| #488 | `d15282fc28038cf05b54f691d3bf72f568482984`, Draft, base `main` | Validation Evidence landing vehicle on protected #490. GAP-125 extends the bounded exact pair-distance proof through `n=16`. #491 characterization proves the failure class continues at `n=17`, compares O(n²) and O(n) exact numerator identities, defines test/operability evidence for resource budgeting, and leaves production admission unchanged pending measured CPU/allocation/API evidence. |
 | #491 | open | Replace the sample-count staircase with a measured exact-proof budget. Requires reproducible CPU/allocation evidence, checked-`u128` envelope, O(n²)/O(n)/wider-reference comparison, realistic scientific fixtures, exact-head gates, and applicable buyer-path p95 evidence. |
 | #416 | `aa730c63563eb4a33048d822b581036c8487bd47`, Draft | Validation / Analysis Run landing vehicle. Generic cutoff-before-identity repair remains inherited; fold children keep unique source/tests/doctoring until conflict-resolving inheritance is verified. |
 | #310 | `c6680450152b1e0a2c9abb553772d74a23923335`, Draft | Longitudinal Modeling vehicle. Stable `Between` recovery is unit-level with canonical occasion `0`; `Within` retains actual occasion identity. Older base remains a non-destructive restack finding. |
@@ -60,7 +60,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 ## Current Validation Evidence repair and resource finding
 
-#488 exact head `757fb0e4770b24f73f301b336adfcf7f656dcea5` inherits the full GAP-045–124 source/test/fixture/contract lineage and GAP-125's sixteen-observation repair.
+#488 exact head `d15282fc28038cf05b54f691d3bf72f568482984` inherits the full GAP-045–124 source/test/fixture/contract lineage and GAP-125's sixteen-observation repair.
 
 GAP-125 public RED `5da82b2d651706c191ca191c6c077d916cbfda25` uses exact represented residuals `[314270929,327661307,371854441,398522837,413483290,416184956,565808551,682627163,724514517,731058943,740662035,970233120,1141566755,1320628283,1526331271,1992574092]`. Its 120 exact squared pair distances sum to `56_762_922_330_032_131_548`; denominator `16²×15=3_840`; gcd `12`; reduced radicand `4_730_243_527_502_677_629/320`. The predecessor translated floating moment/`sqrt` fallback returns adjacent lower `0x419c_fcbb_b78d_2ad4`, while exact midpoint comparison returns `0x419c_fcbb_b78d_2ad5`. Causal repair `a509ae9e46c8ffc2cc3ef4f0e904774ad2516e1f` advances only the existing bounded proof to `n=4..=16`.
 
@@ -68,9 +68,11 @@ Issue #491 characterization commit `757fb0e4770b24f73f301b336adfcf7f656dcea5` ad
 
 The same commit adds `crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs`, which verifies that the O(n²) pair-distance sum equals `n*Σc_i²-(Σc_i)²` exactly on the n=17 fixture and fixes a compact-dyadic checked-`u128` worst-case envelope: for aligned diameter `D<=2^53`, `n²D²` fits through `n=2047` and reaches the unrepresentable `2^128` bound at `n=2048`. This arithmetic ceiling is not a production budget.
 
-`crates/validation_core/examples/bias_se_exact_proof_budget.rs` supplies a standard-library timing harness for the quadratic and linear checked-integer kernels at 16, 64, 256, 1024, and 2047 observations. It emits kernel p95 timing rows and checks algebraic equality before timing. No release-mode result is recorded yet. `docs/research/validation-bias-standard-error-exact-proof-budget.md` also records that the current pair-record allocation count is exactly `n(n-1)/2` and distinguishes a semantics-preserving two-pass O(n²) allocation-removal option from a stronger sufficient-admission O(n) path.
+`crates/validation_core/examples/bias_se_exact_proof_budget.rs` supplies a standard-library timing harness for the quadratic and linear checked-integer kernels at 16, 64, 256, 1024, and 2047 observations. It emits kernel p95 timing rows and checks algebraic equality before timing. `docs/research/validation-bias-standard-error-exact-proof-budget.md` records the pair-record allocation count `n(n-1)/2` and distinguishes a semantics-preserving two-pass O(n²) allocation-removal option from a stronger sufficient-admission O(n) path.
 
-The next source decision must be based on measured evidence, not the next integer sample count. Required evidence: release-mode CPU and allocation/layout results on a recorded toolchain/CPU; comparison of the O(n) sufficient-admission accepted/refused set against the existing pairwise proof; a wider-integer/reference alternative assessment; realistic public scientific acceptance fixtures with permutation/sign mirrors; and applicable buyer-path `p95<=20 ms` evidence before widening production admission.
+Current #488 documentation head `d15282fc28038cf05b54f691d3bf72f568482984` makes the resource contract explicit in `docs/TEST_STRATEGY.md` and `docs/OPERABILITY.md`. Required before widening production admission: release-mode raw timings on a recorded CPU/OS/Rust toolchain; measured allocation/layout; admitted/refused-set comparison between the O(n) sufficient proof and current pairwise proof; checked-`u128` overflow/refusal across sample count and exponent spread; wider-integer/reference assessment; realistic public scientific contracts; and applicable full-path `p95<=20 ms` evidence.
+
+The next source decision must be based on measured evidence, not the next integer sample count.
 
 ## Gap register
 
@@ -82,7 +84,7 @@ The next source decision must be based on measured evidence, not the next intege
 | GAP-111–120 | Exact pair-distance/midpoint proof introduced and extended through `n=11`; verification pending | Exact RED→repair/test/research lineages remain inherited. |
 | GAP-121–124 | Exact pair-distance proof extended through `n=12..15`; verification pending | REDs `b6ac1117...`, `369af46d...`, `db403976...`, `1c8a7ced...` with causal repairs `035cf392...`, `0b8727e7...`, `58efe80d...`, `3cc041ee...`; doctoring inherited. |
 | GAP-125 | Exact `n=16` pair-distance result remained one ULP low on translated fallback; verification pending | RED `5da82b2d...` → repair `a509ae9e...` → CHANGELOG/research `3d2297c6...`; production bounded proof is now `n=4..=16`. |
-| #491 | Hard sample-count cutoff is an unmeasured resource budget; open | Characterization `757fb0e4...` proves an n=17 counterexample, O(n²)/O(n) exact numerator equivalence, compact-dyadic `u128` envelope, and adds timing tooling. Production cutoff deliberately unchanged pending measured CPU/allocation/API evidence. |
+| #491 | Hard sample-count cutoff is an unmeasured resource budget; open | Characterization `757fb0e4...` proves an n=17 counterexample, O(n²)/O(n) exact numerator equivalence, compact-dyadic `u128` envelope, and timing tooling; docs head `d15282fc...` fixes measurement/operability gates. Production cutoff deliberately unchanged pending measured CPU/allocation/API evidence. |
 
 ## Release gate
 
