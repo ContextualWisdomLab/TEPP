@@ -1,3 +1,13 @@
+//! Preserve the exact two-level count geometry at the production `n=16` admission boundary.
+//!
+//! Six residuals at zero and ten at `next_down(1.0)` give
+//! `m(n-m)/(n-1) = 6*10/15 = 4`, so the represented-input standard error of the mean is exactly
+//! `|gap|/8`, with public bits `0x3fbf_ffff_ffff_ffff`. Reconstructing the identity through rounded
+//! translated moments and `sqrt` would instead round this case to `0.125`. The contract also
+//! requires permutation and sign invariance and fails closed when a minimum-subnormal gap would
+//! make the exact positive result collapse to false zero. This fixture is inside, and does not
+//! widen, the production exact-proof admission budget `n=4..=16`.
+
 use validation_core::{ValidationError, bias_standard_error};
 
 #[test]
