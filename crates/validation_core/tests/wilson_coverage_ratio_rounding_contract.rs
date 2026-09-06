@@ -1,3 +1,9 @@
+//! Regression contract for exact-count Wilson coverage ratio rounding.
+//!
+//! Durable integer provenance must determine both the empirical coverage ratio and
+//! the Wilson projection before binary64 rounding, including counts beyond the exact
+//! integer range of a standalone `f64` conversion.
+
 use validation_core::WilsonCoverageEvidenceV1;
 
 #[test]
