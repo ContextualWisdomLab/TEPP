@@ -1,3 +1,5 @@
+//! Regression contracts for all-covered Wilson intervals at exact-count small-z rounding boundaries.
+
 use validation_core::wilson_coverage_interval;
 
 #[test]

@@ -55,8 +55,8 @@ impl Wide256 {
                     .expect("schoolbook partial sum fits u128")
                     .checked_add(carry)
                     .expect("schoolbook carry sum fits u128");
-                limbs[limb_index] = u64::try_from(accumulator & mask)
-                    .expect("masked schoolbook limb fits u64");
+                limbs[limb_index] =
+                    u64::try_from(accumulator & mask).expect("masked schoolbook limb fits u64");
                 carry = accumulator >> 64;
             }
             limbs[left_index + 2] =
@@ -361,18 +361,15 @@ fn assert_and_measure_geometry(
         "narrow-wide-pair hybrid must preserve the exact pair numerator"
     );
     assert_eq!(
-        hybrid.used_pairwise_fallback,
-        expect_hybrid_fallback,
+        hybrid.used_pairwise_fallback, expect_hybrid_fallback,
         "narrow-pair fallback observation must match the declared geometry"
     );
     assert_eq!(
-        wide_hybrid.used_wide_product,
-        expect_wide_hybrid_wide_product,
+        wide_hybrid.used_wide_product, expect_wide_hybrid_wide_product,
         "wide-route observation must match the declared geometry"
     );
     assert_eq!(
-        wide_hybrid.used_pairwise_fallback,
-        expect_wide_hybrid_pair_fallback,
+        wide_hybrid.used_pairwise_fallback, expect_wide_hybrid_pair_fallback,
         "wide-hybrid pair fallback observation must match the declared geometry"
     );
 
@@ -391,7 +388,10 @@ fn assert_and_measure_geometry(
     let mut kernels: Vec<(&str, Kernel)> = vec![
         ("quadratic_buffered", pair_square_sum_quadratic_buffered),
         ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
-        ("linear_wide_product_reference", pair_square_sum_linear_wide_product),
+        (
+            "linear_wide_product_reference",
+            pair_square_sum_linear_wide_product,
+        ),
         ("hybrid_narrow_pair", pair_square_sum_hybrid),
         ("hybrid_narrow_wide_pair", pair_square_sum_wide_hybrid),
     ];
@@ -423,15 +423,7 @@ fn main() {
     );
     for sample_count in [16_usize, 64, 256, 1_024, 2_047] {
         let values = fixture(sample_count);
-        assert_and_measure_geometry(
-            "compact_admit",
-            &values,
-            samples,
-            true,
-            false,
-            false,
-            false,
-        );
+        assert_and_measure_geometry("compact_admit", &values, samples, true, false, false, false);
     }
 
     let power_of_two_values = boundary_fixture(65, 1_u128 << 58);

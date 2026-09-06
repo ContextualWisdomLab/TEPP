@@ -1,3 +1,5 @@
+//! Regression contract for bit-stable three-level bias SE under exact power-of-two scaling.
+
 use validation_core::bias_standard_error;
 
 const EXPECTED_STANDARD_ERROR_BITS: u64 = 0x64f9_5555_5555_5555;
@@ -24,12 +26,16 @@ fn exact_three_level_rational_scale_is_invariant_under_exact_power_of_two_scalin
     ];
 
     for recovered in permutations {
-        let standard_error = bias_standard_error(&truth, &recovered).expect("finite standard error");
+        let standard_error =
+            bias_standard_error(&truth, &recovered).expect("finite standard error");
         assert_eq!(standard_error.to_bits(), EXPECTED_STANDARD_ERROR_BITS);
 
         let mirrored = recovered.map(|value| -value);
         let mirrored_standard_error =
             bias_standard_error(&truth, &mirrored).expect("finite mirrored standard error");
-        assert_eq!(mirrored_standard_error.to_bits(), EXPECTED_STANDARD_ERROR_BITS);
+        assert_eq!(
+            mirrored_standard_error.to_bits(),
+            EXPECTED_STANDARD_ERROR_BITS
+        );
     }
 }
