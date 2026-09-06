@@ -36,7 +36,9 @@ Source-level RED `e0b324864e48a503e2aba0d2a487a0b95f5276ed` required a linear ne
 
 A later retention criterion required the conditioned observed-anchor fallback to demonstrate unique bounded admission after neutral-zero refusal. The checked-in production and unit-test corpus supplied no such represented fixture. Source-level RED `d40bfbf98b36562164d15d505f8f8825fd1c1349` rejected continued production reliance on the unsupported route, and repair `14e7862f4ddccce54f3b93d4dac89adbf047ba77` removed `exact_anchor_linear_pair_square_sum`. Production order is now `neutral_zero_linear -> pairwise_reference -> generic_fallback`. This is a consolidation decision under current evidence, not a theorem that pairwise is globally redundant.
 
-Commit `da703fc50e136ed79e12262909c9f400a3945621` repairs the remaining equivalence characterization so it mirrors the production signed neutral-zero arithmetic rather than the removed minimum-anchor helper. For the common represented family `{0,1,2^53}`, it retains exact numerator/reduced-ratio equality against pairwise at `n=4,16,17,65,257,2050` and order invariance. It also adds the mixed-sign represented geometry `[-2^53,0,1,2^53]`: pairwise subtraction correctly refuses the inexact `-2^53` versus `+1` difference, while neutral-zero coordinates admit unit exponent `0`, `S1` magnitude `1`, `S2=2^107+1`, `P=2^109+3`, and the public exact route rounds to `0x432a20bd700c2c3e`. This is production-route admission evidence, not permission to widen `n`.
+Commit `da703fc50e136ed79e12262909c9f400a3945621` was an intermediate correction that replaced the removed minimum-anchor helper in the equivalence characterization with a neutral-zero formulation. Review of that test exposed a second methodological defect: the integration test copied `Wide256`, dyadic parsing, scaling, and the neutral-zero kernel from production, so it was not an independent scientific oracle and it described `n=17..2050` as production-aligned even though production exact admission stops at 16.
+
+Repair `43d208383b765a3424019de45530af77ca484d78` removes the copied exact-route implementation from the integration test. The production-equivalence contract is now restricted to admitted `n=4` and `n=16` represented families and uses direct `i128/u128` integer pair-distance arithmetic as an independent oracle plus audited binary64 output bits. Forward, reversed, and rotated `n=16` inputs must return identical bits. The mixed-sign represented geometry `[-2^53,0,1,2^53]` remains an admission witness: direct binary64 subtraction of `-2^53-1` rounds away the unit contribution, while the independent integer pair oracle retains `P=2^109+3` and the public exact route returns `0x432a20bd700c2c3e`. Wider `n>16` arithmetic remains characterization evidence only and is not called a production-route test.
 
 Production sample admission remains `n=4..=16`.
 
@@ -48,7 +50,7 @@ The timing vehicle remains `crates/validation_core/examples/bias_se_exact_proof_
 
 ## Decision
 
-Keep production `validation_core::bias_standard_error` at `n=4..=16`. Use the neutral-zero two-pass exact proof before quadratic proof work inside that budget, keep pairwise O(n²) as the fail-closed comparison/reference path, and fall back to the established general implementation when bounded exact proof refuses. Do not reintroduce observed-anchor scanning without a represented fixture that proves unique scientific admission value.
+Keep production `validation_core::bias_standard_error` at `n=4..=16`. Use the neutral-zero two-pass exact proof before quadratic proof work inside that budget, keep pairwise O(n²) as the fail-closed comparison/reference path, and fall back to the established general implementation when bounded exact proof refuses. Do not reintroduce observed-anchor scanning without a represented fixture that proves unique scientific admission value. Scientific acceptance tests must use independent oracles or private production-unit tests; do not copy production exact arithmetic into an integration test and then treat agreement between the copies as independent evidence.
 
 Before widening beyond 16, require exact-head Rust 1.98.0 fmt/clippy/nextest/rustdoc and owned-production 100% line/branch coverage, same-head security/documentation GREEN and qualifying independent review, broad pair/neutral-zero equality wherever both admit, explicit neutral-zero-only represented fixtures, exact candidate stepping/midpoint/tie-to-even and permutation invariance, fail-closed overflow/range behavior, truthful production route telemetry, recorded release-mode raw CPU/allocator/RSS and applicable buyer-path p95 evidence, and current CHANGELOG/TRACEABILITY/TEST_STRATEGY/OPERABILITY/operator baseline.
 
@@ -69,11 +71,12 @@ Before widening beyond 16, require exact-head Rust 1.98.0 fmt/clippy/nextest/rus
 - Neutral-anchor RED / correctness repair: `9f403194a2ec1636531c2dfe9229cfb34b73d747` / `6cf30eeb549c0df0377bda1111cf46396e8282a3`
 - Neutral-zero route-order RED / production resource repair: `e0b324864e48a503e2aba0d2a487a0b95f5276ed` / `2b62bd46eb0c391327d2285c2244a76f5a1e0449`
 - Unsupported conditioned-anchor retention RED / removal: `d40bfbf98b36562164d15d505f8f8825fd1c1349` / `14e7862f4ddccce54f3b93d4dac89adbf047ba77`
-- Production-aligned neutral-zero equivalence and mixed-sign admission: `da703fc50e136ed79e12262909c9f400a3945621`
+- Intermediate copied neutral-zero characterization: `da703fc50e136ed79e12262909c9f400a3945621`
+- Independent production-domain pair oracle repair: `43d208383b765a3424019de45530af77ca484d78`
 - Narrow-wide-pair characterization RED / repair: `3136739460ef0c8e13c044a7e5b04891e4f4e23d` / `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5`
 - CHANGELOG fragment: `CHANGELOG.d/validation-bias-exact-proof-budget-characterization.md`
 - Production module: `crates/validation_core/src/bias_se.rs`
 - Route-order contract: `crates/validation_core/tests/bias_standard_error_neutral_zero_route_order_contract.rs`
-- Production-aligned equivalence characterization: `crates/validation_core/tests/bias_standard_error_represented_route_equivalence_characterization.rs`
+- Independent production-domain equivalence characterization: `crates/validation_core/tests/bias_standard_error_represented_route_equivalence_characterization.rs`
 - Public regression: `crates/validation_core/tests/bias_standard_error_nonminimum_anchor_exact_rounding_contract.rs`
 - Exact-proof budget harness: `crates/validation_core/examples/bias_se_exact_proof_budget.rs`
