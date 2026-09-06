@@ -1,3 +1,9 @@
+//! Contracts exact rounding for two-level represented residuals with a rational count factor.
+//!
+//! The 2-versus-8 split at n=10 has SE(mean)^2 = 4*gap^2/225, so the public result
+//! depends on preserving the exact rational square through the final sqrt/rounding decision.
+//! The contract also fixes permutation and sign symmetry and keeps underflow fail-closed.
+
 use validation_core::{ValidationError, bias_standard_error};
 
 #[test]
@@ -7,8 +13,8 @@ fn bias_standard_error_preserves_exact_rational_square_two_level_geometry() {
         0.0, 0.0, repeated, repeated, repeated, repeated, repeated, repeated, repeated, repeated,
     ];
 
-    let standard_error = bias_standard_error(&[0.0; 10], &recovered)
-        .expect("represented-input standard error");
+    let standard_error =
+        bias_standard_error(&[0.0; 10], &recovered).expect("represented-input standard error");
     // With two observations at one exact residual level and eight at the other,
     // m(n-m)/(n^2(n-1)) = 2*8/(10^2*9) = 4/225. Therefore SE(mean) is exactly
     // 2*|gap|/15. GAP-103 admits only reciprocal-integer-square count factors,

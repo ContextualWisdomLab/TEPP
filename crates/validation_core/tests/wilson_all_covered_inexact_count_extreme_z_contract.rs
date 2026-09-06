@@ -1,3 +1,10 @@
+//! Contracts all-covered Wilson evidence when durable counts exceed exact binary64 integers.
+//!
+//! A u64 sample count above 2^53 must retain its exact provenance while endpoint arithmetic
+//! remains correctly rounded at extreme critical-value scales. The contract prevents
+//! complementary-mass cancellation from erasing a positive lower endpoint and prevents
+//! subnormal squared-z scales from inventing non-representable uncertainty.
+
 use validation_core::WilsonCoverageEvidenceV1;
 
 #[test]
