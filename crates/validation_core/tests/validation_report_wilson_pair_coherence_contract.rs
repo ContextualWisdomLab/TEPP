@@ -1,3 +1,10 @@
+//! Require Wilson coverage bounds in a validation report to form one coherent score interval.
+//!
+//! Lower and upper bounds are not independent range-checked scalars: together with the reported
+//! coverage they must be realizable by the canonical Wilson producer for one non-empty sample and
+//! finite positive critical value. A pair can contain the reported coverage yet still be impossible;
+//! such evidence must fail closed in validation, JSON serialization, human summaries, and deserialization.
+//!
 use validation_core::{
     ValidationError, ValidationReport, interval_coverage, wilson_coverage_interval,
 };
