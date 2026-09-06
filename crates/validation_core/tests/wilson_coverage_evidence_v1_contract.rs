@@ -1,3 +1,10 @@
+//! Contracts the versioned Wilson coverage-evidence envelope used for validation receipts.
+//!
+//! The v1 schema binds sample and covered counts, the configured standard-normal
+//! critical value, empirical coverage, and both Wilson endpoints. Deserialization
+//! and re-validation must fail closed when those fields disagree, when unsupported
+//! semantics are introduced, or when count/probability domains are impossible.
+
 use validation_core::{ValidationError, WilsonCoverageEvidenceV1};
 
 fn canonical_evidence() -> WilsonCoverageEvidenceV1 {
@@ -57,7 +64,10 @@ fn tampered_denominator_critical_value_or_endpoint_fails_closed() {
 
     let mut wrong_coverage = evidence;
     wrong_coverage.empirical_coverage = 0.5;
-    assert_eq!(wrong_coverage.validate(), Err(ValidationError::InvalidInput));
+    assert_eq!(
+        wrong_coverage.validate(),
+        Err(ValidationError::InvalidInput)
+    );
 }
 
 #[test]
@@ -90,7 +100,10 @@ fn impossible_counts_and_numeric_domains_fail_closed() {
 
     let mut impossible_counts = evidence;
     impossible_counts.covered_count = impossible_counts.sample_count + 1;
-    assert_eq!(impossible_counts.validate(), Err(ValidationError::InvalidInput));
+    assert_eq!(
+        impossible_counts.validate(),
+        Err(ValidationError::InvalidInput)
+    );
 
     for invalid_z in [0.0, -1.0, f64::NAN, f64::INFINITY, 1e200] {
         let mut invalid = evidence;

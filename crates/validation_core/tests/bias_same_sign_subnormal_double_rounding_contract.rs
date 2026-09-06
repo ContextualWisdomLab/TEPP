@@ -1,3 +1,10 @@
+//! Contracts exact binary64 mean-bias rounding for same-sign subnormal inputs.
+//!
+//! These cases guard the final represented-value decision against double rounding:
+//! accumulation may cross the normal/subnormal boundary or land exactly halfway
+//! between subnormal units, so the public metric must round once at the final scale
+//! with IEEE 754 ties-to-even semantics.
+
 use validation_core::mean_bias;
 
 #[test]
@@ -19,7 +26,10 @@ fn mean_bias_does_not_double_round_same_sign_subnormal_mean() {
 
     let mirrored: Vec<_> = recovered.iter().map(|value| -*value).collect();
     let mirrored_bias = mean_bias(&truth, &mirrored).expect("mirrored subnormal mean bias");
-    assert_eq!(mirrored_bias.to_bits(), (1_u64 << 63) | (minimum_normal_units - 21));
+    assert_eq!(
+        mirrored_bias.to_bits(),
+        (1_u64 << 63) | (minimum_normal_units - 21)
+    );
 }
 
 #[test]
