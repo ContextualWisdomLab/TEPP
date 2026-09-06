@@ -1,3 +1,10 @@
+//! Enforce scientific-domain coherence before Validation Evidence can be projected or serialized.
+//!
+//! RMSE and standard errors are nonnegative, coverage and temporal-order accuracy are probabilities,
+//! and Wilson limits must be ordered, lie in `[0, 1]`, and contain the observed coverage. The same
+//! invariants govern direct validation, human/JSON projection, serialization, and deserialization so
+//! an impossible validation receipt cannot become durable evidence through a weaker representation.
+
 use validation_core::{MonteCarloSummary, ValidationError, ValidationReport};
 
 fn valid_report() -> ValidationReport {

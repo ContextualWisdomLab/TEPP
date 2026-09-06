@@ -1,3 +1,10 @@
+//! Preserve representable RMSE evidence across overflow and subnormal arithmetic boundaries.
+//!
+//! Squaring an extreme finite residual may overflow even when the root-mean-square itself is exactly
+//! representable, so the estimator must recover that finite value rather than reject it. Conversely,
+//! a subnormal residual may be retained only when the requested RMSE remains representable; arithmetic
+//! that would manufacture a false zero must fail closed instead of understating recovery error.
+
 use validation_core::{rmse_standard_error, root_mean_square_error};
 
 #[test]
