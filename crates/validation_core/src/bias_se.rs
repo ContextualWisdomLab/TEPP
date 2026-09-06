@@ -2,8 +2,8 @@
 //!
 //! The general bias implementation remains the fallback authority. This module
 //! admits a bounded small-sample exact pair-distance identity when represented
-//! residuals admit a neutral-zero linear proof, a conditioned exact observed
-//! anchor, or error-free pairwise differences; the exact rational square root is
+//! residuals admit a neutral-zero linear proof or error-free pairwise differences;
+//! the exact rational square root is
 //! then rounded against binary64 midpoints without first rounding the ratio under
 //! the square root.
 
@@ -111,11 +111,7 @@ impl Wide256 {
     }
 
     const fn to_u128(self) -> Option<u128> {
-        if self.high == 0 {
-            Some(self.low)
-        } else {
-            None
-        }
+        if self.high == 0 { Some(self.low) } else { None }
     }
 
     const fn is_zero(self) -> bool {
@@ -155,10 +151,8 @@ fn compare_scaled_wide(
 
     let left_bits = left.bit_len();
     let right_bits = right.bit_len();
-    let left_top = left_exponent
-        .checked_add(i32::try_from(left_bits.checked_sub(1)?).ok()?)?;
-    let right_top = right_exponent
-        .checked_add(i32::try_from(right_bits.checked_sub(1)?).ok()?)?;
+    let left_top = left_exponent.checked_add(i32::try_from(left_bits.checked_sub(1)?).ok()?)?;
+    let right_top = right_exponent.checked_add(i32::try_from(right_bits.checked_sub(1)?).ok()?)?;
     match left_top.cmp(&right_top) {
         Ordering::Less => return Some(Ordering::Less),
         Ordering::Greater => return Some(Ordering::Greater),
@@ -298,7 +292,10 @@ fn correctly_rounded_scaled_sqrt_ratio(
 }
 
 fn exact_pairwise_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
-    let pair_count = residuals.len().checked_mul(residuals.len().checked_sub(1)?)? / 2;
+    let pair_count = residuals
+        .len()
+        .checked_mul(residuals.len().checked_sub(1)?)?
+        / 2;
     let mut pair_dyadics = Vec::with_capacity(pair_count);
     let mut unit_exponent = i32::MAX;
     for left in 0..residuals.len() {
@@ -375,82 +372,6 @@ fn exact_neutral_zero_linear_pair_square_sum(residuals: &[f64]) -> Option<(u128,
     Some((numerator, unit_exponent))
 }
 
-fn exact_anchor_linear_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
-    // Neutral zero is handled by the O(n) fast route. Search represented residuals
-    // only when translating by an observed anchor can reduce the dyadic dynamic
-    // range enough to recover a bounded proof that neutral zero refused. The final
-    // total-order tie-break keeps selection independent of observation order.
-    let mut best: Option<(f64, f64, Vec<f64>)> = None;
-    for anchor in residuals.iter().copied() {
-        let mut translated = Vec::with_capacity(residuals.len());
-        let mut max_magnitude = 0.0_f64;
-        let mut exact = true;
-        for &residual in residuals {
-            let coordinate = residual - anchor;
-            if !coordinate.is_finite()
-                || subtraction_roundoff(residual, anchor, coordinate) != 0.0
-            {
-                exact = false;
-                break;
-            }
-            max_magnitude = max_magnitude.max(coordinate.abs());
-            translated.push(coordinate);
-        }
-        if !exact {
-            continue;
-        }
-
-        let should_replace = match &best {
-            None => true,
-            Some((best_max_magnitude, best_anchor, _)) => max_magnitude
-                .total_cmp(best_max_magnitude)
-                .then_with(|| anchor.total_cmp(best_anchor))
-                .is_lt(),
-        };
-        if should_replace {
-            best = Some((max_magnitude, anchor, translated));
-        }
-    }
-    let (_, _, translated) = best?;
-
-    let mut dyadics = Vec::with_capacity(translated.len());
-    let mut unit_exponent = i32::MAX;
-    for &coordinate in &translated {
-        if coordinate == 0.0 {
-            dyadics.push(None);
-            continue;
-        }
-        let dyadic = positive_dyadic(coordinate.abs())?;
-        unit_exponent = unit_exponent.min(dyadic.1);
-        dyadics.push(Some((coordinate.is_sign_negative(), dyadic)));
-    }
-    if unit_exponent == i32::MAX {
-        return Some((0, 0));
-    }
-
-    let mut positive_sum = 0_u128;
-    let mut negative_sum = 0_u128;
-    let mut square_sum = 0_u128;
-    for dyadic in dyadics.into_iter().flatten() {
-        let (negative, (significand, exponent)) = dyadic;
-        let shift = exponent.checked_sub(unit_exponent)?.unsigned_abs();
-        let coefficient = multiply_by_power_of_two(significand, shift)?;
-        if negative {
-            negative_sum = negative_sum.checked_add(coefficient)?;
-        } else {
-            positive_sum = positive_sum.checked_add(coefficient)?;
-        }
-        square_sum = square_sum.checked_add(coefficient.checked_mul(coefficient)?)?;
-    }
-
-    let sample_count = u128::try_from(residuals.len()).ok()?;
-    let scaled_square_sum = Wide256::multiply_u128(sample_count, square_sum);
-    let signed_sum_magnitude = positive_sum.abs_diff(negative_sum);
-    let squared_sum = Wide256::multiply_u128(signed_sum_magnitude, signed_sum_magnitude);
-    let numerator = scaled_square_sum.checked_sub(squared_sum)?.to_u128()?;
-    Some((numerator, unit_exponent))
-}
-
 fn exact_pair_distance_standard_error(
     truth: &[f64],
     recovered: &[f64],
@@ -482,12 +403,11 @@ fn exact_pair_distance_standard_error(
 
     // Attempt the neutral-zero two-pass proof first: finite represented residuals
     // are exact coordinates around zero, so this is O(n) with O(1) proof storage.
-    // If its bounded integer coordinate range refuses, search exact observed anchors
-    // that may reduce that range. Keep pairwise O(n²) last as a comparison and
-    // fail-closed reference while admission equivalence and release-mode budgets are
-    // still being characterized.
+    // Keep pairwise O(n²) only as a fail-closed comparison reference while broader
+    // represented-input equivalence and release-mode budgets are characterized.
+    // The former conditioned observed-anchor scan was removed because no production
+    // fixture demonstrated unique admission after the neutral-zero proof refused.
     let (pair_square_sum, unit_exponent) = exact_neutral_zero_linear_pair_square_sum(&residuals)
-        .or_else(|| exact_anchor_linear_pair_square_sum(&residuals))
         .or_else(|| exact_pairwise_pair_square_sum(&residuals))?;
     if pair_square_sum == 0 {
         return Some(Ok(0.0));
@@ -510,21 +430,18 @@ fn exact_pair_distance_standard_error(
     }
     let reduced_numerator = pair_square_sum / divisor_left;
     let reduced_denominator = denominator / divisor_left;
-    let standard_error = correctly_rounded_scaled_sqrt_ratio(
-        reduced_numerator,
-        reduced_denominator,
-        unit_exponent,
-    )?;
+    let standard_error =
+        correctly_rounded_scaled_sqrt_ratio(reduced_numerator, reduced_denominator, unit_exponent)?;
     Some(Ok(standard_error))
 }
 
 /// Standard error of mean signed bias.
 ///
 /// Four- through sixteen-observation samples first attempt an exact neutral-zero
-/// linear proof, then a conditioned exact observed-anchor translation, and finally
-/// the pairwise-difference reference when the earlier bounded proofs refuse. Each
-/// admitted route uses the same exact pair-distance identity and exact dyadic
-/// midpoint rounding. All other samples retain the established bias implementation
+/// linear proof and then the pairwise-difference reference when the bounded linear
+/// proof refuses. Each admitted route uses the same exact pair-distance identity
+/// and exact dyadic midpoint rounding. All other samples retain the established
+/// bias implementation
 /// and its existing fail-closed behavior.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     if let Some(result) = exact_pair_distance_standard_error(truth, recovered) {
@@ -536,10 +453,10 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 #[cfg(test)]
 mod tests {
     use super::{
-        compare_scaled_wide, correctly_rounded_scaled_sqrt_ratio,
-        exact_anchor_linear_pair_square_sum, exact_neutral_zero_linear_pair_square_sum,
-        exact_pair_distance_standard_error, exact_pairwise_pair_square_sum, exact_power_of_two,
-        midpoint_dyadic, multiply_by_power_of_two, positive_dyadic, Wide256,
+        Wide256, compare_scaled_wide, correctly_rounded_scaled_sqrt_ratio,
+        exact_neutral_zero_linear_pair_square_sum, exact_pair_distance_standard_error,
+        exact_pairwise_pair_square_sum, exact_power_of_two,
+        midpoint_dyadic, multiply_by_power_of_two, positive_dyadic,
     };
     use core::cmp::Ordering;
 
@@ -557,10 +474,7 @@ mod tests {
                 .to_bits(),
             0x3ffa_ee98_6a40_25f8
         );
-        assert_eq!(
-            correctly_rounded_scaled_sqrt_ratio(48, 48, 0),
-            Some(1.0)
-        );
+        assert_eq!(correctly_rounded_scaled_sqrt_ratio(48, 48, 0), Some(1.0));
         assert_eq!(
             correctly_rounded_scaled_sqrt_ratio(1_739_374_438_758_325_417, 16, 0)
                 .expect("large exact numerator remains bounded by exact midpoint proof")
@@ -632,19 +546,13 @@ mod tests {
             compare_scaled_wide(three, 2_046, one, 2_047),
             Some(Ordering::Greater)
         );
-        assert_eq!(
-            compare_scaled_wide(one, 1, one, 0),
-            Some(Ordering::Greater)
-        );
+        assert_eq!(compare_scaled_wide(one, 1, one, 0), Some(Ordering::Greater));
         assert_eq!(compare_scaled_wide(one, 0, one, 1), Some(Ordering::Less));
     }
 
     #[test]
     fn wide_subtraction_preserves_borrow_and_bounded_downcast() {
-        let left = Wide256 {
-            high: 1,
-            low: 0,
-        };
+        let left = Wide256 { high: 1, low: 0 };
         let right = Wide256::from_u128(1);
         assert_eq!(
             left.checked_sub(right),
@@ -700,11 +608,10 @@ mod tests {
     }
 
     #[test]
-    fn anchor_linear_route_recovers_observed_and_neutral_anchor_geometries() {
+    fn neutral_zero_linear_route_recovers_pairwise_refusal_geometries() {
         let tiny = 2.0_f64.powi(-54);
         let small = [0.0, 1.0, tiny, 2.0];
         assert_eq!(exact_pairwise_pair_square_sum(&small), None);
-        assert!(exact_anchor_linear_pair_square_sum(&small).is_some());
         assert!(exact_neutral_zero_linear_pair_square_sum(&small).is_some());
 
         let diameter = 9_007_199_254_740_992.0_f64;
@@ -713,14 +620,10 @@ mod tests {
         let (numerator, unit_exponent) = exact_neutral_zero_linear_pair_square_sum(&wide)
             .expect("zero is an exact non-minimum translation anchor");
         assert_eq!(unit_exponent, 0);
-        assert_eq!(
-            numerator,
-            243_388_915_243_820_099_130_562_543_878_155_u128
-        );
+        assert_eq!(numerator, 243_388_915_243_820_099_130_562_543_878_155_u128);
 
         let no_observed_anchor = [1.0, tiny, 2.0, 3.0];
         assert_eq!(exact_pairwise_pair_square_sum(&no_observed_anchor), None);
-        assert_eq!(exact_anchor_linear_pair_square_sum(&no_observed_anchor), None);
         let (numerator, unit_exponent) =
             exact_neutral_zero_linear_pair_square_sum(&no_observed_anchor)
                 .expect("neutral zero is exact when no observed residual is a universal anchor");
