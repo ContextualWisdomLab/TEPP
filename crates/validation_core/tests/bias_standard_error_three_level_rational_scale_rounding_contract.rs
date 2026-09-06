@@ -1,3 +1,10 @@
+//! Correct-rounding contract for a represented three-level rational scale.
+//!
+//! The sample has an exact dyadic spacing whose standard-error scale reduces to
+//! a non-dyadic rational before the final square root. The public result must be
+//! rounded once to the expected binary64 value and remain bit-identical under
+//! every permutation and sign reflection of the represented observations.
+
 use validation_core::bias_standard_error;
 
 const EXPECTED_STANDARD_ERROR_BITS: u64 = 0x3f79_5555_5555_5555;
@@ -24,12 +31,16 @@ fn exact_three_level_rational_scale_preserves_correct_rounding() {
     ];
 
     for recovered in permutations {
-        let standard_error = bias_standard_error(&truth, &recovered).expect("finite standard error");
+        let standard_error =
+            bias_standard_error(&truth, &recovered).expect("finite standard error");
         assert_eq!(standard_error.to_bits(), EXPECTED_STANDARD_ERROR_BITS);
 
         let mirrored = recovered.map(|value| -value);
         let mirrored_standard_error =
             bias_standard_error(&truth, &mirrored).expect("finite mirrored standard error");
-        assert_eq!(mirrored_standard_error.to_bits(), EXPECTED_STANDARD_ERROR_BITS);
+        assert_eq!(
+            mirrored_standard_error.to_bits(),
+            EXPECTED_STANDARD_ERROR_BITS
+        );
     }
 }

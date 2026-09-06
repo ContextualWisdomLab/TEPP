@@ -1,3 +1,11 @@
+//! Exact reduced-ratio contract for the four-observation bias standard error.
+//!
+//! This geometry makes the exact pair-distance numerator and denominator share a
+//! factor of four. Reducing that ratio before the bounded square-root proof is
+//! required to reach the correctly rounded binary64 result; the unreduced
+//! fallback lands one ULP low. Permutation and sign changes must preserve the
+//! same public metric bits.
+
 use validation_core::bias_standard_error;
 
 fn assert_reduced_ratio_contract(recovered: [f64; 4]) {
