@@ -1,7 +1,13 @@
+//! Regression contract for permutation and sign invariance of the three-sample metric.
+//!
+//! The historical filename references an earlier anchor implementation. The
+//! scientific invariant is that reordering or mirroring the represented sample
+//! cannot change the correctly rounded standard error.
+
 use validation_core::bias_standard_error;
 
 #[test]
-fn bias_standard_error_is_invariant_to_the_exact_translation_anchor() {
+fn three_observation_standard_error_is_permutation_and_sign_invariant() {
     let low = f64::from_bits(0x4194_f788_9184_b980);
     let middle = f64::from_bits(0x420c_409f_fce3_8390);
     let high = f64::from_bits(0x4222_70c4_634c_c6b6);

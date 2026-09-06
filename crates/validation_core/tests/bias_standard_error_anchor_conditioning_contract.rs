@@ -1,3 +1,9 @@
+//! Regression contract for correctly rounded three-observation bias standard error.
+//!
+//! The historical filename predates removal of the conditioned-anchor production
+//! route. The durable contract is order and sign invariance for represented
+//! three-observation inputs handled by the established small-sample authority.
+
 use validation_core::bias_standard_error;
 
 const EXPECTED_STANDARD_ERROR_BITS: u64 = 0x3fd1_7a99_c875_b980;
@@ -11,7 +17,7 @@ fn represented_sample() -> [f64; 3] {
 }
 
 #[test]
-fn exact_translated_anchor_conditioning_preserves_correct_rounding() {
+fn represented_three_observation_rounding_is_order_and_sign_invariant() {
     let [middle, low, high] = represented_sample();
     let truth = [0.0; 3];
     let permutations = [
