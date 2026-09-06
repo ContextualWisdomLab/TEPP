@@ -1,9 +1,12 @@
-//! Characterizes represented-input equivalence between pairwise and wide-linear bias-SE proofs.
+//! Characterizes represented-input equivalence between pairwise and production neutral-zero bias-SE proofs.
 //!
-//! This is test-only evidence for issue #491. It deliberately leaves production
-//! admission at `n=4..=16`: the pairwise O(n²) proof remains authoritative until
-//! represented-input route equivalence, exact rounding, resource evidence, and
-//! protected-head quality gates are all satisfied.
+//! This is test-only evidence for issue #491. Production admission remains
+//! `n=4..=16`: the neutral-zero O(n) proof is primary, while pairwise O(n²)
+//! remains a fail-closed comparison/reference path until represented-input
+//! equivalence, exact rounding, resource evidence, and protected-head quality
+//! gates are all satisfied.
+
+use validation_core::bias_standard_error;
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct Wide256 {
@@ -144,45 +147,51 @@ fn pairwise_exact_numerator(values: &[f64]) -> Option<(u128, i32)> {
     Some((pair_square_sum, unit_exponent))
 }
 
-fn wide_linear_exact_numerator(values: &[f64]) -> Option<(u128, i32, u128, u128)> {
-    let anchor = values
-        .iter()
-        .copied()
-        .min_by(f64::total_cmp)?;
-    let mut dyadics = Vec::with_capacity(values.len());
+fn neutral_zero_linear_exact_numerator(values: &[f64]) -> Option<(u128, i32, u128, u128)> {
     let mut unit_exponent = i32::MAX;
-
-    for value in values.iter().copied() {
-        let difference = value - anchor;
-        if !difference.is_finite() || subtraction_roundoff(value, anchor, difference) != 0.0 {
-            return None;
-        }
-        if difference == 0.0 {
-            dyadics.push(None);
+    for &coordinate in values {
+        if coordinate == 0.0 {
             continue;
         }
-        let dyadic = positive_dyadic(difference)?;
-        unit_exponent = unit_exponent.min(dyadic.1);
-        dyadics.push(Some(dyadic));
+        let (_, exponent) = positive_dyadic(coordinate.abs())?;
+        unit_exponent = unit_exponent.min(exponent);
     }
     if unit_exponent == i32::MAX {
         return Some((0, 0, 0, 0));
     }
 
-    let mut coefficient_sum = 0_u128;
+    let mut positive_sum = 0_u128;
+    let mut negative_sum = 0_u128;
     let mut square_sum = 0_u128;
-    for dyadic in dyadics.into_iter().flatten() {
-        let shift = dyadic.1.checked_sub(unit_exponent)?.unsigned_abs();
-        let coefficient = multiply_by_power_of_two(dyadic.0, shift)?;
-        coefficient_sum = coefficient_sum.checked_add(coefficient)?;
+    for &coordinate in values {
+        if coordinate == 0.0 {
+            continue;
+        }
+        let (significand, exponent) = positive_dyadic(coordinate.abs())?;
+        let shift = exponent.checked_sub(unit_exponent)?.unsigned_abs();
+        let coefficient = multiply_by_power_of_two(significand, shift)?;
+        if coordinate.is_sign_negative() {
+            negative_sum = negative_sum.checked_add(coefficient)?;
+        } else {
+            positive_sum = positive_sum.checked_add(coefficient)?;
+        }
         square_sum = square_sum.checked_add(coefficient.checked_mul(coefficient)?)?;
     }
 
+    let signed_sum_magnitude = positive_sum.abs_diff(negative_sum);
     let sample_count = u128::try_from(values.len()).ok()?;
     let numerator = Wide256::multiply_u128(sample_count, square_sum)
-        .checked_sub(Wide256::multiply_u128(coefficient_sum, coefficient_sum))?
+        .checked_sub(Wide256::multiply_u128(
+            signed_sum_magnitude,
+            signed_sum_magnitude,
+        ))?
         .as_u128()?;
-    Some((numerator, unit_exponent, coefficient_sum, square_sum))
+    Some((
+        numerator,
+        unit_exponent,
+        signed_sum_magnitude,
+        square_sum,
+    ))
 }
 
 fn gcd(mut left: u128, mut right: u128) -> u128 {
@@ -195,7 +204,7 @@ fn gcd(mut left: u128, mut right: u128) -> u128 {
 }
 
 #[test]
-fn represented_pairwise_and_wide_linear_routes_share_the_same_exact_ratio() {
+fn represented_pairwise_and_neutral_zero_routes_share_the_same_exact_ratio() {
     for sample_count in [4_usize, 16, 17, 65, 257, 2_050] {
         let values = represented_values(sample_count);
         for value in values.iter().copied() {
@@ -209,12 +218,16 @@ fn represented_pairwise_and_wide_linear_routes_share_the_same_exact_ratio() {
 
         let (pair_numerator, pair_exponent) =
             pairwise_exact_numerator(&values).expect("pairwise represented-input authority");
-        let (wide_numerator, wide_exponent, coefficient_sum, square_sum) =
-            wide_linear_exact_numerator(&values).expect("wide-linear represented-input candidate");
-        assert_eq!(wide_exponent, pair_exponent, "common exact unit must agree");
+        let (linear_numerator, linear_exponent, signed_sum_magnitude, square_sum) =
+            neutral_zero_linear_exact_numerator(&values)
+                .expect("neutral-zero represented-input candidate");
         assert_eq!(
-            wide_numerator, pair_numerator,
-            "wide O(n) identity must preserve the O(n²) exact pair numerator for n={sample_count}"
+            linear_exponent, pair_exponent,
+            "common exact unit must agree"
+        );
+        assert_eq!(
+            linear_numerator, pair_numerator,
+            "neutral-zero O(n) identity must preserve the O(n²) exact pair numerator for n={sample_count}"
         );
 
         let sample_count_u128 = u128::try_from(sample_count).expect("sample count fits u128");
@@ -224,8 +237,16 @@ fn represented_pairwise_and_wide_linear_routes_share_the_same_exact_ratio() {
             .expect("scientific denominator fits u128");
         let divisor = gcd(pair_numerator, denominator);
         assert_eq!(
-            (wide_numerator / divisor, denominator / divisor, wide_exponent),
-            (pair_numerator / divisor, denominator / divisor, pair_exponent),
+            (
+                linear_numerator / divisor,
+                denominator / divisor,
+                linear_exponent,
+            ),
+            (
+                pair_numerator / divisor,
+                denominator / divisor,
+                pair_exponent,
+            ),
             "both routes must present the exact rounder with the same reduced ratio"
         );
 
@@ -235,7 +256,9 @@ fn represented_pairwise_and_wide_linear_routes_share_the_same_exact_ratio() {
                 "n=2050 must exercise the wider cancellation product"
             );
             assert!(
-                coefficient_sum.checked_mul(coefficient_sum).is_none(),
+                signed_sum_magnitude
+                    .checked_mul(signed_sum_magnitude)
+                    .is_none(),
                 "n=2050 must exercise the wider squared-sum product"
             );
             assert_eq!(
@@ -255,11 +278,11 @@ fn represented_pairwise_and_wide_linear_routes_share_the_same_exact_ratio() {
 }
 
 #[test]
-fn wide_linear_route_is_order_invariant_when_the_exact_anchor_moves() {
+fn neutral_zero_linear_route_is_order_invariant() {
     let mut values = represented_values(65);
-    let forward = wide_linear_exact_numerator(&values).expect("forward route");
+    let forward = neutral_zero_linear_exact_numerator(&values).expect("forward route");
     values.reverse();
-    let reversed = wide_linear_exact_numerator(&values).expect("reversed route");
+    let reversed = neutral_zero_linear_exact_numerator(&values).expect("reversed route");
     assert_eq!(forward.0, reversed.0);
     assert_eq!(forward.1, reversed.1);
     assert_eq!(
@@ -268,4 +291,25 @@ fn wide_linear_route_is_order_invariant_when_the_exact_anchor_moves() {
             .expect("reversed pair authority")
             .0
     );
+}
+
+#[test]
+fn neutral_zero_route_admits_mixed_sign_geometry_when_pairwise_refuses() {
+    let diameter = (1_u64 << 53) as f64;
+    let values = [-diameter, 0.0, 1.0, diameter];
+    assert!(
+        pairwise_exact_numerator(&values).is_none(),
+        "pairwise subtraction must refuse the represented -2^53 versus +1 difference"
+    );
+
+    let (numerator, unit_exponent, signed_sum_magnitude, square_sum) =
+        neutral_zero_linear_exact_numerator(&values).expect("neutral-zero exact proof");
+    assert_eq!(unit_exponent, 0);
+    assert_eq!(signed_sum_magnitude, 1);
+    assert_eq!(square_sum, (1_u128 << 107) + 1);
+    assert_eq!(numerator, (1_u128 << 109) + 3);
+
+    let truth = [0.0; 4];
+    let standard_error = bias_standard_error(&truth, &values).expect("finite standard error");
+    assert_eq!(standard_error.to_bits(), 0x432a_20bd_700c_2c3e);
 }
