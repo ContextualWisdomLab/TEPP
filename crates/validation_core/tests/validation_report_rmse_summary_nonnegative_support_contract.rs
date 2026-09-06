@@ -1,3 +1,7 @@
+//! Verifies that `ValidationReport` rejects Monte Carlo RMSE summaries whose
+//! nonnegative replication support is mathematically unattainable.
+//! For nonnegative replications, `SE(mean) <= mean`; the attainable boundary remains accepted.
+
 use validation_core::{MonteCarloSummary, ValidationError, ValidationReport};
 
 fn report_with(summary: MonteCarloSummary) -> ValidationReport {

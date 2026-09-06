@@ -1,3 +1,7 @@
+//! Verifies exact-recovery semantics when the standard-error multiplier is zero.
+//! Nonzero subnormal residuals must remain rejected even under a huge standard error,
+//! while signed zero remains one numeric recovery value.
+
 use validation_core::accept_within_standard_errors;
 
 #[test]

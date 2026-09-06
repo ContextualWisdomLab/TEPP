@@ -1,3 +1,7 @@
+//! Verifies correctly rounded bias-standard-error scaling for a represented
+//! three-observation geometry whose exact residual gap is `5 * 2^-52`.
+//! The contract rejects double rounding through `rounded(1/3) * gap` and preserves sign-mirror invariance.
+
 use validation_core::bias_standard_error;
 
 #[test]
