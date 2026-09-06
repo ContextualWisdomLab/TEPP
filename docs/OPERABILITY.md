@@ -20,23 +20,7 @@ The Rust domain packages are embedded/library boundaries. They require no produc
 
 ## Planned service SLIs
 
-When corresponding services exist, track:
-
-- source ingest success/rejection and exact error class;
-- evidence/span count and lineage completeness;
-- future-evidence exclusion count at each knowledge cutoff;
-- temporal contradiction/path-consistency and budget exhaustion counts;
-- event/link/tracking confidence and calibration;
-- semantic-unit unknown/abstention rate by language;
-- model convergence/ELBO/objective and posterior diagnostics;
-- true-recovery/validation drift against release benchmark;
-- CPU/GPU parity and fallback count;
-- VRAM/RSS/transfer/kernel time;
-- model/LLM provider failures and evidence-verifier rejection;
-- artifact/export provenance completeness;
-- tenant authorization/audit anomalies.
-
-Do not expose raw PII/source text in ordinary metrics/logs merely to gain observability.
+When corresponding services exist, track source ingest success/rejection and exact error class; evidence/span count and lineage completeness; future-evidence exclusion at each knowledge cutoff; temporal contradiction/path-consistency and budget exhaustion; event/link/tracking confidence and calibration; semantic-unit unknown/abstention by language; model convergence/objective/posterior diagnostics; true-recovery drift; CPU/GPU parity and fallback; VRAM/RSS/transfer/kernel time; model/LLM provider failures and evidence-verifier rejection; artifact/export provenance completeness; and tenant authorization/audit anomalies. Do not expose raw PII/source text in ordinary metrics/logs merely to gain observability.
 
 ## Data snapshot and replay
 
@@ -60,31 +44,34 @@ Before PostgreSQL becomes production state, prove migrations and rollback, tenan
 
 A numerical proof boundary is an operational resource contract when it changes asymptotic work, allocation, or buyer-path latency. It is not determined by the next sample count that happens to expose a rounding defect.
 
-Issue #491 owns the current bias-standard-error exact-proof budget. Production exact admission remains `n<=16`; larger counts are characterization evidence only. The current work separates represented-input exactness, arithmetic width, exact-rounding width, and measured resource cost rather than treating one integer cutoff as all four.
+Issue #491 owns the current bias-standard-error exact-proof budget. Production exact admission remains `n<=16`; larger counts are characterization evidence only. The work separates represented-input exactness, arithmetic width, exact-rounding width, and measured resource cost rather than treating one integer cutoff as all four.
 
-The old nonnegative minimum-anchor characterization established `Σc_i <= Σc_i² <= P` and showed why raw-scale `D=2^58,n=65` refusal disappears after common dyadic-unit normalization. Odd `D=2^58+1,n=65` remains a real narrow-width witness: pair numerator fits in 123 bits while cancellation products require 129 bits. `Wide256` characterization `081000289f5a52e94863026d55696ee2a4daf923` and product-width RED `f74d9ac11cb0acf3eb8fdd9ad79ac3d2e9180993` → repair `e9a7dee29afb97542bfe2965f850c8ab5a34368e` show the characterized cancellation products need no more than two `u128` limbs.
+The old nonnegative minimum-anchor characterization established `Σc_i <= Σc_i² <= P` and showed why raw-scale `D=2^58,n=65` refusal disappears after common dyadic-unit normalization. Odd `D=2^58+1,n=65` remains a narrow-width witness: pair numerator fits in 123 bits while cancellation products require 129 bits. `Wide256` characterization `081000289f5a52e94863026d55696ee2a4daf923` and product-width RED `f74d9ac11cb0acf3eb8fdd9ad79ac3d2e9180993` → repair `e9a7dee29afb97542bfe2965f850c8ab5a34368e` show the characterized cancellation products need no more than two `u128` limbs.
 
-Represented-input reachability `5a19b6334487b43fb630abba7e487d7cf4c49960` reaches the wider numerator route at `n=4096` on residual classes `{0,1,2^53}`. Exact-rounding characterization `a8423173188fa53a26a16d3afdafeb76e114cc1d` then shows that represented `n=2050` needs 136-bit candidate-square and 140-bit adjacent-midpoint comparison operands even though its exact pair numerator is only 118 bits. `aab9fe9115cee97225f2aa81e54a55ceafb23336` shows those comparisons can remain bounded as `Wide256` mantissa plus signed dyadic exponent. RED `f7717361ad8c5f0592688c1514c104cc1b4adabe` → repair `e4a85f53a611922be7492fe906d62ce65787c18e` integrates that comparison into the production exact rounder, and `1240ace8eb41a01fa72a4bb99df842fd550a1288` fixes both tie-to-even parity directions.
+Represented-input reachability `5a19b6334487b43fb630abba7e487d7cf4c49960` reaches the wider numerator route at `n=4096` on `{0,1,2^53}`. Exact-rounding characterization `a8423173188fa53a26a16d3afdafeb76e114cc1d` shows represented `n=2050` needs 136-bit candidate-square and 140-bit adjacent-midpoint comparison operands even though its exact pair numerator is 118 bits. `aab9fe9115cee97225f2aa81e54a55ceafb23336` shows those comparisons can remain bounded as `Wide256` mantissa plus signed dyadic exponent. RED `f7717361ad8c5f0592688c1514c104cc1b4adabe` → repair `e4a85f53a611922be7492fe906d62ce65787c18e` integrates that comparison into the production exact rounder, and `1240ace8eb41a01fa72a4bb99df842fd550a1288` fixes both tie-to-even parity directions.
 
 `7a2ab0a1ef7a72d8cc9b9253d7f92c493e578943` proves represented pair/Wide256 exact-ratio equivalence for one family where the represented minimum is an exact anchor. That is not a universal anchor policy. Characterization `2bc1d2284d75154e020640adb573c1cfadf005fb` demonstrates `[0,1,2^-54,2]`, where non-anchor pair subtraction rounds but anchor `0` remains exact.
 
-The current production repair closes a stronger correctness defect. Source RED `fd9f9ff2c5c395e4cc13042232f4deef018adb48` uses represented residuals `[0,1,2,-2^53]`. The minimum residual cannot exactly translate `1` because `2^53+1` is not representable; anchor `0` preserves every coordinate. Signed unit-one coordinates give exact pair numerator `243388915243820099130562543878155`, denominator `48`, and correctly rounded result `0x4320000000000001`. The predecessor translated floating-moment fallback produces adjacent lower `0x4320000000000000`.
+Source RED `fd9f9ff2c5c395e4cc13042232f4deef018adb48` establishes the first public anchor defect with `[0,1,2,-2^53]`: minimum `-2^53` cannot exactly translate `1`, represented anchor `0` preserves every coordinate, exact `P=243388915243820099130562543878155`, denominator `48`, and exact result `0x4320000000000001` while the predecessor translated floating-moment path returns `0x4320000000000000`. Initial repair `81ba770cc4812c8fbeb4b3529f0a73b41abbed0f` searched represented residual anchors.
 
-Repair `81ba770cc4812c8fbeb4b3529f0a73b41abbed0f` therefore keeps pairwise exact proof first but, on pairwise refusal, searches every represented residual as an exact anchor. It chooses the candidate with the smallest exact maximum translated magnitude and represented-value tie-break, builds signed coordinates on a common dyadic unit, accumulates positive/negative coefficient mass and square mass with checked `u128`, performs `n*Σc_i²-(Σc_i)²` with exact `Wide256` products/subtraction, downcasts only a bounded final numerator, and reuses the exact candidate/midpoint tie-to-even rounder. This is a correctness repair within the existing sample budget, not permission to widen the budget.
+Follow-up RED `9f403194a2ec1636531c2dfe9229cfb34b73d747` shows that observed anchors alone are operationally incomplete. Residuals `[1,2^-54,2,3]` have no observed universal exact anchor, but neutral dyadic anchor `0` preserves every residual exactly. On unit `2^-54`, exact `P=6490371073168534319490338297741315`; exact result `0x3fe4a7e9cb8a3491` differs by one ULP from the predecessor fallback `0x3fe4a7e9cb8a3492`.
+
+Repair `6cf30eeb549c0df0377bda1111cf46396e8282a3` keeps pairwise exact proof first, then considers neutral zero plus every represented residual as exact-anchor candidates. It requires error-free coordinates, chooses the smallest exact maximum translated magnitude with represented-value tie-break, builds a common dyadic grid, tracks positive and negative coefficient mass separately, performs `n*Σc_i²-(Σc_i)²` with exact `Wide256` products/subtraction, downcasts only a bounded final numerator, and reuses exact candidate/midpoint tie-to-even rounding. Neutral zero is a deterministic translation origin, not a synthetic observation; source residuals remain unchanged.
 
 Operator implications:
 
-- do not diagnose pairwise-f64 or minimum-anchor refusal as scientific invalidity when another deterministic represented anchor is exact;
-- do not make row order part of anchor selection. Forward/reversed fixtures must be bit-identical;
-- treat failure of signed coordinate accumulation, Wide256 subtraction/downcast, denominator reduction, or exact rounding as a fail-closed proof refusal and use the established generic fallback rather than weakening arithmetic checks;
-- keep pairwise exact proof as the first authority while production exact-anchor coverage matures;
+- do not diagnose pairwise-f64, minimum-anchor, or observed-anchor refusal as scientific invalidity when the neutral zero translation remains exact and the bounded dyadic proof admits it;
+- do not make row order part of anchor selection; forward/reversed/permuted fixtures must be bit-identical;
+- keep observed anchors because they can reduce exact dynamic range relative to zero; zero is the deterministic completeness fallback for the demonstrated represented-domain defect, not a claim of global resource-optimality;
+- treat signed-coordinate accumulation, Wide256 subtraction/downcast, denominator reduction, or exact-rounding failure as a fail-closed proof refusal and use the established generic fallback rather than weakening checks;
+- keep pairwise exact proof as the first authority while exact-anchor coverage matures;
 - separate route observability from numerical equality. The resource harness records `used_wide_product` and `used_pairwise_fallback` independently;
 - treat `n=2_047`, `4_095`, and `208_064` only as arithmetic envelope markers from older aligned characterizations, not service limits;
 - before widening beyond 16, retain raw Rust 1.98.0 `--release` timing CSV, CPU/OS/build flags, p95, actual scratch capacity/payload, allocator/RSS, and any applicable buyer-path `p95<=20 ms` evidence without sample shrinkage or omitted proof work.
 
-Exact pair-record counts remain 120 at `n=16`, 136 at `n=17`, 2,096,128 at `n=2048`, and 4,997,541 at `n=3162`. A two-pass O(n²) implementation may remove pair-record storage but still requires exact-head scientific and resource evidence. A Wide256 O(n) implementation may remove both pair storage and pair enumeration for admitted geometries but still requires pair-equivalence, anchor-only admission, exact-rounding, refusal, and resource evidence on one surviving production head.
+Exact pair-record counts remain 120 at `n=16`, 136 at `n=17`, 2,096,128 at `n=2048`, and 4,997,541 at `n=3162`. A two-pass O(n²) implementation may remove pair-record storage but still requires exact-head scientific/resource evidence. A Wide256 O(n) implementation may remove both pair storage and pair enumeration for admitted geometries but still requires pair-equivalence, anchor-only admission, exact-rounding, refusal, and resource evidence on one surviving production head.
 
-No release-mode resource numbers are authoritative yet. Current #488 exact-head workflows after the source repair and subsequent doctoring remain pending/queued until a surviving head completes. The source-level RED workflows were cancelled by the immediate repair push and are not counted as hosted RED. Predecessor Rustfmt artifact `9982621569` from `1f765a...` is not current-head formatting evidence.
+No release-mode resource numbers are authoritative yet. Source-level RED runs that were superseded or cancelled are not counted as hosted RED. Predecessor Rustfmt artifact `9982621569` from `1f765a...` is not current-head formatting evidence.
 
 ## Model release/cutover
 
