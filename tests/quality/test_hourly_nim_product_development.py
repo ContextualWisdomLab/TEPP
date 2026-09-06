@@ -36,13 +36,13 @@ def _parser_module() -> ModuleType:
 class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
     """Structural tests for the credential-separated product-development loop."""
 
-    def test_hourly_workflow_schedule_credentials_and_queue_gate(self) -> None:
-        """Run at minute 47 with provider discovery and fail closed around inventory."""
+    def test_hourly_workflow_central_admission_credentials_and_queue_gate(self) -> None:
+        """Stay dispatch-only under central admission and fail closed around inventory."""
 
         text = _text(WORKFLOW)
         bootstrap = _text(BOOTSTRAP)
         for token in (
-            'cron: "47 * * * *"',
+            "# cwl-org-commercial-entrypoint: v1",
             "workflow_dispatch:",
             "dry_run:",
             "hourly-nim-product-development-${{ github.repository }}",
@@ -77,6 +77,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "ContextualWisdomLab/TEPP",
         ):
             self.assertIn(token, text)
+        self.assertNotIn("\n  schedule:\n", text)
         for token in ("discover_all_models", "register_credential", "PROVIDER_CREDENTIAL_NAMES"):
             self.assertIn(token, bootstrap)
         self.assertNotIn("COPILOT_GITHUB_TOKEN", text)
@@ -278,6 +279,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         for pull_request in (93, 94, 97, 101, 102, 104, 108, 109, 111, 112):
             with self.subTest(pull_request=pull_request):
                 self.assertNotIn(f"PR #{pull_request}", runbook)
+
     def test_bootstrap_registers_each_provider_key_and_removes_environment_values(self) -> None:
         """Exercise the real bootstrap loop with a key-counting KV double."""
 
