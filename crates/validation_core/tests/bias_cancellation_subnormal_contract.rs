@@ -1,3 +1,11 @@
+//! Preserve binary64 mean-bias evidence across extreme cancellation and transport permutation.
+//!
+//! Opposite `f64::MAX` residuals must not erase a representable signed minimum-subnormal mean left
+//! by the remaining residuals, and a full-range exact cancellation must stay exactly zero. The
+//! mixed-sign `[3, -1, -1]` geometry also fixes the canonical binary64 `1/3` result under
+//! permutation and sign mirroring; its oracle is explicitly `f64` because the contract compares
+//! `to_bits()` rather than an abstract untyped floating literal.
+
 use validation_core::mean_bias;
 
 #[test]
@@ -33,7 +41,7 @@ fn mixed_sign_bias_is_canonical_under_transport_permutation() {
     let truth = [0.0; 3];
     let first = [3.0, -1.0, -1.0];
     let permuted = [-1.0, 3.0, -1.0];
-    let expected = 1.0 / 3.0;
+    let expected = 1.0_f64 / 3.0;
 
     let first_bias = mean_bias(&truth, &first).expect("first bias");
     let permuted_bias = mean_bias(&truth, &permuted).expect("permuted bias");
