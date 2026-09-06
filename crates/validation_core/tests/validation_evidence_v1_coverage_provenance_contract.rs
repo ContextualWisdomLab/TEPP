@@ -1,3 +1,11 @@
+//! Bind a versioned Validation Evidence receipt to its Wilson coverage provenance.
+//!
+//! `ValidationEvidenceV1` is not a bag of independently plausible metrics. The projected report must
+//! reproduce the empirical coverage and Wilson endpoints from the same versioned coverage receipt,
+//! while `sample_count`, `covered_count`, interval sidedness, and schema identity survive a JSON
+//! round trip. Schema drift, count tampering, endpoint divergence, or unknown authority fields must
+//! fail closed rather than activate scientific evidence with inconsistent provenance.
+
 use validation_core::{
     ValidationError, ValidationEvidenceV1, ValidationReport, WilsonCoverageEvidenceV1,
 };
