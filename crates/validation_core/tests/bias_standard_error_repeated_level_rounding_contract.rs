@@ -1,3 +1,9 @@
+//! Contracts exact bias-standard-error rounding for a repeated represented residual level.
+//!
+//! The three-observation geometry fixes the exact pairwise second moment when two observations
+//! share one residual level. Forward, permuted, and sign-mirrored inputs must therefore produce
+//! the same correctly rounded public standard error rather than depend on accumulation order.
+
 use validation_core::bias_standard_error;
 
 #[test]
@@ -5,8 +11,8 @@ fn bias_standard_error_preserves_three_observation_repeated_level_identity() {
     let repeated = f64::from_bits(0x3fef_ffff_ffff_ffff);
     let recovered = [0.0, repeated, repeated];
 
-    let standard_error = bias_standard_error(&[0.0; 3], &recovered)
-        .expect("represented-input standard error");
+    let standard_error =
+        bias_standard_error(&[0.0; 3], &recovered).expect("represented-input standard error");
     // For exactly represented residuals [0, a, a], the three-observation
     // standard error simplifies algebraically to |a| / 3. The predecessor
     // squared the normalized a values, formed the second moment, and then took

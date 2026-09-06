@@ -1,3 +1,9 @@
+//! Contracts joint moment support for serialized Monte Carlo percentile evidence.
+//!
+//! Distinct empirical percentile endpoints consume the same finite squared-deviation budget
+//! recorded by the sample standard deviation; validating each endpoint independently is not
+//! sufficient. Equal endpoints may refer to one retained observation and must not be charged twice.
+
 use validation_core::{MonteCarloSummary, ValidationError};
 
 fn summary(percentile_lower: f64, percentile_upper: f64) -> MonteCarloSummary {
