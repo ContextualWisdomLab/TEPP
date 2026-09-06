@@ -1,3 +1,12 @@
+//! Characterize exact bias-standard-error proof resource envelopes without widening production admission.
+//!
+//! The `n > 16` fixtures here quantify pair-record growth, checked-`u128` intermediate ceilings, and
+//! a two-limb `Wide256` recovery reference. They are characterization evidence only: this test contains
+//! reference arithmetic that mirrors production concepts, so it is not an independent scientific
+//! acceptance oracle and must not justify a production cutoff change by itself. Production remains
+//! bounded to `n=4..=16` until exact-head route telemetry, independent bit-level evidence, and measured
+//! release-mode resource data support a different budget.
+//!
 use validation_core::bias_standard_error;
 
 const SEVENTEEN_OBSERVATION_FIXTURE: [u128; 17] = [
@@ -50,8 +59,8 @@ impl Wide256 {
                     .expect("schoolbook partial sum fits u128")
                     .checked_add(carry)
                     .expect("schoolbook carry sum fits u128");
-                limbs[limb_index] = u64::try_from(accumulator & mask)
-                    .expect("masked schoolbook limb fits u64");
+                limbs[limb_index] =
+                    u64::try_from(accumulator & mask).expect("masked schoolbook limb fits u64");
                 carry = accumulator >> 64;
             }
             limbs[left_index + 2] =
@@ -206,8 +215,8 @@ fn worst_case_linear_intermediate(sample_count: u128, diameter: u128) -> Option<
 }
 
 fn worst_case_pair_square_numerator(sample_count: u128, diameter: u128) -> Option<u128> {
-    let split_product = (sample_count / 2)
-        .checked_mul(sample_count.checked_sub(sample_count / 2)?)?;
+    let split_product =
+        (sample_count / 2).checked_mul(sample_count.checked_sub(sample_count / 2)?)?;
     split_product.checked_mul(diameter.checked_mul(diameter)?)
 }
 
@@ -237,9 +246,8 @@ fn seventeen_observation_fixture_proves_linear_identity_matches_pair_reference()
     assert_eq!(SCIENTIFIC_DENOMINATOR / divisor, REDUCED_DENOMINATOR);
 
     let truth = [0.0; 17];
-    let recovered = SEVENTEEN_OBSERVATION_FIXTURE.map(|value| {
-        f64::from(u32::try_from(value).expect("fixture value fits u32 exactly"))
-    });
+    let recovered = SEVENTEEN_OBSERVATION_FIXTURE
+        .map(|value| f64::from(u32::try_from(value).expect("fixture value fits u32 exactly")));
     assert_eq!(
         bias_standard_error(&truth, &recovered)
             .expect("current bounded fallback remains representable")
@@ -254,8 +262,8 @@ fn linear_checked_integer_kernel_matches_pair_reference_when_it_admits() {
         let values = deterministic_compact_fixture(sample_count);
         let pairwise = pair_square_sum_quadratic(&values)
             .expect("compact-grid pair reference stays within u128");
-        let linear = pair_square_sum_linear(&values)
-            .expect("compact-grid linear kernel stays within u128");
+        let linear =
+            pair_square_sum_linear(&values).expect("compact-grid linear kernel stays within u128");
         assert_eq!(
             linear, pairwise,
             "linear sufficient proof must preserve the exact pair numerator at n={sample_count}"
@@ -270,8 +278,8 @@ fn linear_checked_integer_kernel_normalizes_a_common_power_of_two_unit() {
     values.push(0);
     values.extend((0..64).map(|_| diameter));
 
-    let pairwise = pair_square_sum_quadratic(&values)
-        .expect("common-power pair numerator stays within u128");
+    let pairwise =
+        pair_square_sum_quadratic(&values).expect("common-power pair numerator stays within u128");
     assert_eq!(pairwise, 1_u128 << 122);
     assert_eq!(
         pair_square_sum_linear(&values),
@@ -287,8 +295,8 @@ fn linear_checked_integer_kernel_is_not_admission_equivalent_to_pair_reference()
     let mut fits_both = Vec::with_capacity(64);
     fits_both.push(0);
     fits_both.extend((0..63).map(|_| diameter));
-    let pairwise_64 = pair_square_sum_quadratic(&fits_both)
-        .expect("64-sample pair numerator stays within u128");
+    let pairwise_64 =
+        pair_square_sum_quadratic(&fits_both).expect("64-sample pair numerator stays within u128");
     assert_eq!(
         pair_square_sum_linear(&fits_both),
         Some(pairwise_64),
@@ -301,7 +309,11 @@ fn linear_checked_integer_kernel_is_not_admission_equivalent_to_pair_reference()
     let pairwise_65 = pair_square_sum_quadratic(&pair_only)
         .expect("65-sample pair numerator still stays within u128");
     let expected_pairwise_65 = 64_u128
-        .checked_mul(diameter.checked_mul(diameter).expect("diameter square fits"))
+        .checked_mul(
+            diameter
+                .checked_mul(diameter)
+                .expect("diameter square fits"),
+        )
         .expect("pair numerator fits");
     assert_eq!(pairwise_65, expected_pairwise_65);
     assert_eq!(
@@ -318,8 +330,8 @@ fn wide_product_reference_recovers_the_pair_only_odd_boundary() {
     pair_only.push(0);
     pair_only.extend((0..64).map(|_| diameter));
 
-    let pairwise = pair_square_sum_quadratic(&pair_only)
-        .expect("65-sample pair numerator stays within u128");
+    let pairwise =
+        pair_square_sum_quadratic(&pair_only).expect("65-sample pair numerator stays within u128");
     assert_eq!(pair_square_sum_linear(&pair_only), None);
     assert_eq!(
         pair_square_sum_linear_wide_product(&pair_only).and_then(Wide256::as_u128),
