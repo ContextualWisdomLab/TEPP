@@ -1,3 +1,13 @@
+//! Enforce coherence between Monte Carlo replication spread and reported standard error.
+//!
+//! `MonteCarloSummary` is durable Validation Evidence, so its uncertainty fields cannot be
+//! independently user-selected. For multiple replications, the reported standard error must remain
+//! coherent with the stored standard deviation and replication count, allowing only the adjacent
+//! binary64 rounding neighborhood of the canonical `sd / sqrt(n)` result. Positive spread cannot
+//! carry zero uncertainty, zero spread cannot carry positive uncertainty, and a singleton cannot
+//! claim an empirical spread. Invalid evidence must fail both domain validation and serde ingress /
+//! egress instead of being persisted as a scientifically contradictory receipt.
+
 use validation_core::{MonteCarloSummary, ValidationError};
 
 fn summary(replication_count: usize, standard_deviation: f64, standard_error: f64) -> MonteCarloSummary {
