@@ -1,3 +1,11 @@
+//! Recover representable mean bias even when individual signed residuals overflow binary64.
+//!
+//! Opposite residuals produced by swapping `±f64::MAX` must cancel to exact zero rather than fail
+//! merely because each subtraction is individually infinite. A three-observation variant must retain
+//! a one-minimum-subnormal mean after the overflowing pair cancels. The genuinely one-sided
+//! unrepresentable case remains fail closed with `InvalidInput`; cancellation is not permission to
+//! manufacture a finite result where the represented-input mean itself is outside binary64.
+
 use validation_core::{ValidationError, mean_bias};
 
 #[test]
