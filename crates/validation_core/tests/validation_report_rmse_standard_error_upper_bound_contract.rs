@@ -1,3 +1,12 @@
+//! Reject Validation Evidence whose RMSE standard error exceeds its mathematical support.
+//!
+//! The crate's delta-method RMSE uncertainty is derived from the nonnegative squared-residual
+//! sample. Under that producer contract, the standard error cannot exceed `RMSE / 2`; the
+//! two-residual geometry `[0, 1]` reaches the support boundary. This regression requires canonical
+//! producer output to validate while an impossible `(rmse, rmse_standard_error) = (0.2, 0.11)`
+//! fails closed through domain validation, serialization, human-summary projection, and JSON
+//! ingress rather than becoming durable contradictory Validation Evidence.
+
 use validation_core::{
     ValidationError, ValidationReport, rmse_standard_error, root_mean_square_error,
 };
