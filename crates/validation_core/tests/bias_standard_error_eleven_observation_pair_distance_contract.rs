@@ -1,3 +1,9 @@
+//! Eleven-observation represented pair-distance rounding contract.
+//!
+//! Audited forward, reversed, and permuted samples and their sign mirrors must
+//! preserve the exact represented pair-distance ratio and the same correctly
+//! rounded standard error instead of the one-ULP-low floating-moment fallback.
+
 use validation_core::bias_standard_error;
 
 fn assert_eleven_observation_pair_distance_contract(recovered: [f64; 11]) {

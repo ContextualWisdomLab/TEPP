@@ -1,3 +1,9 @@
+//! Preserves low-order represented dispersion when rounded residual highs coincide.
+//!
+//! The contract fixes a three-observation geometry where all binary64 residual
+//! highs round to one while an exact subtraction low term changes the correctly
+//! rounded standard error. Sign mirroring must leave that uncertainty unchanged.
+
 use validation_core::bias_standard_error;
 
 #[test]

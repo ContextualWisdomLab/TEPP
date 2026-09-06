@@ -1,3 +1,9 @@
+//! Preserves subtraction low terms when represented residual high parts differ.
+//!
+//! The contract distinguishes exact represented-input dispersion from the larger
+//! result obtained after prematurely rounding pairwise residuals, while retaining
+//! sign symmetry and the established exact-residual control geometry.
+
 use validation_core::bias_standard_error;
 
 #[test]

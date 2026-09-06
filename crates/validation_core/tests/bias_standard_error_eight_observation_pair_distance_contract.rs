@@ -1,3 +1,9 @@
+//! Eight-observation represented pair-distance rounding contract.
+//!
+//! Three orderings and their sign mirrors must preserve the audited exact
+//! pair-distance ratio and its correctly rounded binary64 standard error, rather
+//! than falling back to a translated floating-moment result one ULP higher.
+
 use validation_core::bias_standard_error;
 
 fn assert_eight_observation_pair_distance_contract(recovered: [f64; 8]) {
