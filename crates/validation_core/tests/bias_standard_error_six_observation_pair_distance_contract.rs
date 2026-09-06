@@ -1,3 +1,9 @@
+//! Regression contract for exact six-observation bias standard-error rounding.
+//!
+//! The represented-input fixture requires the bounded pair-distance midpoint proof
+//! to remain permutation- and sign-invariant where the translated floating-moment
+//! fallback rounds one binary64 ULP high.
+
 use validation_core::bias_standard_error;
 
 fn assert_six_observation_pair_distance_contract(recovered: [f64; 6]) {
