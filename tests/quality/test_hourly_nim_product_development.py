@@ -24,6 +24,48 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _top_level_mapping_child_keys(text: str, key: str) -> set[str]:
+    """Return immediate child keys for one block-style top-level YAML mapping."""
+
+    lines = text.splitlines()
+    header = f"{key}:"
+
+    def is_block_header(line: str) -> bool:
+        if line[:1].isspace() or not line.startswith(header):
+            return False
+        suffix = line[len(header) :]
+        if not suffix:
+            return True
+        if not suffix[0].isspace():
+            return False
+        remainder = suffix.strip()
+        return not remainder or remainder.startswith("#")
+
+    matches = [index for index, line in enumerate(lines) if is_block_header(line)]
+    assert len(matches) == 1, f"expected one block-style {header!r} mapping"
+
+    entries: list[tuple[int, str]] = []
+    for line in lines[matches[0] + 1 :]:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent == 0:
+            break
+        entries.append((indent, stripped))
+
+    assert entries, f"top-level {header!r} mapping must not be empty"
+    child_indent = min(indent for indent, _entry in entries)
+    child_keys: set[str] = set()
+    for indent, entry in entries:
+        if indent != child_indent:
+            continue
+        child_key, separator, _value = entry.partition(":")
+        assert separator, f"expected mapping entry under {header!r}: {entry!r}"
+        child_keys.add(child_key.strip("'\""))
+    return child_keys
+
+
 def _parser_module() -> ModuleType:
     """Load the trusted pull-request metadata parser as a covered module."""
 
@@ -36,13 +78,13 @@ def _parser_module() -> ModuleType:
 class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
     """Structural tests for the credential-separated product-development loop."""
 
-    def test_hourly_workflow_schedule_credentials_and_queue_gate(self) -> None:
-        """Run at minute 47 with provider discovery and fail closed around inventory."""
+    def test_hourly_workflow_central_admission_credentials_and_queue_gate(self) -> None:
+        """Stay dispatch-only under central admission and fail closed around inventory."""
 
         text = _text(WORKFLOW)
         bootstrap = _text(BOOTSTRAP)
         for token in (
-            'cron: "47 * * * *"',
+            "# cwl-org-commercial-entrypoint: v1",
             "workflow_dispatch:",
             "dry_run:",
             "hourly-nim-product-development-${{ github.repository }}",
@@ -77,6 +119,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "ContextualWisdomLab/TEPP",
         ):
             self.assertIn(token, text)
+        self.assertEqual(_top_level_mapping_child_keys(text, "on"), {"workflow_dispatch"})
         for token in ("discover_all_models", "register_credential", "PROVIDER_CREDENTIAL_NAMES"):
             self.assertIn(token, bootstrap)
         self.assertNotIn("COPILOT_GITHUB_TOKEN", text)
@@ -84,6 +127,28 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         self.assertEqual(text.count("gh pr create"), 1)
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("gh release create", text)
+
+    def test_schedule_detection_is_independent_of_yaml_indentation_width(self) -> None:
+        """Reject a repository-local schedule regardless of valid block indentation."""
+
+        for indent in ("  ", "    "):
+            candidate = f'on:\n{indent}schedule:\n{indent}  - cron: "47 * * * *"\n'
+            with self.subTest(indent=len(indent)):
+                self.assertEqual(_top_level_mapping_child_keys(candidate, "on"), {"schedule"})
+
+    def test_block_header_accepts_yaml_trivia_and_rejects_flow_value(self) -> None:
+        """Recognize block headers with valid trivia without admitting flow-style values."""
+
+        for header in ("on:", "on:   ", "on: # central admission"):
+            with self.subTest(header=header):
+                candidate = f"{header}\n  workflow_dispatch:\n"
+                self.assertEqual(
+                    _top_level_mapping_child_keys(candidate, "on"),
+                    {"workflow_dispatch"},
+                )
+
+        with self.assertRaisesRegex(AssertionError, "expected one block-style"):
+            _top_level_mapping_child_keys("on: {workflow_dispatch: {}}\n", "on")
 
     def test_hourly_workflow_separates_three_runner_trust_boundaries(self) -> None:
         """Separate model execution, verification, and late publication authority."""
@@ -278,6 +343,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         for pull_request in (93, 94, 97, 101, 102, 104, 108, 109, 111, 112):
             with self.subTest(pull_request=pull_request):
                 self.assertNotIn(f"PR #{pull_request}", runbook)
+
     def test_bootstrap_registers_each_provider_key_and_removes_environment_values(self) -> None:
         """Exercise the real bootstrap loop with a key-counting KV double."""
 
