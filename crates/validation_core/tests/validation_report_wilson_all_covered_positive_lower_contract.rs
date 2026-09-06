@@ -1,3 +1,10 @@
+//! Preserve the strictly positive Wilson lower bound implied by non-empty all-covered evidence.
+//!
+//! For empirical coverage `p = 1`, a non-empty sample and finite critical value produce the canonical
+//! lower endpoint `n / (n + z²)`, which is strictly positive. A stored `[0, 1]` Wilson interval cannot
+//! therefore be producer-authentic even though it is ordered and contains the empirical coverage;
+//! validation and every durable projection must fail closed on that artifact.
+
 use validation_core::{ValidationError, ValidationReport, wilson_coverage_interval};
 
 fn all_covered_report(wilson_lower: f64) -> ValidationReport {

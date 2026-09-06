@@ -1,3 +1,10 @@
+//! Keep zero RMSE evidence coherent with its sampling uncertainty across every projection boundary.
+//!
+//! When recovered values equal truth exactly, both RMSE and its standard error are exactly zero.
+//! A report that pairs zero RMSE with positive RMSE uncertainty is therefore impossible evidence and
+//! must fail validation, JSON/human projection, and deserialization. Signed zero remains equivalent
+//! to exact zero rather than becoming an artificial incompatibility.
+
 use validation_core::{
     ValidationError, ValidationReport, rmse_standard_error, root_mean_square_error,
 };

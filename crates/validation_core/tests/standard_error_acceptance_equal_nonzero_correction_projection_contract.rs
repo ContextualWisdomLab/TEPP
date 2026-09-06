@@ -1,3 +1,10 @@
+//! Preserve the exact represented-input ordering when rounded residual and bound corrections collide.
+//!
+//! A subtraction and `k * SE` product can round to the same finite value while their first-order
+//! corrections also project to the same nonzero subnormal. Validation must then discriminate the
+//! exact residual-versus-bound ordering rather than promote the rounded collision to equality or
+//! reject every collision. Positive and negative correction projections both remain covered.
+
 use validation_core::accept_within_standard_errors;
 
 #[test]
@@ -15,8 +22,10 @@ fn equal_nonzero_correction_projection_preserves_exact_rejection() {
     let standard_error = f64::from_bits(0x2124_696e_33e2_baaa);
 
     assert_eq!(estimate - target, k * standard_error);
-    assert!(!accept_within_standard_errors(estimate, target, standard_error, k)
-        .expect("finite represented inputs"));
+    assert!(
+        !accept_within_standard_errors(estimate, target, standard_error, k)
+            .expect("finite represented inputs")
+    );
 }
 
 #[test]
@@ -32,8 +41,10 @@ fn equal_nonzero_correction_projection_preserves_exact_acceptance() {
     let standard_error = f64::from_bits(0x20ea_1585_cc49_24ca);
 
     assert_eq!(estimate - target, k * standard_error);
-    assert!(accept_within_standard_errors(estimate, target, standard_error, k)
-        .expect("finite represented inputs"));
+    assert!(
+        accept_within_standard_errors(estimate, target, standard_error, k)
+            .expect("finite represented inputs")
+    );
 }
 
 #[test]
@@ -49,6 +60,8 @@ fn equal_negative_correction_projection_preserves_exact_rejection() {
     let standard_error = f64::from_bits(0x150b_cc8f_a576_9411);
 
     assert_eq!(estimate - target, k * standard_error);
-    assert!(!accept_within_standard_errors(estimate, target, standard_error, k)
-        .expect("finite represented inputs"));
+    assert!(
+        !accept_within_standard_errors(estimate, target, standard_error, k)
+            .expect("finite represented inputs")
+    );
 }
