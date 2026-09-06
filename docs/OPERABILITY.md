@@ -56,20 +56,26 @@ Source RED `fd9f9ff2c5c395e4cc13042232f4deef018adb48` establishes the first publ
 
 Follow-up RED `9f403194a2ec1636531c2dfe9229cfb34b73d747` shows that observed anchors alone are operationally incomplete. Residuals `[1,2^-54,2,3]` have no observed universal exact anchor, but neutral dyadic anchor `0` preserves every residual exactly. On unit `2^-54`, exact `P=6490371073168534319490338297741315`; exact result `0x3fe4a7e9cb8a3491` differs by one ULP from the predecessor fallback `0x3fe4a7e9cb8a3492`.
 
-Repair `6cf30eeb549c0df0377bda1111cf46396e8282a3` keeps pairwise exact proof first, then considers neutral zero plus every represented residual as exact-anchor candidates. It requires error-free coordinates, chooses the smallest exact maximum translated magnitude with represented-value tie-break, builds a common dyadic grid, tracks positive and negative coefficient mass separately, performs `n*Σc_i²-(Σc_i)²` with exact `Wide256` products/subtraction, downcasts only a bounded final numerator, and reuses exact candidate/midpoint tie-to-even rounding. Neutral zero is a deterministic translation origin, not a synthetic observation; source residuals remain unchanged.
+Correctness repair `6cf30eeb549c0df0377bda1111cf46396e8282a3` established neutral zero as an admissible exact translation origin, but its production order still paid pairwise O(n²) first and then O(n²) anchor search. Source-level route-order RED `e0b324864e48a503e2aba0d2a487a0b95f5276ed` requires `neutral_zero_linear -> conditioned_observed_anchor -> pairwise_reference`. Repair `2b62bd46eb0c391327d2285c2244a76f5a1e0449` implements that sequence.
+
+The neutral-zero kernel scans residuals once to determine the common dyadic exponent and once more to accumulate positive/negative coefficient mass and `Σc_i²`; it then computes `n*Σc_i²-(Σc_i)²` with exact `Wide256` products/subtraction. This is O(n) time with O(1) proof storage after the already-required residual vector and allocates no pair records. If the bounded zero-origin integer representation refuses, observed-anchor search remains an O(n²) conditioned fallback that may reduce coordinate dynamic range. Pairwise O(n²) now runs last as comparison/fail-closed authority while broader represented-input equivalence remains under validation.
+
+The superseded route-order RED did not finish a hosted failing run, so it is source-level TDD evidence only. The current source adds a common-domain neutral-zero/pairwise equality unit and preserves the anchor-only public regressions; that is not yet full bounded-domain equivalence.
 
 Operator implications:
 
-- do not diagnose pairwise-f64, minimum-anchor, or observed-anchor refusal as scientific invalidity when the neutral zero translation remains exact and the bounded dyadic proof admits it;
-- do not make row order part of anchor selection; forward/reversed/permuted fixtures must be bit-identical;
-- keep observed anchors because they can reduce exact dynamic range relative to zero; zero is the deterministic completeness fallback for the demonstrated represented-domain defect, not a claim of global resource-optimality;
-- treat signed-coordinate accumulation, Wide256 subtraction/downcast, denominator reduction, or exact-rounding failure as a fail-closed proof refusal and use the established generic fallback rather than weakening checks;
-- keep pairwise exact proof as the first authority while exact-anchor coverage matures;
-- separate route observability from numerical equality. The resource harness records `used_wide_product` and `used_pairwise_fallback` independently;
+- attempt the neutral-zero linear proof before quadratic proof work for the current bounded production route;
+- do not diagnose pairwise-f64, minimum-anchor, or observed-anchor refusal as scientific invalidity when neutral-zero or a conditioned exact anchor admits the bounded dyadic proof;
+- keep observed anchors only as a demonstrated dynamic-range recovery fallback and require a fixture that proves such recovery; do not retain O(n²) search merely by assumption;
+- do not make row order part of proof semantics; forward/reversed/permuted fixtures must be bit-identical;
+- treat signed-coordinate accumulation, Wide256 subtraction/downcast, denominator reduction, or exact-rounding failure as a fail-closed proof refusal and use later proof/fallback routes rather than weakening checks;
+- keep pairwise proof as the comparison/fail-closed authority, not as unconditional first work;
+- separate route observability from numerical equality. The existing resource harness records `used_wide_product` and `used_pairwise_fallback`, but production evidence still must distinguish `neutral_zero_linear`, `conditioned_observed_anchor`, `pairwise_reference`, and `generic_fallback`;
+- describe storage precisely: the new kernel uses O(1) proof storage after the residual vector, while the public exact path still materializes O(n) residual storage;
 - treat `n=2_047`, `4_095`, and `208_064` only as arithmetic envelope markers from older aligned characterizations, not service limits;
 - before widening beyond 16, retain raw Rust 1.98.0 `--release` timing CSV, CPU/OS/build flags, p95, actual scratch capacity/payload, allocator/RSS, and any applicable buyer-path `p95<=20 ms` evidence without sample shrinkage or omitted proof work.
 
-Exact pair-record counts remain 120 at `n=16`, 136 at `n=17`, 2,096,128 at `n=2048`, and 4,997,541 at `n=3162`. A two-pass O(n²) implementation may remove pair-record storage but still requires exact-head scientific/resource evidence. A Wide256 O(n) implementation may remove both pair storage and pair enumeration for admitted geometries but still requires pair-equivalence, anchor-only admission, exact-rounding, refusal, and resource evidence on one surviving production head.
+Exact pair-record counts remain 120 at `n=16`, 136 at `n=17`, 2,096,128 at `n=2048`, and 4,997,541 at `n=3162`. A two-pass O(n²) implementation may remove pair-record storage but still requires exact-head scientific/resource evidence. The neutral-zero Wide256 O(n) implementation removes pair enumeration for admitted geometries but still requires broad pair-equivalence, conditioned-anchor admission, exact-rounding, refusal, route, and resource evidence on one surviving production head.
 
 No release-mode resource numbers are authoritative yet. Source-level RED runs that were superseded or cancelled are not counted as hosted RED. Predecessor Rustfmt artifact `9982621569` from `1f765a...` is not current-head formatting evidence.
 
