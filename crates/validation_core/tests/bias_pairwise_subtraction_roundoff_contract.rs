@@ -1,3 +1,9 @@
+//! Preserve error-free subtraction mass before represented mean-bias averaging.
+//!
+//! The two-observation fixtures expose low terms lost by independently rounded `recovered - truth`
+//! subtraction. Mean-bias aggregation must retain that represented-input correction through the
+//! denominator, and sign mirroring must preserve magnitude while reversing the sign bit.
+
 use validation_core::mean_bias;
 
 fn assert_bias_bits(truth: [f64; 2], recovered: [f64; 2], expected: u64) {

@@ -1,3 +1,9 @@
+//! Preserve compensated same-sign remainder mass through the scientific sample-count division.
+//!
+//! After mixed-sign cancellation leaves a same-sign low-order remainder, the compensated numerator
+//! must be divided before it is collapsed to a coarser binary64 value. The mirrored fixture fixes
+//! the same correctly rounded magnitude with the opposite sign.
+
 use validation_core::mean_bias;
 
 #[test]

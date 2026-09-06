@@ -1,3 +1,9 @@
+//! Keep Monte Carlo summaries in the RMSE report slot inside the nonnegative RMSE domain.
+//!
+//! `MonteCarloSummary` is intentionally sign-neutral for metrics such as bias, but once embedded as
+//! RMSE evidence its mean and empirical percentile support cannot be negative. The typed report
+//! boundary must reject contradictory evidence consistently across validation, projection, and serde.
+
 use validation_core::{MonteCarloSummary, ValidationError, ValidationReport};
 
 fn report_with_rmse_summary(summary: MonteCarloSummary) -> ValidationReport {

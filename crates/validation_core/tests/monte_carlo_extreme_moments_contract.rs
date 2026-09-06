@@ -1,3 +1,9 @@
+//! Preserve representable Monte Carlo moments across overflow and false-zero uncertainty boundaries.
+//!
+//! A full-range symmetric replication set has finite mean, sample standard deviation, and standard
+//! error even when naive squared deviations overflow. Conversely, genuinely nonzero subnormal
+//! replication variability must fail closed when its uncertainty cannot be represented without zero.
+
 use validation_core::{ValidationError, summarize_replications};
 
 #[test]

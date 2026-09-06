@@ -1,3 +1,10 @@
+//! Preserve low-order opposing residual mass through represented mean-bias division.
+//!
+//! Four quarter-ULP residuals opposing a unit residual combine to one full ULP before the
+//! scientific denominator is applied. Aggregation must therefore retain their joint represented
+//! mass instead of rounding each contribution away, and sign mirroring must change only the sign
+//! of the correctly rounded mean bias.
+
 use validation_core::mean_bias;
 
 #[test]

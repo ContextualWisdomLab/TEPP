@@ -1,3 +1,9 @@
+//! Preserve exact durable Wilson counts beyond the integer-exact range of binary64.
+//!
+//! `sample_count = 2^53 + 1` and `covered_count = 2^53` are distinct provenance even though an
+//! independent `f64` conversion maps both to the same value. The versioned evidence carrier must
+//! retain the one observed miss in empirical coverage and Wilson endpoints across JSON round trip.
+
 use validation_core::WilsonCoverageEvidenceV1;
 
 #[test]

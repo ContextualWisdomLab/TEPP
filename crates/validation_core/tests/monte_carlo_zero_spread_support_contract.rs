@@ -1,3 +1,9 @@
+//! Require zero Monte Carlo sample spread to have degenerate empirical support.
+//!
+//! A durable summary with zero sample standard deviation represents identical retained replications;
+//! its empirical percentile endpoints must therefore equal the represented mean. The invariant is
+//! sign-neutral and treats signed zero as one numerical state while rejecting contradictory support.
+
 use validation_core::{MonteCarloSummary, ValidationError};
 
 fn summary(

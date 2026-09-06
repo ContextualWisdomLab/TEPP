@@ -1,3 +1,10 @@
+//! Preserve exact-count Wilson lower-endpoint rounding when the denominator is only partly absorbed.
+//!
+//! Small exact represented `z²` terms can make `n + z²` inexact without being fully lost. The
+//! all-covered endpoint must retain the exact count contribution and move only when the exact
+//! represented-input quotient crosses a binary64 midpoint; compensation must not over-correct a
+//! nearby case whose direct quotient is already correctly rounded.
+
 use validation_core::wilson_coverage_interval;
 
 #[test]

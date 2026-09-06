@@ -1,3 +1,9 @@
+//! Preserve a positive interior Wilson lower endpoint under an extreme finite critical value.
+//!
+//! For `p = 0.5` and finite `z = 1e154`, subtractive center-minus-margin evaluation can lose the
+//! small positive lower root. The public interval must agree bit-for-bit with the algebraically
+//! rationalized represented reference while keeping the upper endpoint inside `[p, 1]`.
+
 use validation_core::wilson_coverage_interval;
 
 #[test]

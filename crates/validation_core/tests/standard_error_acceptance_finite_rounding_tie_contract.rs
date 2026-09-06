@@ -1,3 +1,10 @@
+//! Preserve exact represented-input ordering when finite residual and SE bound round to one value.
+//!
+//! A subtraction residual and `k * standard_error` product may collide in binary64 even though their
+//! exact represented-input values remain strictly ordered. The acceptance decision must use the
+//! available correction or exact dyadic boundary, including subnormal and minimum-normal cases,
+//! while keeping exact equal bounds accepted.
+
 use validation_core::accept_within_standard_errors;
 
 #[test]

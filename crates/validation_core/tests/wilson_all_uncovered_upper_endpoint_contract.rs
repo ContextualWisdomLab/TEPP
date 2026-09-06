@@ -1,3 +1,10 @@
+//! Preserve Wilson upper endpoints below one for all-uncovered and strict-interior evidence.
+//!
+//! At large finite critical values, direct center-plus-margin arithmetic can round numerator and
+//! denominator to the same binary64 value and invent exact upper coverage of one. The represented
+//! Wilson endpoint must instead retain the immediate-predecessor boundary when the exact score
+//! interval remains strictly below one.
+
 use validation_core::wilson_coverage_interval;
 
 #[test]

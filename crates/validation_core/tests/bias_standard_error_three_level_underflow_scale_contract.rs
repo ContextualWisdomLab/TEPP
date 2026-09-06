@@ -1,3 +1,9 @@
+//! Preserve nonzero three-level bias standard error across raw square underflow.
+//!
+//! Residual levels at zero, the minimum normal value, and twice that value have representable
+//! dispersion even though direct square products cross the subnormal boundary. The result must
+//! remain bit-identical under every permutation and sign reflection instead of collapsing to zero.
+
 use validation_core::bias_standard_error;
 
 const EXPECTED_STANDARD_ERROR_BITS: u64 = 0x0009_3cd3_a2c8_198e;

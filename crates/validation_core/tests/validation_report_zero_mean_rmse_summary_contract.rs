@@ -1,3 +1,9 @@
+//! Require zero-mean Monte Carlo RMSE evidence to represent perfect recovery in every replication.
+//!
+//! RMSE replications are nonnegative, so an exact-zero retained mean cannot coexist with positive
+//! spread, uncertainty, or positive percentile support. The typed report must preserve that stronger
+//! domain invariant while treating signed zero as the same numerical perfect-recovery state.
+
 use validation_core::{MonteCarloSummary, ValidationError, ValidationReport};
 
 fn report_with(summary: MonteCarloSummary) -> ValidationReport {
