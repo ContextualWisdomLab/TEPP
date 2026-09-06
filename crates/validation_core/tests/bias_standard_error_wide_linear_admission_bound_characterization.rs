@@ -1,3 +1,5 @@
+//! Characterizes exact-proof admission bounds for canonical bias-standard-error coefficients.
+
 fn deterministic_compact_fixture(sample_count: usize) -> Vec<u128> {
     (0..sample_count)
         .map(|index| {
@@ -50,7 +52,9 @@ fn assert_pair_admission_bounds_linear_accumulators(values: &[u128]) {
     let pair_sum = pair_square_sum(values).expect("fixture pair numerator fits u128");
     let (coefficient_sum, square_sum, common_shift) =
         normalized_linear_terms(values).expect("pair-admitted normalized terms fit u128");
-    let squared_shift = common_shift.checked_mul(2).expect("dyadic square shift fits u32");
+    let squared_shift = common_shift
+        .checked_mul(2)
+        .expect("dyadic square shift fits u32");
     let normalized_pair_sum = pair_sum >> squared_shift;
     let restored_pair_sum = normalized_pair_sum
         .checked_shl(squared_shift)
@@ -95,4 +99,9 @@ fn pair_admitted_bound_holds_across_small_integer_composition_space() {
             assert_pair_admission_bounds_linear_accumulators(&values);
         }
     }
+}
+
+#[test]
+fn pair_admission_implies_wide_linear_product_capacity() {
+    assert_pair_admission_implies_wide_linear_product_capacity();
 }
