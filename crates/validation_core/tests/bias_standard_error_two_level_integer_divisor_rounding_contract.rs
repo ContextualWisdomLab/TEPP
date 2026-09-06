@@ -1,3 +1,5 @@
+//! Locks exact integer-divisor two-level bias standard-error rounding and its fail-closed edge.
+
 use validation_core::{ValidationError, bias_standard_error};
 
 #[test]

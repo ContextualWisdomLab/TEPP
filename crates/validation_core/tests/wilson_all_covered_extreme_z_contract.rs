@@ -1,3 +1,5 @@
+//! Locks the all-covered Wilson lower endpoint under a finite extreme critical value.
+
 use validation_core::wilson_coverage_interval;
 
 #[test]

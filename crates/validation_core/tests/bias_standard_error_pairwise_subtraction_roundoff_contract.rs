@@ -1,3 +1,5 @@
+//! Locks represented-residual pairwise subtraction roundoff in bias standard-error recovery.
+
 use validation_core::bias_standard_error;
 
 #[test]
