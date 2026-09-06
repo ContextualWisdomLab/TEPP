@@ -1,3 +1,11 @@
+//! Preserve the exact two-observation standard-error identity when the residual mean rounds.
+//!
+//! Adjacent binary64 residuals around `1.0` have an exact separation of `2^-53`; for two
+//! observations the sample standard error is half that separation, `2^-54`, even though their
+//! arithmetic mean is not itself exactly representable. Mirroring both residuals must preserve the
+//! same result, while equal residuals must remain exactly zero. This regression constrains public
+//! behavior below the `n=4..=16` production exact-proof admission range and does not enlarge it.
+
 use validation_core::bias_standard_error;
 
 #[test]
