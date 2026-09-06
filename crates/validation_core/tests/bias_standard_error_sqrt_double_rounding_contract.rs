@@ -1,3 +1,11 @@
+//! Preserve one final binary64 rounding after standard-error normalization.
+//!
+//! A represented three-residual geometry at `2^-55` exercises the boundary where rounding an
+//! intermediate square/root path can move the final standard error by one bit. The public result
+//! must be sign invariant and round once to `0x3c72_79a7_4590_331c`; the two-observation unit case
+//! remains exactly `1.0`. This regression constrains public numerical behavior only and does not
+//! widen the production exact-proof admission budget beyond `n=4..=16`.
+
 use validation_core::bias_standard_error;
 
 #[test]
