@@ -1,3 +1,12 @@
+//! Preserve interior Wilson endpoints when direct subtraction loses lower-tail signal.
+//!
+//! For finite interior coverage and very large `z`, the lower Wilson endpoint can be positive while
+//! the textbook subtractive root leaves only a floating-point cancellation residual. The production
+//! implementation must use an algebraically equivalent rationalized form, match the represented
+//! binary64 reference, and keep the upper endpoint within `[p, 1]`. The companion small-`z` case
+//! ensures the rationalization does not introduce a division by a tiny `z²` and remains valid on the
+//! opposite scaling regime.
+
 use validation_core::wilson_coverage_interval;
 
 #[test]
@@ -17,9 +26,7 @@ fn interior_wilson_lower_bound_does_not_accept_a_roundoff_residual_as_signal() {
     // leaves a nonzero floating-point residue, so an exact-zero fallback alone
     // cannot detect the cancellation error.
     let expected_lower = (2.0 * n * p * p / z_squared)
-        / (1.0
-            + 2.0 * n * p / z_squared
-            + (1.0 + 4.0 * n * p * (1.0 - p) / z_squared).sqrt());
+        / (1.0 + 2.0 * n * p / z_squared + (1.0 + 4.0 * n * p * (1.0 - p) / z_squared).sqrt());
     assert!(expected_lower.is_finite());
     assert!(expected_lower > 0.0);
 
@@ -44,9 +51,7 @@ fn rationalized_lower_root_preserves_small_z_without_dividing_by_tiny_z_squared(
     assert!(z_squared < 1.0);
 
     let expected_lower = (2.0 * n * p * p)
-        / (z_squared
-            + 2.0 * n * p
-            + z * (z_squared + 4.0 * n * p * (1.0 - p)).sqrt());
+        / (z_squared + 2.0 * n * p + z * (z_squared + 4.0 * n * p * (1.0 - p)).sqrt());
 
     let (actual_lower, actual_upper) =
         wilson_coverage_interval(&truth, &lower, &upper, z).expect("finite Wilson interval");
