@@ -29,7 +29,19 @@ def _top_level_mapping_child_keys(text: str, key: str) -> set[str]:
 
     lines = text.splitlines()
     header = f"{key}:"
-    matches = [index for index, line in enumerate(lines) if line == header]
+
+    def is_block_header(line: str) -> bool:
+        if line[:1].isspace() or not line.startswith(header):
+            return False
+        suffix = line[len(header) :]
+        if not suffix:
+            return True
+        if not suffix[0].isspace():
+            return False
+        remainder = suffix.strip()
+        return not remainder or remainder.startswith("#")
+
+    matches = [index for index, line in enumerate(lines) if is_block_header(line)]
     assert len(matches) == 1, f"expected one block-style {header!r} mapping"
 
     entries: list[tuple[int, str]] = []
@@ -123,6 +135,20 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             candidate = f'on:\n{indent}schedule:\n{indent}  - cron: "47 * * * *"\n'
             with self.subTest(indent=len(indent)):
                 self.assertEqual(_top_level_mapping_child_keys(candidate, "on"), {"schedule"})
+
+    def test_block_header_accepts_yaml_trivia_and_rejects_flow_value(self) -> None:
+        """Recognize block headers with valid trivia without admitting flow-style values."""
+
+        for header in ("on:", "on:   ", "on: # central admission"):
+            with self.subTest(header=header):
+                candidate = f"{header}\n  workflow_dispatch:\n"
+                self.assertEqual(
+                    _top_level_mapping_child_keys(candidate, "on"),
+                    {"workflow_dispatch"},
+                )
+
+        with self.assertRaisesRegex(AssertionError, "expected one block-style"):
+            _top_level_mapping_child_keys("on: {workflow_dispatch: {}}\n", "on")
 
     def test_hourly_workflow_separates_three_runner_trust_boundaries(self) -> None:
         """Separate model execution, verification, and late publication authority."""
