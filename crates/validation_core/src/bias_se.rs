@@ -47,6 +47,117 @@ fn multiply_by_power_of_two(value: u128, shift: u32) -> Option<u128> {
     value.checked_mul(factor)
 }
 
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct Wide256 {
+    high: u128,
+    low: u128,
+}
+
+impl Wide256 {
+    const fn from_u128(value: u128) -> Self {
+        Self {
+            high: 0,
+            low: value,
+        }
+    }
+
+    fn multiply_u128(left: u128, right: u128) -> Self {
+        let mask = u128::from(u64::MAX);
+        let left_limbs = [
+            u64::try_from(left & mask).expect("masked low limb fits u64"),
+            u64::try_from(left >> 64).expect("high limb fits u64"),
+        ];
+        let right_limbs = [
+            u64::try_from(right & mask).expect("masked low limb fits u64"),
+            u64::try_from(right >> 64).expect("high limb fits u64"),
+        ];
+        let mut limbs = [0_u64; 4];
+
+        for (left_index, left_limb) in left_limbs.iter().copied().enumerate() {
+            let mut carry = 0_u128;
+            for (right_index, right_limb) in right_limbs.iter().copied().enumerate() {
+                let limb_index = left_index + right_index;
+                let accumulator = u128::from(left_limb)
+                    .checked_mul(u128::from(right_limb))
+                    .expect("64-bit limb product fits u128")
+                    .checked_add(u128::from(limbs[limb_index]))
+                    .expect("schoolbook partial sum fits u128")
+                    .checked_add(carry)
+                    .expect("schoolbook carry sum fits u128");
+                limbs[limb_index] =
+                    u64::try_from(accumulator & mask).expect("masked schoolbook limb fits u64");
+                carry = accumulator >> 64;
+            }
+            limbs[left_index + 2] =
+                u64::try_from(carry).expect("schoolbook multiplication carry fits u64");
+        }
+
+        Self {
+            high: u128::from(limbs[2]) | (u128::from(limbs[3]) << 64),
+            low: u128::from(limbs[0]) | (u128::from(limbs[1]) << 64),
+        }
+    }
+
+    const fn is_zero(self) -> bool {
+        self.high == 0 && self.low == 0
+    }
+
+    fn bit_len(self) -> u32 {
+        if self.high != 0 {
+            128 + (u128::BITS - self.high.leading_zeros())
+        } else {
+            u128::BITS - self.low.leading_zeros()
+        }
+    }
+
+    fn bit(self, index: u32) -> bool {
+        if index < u128::BITS {
+            ((self.low >> index) & 1) != 0
+        } else {
+            let high_index = index - u128::BITS;
+            ((self.high >> high_index) & 1) != 0
+        }
+    }
+}
+
+fn compare_scaled_wide(
+    left: Wide256,
+    left_exponent: i32,
+    right: Wide256,
+    right_exponent: i32,
+) -> Option<Ordering> {
+    match (left.is_zero(), right.is_zero()) {
+        (true, true) => return Some(Ordering::Equal),
+        (true, false) => return Some(Ordering::Less),
+        (false, true) => return Some(Ordering::Greater),
+        (false, false) => {}
+    }
+
+    let left_bits = left.bit_len();
+    let right_bits = right.bit_len();
+    let left_top = left_exponent
+        .checked_add(i32::try_from(left_bits.checked_sub(1)?).ok()?)?;
+    let right_top = right_exponent
+        .checked_add(i32::try_from(right_bits.checked_sub(1)?).ok()?)?;
+    match left_top.cmp(&right_top) {
+        Ordering::Less => return Some(Ordering::Less),
+        Ordering::Greater => return Some(Ordering::Greater),
+        Ordering::Equal => {}
+    }
+
+    let width = left_bits.max(right_bits);
+    for offset in 0..width {
+        let left_bit = offset < left_bits && left.bit(left_bits - 1 - offset);
+        let right_bit = offset < right_bits && right.bit(right_bits - 1 - offset);
+        match left_bit.cmp(&right_bit) {
+            Ordering::Less => return Some(Ordering::Less),
+            Ordering::Greater => return Some(Ordering::Greater),
+            Ordering::Equal => {}
+        }
+    }
+    Some(Ordering::Equal)
+}
+
 fn compare_scaled_ratio_to_dyadic_square(
     numerator: u128,
     numerator_exponent: i32,
@@ -55,16 +166,14 @@ fn compare_scaled_ratio_to_dyadic_square(
     exponent: i32,
 ) -> Option<Ordering> {
     let square = significand.checked_mul(significand)?;
-    let right = denominator.checked_mul(square)?;
     let square_exponent = exponent.checked_mul(2)?;
-    let exponent_delta = numerator_exponent.checked_sub(square_exponent)?;
-    if exponent_delta >= 0 {
-        let left = multiply_by_power_of_two(numerator, exponent_delta.unsigned_abs())?;
-        Some(left.cmp(&right))
-    } else {
-        let shifted_right = multiply_by_power_of_two(right, exponent_delta.unsigned_abs())?;
-        Some(numerator.cmp(&shifted_right))
-    }
+    let right = Wide256::multiply_u128(denominator, square);
+    compare_scaled_wide(
+        Wide256::from_u128(numerator),
+        numerator_exponent,
+        right,
+        square_exponent,
+    )
 }
 
 fn midpoint_dyadic(left: f64, right: f64) -> Option<(u128, i32)> {
@@ -107,9 +216,9 @@ fn correctly_rounded_scaled_sqrt_ratio(
     let unit = exact_power_of_two(unit_exponent)?;
     let denominator_f64 = denominator as f64;
     // The binary64 numerator conversion is only a seed. The returned value is
-    // admitted solely after the exact u128 dyadic-square and midpoint comparisons
-    // below. This lets the bounded proof retain exact reduced numerators above
-    // 2^53 without pretending that their seed conversion is exact.
+    // admitted solely after the exact two-limb dyadic-square and midpoint
+    // comparisons below. This lets the bounded proof retain exact reduced
+    // numerators above 2^53 without pretending that their seed conversion is exact.
     let mut candidate = ((numerator as f64) / denominator_f64).sqrt() * unit;
     if !candidate.is_finite() || candidate <= 0.0 {
         return None;
@@ -273,9 +382,11 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 #[cfg(test)]
 mod tests {
     use super::{
-        correctly_rounded_scaled_sqrt_ratio, exact_pair_distance_standard_error,
-        exact_power_of_two, midpoint_dyadic, multiply_by_power_of_two, positive_dyadic,
+        compare_scaled_wide, correctly_rounded_scaled_sqrt_ratio,
+        exact_pair_distance_standard_error, exact_power_of_two, midpoint_dyadic,
+        multiply_by_power_of_two, positive_dyadic, Wide256,
     };
+    use core::cmp::Ordering;
 
     #[test]
     fn exact_ratio_sqrt_corrects_both_adjacent_rounding_directions() {
@@ -297,7 +408,7 @@ mod tests {
         );
         assert_eq!(
             correctly_rounded_scaled_sqrt_ratio(1_739_374_438_758_325_417, 16, 0)
-                .expect("large exact numerator remains bounded by u128 midpoint proof")
+                .expect("large exact numerator remains bounded by exact midpoint proof")
                 .to_bits(),
             0x41b3_a706_d408_9e32
         );
@@ -316,17 +427,43 @@ mod tests {
     }
 
     #[test]
-    fn exact_ratio_sqrt_requires_wide_scaled_products_for_represented_n2050_boundary() {
+    fn exact_ratio_sqrt_admits_wide_scaled_products_for_represented_n2050_boundary() {
         assert_eq!(
             correctly_rounded_scaled_sqrt_ratio(
                 332_306_998_946_228_931_332_463_617_650_984_961,
                 8_610_922_500,
                 0,
             )
-            .expect("exact represented boundary must survive comparison-product width")
+            .expect("exact represented boundary survives comparison-product width")
             .to_bits(),
             0x4296_998e_1aff_78de
         );
+    }
+
+    #[test]
+    fn wide_scaled_comparison_covers_full_width_exponents_and_zero_ordering() {
+        let zero = Wide256::from_u128(0);
+        let one = Wide256::from_u128(1);
+        let two = Wide256::from_u128(2);
+        let three = Wide256::from_u128(3);
+        let product = Wide256::multiply_u128(u128::MAX, u128::MAX);
+
+        assert_eq!(product.high, u128::MAX - 1);
+        assert_eq!(product.low, 1);
+        assert_eq!(product.bit_len(), 256);
+        assert!(product.bit(255));
+        assert!(product.bit(0));
+        assert_eq!(one.bit_len(), 1);
+        assert!(!one.bit(128));
+
+        assert_eq!(compare_scaled_wide(zero, 0, zero, 0), Some(Ordering::Equal));
+        assert_eq!(compare_scaled_wide(zero, -2_148, one, 2_047), Some(Ordering::Less));
+        assert_eq!(compare_scaled_wide(one, 2_047, zero, -2_148), Some(Ordering::Greater));
+        assert_eq!(compare_scaled_wide(one, -2_148, two, -2_149), Some(Ordering::Equal));
+        assert_eq!(compare_scaled_wide(one, -2_148, three, -2_149), Some(Ordering::Less));
+        assert_eq!(compare_scaled_wide(three, 2_046, one, 2_047), Some(Ordering::Greater));
+        assert_eq!(compare_scaled_wide(one, 1, one, 0), Some(Ordering::Greater));
+        assert_eq!(compare_scaled_wide(one, 0, one, 1), Some(Ordering::Less));
     }
 
     #[test]
