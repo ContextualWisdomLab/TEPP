@@ -1,3 +1,10 @@
+//! Correctly rounded bias standard error from exact represented residual geometry.
+//!
+//! The contract fixes a three-observation case where rounding the residual mean
+//! before dispersion changes the binary64 result. It also checks sign symmetry,
+//! so uncertainty must be derived from the represented residual geometry rather
+//! than from a prematurely rounded residual mean.
+
 use validation_core::bias_standard_error;
 
 #[test]

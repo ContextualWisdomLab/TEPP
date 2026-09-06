@@ -1,3 +1,10 @@
+//! Durable Wilson coverage evidence retains exact integer sample-count provenance.
+//!
+//! Counts above 2^53 are not exactly representable in binary64. These contracts
+//! require Wilson endpoint reconstruction to use the versioned `u64` counts rather
+//! than a pre-rounded floating denominator, including all-covered cases whose
+//! positive miss mass remains representable immediately below one.
+
 use validation_core::WilsonCoverageEvidenceV1;
 
 #[test]
