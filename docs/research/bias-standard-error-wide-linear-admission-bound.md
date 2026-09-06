@@ -52,19 +52,29 @@ This is a new causal resource finding: the wider route must cover exact-rounding
 
 Executable evidence for both represented boundaries is `crates/validation_core/tests/bias_standard_error_represented_wide_recovery_characterization.rs`: reachability was introduced at `5a19b6334487b43fb630abba7e487d7cf4c49960`, and the exact-midpoint width characterization at `a8423173188fa53a26a16d3afdafeb76e114cc1d`.
 
+## Exponent-safe exact comparison
+
+The 136/140-bit finding does not require an arbitrary-precision integer for the comparison itself. Characterization `aab9fe9115cee97225f2aa81e54a55ceafb23336` adds a two-limb comparison reference that keeps each nonzero integer mantissa in `Wide256` and keeps its power-of-two scale as a signed exponent. It first compares the absolute top-bit positions. Only when those positions tie does it compare significand bits aligned from the common top bit. No `2^k` factor is materialized.
+
+For represented `n = 2050`, that reference orders the 136-bit candidate-square operands as target greater than candidate square and the 140-bit upward-midpoint operands as target less than midpoint square, reproducing the exact nearest-binary64 decision from the earlier characterization. It also verifies equality and strict ordering across exponent pairs `-2148/-2149` and `2046/2047`, where a direct `u128` shift-factor construction is not a viable representation. The full-width edge `(2^128 - 1)^2` remains exactly represented as high limb `2^128 - 2`, low limb `1`.
+
+This closes algorithm feasibility for exact scaled ordering but is intentionally test-only. The production comparator in `crates/validation_core/src/bias_se.rs` still uses bounded `u128` products and `multiply_by_power_of_two`; production admission therefore remains unchanged until the comparison primitive is integrated and verified on the authoritative path.
+
+The standards basis remains the current published floating-point standards, IEEE 754-2019 and ISO/IEC 60559:2020. IEEE currently lists 754-2019 as an active standard and ISO lists ISO/IEC 60559:2020 as the published international standard; IEEE P754 is an active revision project and is not treated as a published replacement in this decision.
+
 ## Consequence for #491
 
 The candidate numerator route remains `narrow O(n) -> Wide256 O(n) -> buffered pair fail-closed fallback`, introduced by RED `3136739460ef0c8e13c044a7e5b04891e4f4e23d` and repair `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5`. The predecessor narrow-to-pair hybrid remains a comparison baseline.
 
 For odd `D = 2^58 + 1`, `n = 65`, the predecessor hybrid must still select the pair fallback because its narrow products overflow. The newer candidate must select the wider-product route, recover the same exact restored numerator as both O(n²) references, and report `used_wide_product=true` with `used_pairwise_fallback=false`. The power-of-two-normalized `D=2^58,n=65` geometry and odd `n=64` geometry remain narrow-path admissions. Separate route observability matters because a correct exact numerator does not by itself show whether the candidate avoided O(n²) allocation.
 
-The product-width theorem makes a post-Wide256 pair fallback look redundant for the numerator identity within the canonical `u128` coefficient domain. The represented `n=2050` midpoint finding shows that this does not extend automatically to the whole exact-rounding proof. Production promotion therefore needs a coherent wider comparison path or another bounded proof that preserves the same candidate/midpoint semantics without introducing a new false refusal.
+The product-width theorem makes a post-Wide256 pair fallback look redundant for the numerator identity within the canonical `u128` coefficient domain. The represented `n=2050` midpoint finding shows that this does not extend automatically to the whole exact-rounding proof. The exponent-safe comparison characterization now supplies a bounded exact ordering algorithm for that second boundary, but production promotion still requires integrating it with normalization, candidate stepping, midpoint tie-to-even, and fail-closed semantics on the authoritative path.
 
-The executable accumulator characterization is `crates/validation_core/tests/bias_standard_error_wide_linear_admission_bound_characterization.rs`. The represented-input characterization is `crates/validation_core/tests/bias_standard_error_represented_wide_recovery_characterization.rs`. The timing/layout vehicle is `crates/validation_core/examples/bias_se_exact_proof_budget.rs`; it records `used_wide_product` and `used_pairwise_fallback` independently so route selection can be audited from raw CSV.
+The executable accumulator characterization is `crates/validation_core/tests/bias_standard_error_wide_linear_admission_bound_characterization.rs`. The represented-input characterization is `crates/validation_core/tests/bias_standard_error_represented_wide_recovery_characterization.rs`. The exponent-safe comparison characterization is `crates/validation_core/tests/bias_standard_error_wide_scaled_comparison_characterization.rs`. The timing/layout vehicle is `crates/validation_core/examples/bias_se_exact_proof_budget.rs`; it records `used_wide_product` and `used_pairwise_fallback` independently so route selection can be audited from raw CSV.
 
 ## Decision
 
-Do not promote the wider O(n) route into production solely from the arithmetic proof or characterization. Production `validation_core::bias_standard_error` remains bounded to `n=4..=16`. A production change requires a complete represented-input exact-rounding path whose numerator and candidate/midpoint comparisons are width-safe, recorded Rust 1.98.0 `--release` raw CSV, CPU/OS/build metadata, allocator/RSS evidence, applicable full buyer-path p95 evidence, exact-head Rust/rustdoc/100% line+branch coverage/security/documentation GREEN, and qualifying independent current-head review.
+Do not promote the wider O(n) route into production solely from the arithmetic proof or characterization. Production `validation_core::bias_standard_error` remains bounded to `n=4..=16`. A production change requires integrating the exponent-safe comparison into the authoritative exact-rounding path, demonstrating represented-input admission equivalence and tie-to-even preservation, recorded Rust 1.98.0 `--release` raw CSV, CPU/OS/build metadata, allocator/RSS evidence, applicable full buyer-path p95 evidence, exact-head Rust/rustdoc/100% line+branch coverage/security/documentation GREEN, and qualifying independent current-head review.
 
 ## Traceability
 
@@ -75,6 +85,7 @@ Do not promote the wider O(n) route into production solely from the arithmetic p
 - Wide-product capacity repair: `e9a7dee29afb97542bfe2965f850c8ab5a34368e`
 - Represented-input Wide256 reachability: `5a19b6334487b43fb630abba7e487d7cf4c49960`
 - Represented exact-midpoint width characterization: `a8423173188fa53a26a16d3afdafeb76e114cc1d`
+- Exponent-safe scaled comparison characterization: `aab9fe9115cee97225f2aa81e54a55ceafb23336`
 - Narrow-wide-pair RED: `3136739460ef0c8e13c044a7e5b04891e4f4e23d`
 - Narrow-wide-pair repair: `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5`
 - CHANGELOG fragment: `CHANGELOG.d/validation-bias-standard-error-wide-linear-admission-bound.md`
