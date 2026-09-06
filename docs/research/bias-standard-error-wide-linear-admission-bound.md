@@ -22,7 +22,7 @@ Characterization `2bc1d2284d75154e020640adb573c1cfadf005fb` shows why: residuals
 
 Source RED `fd9f9ff2c5c395e4cc13042232f4deef018adb48` then shows a public defect with `[0,1,2,-2^53]`. The represented minimum `-2^53` cannot exactly translate `1`, but represented anchor `0` preserves every coordinate. Signed unit-one coordinates give `P=243388915243820099130562543878155`, denominator `48`, and correctly rounded result `0x4320000000000001`; the predecessor translated floating-moment fallback returns `0x4320000000000000`. The RED Actions runs were cancelled by the immediate successor and are not hosted RED evidence.
 
-Initial repair `81ba770cc4812c8fbeb4b3529f0a73b41abbed0f` searched every represented residual as a candidate exact anchor. Follow-up RED `9f403194a2ec1636531c2dfe9229cfb34b73d747` proves that set is still incomplete. With represented residuals `[1,2^-54,2,3]`, no observed residual is a universal exact anchor: each nonzero candidate loses the tiny represented component in at least one subtraction. Neutral dyadic anchor `0`, although not an observed residual in this fixture, preserves every coordinate exactly.
+Initial repair `81ba770cc4812c8fbeb4b3529f0a73b41abbed0f` searched every represented residual as a candidate exact anchor. Follow-up RED `9f403194a2ec1636531c2dfe9229cfb34b73d747` proves that set is still incomplete. With represented residuals `[1,2^-54,2,3]`, no observed residual is a universal exact anchor: each nonzero candidate loses the tiny represented component in at least one subtraction. Neutral dyadic anchor `0`, although not an observed residual in this fixture, preserves every represented residual exactly.
 
 On common unit `2^-54`, those coordinates are `[2^54,1,2^55,3*2^54]` and
 
@@ -30,9 +30,21 @@ On common unit `2^-54`, those coordinates are `[2^54,1,2^55,3*2^54]` and
 
 The exact scientific denominator is `48 * 2^108`, equivalently the exact-rounding route receives numerator `P`, denominator `48`, unit exponent `-54`. Correct binary64 rounding is `0x3fe4a7e9cb8a3491`. The predecessor translated floating-moment fallback returns adjacent upper `0x3fe4a7e9cb8a3492`; this is a second public one-ULP defect and demonstrates that “search observed anchors” is not a complete scientific admission policy.
 
-Repair `6cf30eeb549c0df0377bda1111cf46396e8282a3` expands the production candidate set to neutral `0` plus every represented residual. Every candidate must preserve all translated coordinates exactly. Among admitted candidates, the implementation chooses the smallest maximum translated magnitude and breaks ties by represented anchor value, preserving permutation invariance while preferring a smaller exact dynamic range when an observed anchor is useful. Signed dyadic coordinates keep positive and negative coefficient mass separately; `n*Σc_i²` and `(Σc_i)²` are formed in `Wide256`, subtracted exactly, and downcast only if the final numerator fits the bounded exact-rounder contract. Unsupported coordinate construction, integer accumulation, Wide256 subtraction/downcast, denominator, or exact-rounding cases fail closed to the established generic implementation.
+Repair `6cf30eeb549c0df0377bda1111cf46396e8282a3` expanded the production candidate set to neutral `0` plus every represented residual. Every candidate had to preserve all translated coordinates exactly; the implementation chose the smallest maximum translated magnitude with a represented-value tie-break. This closed the demonstrated correctness defects but still evaluated pairwise proof first and then scanned the full sample for each anchor candidate, so the production proof path remained O(n²).
 
-Neutral zero is not synthetic evidence. It is a deterministic translation origin for the translation-invariant pair-distance identity; subtracting `0` from a finite binary64 residual reproduces that represented residual exactly. The source observations remain unchanged. The repair still does not prove that zero plus observed residuals is a globally resource-optimal anchor set for every representable geometry; it closes the demonstrated correctness gaps without turning an unproved optimization claim into admission policy.
+Neutral zero is not synthetic evidence. It is a deterministic translation origin for the translation-invariant pair-distance identity; subtracting `0` from a finite binary64 residual reproduces that represented residual exactly. The source observations remain unchanged.
+
+## Production route repair
+
+The resource finding above is now repaired on active PR #488, without widening the production sample budget.
+
+Source-level RED `e0b324864e48a503e2aba0d2a487a0b95f5276ed` adds a contract requiring the production proof order `neutral_zero_linear -> conditioned_observed_anchor -> pairwise_reference`. The RED commit was superseded before hosted failure evidence completed: its non-Rust Actions runs were cancelled and the Rust run had not produced a failing result. It is therefore source-level TDD evidence, not hosted RED evidence.
+
+Repair `2b62bd46eb0c391327d2285c2244a76f5a1e0449` adds `exact_neutral_zero_linear_pair_square_sum`. It scans represented residuals once to select the common dyadic exponent and a second time to accumulate positive/negative integer coefficient mass and `Σc_i²`. It then evaluates `n*Σc_i²-(Σc_i)²` with exact `Wide256` products and subtraction. The kernel is O(n) time and O(1) proof storage after the residual vector; it allocates no pair records.
+
+If the zero-origin bounded integer representation refuses, `exact_anchor_linear_pair_square_sum` now searches only represented residual anchors. That O(n²) fallback remains scientifically useful because an exact translated origin can reduce dyadic dynamic range. `exact_pairwise_pair_square_sum` is evaluated last as the O(n²) comparison/fail-closed reference while broader represented-input equality remains under test.
+
+The production module now includes a common-domain equality unit test for neutral-zero versus pairwise proof and retains the exact anchor-only regression geometries. This is not yet a proof of full bounded-domain equivalence. Required follow-up evidence includes broader deterministic common-domain equality, permutation/reversal bit identity, a fixture where conditioned observed anchoring recovers a zero-origin bounded refusal, and route-specific production execution evidence.
 
 Production sample admission remains `n=4..=16`.
 
@@ -40,13 +52,13 @@ Production sample admission remains `n=4..=16`.
 
 Exact pair records are 120 at `n=16`, 136 at `n=17`, 2,096,128 at `n=2048`, and 4,997,541 at `n=3162`. For the older aligned nonnegative diameter characterization `D=2^53`, narrow checked products fit through `n=2047`, exact pair-numerator extremum through `n=4095`, and unreduced `n²(n-1)` stays at or below `2^53` through `n=208064`. GCD reduction and represented geometry mean none is a universal production cutoff.
 
-The timing vehicle remains `crates/validation_core/examples/bias_se_exact_proof_budget.rs`; it records wide-product and pair-fallback selection separately. No Rust 1.98.0 `--release` CPU/raw CSV, allocator/RSS, or applicable buyer-path p95 evidence is authoritative yet.
+The timing vehicle remains `crates/validation_core/examples/bias_se_exact_proof_budget.rs`; it records wide-product and pair-fallback selection separately. It is still characterization tooling, not production route telemetry. No Rust 1.98.0 `--release` CPU/raw CSV, allocator/RSS, or applicable buyer-path p95 evidence is authoritative yet.
 
 ## Decision
 
-Keep production `validation_core::bias_standard_error` at `n=4..=16`. Accept neutral-zero-plus-observed-anchor exact proof inside that existing budget because `9f403194... -> 6cf30eeb...` repairs a demonstrated public one-ULP defect. Do not infer that a larger sample budget is safe or that pairwise authority can yet be removed.
+Keep production `validation_core::bias_standard_error` at `n=4..=16`. Use the neutral-zero two-pass exact proof before quadratic proof work inside that existing budget, retain conditioned observed anchors when they can reduce bounded coordinate range, and keep pairwise O(n²) as comparison/fail-closed reference until broader equivalence and measured production-route evidence support consolidation.
 
-Before widening beyond 16, require exact-head Rust 1.98.0 fmt/clippy/nextest/rustdoc and owned production 100% line/branch coverage, same-head security/documentation GREEN and qualifying independent review, pair/anchor equality wherever both admit, explicit anchor-only fixtures `[0,1,2^-54,2]`, `[0,1,2,-2^53]`, and `[1,2^-54,2,3]`, exact candidate stepping/midpoint/tie-to-even and permutation invariance, fail-closed overflow/range behavior, recorded release-mode raw CPU/allocator/RSS and applicable buyer-path p95 evidence, and current CHANGELOG/TRACEABILITY/TEST_STRATEGY/OPERABILITY/operator baseline.
+Before widening beyond 16, require exact-head Rust 1.98.0 fmt/clippy/nextest/rustdoc and owned production 100% line/branch coverage, same-head security/documentation GREEN and qualifying independent review, broad pair/neutral-zero equality wherever both admit, explicit anchor-only fixtures `[0,1,2^-54,2]`, `[0,1,2,-2^53]`, and `[1,2^-54,2,3]`, exact candidate stepping/midpoint/tie-to-even and permutation invariance, fail-closed overflow/range behavior, truthful production route telemetry, recorded release-mode raw CPU/allocator/RSS and applicable buyer-path p95 evidence, and current CHANGELOG/TRACEABILITY/TEST_STRATEGY/OPERABILITY/operator baseline.
 
 ## Traceability
 
@@ -62,9 +74,11 @@ Before widening beyond 16, require exact-head Rust 1.98.0 fmt/clippy/nextest/rus
 - Represented pair/Wide256 exact-ratio equivalence: `7a2ab0a1ef7a72d8cc9b9253d7f92c493e578943`
 - Pairwise-f64-strict characterization: `2bc1d2284d75154e020640adb573c1cfadf005fb`
 - Non-minimum represented-anchor RED / repair: `fd9f9ff2c5c395e4cc13042232f4deef018adb48` / `81ba770cc4812c8fbeb4b3529f0a73b41abbed0f`
-- Neutral-anchor RED / repair: `9f403194a2ec1636531c2dfe9229cfb34b73d747` / `6cf30eeb549c0df0377bda1111cf46396e8282a3`
-- Narrow-wide-pair RED / repair: `3136739460ef0c8e13c044a7e5b04891e4f4e23d` / `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5`
+- Neutral-anchor RED / correctness repair: `9f403194a2ec1636531c2dfe9229cfb34b73d747` / `6cf30eeb549c0df0377bda1111cf46396e8282a3`
+- Neutral-zero route-order RED / production resource repair: `e0b324864e48a503e2aba0d2a487a0b95f5276ed` / `2b62bd46eb0c391327d2285c2244a76f5a1e0449`
+- Narrow-wide-pair characterization RED / repair: `3136739460ef0c8e13c044a7e5b04891e4f4e23d` / `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5`
 - CHANGELOG fragment: `CHANGELOG.d/validation-bias-exact-proof-budget-characterization.md`
 - Production module: `crates/validation_core/src/bias_se.rs`
+- Route-order contract: `crates/validation_core/tests/bias_standard_error_neutral_zero_route_order_contract.rs`
 - Public regression: `crates/validation_core/tests/bias_standard_error_nonminimum_anchor_exact_rounding_contract.rs`
 - Exact-proof budget harness: `crates/validation_core/examples/bias_se_exact_proof_budget.rs`
