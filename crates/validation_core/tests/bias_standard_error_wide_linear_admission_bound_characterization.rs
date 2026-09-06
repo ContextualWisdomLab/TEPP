@@ -48,6 +48,30 @@ fn normalized_linear_terms(values: &[u128]) -> Option<(u128, u128, u32)> {
     Some((coefficient_sum, square_sum, common_shift))
 }
 
+fn product_bit_upper_bound(left: u128, right: u128) -> u32 {
+    let left_bits = u128::BITS - left.leading_zeros();
+    let right_bits = u128::BITS - right.leading_zeros();
+    left_bits.saturating_add(right_bits)
+}
+
+fn assert_pair_admission_implies_wide_linear_product_capacity() {
+    assert!(
+        usize::BITS <= u128::BITS,
+        "the supported target must convert Vec length to u128 without truncation"
+    );
+
+    // Pair admission gives P <= u128::MAX. For canonical nonnegative
+    // anchor-relative coefficients with at least one zero, S1 <= S2 <= P.
+    // Therefore both linear-identity products are products of two u128 values:
+    // n*S2 and S1*S1. Their exact bit-width upper bound is 256, which is exactly
+    // the capacity of the two-limb Wide256 characterization reference.
+    assert_eq!(
+        product_bit_upper_bound(u128::MAX, u128::MAX),
+        256,
+        "the extremal u128-by-u128 product requires but does not exceed 256 bits"
+    );
+}
+
 fn assert_pair_admission_bounds_linear_accumulators(values: &[u128]) {
     let pair_sum = pair_square_sum(values).expect("fixture pair numerator fits u128");
     let (coefficient_sum, square_sum, common_shift) =
@@ -68,6 +92,17 @@ fn assert_pair_admission_bounds_linear_accumulators(values: &[u128]) {
     assert!(
         square_sum <= normalized_pair_sum,
         "because at least one anchor coefficient is zero, every c_i^2 occurs in the exact pair numerator"
+    );
+    assert!(
+        product_bit_upper_bound(
+            u128::try_from(values.len()).expect("supported Vec length fits u128"),
+            square_sum,
+        ) <= 256,
+        "pair-admitted n*S2 cannot exceed Wide256 product capacity"
+    );
+    assert!(
+        product_bit_upper_bound(coefficient_sum, coefficient_sum) <= 256,
+        "pair-admitted S1^2 cannot exceed Wide256 product capacity"
     );
 }
 
