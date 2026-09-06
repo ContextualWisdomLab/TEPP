@@ -1,12 +1,13 @@
-//! Characterizes a represented-input geometry that needs wider O(n) cancellation products.
+//! Characterizes represented-input geometries that need wider exact proof products.
 //!
-//! The fixture keeps every residual and every distinct pairwise subtraction exact in
-//! binary64, while canonical anchor-relative coefficients make the narrow `u128`
-//! linear identity overflow before cancellation. The exact pair numerator still fits
-//! `u128`, so this is a reachable represented-input reason to retain the `Wide256`
-//! characterization rather than relying only on synthetic integer coefficients.
+//! These fixtures keep residual construction and every distinct pairwise subtraction
+//! exact in binary64 while canonical anchor-relative coefficients make narrow `u128`
+//! products overflow before cancellation. The exact pair numerator still fits `u128`.
+//! A second boundary shows that the same width pressure reaches the exact
+//! candidate/midpoint comparison, so widening only the O(n) numerator identity would
+//! not yet establish end-to-end production admission equivalence.
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct Wide256 {
     high: u128,
     low: u128,
@@ -73,6 +74,48 @@ fn subtraction_roundoff(recovered: f64, truth: f64, residual: f64) -> f64 {
     recovered_roundoff + truth_roundoff
 }
 
+fn positive_dyadic(value: f64) -> Option<(u128, i32)> {
+    if !value.is_finite() || value <= 0.0 {
+        return None;
+    }
+    let bits = value.to_bits();
+    let exponent_bits = i32::try_from((bits >> 52) & 0x7ff).ok()?;
+    let fraction = bits & 0x000f_ffff_ffff_ffff;
+    let (mut significand, mut exponent) = if exponent_bits == 0 {
+        (u128::from(fraction), -1074)
+    } else {
+        (
+            u128::from((1_u64 << 52) | fraction),
+            exponent_bits - 1023 - 52,
+        )
+    };
+    if significand == 0 {
+        return None;
+    }
+    let trailing = significand.trailing_zeros();
+    significand >>= trailing;
+    exponent += i32::try_from(trailing).ok()?;
+    Some((significand, exponent))
+}
+
+fn midpoint_dyadic(left: f64, right: f64) -> Option<(u128, i32)> {
+    let (left_significand, left_exponent) = positive_dyadic(left)?;
+    let (right_significand, right_exponent) = positive_dyadic(right)?;
+    let common_exponent = left_exponent.min(right_exponent);
+    let left_shift = left_exponent.checked_sub(common_exponent)?.unsigned_abs();
+    let right_shift = right_exponent
+        .checked_sub(common_exponent)?
+        .unsigned_abs();
+    let left_units = left_significand.checked_mul(1_u128.checked_shl(left_shift)?)?;
+    let right_units = right_significand.checked_mul(1_u128.checked_shl(right_shift)?)?;
+    let mut midpoint_significand = left_units.checked_add(right_units)?;
+    let mut midpoint_exponent = common_exponent.checked_sub(1)?;
+    let trailing = midpoint_significand.trailing_zeros();
+    midpoint_significand >>= trailing;
+    midpoint_exponent += i32::try_from(trailing).ok()?;
+    Some((midpoint_significand, midpoint_exponent))
+}
+
 fn represented_values(sample_count: usize) -> Vec<f64> {
     assert!(sample_count >= 3);
     let diameter = (1_u64 << 53) as f64;
@@ -114,10 +157,8 @@ fn exact_pair_numerator_for_three_level_fixture(sample_count: usize) -> u128 {
         .expect("exact pair numerator fits u128")
 }
 
-#[test]
-fn represented_pair_admission_can_require_wide_linear_products() {
-    const SAMPLE_COUNT: usize = 4_096;
-    let represented = represented_values(SAMPLE_COUNT);
+fn assert_represented_subtractions_are_exact(sample_count: usize) {
+    let represented = represented_values(sample_count);
     let diameter = (1_u64 << 53) as f64;
 
     for value in &represented {
@@ -137,8 +178,10 @@ fn represented_pair_admission_can_require_wide_linear_products() {
             "every distinct represented pair subtraction used by the fixture must be exact"
         );
     }
+}
 
-    let coefficients = canonical_coefficients(SAMPLE_COUNT);
+fn canonical_sums(sample_count: usize) -> (u128, u128) {
+    let coefficients = canonical_coefficients(sample_count);
     assert_eq!(
         coefficients
             .iter()
@@ -147,15 +190,29 @@ fn represented_pair_admission_can_require_wide_linear_products() {
             .map(u128::trailing_zeros)
             .min(),
         Some(0),
-        "the coefficient 1 prevents a removable common dyadic scale from hiding width pressure"
+        "coefficient 1 prevents a removable dyadic scale from hiding width pressure"
     );
 
-    let coefficient_sum = coefficients.iter().copied().try_fold(0_u128, |sum, value| {
-        sum.checked_add(value)
-    }).expect("represented coefficient sum fits u128");
-    let square_sum = coefficients.iter().copied().try_fold(0_u128, |sum, value| {
-        sum.checked_add(value.checked_mul(value)?)
-    }).expect("represented square sum fits u128");
+    let coefficient_sum = coefficients
+        .iter()
+        .copied()
+        .try_fold(0_u128, |sum, value| sum.checked_add(value))
+        .expect("represented coefficient sum fits u128");
+    let square_sum = coefficients
+        .iter()
+        .copied()
+        .try_fold(0_u128, |sum, value| {
+            sum.checked_add(value.checked_mul(value)?)
+        })
+        .expect("represented square sum fits u128");
+    (coefficient_sum, square_sum)
+}
+
+#[test]
+fn represented_pair_admission_can_require_wide_linear_products() {
+    const SAMPLE_COUNT: usize = 4_096;
+    assert_represented_subtractions_are_exact(SAMPLE_COUNT);
+    let (coefficient_sum, square_sum) = canonical_sums(SAMPLE_COUNT);
     let sample_count = u128::try_from(SAMPLE_COUNT).expect("sample count fits u128");
 
     assert!(
@@ -187,6 +244,81 @@ fn represented_pair_admission_can_require_wide_linear_products() {
     assert_eq!(denominator, 68_702_699_520);
     assert!(
         denominator <= (1_u128 << 53),
-        "this represented width case is not blocked by the current exact-denominator gate"
+        "this represented width case is not blocked by the exact-denominator gate"
+    );
+}
+
+#[test]
+fn represented_wide_recovery_also_needs_wider_exact_midpoint_products() {
+    const SAMPLE_COUNT: usize = 2_050;
+    assert_represented_subtractions_are_exact(SAMPLE_COUNT);
+    let (coefficient_sum, square_sum) = canonical_sums(SAMPLE_COUNT);
+    let sample_count = u128::try_from(SAMPLE_COUNT).expect("sample count fits u128");
+    let numerator = exact_pair_numerator_for_three_level_fixture(SAMPLE_COUNT);
+    let denominator = sample_count
+        .checked_mul(sample_count)
+        .and_then(|value| value.checked_mul(sample_count - 1))
+        .expect("unreduced scientific denominator fits u128");
+
+    assert_eq!(
+        Wide256::multiply_u128(sample_count, square_sum)
+            .checked_sub(Wide256::multiply_u128(coefficient_sum, coefficient_sum))
+            .expect("wide cancellation remains ordered")
+            .as_u128(),
+        Some(numerator)
+    );
+    assert!(sample_count.checked_mul(square_sum).is_none());
+    assert!(coefficient_sum.checked_mul(coefficient_sum).is_none());
+    assert_eq!(denominator, 8_610_922_500);
+    assert!(denominator <= (1_u128 << 53));
+
+    let candidate = ((numerator as f64) / (denominator as f64)).sqrt();
+    assert_eq!(candidate.to_bits(), 0x4296_998e_1aff_78de);
+    let (candidate_significand, candidate_exponent) =
+        positive_dyadic(candidate).expect("positive candidate is dyadic");
+    let candidate_square = candidate_significand
+        .checked_mul(candidate_significand)
+        .expect("binary64 significand square fits u128");
+    let candidate_shift = candidate_exponent
+        .checked_mul(-2)
+        .and_then(|value| u32::try_from(value).ok())
+        .expect("candidate comparison shift is positive and bounded");
+    let candidate_factor = 1_u128
+        .checked_shl(candidate_shift)
+        .expect("candidate comparison factor fits u128");
+
+    assert!(
+        denominator.checked_mul(candidate_square).is_none(),
+        "the current u128 exact-square comparator cannot form the right operand"
+    );
+    assert!(
+        numerator.checked_mul(candidate_factor).is_none(),
+        "the current u128 exact-square comparator cannot form the scaled numerator"
+    );
+    let wide_candidate_left = Wide256::multiply_u128(numerator, candidate_factor);
+    let wide_candidate_right = Wide256::multiply_u128(denominator, candidate_square);
+    assert!(
+        wide_candidate_left > wide_candidate_right,
+        "the exact target lies above the floating candidate square"
+    );
+
+    let neighbor = f64::from_bits(candidate.to_bits() + 1);
+    let (midpoint_significand, midpoint_exponent) =
+        midpoint_dyadic(candidate, neighbor).expect("adjacent midpoint is exact dyadic");
+    let midpoint_square = midpoint_significand
+        .checked_mul(midpoint_significand)
+        .expect("midpoint significand square fits u128");
+    let midpoint_shift = midpoint_exponent
+        .checked_mul(-2)
+        .and_then(|value| u32::try_from(value).ok())
+        .expect("midpoint comparison shift is positive and bounded");
+    let midpoint_factor = 1_u128
+        .checked_shl(midpoint_shift)
+        .expect("midpoint comparison factor fits u128");
+    let wide_midpoint_left = Wide256::multiply_u128(numerator, midpoint_factor);
+    let wide_midpoint_right = Wide256::multiply_u128(denominator, midpoint_square);
+    assert!(
+        wide_midpoint_left < wide_midpoint_right,
+        "the exact target lies below the upward midpoint square, proving the candidate is nearest"
     );
 }
