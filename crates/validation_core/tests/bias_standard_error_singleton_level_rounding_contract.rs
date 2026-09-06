@@ -1,3 +1,9 @@
+//! Four-observation singleton-level bias standard-error contract.
+//!
+//! For the represented two-level sample `[0, a, a, a]`, `SE(mean) = |a| / 4`.
+//! The exact route must preserve that identity under permutation and sign mirroring,
+//! while an unrepresentable minimum-subnormal result must fail closed.
+
 use validation_core::{ValidationError, bias_standard_error};
 
 #[test]

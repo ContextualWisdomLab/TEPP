@@ -1,3 +1,9 @@
+//! Exact four-observation large-reduced-ratio bias standard-error contract.
+//!
+//! The represented pair-distance ratio reduces to a numerator above `2^53`.
+//! The exact reduced numerator must remain authoritative through midpoint rounding;
+//! permutations and sign mirrors must preserve the same binary64 result.
+
 use validation_core::bias_standard_error;
 
 fn assert_large_reduced_ratio_contract(recovered: [f64; 4]) {

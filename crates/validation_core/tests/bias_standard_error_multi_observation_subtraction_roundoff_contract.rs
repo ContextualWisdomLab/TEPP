@@ -1,3 +1,9 @@
+//! Three-observation subtraction-roundoff bias standard-error contract.
+//!
+//! The represented residual geometry is exactly `[-2^-55, 0, 2^-55]`, so the
+//! standard error is `2^-55 / sqrt(3)`. The final mathematical value must be
+//! rounded once, remain sign-symmetric, and collapse to zero for equal residuals.
+
 use validation_core::bias_standard_error;
 
 #[test]

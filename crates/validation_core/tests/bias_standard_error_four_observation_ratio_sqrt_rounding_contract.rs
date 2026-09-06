@@ -1,3 +1,9 @@
+//! Exact four-observation ratio/square-root single-rounding contract.
+//!
+//! For represented residuals `[0, 1, 2, 7]`, the standard error is
+//! `sqrt(29 / 12)`. The bounded pair-distance proof must round that mathematical
+//! value once and preserve the result under permutation and sign mirroring.
+
 use validation_core::bias_standard_error;
 
 fn assert_four_observation_contract(recovered: [f64; 4]) {

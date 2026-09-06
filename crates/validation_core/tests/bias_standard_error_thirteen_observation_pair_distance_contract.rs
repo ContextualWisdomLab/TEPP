@@ -1,3 +1,9 @@
+//! Exact thirteen-observation pair-distance bias standard-error contract.
+//!
+//! The represented fixture requires the bounded exact pair-distance ratio and
+//! midpoint proof; the translated floating moment/square-root path rounds one
+//! binary64 ULP high. Permutations and sign mirrors must preserve the result.
+
 use validation_core::bias_standard_error;
 
 fn assert_thirteen_observation_pair_distance_contract(recovered: [f64; 13]) {
