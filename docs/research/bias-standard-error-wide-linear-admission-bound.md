@@ -2,99 +2,93 @@
 
 ## Problem
 
-Issue #491 previously required a fixture where the two-limb O(n) exact pair-numerator reference would refuse because the normalized coefficient sum or normalized square sum overflowed `u128` while the O(n²) pair numerator still fit. That search target is inconsistent with the canonical anchor-relative integer representation used by the characterization.
+Issue #491 originally treated the production `n=4..=16` exact bias-standard-error proof as a sample-count staircase. The accumulated evidence shows that three different questions must remain separate: whether represented data admit an exact proof, whether the arithmetic representation is wide enough to carry that proof, and whether the resource cost is acceptable for production. None is resolved by incrementing `n` alone.
 
-Let `c_i` be canonical nonnegative integer coefficients after subtracting the minimum represented value and removing the greatest common power-of-two unit. At least one `c_i` is zero. Define
+For an earlier characterization that subtracts the represented minimum and produces nonnegative integer coefficients `c_i` on a common exact dyadic unit, define
 
-`P = sum_{i<j} (c_i - c_j)^2`,
-`S1 = sum_i c_i`, and
-`S2 = sum_i c_i^2`.
+`P = sum_{i<j}(c_i-c_j)^2`, `S1 = sum_i c_i`, and `S2 = sum_i c_i^2`.
 
-For every nonnegative integer `c_i`, `c_i <= c_i^2`. Therefore `S1 <= S2`. Because at least one anchor coefficient is zero, the pair terms against that anchor contain every `c_i^2`, and all remaining pair terms are nonnegative. Therefore `S2 <= P`. Hence
-
-`S1 <= S2 <= P`.
-
-If the exact canonical pair numerator `P` fits `u128`, both O(n) accumulators necessarily fit `u128`. A pair-admitted fixture cannot fail the wider O(n) reference solely because `S1` or `S2` overflowed.
+Because at least one coefficient is zero and every coefficient is a nonnegative integer, `S1 <= S2 <= P`. Thus a pair-admitted `P <= u128::MAX` cannot fail a wider O(n) reference solely because `S1` or `S2` overflowed. This theorem is scoped to that nonnegative minimum-anchor representation; the production exact-anchor repair below may use signed coordinates because the represented minimum is not always an exact universal anchor.
 
 ## Full-width product bound
 
-The normalized narrow O(n) implementation can still refuse while `P` fits because the products `n*S2` and `S1^2` may require more than 128 bits before cancellation. The odd-diameter fixture `D = 2^58 + 1`, `n = 65` demonstrates that case: both products require 129 bits while the exact pair numerator is 123 bits.
+The narrow O(n) identity can still refuse while `P` fits because `n*S2` and `S1^2` may exceed 128 bits before cancellation. Odd diameter `D=2^58+1,n=65` is the canonical arithmetic witness: both products require 129 bits while the exact pair numerator requires 123 bits.
 
-That narrow refusal does not imply that a wider product requires arbitrary precision. On supported targets the sample count is converted from `usize` to `u128`; pair admission gives `S2 <= P <= u128::MAX` and `S1 <= S2 <= u128::MAX`. Consequently each exact cancellation product is a product of two `u128` values. Its maximum width is 256 bits: `(2^128 - 1)^2 < 2^256`. The dependency-free two-limb `Wide256` product representation is therefore wide enough for every canonical coefficient set whose exact pair numerator is admitted by `u128`.
+RED `f74d9ac11cb0acf3eb8fdd9ad79ac3d2e9180993` → repair `e9a7dee29afb97542bfe2965f850c8ab5a34368e` makes the capacity theorem executable. With `S1,S2,n` each bounded by `u128`, every cancellation product fits below `2^256`; dependency-free two-limb `Wide256` is therefore sufficient for the product width in the characterized domain. This theorem does not by itself prove end-to-end production admission.
 
-This is a width theorem, not by itself a production-equivalence claim. Normalization, full-width multiplication/subtraction, dyadic restoration, reduced denominator/midpoint rounding, and upstream represented-residual admission still have to compose without introducing a stricter refusal than the existing pair proof.
-
-RED `f74d9ac11cb0acf3eb8fdd9ad79ac3d2e9180993` made that product-capacity theorem executable by adding a characterization test that referenced a not-yet-defined proof helper. Repair `e9a7dee29afb97542bfe2965f850c8ab5a34368e` adds the helper and checks the 256-bit extremum together with the known compact, common-power, odd-boundary, and exhaustive small-integer composition geometries.
+RED `3136739460ef0c8e13c044a7e5b04891e4f4e23d` → repair `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5` adds a measured characterization route `narrow O(n) -> Wide256 O(n) -> buffered pair fail-closed fallback` and records `used_wide_product` separately from `used_pairwise_fallback`. A correct numerator alone does not establish which resource path ran.
 
 ## Represented-input reachability
 
-The odd `D = 2^58 + 1` integer boundary is useful for arithmetic width, but by itself it does not establish that the wider route is needed by a residual set that passes the represented binary64 subtraction gates. A separate characterization supplies such a case without weakening those gates.
-
-At `n = 4096`, take represented residuals with three distinct values: one `0`, one `1`, and 4094 copies of `2^53`. With truth fixed at represented zero, every residual construction is exact. The only distinct pairwise subtractions are `1`, `2^53`, and `2^53 - 1`; all three are exactly representable in binary64, so the production pair-subtraction roundoff predicate accepts the fixture's distinct subtraction classes. Because coefficient `1` is present, the canonical common power-of-two shift is zero rather than an artifact that removes the width pressure.
-
-The canonical sums `S1` and `S2` still fit `u128`, but both narrow cancellation products `n*S2` and `S1^2` exceed `u128`. The exact pair numerator remains only 119 bits:
+Characterization `5a19b6334487b43fb630abba7e487d7cf4c49960` makes Wide256 recovery reachable from represented binary64 inputs rather than synthetic integer-only coefficients. At `n=4096`, represented residual classes `{0,1,2^53}` have exact residual construction and exact distinct pair differences. The common dyadic shift is zero, narrow products overflow, and Wide256 recovers
 
 `P = 664289479338799435974172876300357631`.
 
-The two-limb product/subtraction recovers that value exactly. The unreduced scientific denominator is `4096^2 * 4095 = 68702699520`, which is also below the current `2^53` exact-denominator gate. This closes the narrower question of whether Wide256 recovery is reachable from represented residuals; it does not authorize changing the production sample-count admission.
+The unreduced denominator is `68_702_699_520`. This establishes reachability, not production admission.
 
-## Exact-rounding width is a second boundary
+## Exact-rounding width is a separate boundary
 
-Widening only the O(n) numerator identity is not sufficient for end-to-end exact admission. Before repair `e4a85f53a611922be7492fe906d62ce65787c18e`, the exact candidate/midpoint proof in `bias_se.rs` formed scaled `u128` products when comparing the exact rational target against a binary64 candidate square and the adjacent midpoint square.
+At represented `n=2050`, characterization `a8423173188fa53a26a16d3afdafeb76e114cc1d` reaches a second boundary. The exact pair numerator is
 
-A smaller represented fixture with the same three residual classes at `n = 2050` reaches that boundary. Its residual and pairwise-subtraction classes remain exact and its common dyadic shift is zero. Both narrow O(n) products require 129 bits, while the exact pair numerator is still only 118 bits:
+`P = 332306998946228931332463617650984961`,
 
-`P = 332306998946228931332463617650984961`.
+with denominator `8_610_922_500`. The normal binary64 ratio/square-root seed is `0x4296998e1aff78de`; exact candidate-square comparison needs 136-bit operands and the adjacent upward midpoint comparison needs 140-bit operands.
 
-The unreduced denominator is `8610922500`, below `2^53`. The normal binary64 ratio/square-root seed is `0x4296998e1aff78de`. Its compact dyadic significand/exponent are `3180642552495215 * 2^-9`. Exact candidate-square comparison therefore needs both `P * 2^18` and `denominator * significand^2`; each is 136 bits. Comparing with the exact midpoint to the upward neighbor requires 140-bit operands. Wide256 comparison shows the exact target is above the candidate square and below the midpoint square, proving that the original candidate is the nearest binary64 result.
+Characterization `aab9fe9115cee97225f2aa81e54a55ceafb23336` shows that arbitrary precision is unnecessary for these comparisons: represent each nonzero operand as a `Wide256` mantissa plus signed dyadic exponent, compare absolute top-bit positions, then aligned significand bits only if the top positions tie. It also covers extreme exponent metadata `-2148/-2149` and `2046/2047` without materializing `2^k`.
 
-This is the causal resource finding that motivated the production primitive repair: exact-rounding comparison width must cover the same represented cases as the wider numerator path. Pairwise proof remains the fail-closed comparison authority until the whole represented-input route is proven admission-equivalent.
+RED `f7717361ad8c5f0592688c1514c104cc1b4adabe` → repair `e4a85f53a611922be7492fe906d62ce65787c18e` moves the signed-exponent two-limb comparison into `crates/validation_core/src/bias_se.rs`. `1240ace8eb41a01fa72a4bb99df842fd550a1288` fixes both exact-midpoint tie-to-even parity directions. The binary64 division/sqrt remains only a candidate seed; the returned value is authorized by the exact candidate/midpoint comparison.
 
-Executable evidence for both represented boundaries is `crates/validation_core/tests/bias_standard_error_represented_wide_recovery_characterization.rs`: reachability was introduced at `5a19b6334487b43fb630abba7e487d7cf4c49960`, and the exact-midpoint width characterization at `a8423173188fa53a26a16d3afdafeb76e114cc1d`.
+The standards basis remains IEEE 754-2019 and ISO/IEC 60559:2020. IEEE P754 is an active revision project, not a published replacement.
 
-## Exponent-safe exact comparison
+## Pair versus Wide256 represented equivalence
 
-The 136/140-bit finding does not require an arbitrary-precision integer for the comparison itself. Characterization `aab9fe9115cee97225f2aa81e54a55ceafb23336` adds a two-limb comparison reference that keeps each nonzero integer mantissa in `Wide256` and keeps its power-of-two scale as a signed exponent. It first compares the absolute top-bit positions. Only when those positions tie does it compare significand bits aligned from the common top bit. No `2^k` factor is materialized.
+Characterization `7a2ab0a1ef7a72d8cc9b9253d7f92c493e578943` compares an actual two-pass O(n²) pairwise authority with an independent Wide256 O(n) identity for represented residual classes `{0,1,2^53}` at `n=4,16,17,65,257,2050`. Wherever both admit, they must produce the same common unit exponent, exact pair numerator, and GCD-reduced `(numerator, denominator, unit_exponent)` tuple presented to the exact rounder. At `n=2050`, both narrow products overflow while the two exact routes agree on the 118-bit `P` above.
 
-For represented `n = 2050`, that reference orders the 136-bit candidate-square operands as target greater than candidate square and the 140-bit upward-midpoint operands as target less than midpoint square, reproducing the exact nearest-binary64 decision from the earlier characterization. It also verifies equality and strict ordering across exponent pairs `-2148/-2149` and `2046/2047`, where a direct `u128` shift-factor construction is not a viable representation. The full-width edge `(2^128 - 1)^2` remains exactly represented as high limb `2^128 - 2`, low limb `1`.
+That test originally used the represented minimum as anchor because its characterized input family made the minimum exact. It is not a universal production anchor rule.
 
-RED `f7717361ad8c5f0592688c1514c104cc1b4adabe` moved this finding onto the authoritative path by requiring `correctly_rounded_scaled_sqrt_ratio` to return `0x4296998e1aff78de` for the represented `n=2050` reduced ratio; the previous bounded comparator returned `None` before it could make the exact decision. Repair `e4a85f53a611922be7492fe906d62ce65787c18e` integrates the two-limb product and signed-exponent ordering into `crates/validation_core/src/bias_se.rs`. Candidate and adjacent-midpoint denominator products are now formed as exact `Wide256` values and compared without materializing an oversized power-of-two factor.
+## Pairwise-f64 admission is broader than neither science nor exact-anchor admission
 
-This is a production primitive integration, not a sample-count admission change. `exact_pair_distance_standard_error` remains deliberately bounded to `n=4..=16`; the `n=2050` ratio is a private exact-rounding contract that prevents a future wider numerator route from inheriting the former false refusal. Exact-head Rust/rustdoc/line+branch/security/documentation GREEN and represented-input route equivalence remain required before admission can widen.
+Characterization `2bc1d2284d75154e020640adb573c1cfadf005fb` isolates a distinction inside the existing `n=4` budget. Residuals `[0,1,2^-54,2]` have exact minimum-anchor coordinates, but non-anchor subtraction `1-2^-54` rounds in binary64. The O(n²) pairwise-f64 proof therefore refuses. On common unit `2^-54`, integer coordinates `[0,2^54,1,2^55]` give
 
-The standards basis remains the current published floating-point standards, IEEE 754-2019 and ISO/IEC 60559:2020. IEEE currently lists 754-2019 as an active standard and ISO lists ISO/IEC 60559:2020 as the published international standard; IEEE P754 is an active revision project and is not treated as a published replacement in this decision.
+`P = 3569704090242693886528325169446915`
 
-## Represented route-equivalence slice
+through both direct integer pair distances and `n*S2-S1^2`. The generic translated fallback happens to return the same correctly represented public result `0x3fdea33e2c83c140`. This showed that exact non-anchor pair subtraction is a sufficient reference-path condition, not a scientific prerequisite.
 
-Characterization `7a2ab0a1ef7a72d8cc9b9253d7f92c493e578943` adds an actual two-pass O(n²) pairwise authority comparison against the two-limb O(n) identity for represented residual classes `{0, 1, 2^53}` at `n = 4, 16, 17, 65, 257, 2050`. It does not use the earlier analytic pair-numerator formula for the comparison: represented pair differences are checked for exact binary64 subtraction, normalized to a common dyadic unit, squared, and accumulated by the pairwise route. Independently, the wide-linear route selects the represented minimum as anchor, verifies every anchor-relative subtraction, derives the same dyadic unit, and computes `n*S2 - S1^2` with full-width products and subtraction.
+## Non-minimum exact anchor is a public correctness requirement
 
-For every characterized sample count, both routes must produce the same unit exponent, exact pair numerator, and GCD-reduced `(numerator, denominator, unit_exponent)` tuple presented to the exact rounder. The `n = 2050` fixture is the resource boundary rather than a small-only identity check: both narrow cancellation products must overflow, while the pairwise and Wide256 routes must agree on `P = 332306998946228931332463617650984961`, denominator `8610922500`, divisor `1`, and unit exponent `0`. The characterization also reverses the `n = 65` represented sequence to verify that selecting the minimum exact anchor makes the wide-linear result independent of observation order.
+A stronger represented fixture found after that characterization proves that selecting the represented minimum as a mandatory anchor is also too strict. Fix truth at represented zero and use residuals
 
-This closes a deterministic represented-input arithmetic-equivalence slice, not the whole production admission decision. The test still carries a test-only copy of the candidate arithmetic and does not route `bias_standard_error` samples above `n=16` through the wider implementation. Production integration therefore still requires one implementation of canonical represented normalization and Wide256 numerator routing in the owning module, same-head exact-rounding/tie-to-even evidence, and comparison against the pairwise authority before the fallback can be demoted or the cutoff widened.
+`[0,1,2,-2^53]`.
 
-## Anchor-exact admission is broader than pairwise-f64 admission
+The represented minimum is `-2^53`. Mathematical difference `1-(-2^53)=2^53+1` is not representable in binary64, so neither the pairwise-f64 proof nor a minimum-anchor-only linear proof can preserve this geometry exactly. Anchor `0`, however, gives exact signed coordinates `[0,1,2,-2^53]` on unit `1`.
 
-Characterization `2bc1d2284d75154e020640adb573c1cfadf005fb` isolates a proof-admission distinction inside the existing `n=4` production sample budget. Use represented residuals `[0, 1, 2^-54, 2]` with truth fixed at represented zero. Every residual and every subtraction from the minimum anchor `0` is exact. The non-anchor subtraction `1 - 2^-54`, however, rounds in binary64; the current O(n²) pair proof therefore refuses before exact integer pair accumulation.
+Their translation-invariant exact pair numerator is
 
-That refusal is a limitation of the reference path, not evidence that the represented geometry lacks an exact pair-distance proof. With common unit `2^-54`, the anchor-relative integer coefficients are `[0, 2^54, 1, 2^55]`. Direct integer pair distances and the linear identity agree exactly on
+`P = 243388915243820099130562543878155`,
 
-`P = 3569704090242693886528325169446915`.
+so `SE(mean)^2 = P/48`. Correct binary64 rounding is `0x4320000000000001`. The predecessor translated floating-moment fallback returns the adjacent lower `0x4320000000000000`; this is a public one-ULP defect rather than only a resource/admission observation.
 
-The public metric already returns the correctly represented standard error `0x3fdea33e2c83c140` through its generic translated fallback, so this fixture is not a public numerical defect. It demonstrates that requiring every non-anchor pair subtraction to be exact in binary64 is sufficient for the current O(n²) authority but is not a scientific prerequisite for canonical anchor-linear exact admission. A production O(n) route should therefore be evaluated for two properties separately: equality with the pair authority wherever both admit, and intentional strictly broader admission for anchor-exact geometries such as this one. The pairwise path remains fail-closed comparison evidence during that migration; the finding does not justify widening `n=4..=16`.
+Source-level RED `fd9f9ff2c5c395e4cc13042232f4deef018adb48` adds forward and reversed public contracts for `0x4320000000000001`. Its Actions runs were cancelled by the immediate successor push, so it is not claimed as hosted RED evidence.
 
-## Consequence for #491
+Production repair `81ba770cc4812c8fbeb4b3529f0a73b41abbed0f` keeps exact pairwise accumulation as the first authority. When pair subtraction cannot be proven exact, it searches every represented residual as a candidate translation anchor, requires every anchor-relative coordinate to be error-free, chooses the candidate with the smallest exact maximum translated magnitude and a represented-value tie-break, and converts the signed translated coordinates to a common dyadic grid. Positive and negative coefficient mass are accumulated separately; `n*Σc_i²` and `(Σc_i)²` are formed in `Wide256`, subtracted exactly, and downcast only if the final numerator fits the existing bounded `u128` rounder contract. The same exact candidate/midpoint/tie-to-even rounder then authorizes the result.
 
-The candidate numerator route remains `narrow O(n) -> Wide256 O(n) -> buffered pair fail-closed fallback`, introduced by RED `3136739460ef0c8e13c044a7e5b04891e4f4e23d` and repair `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5`. The predecessor narrow-to-pair hybrid remains a comparison baseline.
+This anchor policy intentionally mirrors the permutation-invariant principle already used by `bias.rs`: observation arrival order is not scientific evidence, and the represented minimum is not privileged when it cannot translate the geometry exactly. Unsupported coordinate accumulation, Wide256 subtraction/downcast, denominator, or exact-rounding cases continue to fail closed to the established generic implementation.
 
-For odd `D = 2^58 + 1`, `n = 65`, the predecessor hybrid must still select the pair fallback because its narrow products overflow. The newer candidate must select the wider-product route, recover the same exact restored numerator as both O(n²) references, and report `used_wide_product=true` with `used_pairwise_fallback=false`. The power-of-two-normalized `D=2^58,n=65` geometry and odd `n=64` geometry remain narrow-path admissions. Separate route observability matters because a correct exact numerator does not by itself show whether the candidate avoided O(n²) allocation.
+The repair also promotes `[0,1,2^-54,2]` from generic fallback to exact anchor admission. It does **not** widen the production sample-count budget: `exact_pair_distance_standard_error` remains bounded to `n=4..=16`.
 
-The product-width theorem makes a post-Wide256 pair fallback look redundant for the numerator identity within the canonical `u128` coefficient domain. The represented `n=2050` midpoint finding showed why this did not extend automatically to the whole exact-rounding proof. The exponent-safe comparison is now integrated into the authoritative rounding primitive, `7a2ab0a1ef7a72d8cc9b9253d7f92c493e578943` demonstrates equality of the pairwise and wide-linear exact-ratio inputs across a deterministic represented-input slice, and `2bc1d2284d75154e020640adb573c1cfadf005fb` demonstrates an intended anchor-linear-only admission slice. The remaining equivalence work moves outward to production canonicalization/routing and fail-closed decisions across the represented domain, not to another sample-count staircase.
+## Resource budget remains unresolved
 
-The executable accumulator characterization is `crates/validation_core/tests/bias_standard_error_wide_linear_admission_bound_characterization.rs`. The represented-input width characterization is `crates/validation_core/tests/bias_standard_error_represented_wide_recovery_characterization.rs`. The represented route-equivalence characterization is `crates/validation_core/tests/bias_standard_error_represented_route_equivalence_characterization.rs`. The anchor-linear admission characterization is `crates/validation_core/tests/bias_standard_error_anchor_linear_admission_characterization.rs`. The exponent-safe comparison characterization is `crates/validation_core/tests/bias_standard_error_wide_scaled_comparison_characterization.rs`. The timing/layout vehicle is `crates/validation_core/examples/bias_se_exact_proof_budget.rs`; it records `used_wide_product` and `used_pairwise_fallback` independently so route selection can be audited from raw CSV.
+Exact pair records are 120 at `n=16`, 136 at `n=17`, 2,096,128 at `n=2048`, and 4,997,541 at `n=3162`. For the older aligned nonnegative diameter characterization `D=2^53`, narrow checked products fit through `n=2047`, the exact pair-numerator extremum fits through `n=4095`, and unreduced `n²(n-1)` stays at or below `2^53` through `n=208064`. Because production reduces the denominator by GCD and represented geometry varies, none is a universal refusal count or production budget.
+
+The production anchor repair changes the question from “can O(n) replace O(n²)?” to “what exact represented geometries can be admitted deterministically and at what measured cost?” Same-domain pair equivalence, intended anchor-only admission, exact rounder behavior, and fail-closed refusal all need to survive on one current head before any pair fallback can be demoted or the sample cutoff can move.
+
+The timing/layout vehicle remains `crates/validation_core/examples/bias_se_exact_proof_budget.rs`; it records wide-product and pair-fallback selection separately. No Rust 1.98.0 `--release` CPU/raw CSV, allocator/RSS, or applicable buyer-path p95 evidence is claimed yet.
 
 ## Decision
 
-Do not widen production `validation_core::bias_standard_error` solely because the exact-rounding primitive now supports wider comparison products, because the deterministic represented route-equivalence slice passes, or because anchor-linear proof admission is strictly broader than pairwise-f64 subtraction admission. Production admission remains `n=4..=16`. A budget change requires production canonical anchor-relative normalization and Wide256 routing, equality against the pairwise authority wherever both admit, explicit tests for intended anchor-linear-only admissions, exact tie-to-even preservation, recorded Rust 1.98.0 `--release` raw CSV, CPU/OS/build metadata, allocator/RSS evidence, applicable full buyer-path p95 evidence, exact-head Rust/rustdoc/100% line+branch coverage/security/documentation GREEN, and qualifying independent current-head review.
+Keep production `validation_core::bias_standard_error` admission at `n=4..=16`. Accept the deterministic exact-anchor/Wide256 repair within that existing budget because the non-minimum-anchor fixture is a public one-ULP correctness defect, not a speculative performance optimization. Do not infer from that repair that a larger sample budget is safe.
+
+Before any budget change beyond 16, require: exact-head Rust 1.98.0 fmt/clippy/nextest/rustdoc and owned production 100% line/branch coverage; same-head security/documentation GREEN and qualifying independent review; pair/anchor equality wherever both admit; explicit intended anchor-only admissions including `[0,1,2^-54,2]` and `[0,1,2,-2^53]`; exact candidate stepping/midpoint/tie-to-even and permutation invariance; fail-closed overflow/range behavior; recorded release-mode raw CPU/allocator/RSS and applicable buyer-path p95 evidence; and current CHANGELOG/TRACEABILITY/TEST_STRATEGY/OPERABILITY/operator baseline.
 
 ## Traceability
 
@@ -108,10 +102,14 @@ Do not widen production `validation_core::bias_standard_error` solely because th
 - Exponent-safe scaled comparison characterization: `aab9fe9115cee97225f2aa81e54a55ceafb23336`
 - Production scaled-comparison RED: `f7717361ad8c5f0592688c1514c104cc1b4adabe`
 - Production scaled-comparison repair: `e4a85f53a611922be7492fe906d62ce65787c18e`
-- Represented pair/wide exact-ratio equivalence: `7a2ab0a1ef7a72d8cc9b9253d7f92c493e578943`
-- Anchor-linear-only represented admission: `2bc1d2284d75154e020640adb573c1cfadf005fb`
+- Exact midpoint tie-to-even edge contract: `1240ace8eb41a01fa72a4bb99df842fd550a1288`
+- Represented pair/Wide256 exact-ratio equivalence: `7a2ab0a1ef7a72d8cc9b9253d7f92c493e578943`
+- Anchor-linear-only represented admission characterization: `2bc1d2284d75154e020640adb573c1cfadf005fb`
+- Non-minimum-anchor public RED: `fd9f9ff2c5c395e4cc13042232f4deef018adb48`
+- Deterministic exact-anchor production repair: `81ba770cc4812c8fbeb4b3529f0a73b41abbed0f`
 - Narrow-wide-pair RED: `3136739460ef0c8e13c044a7e5b04891e4f4e23d`
 - Narrow-wide-pair repair: `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5`
 - CHANGELOG fragment: `CHANGELOG.d/validation-bias-exact-proof-budget-characterization.md`
-- Production module under decision: `crates/validation_core/src/bias_se.rs`
+- Production module: `crates/validation_core/src/bias_se.rs`
+- Public regression: `crates/validation_core/tests/bias_standard_error_nonminimum_anchor_exact_rounding_contract.rs`
 - Exact-proof budget harness: `crates/validation_core/examples/bias_se_exact_proof_budget.rs`
