@@ -111,7 +111,11 @@ impl Wide256 {
     }
 
     const fn to_u128(self) -> Option<u128> {
-        if self.high == 0 { Some(self.low) } else { None }
+        if self.high == 0 {
+            Some(self.low)
+        } else {
+            None
+        }
     }
 
     const fn is_zero(self) -> bool {
@@ -329,8 +333,13 @@ fn exact_pairwise_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
 }
 
 fn exact_anchor_linear_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
+    // Zero is a neutral dyadic translation anchor for every finite represented
+    // residual, even when no observed residual can translate every other value
+    // without rounding. Keep represented residuals in the candidate set so an
+    // exact observed anchor with a smaller dynamic range still wins. The final
+    // total-order tie-break makes selection independent of observation order.
     let mut best: Option<(f64, f64, Vec<f64>)> = None;
-    for &anchor in residuals {
+    for anchor in core::iter::once(0.0).chain(residuals.iter().copied()) {
         let mut translated = Vec::with_capacity(residuals.len());
         let mut max_magnitude = 0.0_f64;
         let mut exact = true;
@@ -430,10 +439,10 @@ fn exact_pair_distance_standard_error(
     }
 
     // Preserve the pairwise-f64 proof as the first authority. If one represented
-    // non-anchor pair subtraction rounds, search every represented residual as an
-    // exact translation anchor, choose the smallest exact dynamic range with a
-    // represented-value tie-break, and recover the same translation-invariant
-    // pair numerator through n*Σc_i²-(Σc_i)² using two-limb cancellation products.
+    // non-anchor pair subtraction rounds, compare the neutral zero anchor with
+    // every represented residual anchor and choose the exact translation with the
+    // smallest dynamic range. Recover the same translation-invariant numerator
+    // through n*Σc_i²-(Σc_i)² using two-limb cancellation products.
     let (pair_square_sum, unit_exponent) = exact_pairwise_pair_square_sum(&residuals)
         .or_else(|| exact_anchor_linear_pair_square_sum(&residuals))?;
     if pair_square_sum == 0 {
@@ -470,8 +479,10 @@ fn exact_pair_distance_standard_error(
 /// Four- through sixteen-observation samples whose represented residuals admit
 /// either the exact pairwise-difference proof or a deterministic exact anchor
 /// translation use the exact pair-distance identity when its reduced dyadic ratio
-/// fits the bounded integer proof. All other samples retain the established bias
-/// implementation and its existing fail-closed behavior.
+/// fits the bounded integer proof. The anchor candidates include neutral zero and
+/// every represented residual so proof admission does not depend on a minimum or
+/// observed residual being universally subtractable. All other samples retain the
+/// established bias implementation and its existing fail-closed behavior.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     if let Some(result) = exact_pair_distance_standard_error(truth, recovered) {
         return result;
@@ -558,12 +569,30 @@ mod tests {
         assert!(!one.bit(128));
 
         assert_eq!(compare_scaled_wide(zero, 0, zero, 0), Some(Ordering::Equal));
-        assert_eq!(compare_scaled_wide(zero, -2_148, one, 2_047), Some(Ordering::Less));
-        assert_eq!(compare_scaled_wide(one, 2_047, zero, -2_148), Some(Ordering::Greater));
-        assert_eq!(compare_scaled_wide(one, -2_148, two, -2_149), Some(Ordering::Equal));
-        assert_eq!(compare_scaled_wide(one, -2_148, three, -2_149), Some(Ordering::Less));
-        assert_eq!(compare_scaled_wide(three, 2_046, one, 2_047), Some(Ordering::Greater));
-        assert_eq!(compare_scaled_wide(one, 1, one, 0), Some(Ordering::Greater));
+        assert_eq!(
+            compare_scaled_wide(zero, -2_148, one, 2_047),
+            Some(Ordering::Less)
+        );
+        assert_eq!(
+            compare_scaled_wide(one, 2_047, zero, -2_148),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            compare_scaled_wide(one, -2_148, two, -2_149),
+            Some(Ordering::Equal)
+        );
+        assert_eq!(
+            compare_scaled_wide(one, -2_148, three, -2_149),
+            Some(Ordering::Less)
+        );
+        assert_eq!(
+            compare_scaled_wide(three, 2_046, one, 2_047),
+            Some(Ordering::Greater)
+        );
+        assert_eq!(
+            compare_scaled_wide(one, 1, one, 0),
+            Some(Ordering::Greater)
+        );
         assert_eq!(compare_scaled_wide(one, 0, one, 1), Some(Ordering::Less));
     }
 
@@ -619,7 +648,7 @@ mod tests {
     }
 
     #[test]
-    fn anchor_linear_route_recovers_rounded_non_anchor_pair_and_nonminimum_anchor() {
+    fn anchor_linear_route_recovers_observed_and_neutral_anchor_geometries() {
         let tiny = 2.0_f64.powi(-54);
         let small = [0.0, 1.0, tiny, 2.0];
         assert_eq!(exact_pairwise_pair_square_sum(&small), None);
@@ -631,7 +660,20 @@ mod tests {
         let (numerator, unit_exponent) = exact_anchor_linear_pair_square_sum(&wide)
             .expect("zero is an exact non-minimum translation anchor");
         assert_eq!(unit_exponent, 0);
-        assert_eq!(numerator, 243_388_915_243_820_099_130_562_543_878_155_u128);
+        assert_eq!(
+            numerator,
+            243_388_915_243_820_099_130_562_543_878_155_u128
+        );
+
+        let no_observed_anchor = [1.0, tiny, 2.0, 3.0];
+        assert_eq!(exact_pairwise_pair_square_sum(&no_observed_anchor), None);
+        let (numerator, unit_exponent) = exact_anchor_linear_pair_square_sum(&no_observed_anchor)
+            .expect("neutral zero is exact when no observed residual is a universal anchor");
+        assert_eq!(unit_exponent, -54);
+        assert_eq!(
+            numerator,
+            6_490_371_073_168_534_319_490_338_297_741_315_u128
+        );
     }
 
     #[test]
@@ -781,6 +823,13 @@ mod tests {
                 .expect("represented result")
                 .to_bits(),
             0x3fde_a33e_2c83_c140
+        );
+        assert_eq!(
+            exact_pair_distance_standard_error(&truth, &[1.0, tiny, 2.0, 3.0])
+                .expect("neutral zero anchor admits the represented geometry")
+                .expect("represented result")
+                .to_bits(),
+            0x3fe4_a7e9_cb8a_3491
         );
         assert_eq!(
             exact_pair_distance_standard_error(&[1.0, 0.0, 0.0, 0.0], &[tiny, 0.0, 0.0, 0.0]),
