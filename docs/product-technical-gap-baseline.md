@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-06T00:01:20Z  
+**Snapshot:** 2026-09-06T00:06:15Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
@@ -30,7 +30,7 @@ Passing, queued, skipped, or predecessor-head checks on an open PR never promote
 
 | PR / issue | Exact current evidence | Disposition |
 | --- | --- | --- |
-| #488 | `387be8455eeb6971b4c3a823d8db12124e9e0138`, Draft, base `main` | Validation Evidence landing vehicle on protected #490. GAP-125 keeps production exact pair-distance admission through `n=16`; #491 now has canonical-dyadic normalized narrow O(n), buffered/two-pass pair references, a dependency-free two-limb wider-product characterization, an executable accumulator-bound theorem, the predecessor narrow→pair hybrid, and a new narrow→Wide256→pair candidate with explicit route telemetry. Production behavior is unchanged pending measured resource and exact-head delivery evidence. |
+| #488 | `abd95474396f8a0f2e5dca6718f2bcf582b51b45`, Draft, base `main` | Validation Evidence landing vehicle on protected #490. GAP-125 keeps production exact pair-distance admission through `n=16`; #491 now has canonical-dyadic normalized narrow O(n), buffered/two-pass pair references, a dependency-free two-limb wider-product characterization, an executable accumulator-bound theorem, the predecessor narrow→pair hybrid, and a new narrow→Wide256→pair candidate with explicit route telemetry. Production behavior is unchanged pending measured resource and exact-head delivery evidence. |
 | #491 | open | Replace the sample-count staircase with a measured exact-proof budget. Canonical coefficients satisfy `Σc_i <= Σc_i² <= Σ(i<j)(c_i-c_j)²`, so a pair-admitted accumulator-overflow fixture is impossible. RED `31367394...` → repair `ce4ed272...` implements `narrow O(n) -> Wide256 O(n) -> pairwise fail-closed fallback`; next work is recorded release-mode measurement, allocator/RSS, represented-input admission comparison, exact-head gates/review, and applicable buyer-path p95. |
 | #416 | `aa730c63563eb4a33048d822b581036c8487bd47`, Draft | Validation / Analysis Run landing vehicle. Generic cutoff-before-identity repair remains inherited; fold children keep unique source/tests/doctoring until conflict-resolving inheritance is verified. |
 | #310 | `c6680450152b1e0a2c9abb553772d74a23923335`, Draft | Longitudinal Modeling vehicle. Stable `Between` recovery is unit-level with canonical occasion `0`; `Within` retains actual occasion identity. Older base remains a non-destructive restack finding. |
@@ -67,7 +67,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 ## Current Validation Evidence repair and resource finding
 
-#488 exact head `387be8455eeb6971b4c3a823d8db12124e9e0138` inherits the full GAP-045–124 source/test/fixture/contract lineage and GAP-125's sixteen-observation repair.
+#488 exact head `abd95474396f8a0f2e5dca6718f2bcf582b51b45` inherits the full GAP-045–124 source/test/fixture/contract lineage and GAP-125's sixteen-observation repair.
 
 GAP-125 public RED `5da82b2d651706c191ca191c6c077d916cbfda25` uses exact represented residuals `[314270929,327661307,371854441,398522837,413483290,416184956,565808551,682627163,724514517,731058943,740662035,970233120,1141566755,1320628283,1526331271,1992574092]`. Its 120 exact squared pair distances sum to `56_762_922_330_032_131_548`; denominator `16²×15=3_840`; gcd `12`; reduced radicand `4_730_243_527_502_677_629/320`. The predecessor translated floating moment/`sqrt` fallback returns adjacent lower `0x419c_fcbb_b78d_2ad4`, while exact midpoint comparison returns `0x419c_fcbb_b78d_2ad5`. Causal repair `a509ae9e46c8ffc2cc3ef4f0e904774ad2516e1f` advances only the existing bounded proof to `n=4..=16`.
 
@@ -81,7 +81,7 @@ Characterization `081000289f5a52e94863026d55696ee2a4daf923` adds a dependency-fr
 
 Characterization `b7e4da353ac58069afd73ee7c0e8427d49993fdb` proves the missing resource invariant: `Σc_i <= Σc_i² <= P` for canonical anchor-relative integer coefficients and exact pair numerator `P`. This removes the impossible acceptance task of finding a pair-admitted `u128` accumulator overflow.
 
-RED `3136739460ef0c8e13c044a7e5b04891e4f4e23d` then makes the missing candidate route executable; repair `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5` implements `narrow -> Wide256 -> pair` in the measurement harness and records wide selection separately from pair fallback. CHANGELOG `5ad7021c80a8dc571568b33be40fe3341bed2d21` and research `387be8455eeb6971b4c3a823d8db12124e9e0138` carry this decision through #488 current authority `387be8455eeb6971b4c3a823d8db12124e9e0138`.
+RED `3136739460ef0c8e13c044a7e5b04891e4f4e23d` makes the missing candidate route executable; repair `ce4ed2722e160eb0ca0ee2d636a5eca55e3ff2d5` implements `narrow -> Wide256 -> pair` in the measurement harness and records wide selection separately from pair fallback. Doctoring continues through CHANGELOG `5ad7021c80a8dc571568b33be40fe3341bed2d21`, research `387be8455eeb6971b4c3a823d8db12124e9e0138`, Test Strategy `a2c776eef1e61138fe8e143f4e732f1bea5e0b73`, and Operability/current #488 `abd95474396f8a0f2e5dca6718f2bcf582b51b45`.
 
 No release-mode timing result, allocator/RSS record, applicable buyer-path p95, exact-head hosted GREEN, or qualifying independent review is claimed. The current execution environment has no Rust 1.98.0 toolchain. The next production decision must run the corrected candidate in recorded release mode and compare represented-input admission across sample count, canonical dyadic exponent spread/diameter, and coefficient distribution; `2,047`, `4,095`, `208,064`, or the next integer sample count is not a resource budget.
 
@@ -95,7 +95,7 @@ No release-mode timing result, allocator/RSS record, applicable buyer-path p95, 
 | GAP-111–120 | Exact pair-distance/midpoint proof introduced and extended through `n=11`; verification pending | Exact RED→repair/test/research lineages remain inherited. |
 | GAP-121–124 | Exact pair-distance proof extended through `n=12..15`; verification pending | REDs `b6ac1117...`, `369af46d...`, `db403976...`, `1c8a7ced...` with causal repairs `035cf392...`, `0b8727e7...`, `58efe80d...`, `3cc041ee...`; doctoring inherited. |
 | GAP-125 | Exact `n=16` pair-distance result remained one ULP low on translated fallback; verification pending | RED `5da82b2d...` → repair `a509ae9e...`; production bounded proof is `n=4..=16`. |
-| #491 | Hard sample-count cutoff is an unmeasured resource budget; open | n=17 counterexample remains on fallback. Canonical-dyadic normalization removes the false common-power refusal; odd `D=2^58+1,n=65` proves narrow O(n) product-width refusal is not scientific refusal. `081000289...` adds two-limb wider recovery, `b7e4da35...` proves pair admission already bounds both narrow accumulators, and RED `31367394...` → repair `ce4ed272...` implements the narrow→Wide256→pair candidate with explicit route telemetry. Current #488 authority `387be845...`; production cutoff deliberately unchanged pending release-mode CPU/allocation/RSS, represented-input comparison, API p95 where applicable, and exact-head gates/review. |
+| #491 | Hard sample-count cutoff is an unmeasured resource budget; open | n=17 counterexample remains on fallback. Canonical-dyadic normalization removes the false common-power refusal; odd `D=2^58+1,n=65` proves narrow O(n) product-width refusal is not scientific refusal. `081000289...` adds two-limb wider recovery, `b7e4da35...` proves pair admission already bounds both narrow accumulators, and RED `31367394...` → repair `ce4ed272...` implements the narrow→Wide256→pair candidate with explicit route telemetry. Current #488 authority `abd95474...`; production cutoff deliberately unchanged pending release-mode CPU/allocation/RSS, represented-input comparison, API p95 where applicable, and exact-head gates/review. |
 
 ## Release gate
 
