@@ -2,10 +2,10 @@
 //!
 //! The general bias implementation remains the fallback authority. This module
 //! admits a bounded small-sample exact pair-distance identity when represented
-//! residuals either have error-free pairwise differences or admit a deterministic
-//! exact anchor translation whose dyadic integer numerator fits the bounded proof;
-//! the exact rational square root is then rounded against binary64 midpoints
-//! without first rounding the ratio under the square root.
+//! residuals admit a neutral-zero linear proof, a conditioned exact observed
+//! anchor, or error-free pairwise differences; the exact rational square root is
+//! then rounded against binary64 midpoints without first rounding the ratio under
+//! the square root.
 
 use crate::ValidationError;
 use core::cmp::Ordering;
@@ -332,14 +332,56 @@ fn exact_pairwise_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
     Some((pair_square_sum, unit_exponent))
 }
 
+fn exact_neutral_zero_linear_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
+    // Every finite represented residual is already an exact coordinate relative
+    // to neutral zero. First choose the common dyadic unit, then rescan to build
+    // the signed first moment and square sum. This keeps the proof O(n) with O(1)
+    // proof storage and avoids materializing pair distances.
+    let mut unit_exponent = i32::MAX;
+    for &coordinate in residuals {
+        if coordinate == 0.0 {
+            continue;
+        }
+        let (_, exponent) = positive_dyadic(coordinate.abs())?;
+        unit_exponent = unit_exponent.min(exponent);
+    }
+    if unit_exponent == i32::MAX {
+        return Some((0, 0));
+    }
+
+    let mut positive_sum = 0_u128;
+    let mut negative_sum = 0_u128;
+    let mut square_sum = 0_u128;
+    for &coordinate in residuals {
+        if coordinate == 0.0 {
+            continue;
+        }
+        let (significand, exponent) = positive_dyadic(coordinate.abs())?;
+        let shift = exponent.checked_sub(unit_exponent)?.unsigned_abs();
+        let coefficient = multiply_by_power_of_two(significand, shift)?;
+        if coordinate.is_sign_negative() {
+            negative_sum = negative_sum.checked_add(coefficient)?;
+        } else {
+            positive_sum = positive_sum.checked_add(coefficient)?;
+        }
+        square_sum = square_sum.checked_add(coefficient.checked_mul(coefficient)?)?;
+    }
+
+    let sample_count = u128::try_from(residuals.len()).ok()?;
+    let scaled_square_sum = Wide256::multiply_u128(sample_count, square_sum);
+    let signed_sum_magnitude = positive_sum.abs_diff(negative_sum);
+    let squared_sum = Wide256::multiply_u128(signed_sum_magnitude, signed_sum_magnitude);
+    let numerator = scaled_square_sum.checked_sub(squared_sum)?.to_u128()?;
+    Some((numerator, unit_exponent))
+}
+
 fn exact_anchor_linear_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
-    // Zero is a neutral dyadic translation anchor for every finite represented
-    // residual, even when no observed residual can translate every other value
-    // without rounding. Keep represented residuals in the candidate set so an
-    // exact observed anchor with a smaller dynamic range still wins. The final
-    // total-order tie-break makes selection independent of observation order.
+    // Neutral zero is handled by the O(n) fast route. Search represented residuals
+    // only when translating by an observed anchor can reduce the dyadic dynamic
+    // range enough to recover a bounded proof that neutral zero refused. The final
+    // total-order tie-break keeps selection independent of observation order.
     let mut best: Option<(f64, f64, Vec<f64>)> = None;
-    for anchor in core::iter::once(0.0).chain(residuals.iter().copied()) {
+    for anchor in residuals.iter().copied() {
         let mut translated = Vec::with_capacity(residuals.len());
         let mut max_magnitude = 0.0_f64;
         let mut exact = true;
@@ -438,13 +480,15 @@ fn exact_pair_distance_standard_error(
         residuals.push(residual);
     }
 
-    // Preserve the pairwise-f64 proof as the first authority. If one represented
-    // non-anchor pair subtraction rounds, compare the neutral zero anchor with
-    // every represented residual anchor and choose the exact translation with the
-    // smallest dynamic range. Recover the same translation-invariant numerator
-    // through n*Σc_i²-(Σc_i)² using two-limb cancellation products.
-    let (pair_square_sum, unit_exponent) = exact_pairwise_pair_square_sum(&residuals)
-        .or_else(|| exact_anchor_linear_pair_square_sum(&residuals))?;
+    // Attempt the neutral-zero two-pass proof first: finite represented residuals
+    // are exact coordinates around zero, so this is O(n) with O(1) proof storage.
+    // If its bounded integer coordinate range refuses, search exact observed anchors
+    // that may reduce that range. Keep pairwise O(n²) last as a comparison and
+    // fail-closed reference while admission equivalence and release-mode budgets are
+    // still being characterized.
+    let (pair_square_sum, unit_exponent) = exact_neutral_zero_linear_pair_square_sum(&residuals)
+        .or_else(|| exact_anchor_linear_pair_square_sum(&residuals))
+        .or_else(|| exact_pairwise_pair_square_sum(&residuals))?;
     if pair_square_sum == 0 {
         return Some(Ok(0.0));
     }
@@ -476,13 +520,12 @@ fn exact_pair_distance_standard_error(
 
 /// Standard error of mean signed bias.
 ///
-/// Four- through sixteen-observation samples whose represented residuals admit
-/// either the exact pairwise-difference proof or a deterministic exact anchor
-/// translation use the exact pair-distance identity when its reduced dyadic ratio
-/// fits the bounded integer proof. The anchor candidates include neutral zero and
-/// every represented residual so proof admission does not depend on a minimum or
-/// observed residual being universally subtractable. All other samples retain the
-/// established bias implementation and its existing fail-closed behavior.
+/// Four- through sixteen-observation samples first attempt an exact neutral-zero
+/// linear proof, then a conditioned exact observed-anchor translation, and finally
+/// the pairwise-difference reference when the earlier bounded proofs refuse. Each
+/// admitted route uses the same exact pair-distance identity and exact dyadic
+/// midpoint rounding. All other samples retain the established bias implementation
+/// and its existing fail-closed behavior.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     if let Some(result) = exact_pair_distance_standard_error(truth, recovered) {
         return result;
@@ -494,9 +537,9 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 mod tests {
     use super::{
         compare_scaled_wide, correctly_rounded_scaled_sqrt_ratio,
-        exact_anchor_linear_pair_square_sum, exact_pair_distance_standard_error,
-        exact_pairwise_pair_square_sum, exact_power_of_two, midpoint_dyadic,
-        multiply_by_power_of_two, positive_dyadic, Wide256,
+        exact_anchor_linear_pair_square_sum, exact_neutral_zero_linear_pair_square_sum,
+        exact_pair_distance_standard_error, exact_pairwise_pair_square_sum, exact_power_of_two,
+        midpoint_dyadic, multiply_by_power_of_two, positive_dyadic, Wide256,
     };
     use core::cmp::Ordering;
 
@@ -648,16 +691,26 @@ mod tests {
     }
 
     #[test]
+    fn neutral_zero_linear_route_matches_pairwise_on_common_domain() {
+        let residuals = [0.0, 1.0, 2.0, 7.0];
+        assert_eq!(
+            exact_neutral_zero_linear_pair_square_sum(&residuals),
+            exact_pairwise_pair_square_sum(&residuals)
+        );
+    }
+
+    #[test]
     fn anchor_linear_route_recovers_observed_and_neutral_anchor_geometries() {
         let tiny = 2.0_f64.powi(-54);
         let small = [0.0, 1.0, tiny, 2.0];
         assert_eq!(exact_pairwise_pair_square_sum(&small), None);
         assert!(exact_anchor_linear_pair_square_sum(&small).is_some());
+        assert!(exact_neutral_zero_linear_pair_square_sum(&small).is_some());
 
         let diameter = 9_007_199_254_740_992.0_f64;
         let wide = [0.0, 1.0, 2.0, -diameter];
         assert_eq!(exact_pairwise_pair_square_sum(&wide), None);
-        let (numerator, unit_exponent) = exact_anchor_linear_pair_square_sum(&wide)
+        let (numerator, unit_exponent) = exact_neutral_zero_linear_pair_square_sum(&wide)
             .expect("zero is an exact non-minimum translation anchor");
         assert_eq!(unit_exponent, 0);
         assert_eq!(
@@ -667,8 +720,10 @@ mod tests {
 
         let no_observed_anchor = [1.0, tiny, 2.0, 3.0];
         assert_eq!(exact_pairwise_pair_square_sum(&no_observed_anchor), None);
-        let (numerator, unit_exponent) = exact_anchor_linear_pair_square_sum(&no_observed_anchor)
-            .expect("neutral zero is exact when no observed residual is a universal anchor");
+        assert_eq!(exact_anchor_linear_pair_square_sum(&no_observed_anchor), None);
+        let (numerator, unit_exponent) =
+            exact_neutral_zero_linear_pair_square_sum(&no_observed_anchor)
+                .expect("neutral zero is exact when no observed residual is a universal anchor");
         assert_eq!(unit_exponent, -54);
         assert_eq!(
             numerator,
@@ -819,14 +874,14 @@ mod tests {
         let tiny = 2.0_f64.powi(-54);
         assert_eq!(
             exact_pair_distance_standard_error(&truth, &[0.0, 1.0, tiny, 2.0])
-                .expect("exact anchor route admits rounded non-anchor pair")
+                .expect("neutral-zero linear route admits rounded non-anchor pair")
                 .expect("represented result")
                 .to_bits(),
             0x3fde_a33e_2c83_c140
         );
         assert_eq!(
             exact_pair_distance_standard_error(&truth, &[1.0, tiny, 2.0, 3.0])
-                .expect("neutral zero anchor admits the represented geometry")
+                .expect("neutral-zero linear route admits the represented geometry")
                 .expect("represented result")
                 .to_bits(),
             0x3fe4_a7e9_cb8a_3491
