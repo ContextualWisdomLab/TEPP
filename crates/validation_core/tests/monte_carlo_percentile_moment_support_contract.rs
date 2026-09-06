@@ -1,3 +1,10 @@
+//! Require empirical percentile endpoints to be feasible under the recorded Monte Carlo moments.
+//!
+//! Nearest-rank percentile endpoints are retained replications, so they must fit the sample spread
+//! implied by the recorded mean and sample standard deviation. The check must remain valid when a
+//! binary64 mean rounds between adjacent observations and for signed scalar summaries; impossible
+//! endpoints must fail closed in validation and serialization.
+
 use validation_core::{MonteCarloSummary, ValidationError, summarize_replications};
 
 fn summary(percentile_lower: f64, percentile_upper: f64) -> MonteCarloSummary {

@@ -1,3 +1,10 @@
+//! Preserve standard-error acceptance decisions when scaling arithmetic crosses `f64` range limits.
+//!
+//! A finite represented residual and finite `k * SE` bound must keep their true ordering even
+//! when an intermediate normalization underflows. When both the raw residual and bound overflow,
+//! the fallback must still distinguish the represented-input rejection from the adjacent-multiplier
+//! acceptance rather than treating a rounded normalization tie as scientific equality.
+
 use validation_core::accept_within_standard_errors;
 
 #[test]
@@ -52,7 +59,11 @@ fn both_overflow_fallback_does_not_round_an_exact_rejection_into_acceptance() {
     assert!((estimate - target).is_infinite());
     assert!((multiplier * standard_error).is_infinite());
 
-    let scale = estimate.abs().max(target.abs()).max(standard_error).max(1.0);
+    let scale = estimate
+        .abs()
+        .max(target.abs())
+        .max(standard_error)
+        .max(1.0);
     let predecessor_scaled_error = (estimate / scale) - (target / scale);
     let predecessor_scaled_bound = multiplier * (standard_error / scale);
     assert_eq!(predecessor_scaled_error, predecessor_scaled_bound);
