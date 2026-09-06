@@ -1,3 +1,8 @@
+//! Regression contract for all-covered Wilson evidence at an extreme finite critical value.
+//!
+//! A finite-count correction below the final binary64 half-ULP must not force the lower endpoint
+//! away from the correctly rounded represented-input quotient.
+
 use validation_core::wilson_coverage_interval;
 
 #[test]

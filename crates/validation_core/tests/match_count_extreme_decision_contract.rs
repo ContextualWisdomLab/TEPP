@@ -1,3 +1,8 @@
+//! Regression contract for tolerance decisions when the represented residual itself overflows.
+//!
+//! `match_count` must decide directly from finite represented endpoints and tolerance instead of
+//! requiring `absolute_residuals` to materialize an unrepresentable magnitude.
+
 use validation_core::{ValidationError, absolute_residuals, match_count};
 
 #[test]
