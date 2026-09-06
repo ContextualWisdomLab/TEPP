@@ -1,3 +1,14 @@
+//! Characterize correctly rounded rational-scale standard errors at the subnormal boundary.
+//!
+//! The 6-versus-27 two-level geometry has `n=33` and exact scale
+//! `sqrt(162 / 34848) = 3/44`, so its represented-input target is exactly `3*|gap|/44`.
+//! These regressions require one final binary64 rounding across ordinary subnormal values,
+//! ties-to-even at subnormal-unit midpoints, the minimum-normal boundary, permutation/sign
+//! invariance, and fail-closed refusal when the exact positive result cannot be represented
+//! without collapsing to false zero. Because `n=33` is outside the production exact-proof
+//! admission budget `n=4..=16`, this file is characterization evidence only and does not justify
+//! widening that budget.
+
 use validation_core::{ValidationError, bias_standard_error};
 
 fn two_level_sample(gap: f64) -> Vec<f64> {
