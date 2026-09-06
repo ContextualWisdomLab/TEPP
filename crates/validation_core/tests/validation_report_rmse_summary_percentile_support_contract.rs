@@ -1,3 +1,10 @@
+//! RMSE Monte Carlo percentile-support contract for validation reports.
+//!
+//! A nonnegative RMSE replication sample with count `n` and represented mean `m`
+//! has finite sample sum `n*m`, so no retained empirical percentile can exceed
+//! that sum. The typed RMSE slot enforces this stronger support while preserving
+//! the attainable boundary `max(x_i) = n*m` without introducing a heuristic cap.
+
 use validation_core::{MonteCarloSummary, ValidationError, ValidationReport};
 
 fn report_with(summary: MonteCarloSummary) -> ValidationReport {
