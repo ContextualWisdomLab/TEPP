@@ -1,3 +1,10 @@
+//! Enforce exhaustive percentile/moment coherence for a two-replication Monte Carlo receipt.
+//!
+//! With exactly two retained replications and two distinct nearest-rank endpoints, those endpoints
+//! exhaust the sample. They therefore determine both the represented mean and the sample spread;
+//! a receipt cannot claim additional unobserved dispersion or a different mean while preserving the
+//! same endpoints. Validation and serialization must reject such impossible evidence.
+
 use validation_core::{MonteCarloSummary, ValidationError, summarize_replications};
 
 #[test]

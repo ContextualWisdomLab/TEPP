@@ -1,3 +1,10 @@
+//! Preserve the exact finite sample-count contribution in all-covered Wilson endpoints at large `z`.
+//!
+//! When `z²` is so large that adding a small exact sample count rounds back to `z²`, forming the
+//! denominator in binary64 can erase a residual that still changes the correctly rounded endpoint by
+//! one ULP. Exact-count evidence must retain that contribution without forcing an adjustment when a
+//! nearby power-of-two case already rounds correctly; the all-covered upper endpoint remains one.
+
 use validation_core::wilson_coverage_interval;
 
 #[test]
