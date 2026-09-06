@@ -316,6 +316,20 @@ mod tests {
     }
 
     #[test]
+    fn exact_ratio_sqrt_requires_wide_scaled_products_for_represented_n2050_boundary() {
+        assert_eq!(
+            correctly_rounded_scaled_sqrt_ratio(
+                332_306_998_946_228_931_332_463_617_650_984_961,
+                8_610_922_500,
+                0,
+            )
+            .expect("exact represented boundary must survive comparison-product width")
+            .to_bits(),
+            0x4296_998e_1aff_78de
+        );
+    }
+
+    #[test]
     fn exact_ratio_sqrt_refuses_outside_bounded_proof() {
         let too_large_denominator = (1_u128 << 53) + 1;
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(0, 48, 0), None);
