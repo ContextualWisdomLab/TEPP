@@ -24,6 +24,36 @@ def _text(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def _top_level_mapping_child_keys(text: str, key: str) -> set[str]:
+    """Return immediate child keys for one block-style top-level YAML mapping."""
+
+    lines = text.splitlines()
+    header = f"{key}:"
+    matches = [index for index, line in enumerate(lines) if line == header]
+    assert len(matches) == 1, f"expected one block-style {header!r} mapping"
+
+    entries: list[tuple[int, str]] = []
+    for line in lines[matches[0] + 1 :]:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent == 0:
+            break
+        entries.append((indent, stripped))
+
+    assert entries, f"top-level {header!r} mapping must not be empty"
+    child_indent = min(indent for indent, _entry in entries)
+    child_keys: set[str] = set()
+    for indent, entry in entries:
+        if indent != child_indent:
+            continue
+        child_key, separator, _value = entry.partition(":")
+        assert separator, f"expected mapping entry under {header!r}: {entry!r}"
+        child_keys.add(child_key.strip("'\""))
+    return child_keys
+
+
 def _parser_module() -> ModuleType:
     """Load the trusted pull-request metadata parser as a covered module."""
 
@@ -77,7 +107,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "ContextualWisdomLab/TEPP",
         ):
             self.assertIn(token, text)
-        self.assertNotIn("\n  schedule:\n", text)
+        self.assertEqual(_top_level_mapping_child_keys(text, "on"), {"workflow_dispatch"})
         for token in ("discover_all_models", "register_credential", "PROVIDER_CREDENTIAL_NAMES"):
             self.assertIn(token, bootstrap)
         self.assertNotIn("COPILOT_GITHUB_TOKEN", text)
@@ -85,6 +115,14 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         self.assertEqual(text.count("gh pr create"), 1)
         self.assertNotIn("gh pr merge", text)
         self.assertNotIn("gh release create", text)
+
+    def test_schedule_detection_is_independent_of_yaml_indentation_width(self) -> None:
+        """Reject a repository-local schedule regardless of valid block indentation."""
+
+        for indent in ("  ", "    "):
+            candidate = f'on:\n{indent}schedule:\n{indent}  - cron: "47 * * * *"\n'
+            with self.subTest(indent=len(indent)):
+                self.assertEqual(_top_level_mapping_child_keys(candidate, "on"), {"schedule"})
 
     def test_hourly_workflow_separates_three_runner_trust_boundaries(self) -> None:
         """Separate model execution, verification, and late publication authority."""
