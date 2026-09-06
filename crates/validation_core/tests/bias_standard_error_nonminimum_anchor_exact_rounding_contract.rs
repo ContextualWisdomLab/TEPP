@@ -1,12 +1,12 @@
-//! Regression contract for exact bias-SE recovery when the minimum residual is not an exact anchor.
+//! Regression contracts for exact bias-SE recovery beyond pairwise-f64 admission.
 //!
-//! Issue #491 previously characterized a minimum-anchor linear proof. This fixture
-//! shows why production admission must instead search deterministic exact anchors:
-//! subtracting the minimum residual `-2^53` from `1` rounds, while anchor `0`
-//! preserves every translated coordinate exactly. The exact pair numerator is
-//! `243388915243820099130562543878155`, so `SE(mean)^2 = P / 48` and the
-//! correctly rounded binary64 result is one ULP above the translated floating
-//! moment fallback. Observation order must not change that scientific result.
+//! Issue #491 previously characterized a minimum-anchor linear proof. The first
+//! fixture shows why production admission must search represented anchors rather
+//! than force the minimum. The second shows that represented anchors alone are
+//! still incomplete: no observed residual is an exact universal anchor, while
+//! the neutral dyadic anchor `0` preserves every residual exactly. Both fixtures
+//! have exact pair numerators that fit the bounded proof and both differ by one
+//! ULP from the predecessor translated floating-moment fallback.
 
 use validation_core::bias_standard_error;
 
@@ -24,4 +24,20 @@ fn exact_nonminimum_anchor_recovers_correctly_rounded_four_observation_bias_se()
     let reverse = bias_standard_error(&truth, &reversed)
         .expect("permutation must preserve the exact represented geometry");
     assert_eq!(reverse.to_bits(), forward.to_bits());
+}
+
+#[test]
+fn exact_zero_anchor_recovers_when_no_observed_residual_is_a_universal_anchor() {
+    let tiny = 2.0_f64.powi(-54);
+    let truth = [0.0; 4];
+    let recovered = [1.0, tiny, 2.0, 3.0];
+
+    let forward = bias_standard_error(&truth, &recovered)
+        .expect("neutral-anchor exact geometry is scientifically computable");
+    assert_eq!(forward.to_bits(), 0x3fe4_a7e9_cb8a_3491);
+
+    let permuted = [recovered[2], recovered[0], recovered[3], recovered[1]];
+    let permuted_result = bias_standard_error(&truth, &permuted)
+        .expect("neutral-anchor proof must remain permutation invariant");
+    assert_eq!(permuted_result.to_bits(), forward.to_bits());
 }
