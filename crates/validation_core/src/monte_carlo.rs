@@ -2,7 +2,9 @@
 
 use crate::ValidationError;
 use crate::input::require_finite;
-use crate::numeric::{deterministic_compensated_sum, deterministic_representable_mean};
+use crate::numeric::{
+    deterministic_compensated_sum, deterministic_representable_mean, same_numeric_value,
+};
 
 const STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 const EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
@@ -76,88 +78,99 @@ impl MonteCarloSummary {
         }
         if self.standard_deviation == 0.0 {
             if self.standard_error != 0.0
-                || self.percentile_lower != self.mean
-                || self.percentile_upper != self.mean
+                || !same_numeric_value(self.percentile_lower, self.mean)
+                || !same_numeric_value(self.percentile_upper, self.mean)
             {
                 return Err(ValidationError::InvalidInput);
             }
         } else {
-            if self.replication_count == 1 || self.standard_error == 0.0 {
-                return Err(ValidationError::InvalidInput);
-            }
-            let expected_standard_error =
-                self.standard_deviation / (self.replication_count as f64).sqrt();
-            if expected_standard_error == 0.0 {
-                return Err(ValidationError::InvalidInput);
-            }
-            let relative_error = (self.standard_error / expected_standard_error - 1.0).abs();
-            if !relative_error.is_finite() || relative_error > STANDARD_ERROR_RELATIVE_TOLERANCE {
-                return Err(ValidationError::InvalidInput);
-            }
-
-            let moment_factor = ((self.replication_count - 1) as f64).sqrt();
-            for endpoint in [self.percentile_lower, self.percentile_upper] {
-                let scale = self
-                    .mean
-                    .abs()
-                    .max(endpoint.abs())
-                    .max(self.standard_deviation)
-                    .max(1.0);
-                let scaled_deviation = ((endpoint / scale) - (self.mean / scale)).abs();
-                let scaled_support = (self.standard_deviation / scale) * moment_factor;
-                if !scaled_deviation.is_finite()
-                    || !scaled_support.is_finite()
-                    || scaled_deviation
-                        > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
-                {
-                    return Err(ValidationError::InvalidInput);
-                }
-            }
-
-            if self.percentile_lower != self.percentile_upper {
-                let scale = self
-                    .mean
-                    .abs()
-                    .max(self.percentile_lower.abs())
-                    .max(self.percentile_upper.abs())
-                    .max(self.standard_deviation);
-                let scaled_mean = self.mean / scale;
-                let scaled_lower_deviation = (self.percentile_lower / scale) - scaled_mean;
-                let scaled_upper_deviation = (self.percentile_upper / scale) - scaled_mean;
-                let combined_scaled_deviation =
-                    scaled_lower_deviation.hypot(scaled_upper_deviation);
-                let scaled_support = (self.standard_deviation / scale) * moment_factor;
-                if !combined_scaled_deviation.is_finite()
-                    || !scaled_support.is_finite()
-                    || combined_scaled_deviation
-                        > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
-                {
-                    return Err(ValidationError::InvalidInput);
-                }
-
-                if self.replication_count == 2 {
-                    let endpoint_samples = [self.percentile_lower, self.percentile_upper];
-                    let expected_mean = deterministic_representable_mean(&endpoint_samples)?;
-                    let expected_standard_deviation =
-                        scaled_sample_standard_deviation(&endpoint_samples, expected_mean)?;
-                    for (recorded, expected) in [
-                        (self.mean, expected_mean),
-                        (self.standard_deviation, expected_standard_deviation),
-                    ] {
-                        let coherence_scale = recorded.abs().max(expected.abs());
-                        if coherence_scale == 0.0 {
-                            continue;
-                        }
-                        let relative_distance =
-                            ((recorded / coherence_scale) - (expected / coherence_scale)).abs();
-                        if relative_distance > EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE {
-                            return Err(ValidationError::InvalidInput);
-                        }
-                    }
-                }
-            }
+            self.validate_positive_spread()?;
         }
         Ok(self)
+    }
+
+    fn validate_positive_spread(&self) -> Result<(), ValidationError> {
+        if self.replication_count == 1 || self.standard_error == 0.0 {
+            return Err(ValidationError::InvalidInput);
+        }
+        let expected_standard_error =
+            self.standard_deviation / (self.replication_count as f64).sqrt();
+        if expected_standard_error == 0.0 {
+            return Err(ValidationError::InvalidInput);
+        }
+        let relative_error = (self.standard_error / expected_standard_error - 1.0).abs();
+        if !relative_error.is_finite() || relative_error > STANDARD_ERROR_RELATIVE_TOLERANCE {
+            return Err(ValidationError::InvalidInput);
+        }
+
+        let moment_factor = ((self.replication_count - 1) as f64).sqrt();
+        for endpoint in [self.percentile_lower, self.percentile_upper] {
+            let scale = self
+                .mean
+                .abs()
+                .max(endpoint.abs())
+                .max(self.standard_deviation)
+                .max(1.0);
+            let scaled_deviation = ((endpoint / scale) - (self.mean / scale)).abs();
+            let scaled_support = (self.standard_deviation / scale) * moment_factor;
+            if !scaled_deviation.is_finite()
+                || !scaled_support.is_finite()
+                || scaled_deviation
+                    > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+            {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+
+        if same_numeric_value(self.percentile_lower, self.percentile_upper) {
+            return Ok(());
+        }
+
+        let scale = self
+            .mean
+            .abs()
+            .max(self.percentile_lower.abs())
+            .max(self.percentile_upper.abs())
+            .max(self.standard_deviation);
+        let scaled_mean = self.mean / scale;
+        let scaled_lower_deviation = (self.percentile_lower / scale) - scaled_mean;
+        let scaled_upper_deviation = (self.percentile_upper / scale) - scaled_mean;
+        let combined_scaled_deviation = scaled_lower_deviation.hypot(scaled_upper_deviation);
+        let scaled_support = (self.standard_deviation / scale) * moment_factor;
+        if !combined_scaled_deviation.is_finite()
+            || !scaled_support.is_finite()
+            || combined_scaled_deviation
+                > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+        {
+            return Err(ValidationError::InvalidInput);
+        }
+
+        if self.replication_count == 2 {
+            self.validate_two_replication_endpoints()?;
+        }
+        Ok(())
+    }
+
+    fn validate_two_replication_endpoints(&self) -> Result<(), ValidationError> {
+        let endpoint_samples = [self.percentile_lower, self.percentile_upper];
+        let expected_mean = deterministic_representable_mean(&endpoint_samples)?;
+        let expected_standard_deviation =
+            scaled_sample_standard_deviation(&endpoint_samples, expected_mean)?;
+        for (recorded, expected) in [
+            (self.mean, expected_mean),
+            (self.standard_deviation, expected_standard_deviation),
+        ] {
+            let coherence_scale = recorded.abs().max(expected.abs());
+            if coherence_scale == 0.0 {
+                continue;
+            }
+            let relative_distance =
+                ((recorded / coherence_scale) - (expected / coherence_scale)).abs();
+            if relative_distance > EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -301,10 +314,10 @@ fn scaled_u128_le(
     rhs_significand: u128,
     rhs_exponent: i32,
 ) -> bool {
-    let lhs_bits = 128_i32 - lhs_significand.leading_zeros() as i32;
-    let rhs_bits = 128_i32 - rhs_significand.leading_zeros() as i32;
-    let lhs_top_exponent = lhs_exponent + lhs_bits - 1;
-    let rhs_top_exponent = rhs_exponent + rhs_bits - 1;
+    let lhs_bits = 128_i64 - i64::from(lhs_significand.leading_zeros());
+    let rhs_bits = 128_i64 - i64::from(rhs_significand.leading_zeros());
+    let lhs_top_exponent = i64::from(lhs_exponent) + lhs_bits - 1;
+    let rhs_top_exponent = i64::from(rhs_exponent) + rhs_bits - 1;
     if lhs_top_exponent != rhs_top_exponent {
         return lhs_top_exponent < rhs_top_exponent;
     }
@@ -323,9 +336,9 @@ fn represented_magnitude_le_exact_product(value: f64, factor_a: f64, factor_b: f
     let (a_significand, a_exponent) = binary64_magnitude_components(factor_a);
     let (b_significand, b_exponent) = binary64_magnitude_components(factor_b);
     scaled_u128_le(
-        value_significand as u128,
+        u128::from(value_significand),
         value_exponent,
-        (a_significand as u128) * (b_significand as u128),
+        u128::from(a_significand) * u128::from(b_significand),
         a_exponent + b_exponent,
     )
 }
@@ -339,24 +352,26 @@ fn represented_correction_le_exact_product_roundoff(
 ) -> bool {
     debug_assert!(correction.is_finite() && correction != 0.0);
     debug_assert!(rounded_product.is_finite() && rounded_product > 0.0);
-    debug_assert_eq!(
-        factor_a.mul_add(factor_b, -rounded_product),
-        correction,
+    debug_assert!(
+        same_numeric_value(
+            factor_a.mul_add(factor_b, -rounded_product),
+            correction
+        ),
         "caller must provide the equal nonzero projected product correction"
     );
 
     let (a_significand, a_exponent) = binary64_magnitude_components(factor_a);
     let (b_significand, b_exponent) = binary64_magnitude_components(factor_b);
-    let product_significand = (a_significand as u128) * (b_significand as u128);
+    let product_significand = u128::from(a_significand) * u128::from(b_significand);
     let product_exponent = a_exponent + b_exponent;
     let (rounded_significand, rounded_exponent) = binary64_magnitude_components(rounded_product);
     let common_exponent = product_exponent.min(rounded_exponent);
     let product_shift = (product_exponent - common_exponent) as u32;
     let rounded_shift = (rounded_exponent - common_exponent) as u32;
     debug_assert!(product_significand.leading_zeros() >= product_shift);
-    debug_assert!((rounded_significand as u128).leading_zeros() >= rounded_shift);
+    debug_assert!(u128::from(rounded_significand).leading_zeros() >= rounded_shift);
     let exact_product = product_significand << product_shift;
-    let rounded_product_significand = (rounded_significand as u128) << rounded_shift;
+    let rounded_product_significand = u128::from(rounded_significand) << rounded_shift;
     let (product_roundoff_negative, product_roundoff_significand) =
         if exact_product < rounded_product_significand {
             (true, rounded_product_significand - exact_product)
@@ -373,12 +388,12 @@ fn represented_correction_le_exact_product_roundoff(
         scaled_u128_le(
             product_roundoff_significand,
             common_exponent,
-            correction_significand as u128,
+            u128::from(correction_significand),
             correction_exponent,
         )
     } else {
         scaled_u128_le(
-            correction_significand as u128,
+            u128::from(correction_significand),
             correction_exponent,
             product_roundoff_significand,
             common_exponent,
@@ -399,12 +414,12 @@ fn both_overflow_acceptance(estimate: f64, target: f64, standard_error: f64, k: 
     // one 53-bit significand-width shift.
     debug_assert!(estimate_shift <= 53);
     debug_assert!(target_shift <= 53);
-    let residual_significand = ((estimate_significand as u128) << estimate_shift)
-        + ((target_significand as u128) << target_shift);
+    let residual_significand = (u128::from(estimate_significand) << estimate_shift)
+        + (u128::from(target_significand) << target_shift);
 
     let (k_significand, k_exponent) = binary64_magnitude_components(k);
     let (se_significand, se_exponent) = binary64_magnitude_components(standard_error);
-    let bound_significand = (k_significand as u128) * (se_significand as u128);
+    let bound_significand = u128::from(k_significand) * u128::from(se_significand);
     let bound_exponent = k_exponent + se_exponent;
 
     scaled_u128_le(
@@ -471,8 +486,8 @@ pub fn accept_within_standard_errors(
         return Err(ValidationError::InvalidConfiguration);
     }
     if standard_error == 0.0 || k == 0.0 {
-        // Exact recovery is numerical equality; signed zero is one zero value.
-        return Ok(estimate == target);
+        // Exact recovery is represented numeric identity; signed zero is one zero value.
+        return Ok(same_numeric_value(estimate, target));
     }
 
     let direct_error = estimate - target;
@@ -480,7 +495,7 @@ pub fn accept_within_standard_errors(
     if direct_error.is_finite() {
         if direct_bound.is_finite() {
             let residual = direct_error.abs();
-            if residual == direct_bound && residual != 0.0 {
+            if same_numeric_value(residual, direct_bound) && residual != 0.0 {
                 let difference_roundoff = subtraction_roundoff(estimate, target, direct_error);
                 let residual_roundoff = if direct_error.is_sign_negative() {
                     -difference_roundoff
@@ -488,7 +503,7 @@ pub fn accept_within_standard_errors(
                     difference_roundoff
                 };
                 let product_roundoff = k.mul_add(standard_error, -direct_bound);
-                if residual_roundoff != product_roundoff {
+                if !same_numeric_value(residual_roundoff, product_roundoff) {
                     return Ok(residual_roundoff < product_roundoff);
                 }
                 if residual_roundoff == 0.0 {
