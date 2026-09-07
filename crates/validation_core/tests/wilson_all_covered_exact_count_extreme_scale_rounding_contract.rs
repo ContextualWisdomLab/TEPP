@@ -22,5 +22,5 @@ fn exact_count_all_covered_does_not_overcorrect_below_final_ulp_resolution() {
         .expect("finite positive z with three covered intervals must produce Wilson evidence");
 
     assert_eq!(lower.to_bits(), 0x0277_ffff_ffff_ffff);
-    assert_eq!(upper, 1.0);
+    assert_eq!(upper.to_bits(), 1.0_f64.to_bits());
 }
