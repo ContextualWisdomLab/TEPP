@@ -3,7 +3,8 @@
 use crate::ValidationError;
 use crate::input::require_finite;
 use crate::numeric::{
-    deterministic_compensated_sum, deterministic_representable_mean, same_numeric_value,
+    deterministic_compensated_sum, deterministic_representable_mean,
+    same_numeric_value,
 };
 
 const STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
