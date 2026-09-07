@@ -42,12 +42,12 @@ fn scaled_rmse(residuals: &[f64]) -> Result<ScaledRmse, ValidationError> {
         deterministic_compensated_sum(normalized_squares.clone()) / residuals.len() as f64;
     let normalized_rmse = normalized_mean_square.sqrt();
     let rmse = scale * normalized_rmse;
-    if !rmse.is_finite() || (rmse == 0.0 && normalized_rmse != 0.0) {
+    if rmse == 0.0 {
         Err(ValidationError::InvalidInput)
     } else {
         Ok(ScaledRmse {
             scale,
-            rmse: if rmse == 0.0 { 0.0 } else { rmse },
+            rmse,
             normalized_rmse,
             normalized_mean_square,
             normalized_squares,
@@ -115,10 +115,12 @@ fn rmse_standard_error_from_residuals(residuals: &[f64]) -> Result<f64, Validati
     let denominator = 2.0 * scaled.normalized_rmse * n.sqrt();
     let normalized_standard_error = normalized_sample_variance.sqrt() / denominator;
     let standard_error = scaled.scale * normalized_standard_error;
-    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
-        Err(ValidationError::InvalidInput)
-    } else if standard_error == 0.0 {
-        Ok(0.0)
+    if standard_error == 0.0 {
+        if normalized_standard_error == 0.0 {
+            Ok(0.0)
+        } else {
+            Err(ValidationError::InvalidInput)
+        }
     } else {
         Ok(standard_error)
     }
@@ -146,6 +148,14 @@ mod tests {
         );
         assert_eq!(
             root_mean_square_error(&[], &[]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            rmse_standard_error_from_residuals(&[]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            rmse_standard_error_from_residuals(&[f64::NAN]),
             Err(ValidationError::InvalidInput)
         );
         assert_eq!(
@@ -184,6 +194,10 @@ mod tests {
         assert_eq!(root_mean_square_error(&[0.0, 0.0], &[ulp, 0.0]), Ok(ulp));
         assert_eq!(
             root_mean_square_error(&[0.0, 0.0, 0.0, 0.0], &[ulp, 0.0, 0.0, 0.0]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            rmse_standard_error_from_residuals(&[ulp, 0.0]),
             Err(ValidationError::InvalidInput)
         );
     }
