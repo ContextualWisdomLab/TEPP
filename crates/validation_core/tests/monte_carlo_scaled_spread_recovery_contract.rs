@@ -10,20 +10,13 @@ use validation_core::summarize_replications;
 
 #[test]
 fn scaled_spread_fallback_preserves_representable_full_range_summary() {
-    let summary = summarize_replications(
-        &[f64::MAX, f64::MAX, f64::MAX, -f64::MAX],
-        0.0,
-        1.0,
-    )
-    .expect("the scaled spread remains representable");
+    let summary = summarize_replications(&[f64::MAX, f64::MAX, f64::MAX, -f64::MAX], 0.0, 1.0)
+        .expect("the scaled spread remains representable");
 
     assert_eq!(summary.replication_count, 4);
     assert_eq!(summary.mean.to_bits(), (f64::MAX / 2.0).to_bits());
     assert_eq!(summary.standard_deviation.to_bits(), f64::MAX.to_bits());
-    assert_eq!(
-        summary.standard_error.to_bits(),
-        (f64::MAX / 2.0).to_bits()
-    );
+    assert_eq!(summary.standard_error.to_bits(), (f64::MAX / 2.0).to_bits());
     assert_eq!(summary.percentile_lower.to_bits(), (-f64::MAX).to_bits());
     assert_eq!(summary.percentile_upper.to_bits(), f64::MAX.to_bits());
 }
