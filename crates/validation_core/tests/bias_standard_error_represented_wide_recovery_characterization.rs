@@ -74,6 +74,17 @@ fn subtraction_roundoff(recovered: f64, truth: f64, residual: f64) -> f64 {
     recovered_roundoff + truth_roundoff
 }
 
+fn is_ieee_zero(value: f64) -> bool {
+    value.to_bits() << 1 == 0
+}
+
+fn u128_to_binary64(value: u128) -> f64 {
+    value
+        .to_string()
+        .parse::<f64>()
+        .expect("u128 decimal representation is finite binary64")
+}
+
 fn positive_dyadic(value: f64) -> Option<(u128, i32)> {
     if !value.is_finite() || value <= 0.0 {
         return None;
@@ -116,7 +127,7 @@ fn midpoint_dyadic(left: f64, right: f64) -> Option<(u128, i32)> {
 
 fn represented_values(sample_count: usize) -> Vec<f64> {
     assert!(sample_count >= 3);
-    let diameter = (1_u64 << 53) as f64;
+    let diameter = 9_007_199_254_740_992.0_f64;
     let mut values = Vec::with_capacity(sample_count);
     values.extend([0.0, 1.0]);
     values.extend((2..sample_count).map(|_| diameter));
@@ -157,22 +168,20 @@ fn exact_pair_numerator_for_three_level_fixture(sample_count: usize) -> u128 {
 
 fn assert_represented_subtractions_are_exact(sample_count: usize) {
     let represented = represented_values(sample_count);
-    let diameter = (1_u64 << 53) as f64;
+    let diameter = 9_007_199_254_740_992.0_f64;
 
     for value in &represented {
         let residual = *value - 0.0;
-        assert_eq!(
-            subtraction_roundoff(*value, 0.0, residual),
-            0.0,
+        assert!(
+            is_ieee_zero(subtraction_roundoff(*value, 0.0, residual)),
             "truth-zero residual construction must be exact"
         );
     }
 
     for (left, right) in [(0.0, 1.0), (0.0, diameter), (1.0, diameter)] {
         let difference = left - right;
-        assert_eq!(
-            subtraction_roundoff(left, right, difference),
-            0.0,
+        assert!(
+            is_ieee_zero(subtraction_roundoff(left, right, difference)),
             "every distinct represented pair subtraction used by the fixture must be exact"
         );
     }
@@ -194,7 +203,7 @@ fn canonical_sums(sample_count: usize) -> (u128, u128) {
     let coefficient_sum = coefficients
         .iter()
         .copied()
-        .try_fold(0_u128, |sum, value| sum.checked_add(value))
+        .try_fold(0_u128, u128::checked_add)
         .expect("represented coefficient sum fits u128");
     let square_sum = coefficients
         .iter()
@@ -270,7 +279,7 @@ fn represented_wide_recovery_also_needs_wider_exact_midpoint_products() {
     assert_eq!(denominator, 8_610_922_500);
     assert!(denominator <= (1_u128 << 53));
 
-    let candidate = ((numerator as f64) / (denominator as f64)).sqrt();
+    let candidate = (u128_to_binary64(numerator) / u128_to_binary64(denominator)).sqrt();
     assert_eq!(candidate.to_bits(), 0x4296_998e_1aff_78de);
     let (candidate_significand, candidate_exponent) =
         positive_dyadic(candidate).expect("positive candidate is dyadic");
