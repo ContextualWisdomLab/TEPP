@@ -8,7 +8,7 @@
 use validation_core::bias_standard_error;
 
 const DIAMETER_INTEGER: i128 = 1_i128 << 53;
-const DIAMETER: f64 = (1_u64 << 53) as f64;
+const DIAMETER: f64 = 9_007_199_254_740_992.0_f64;
 
 const ADMITTED_CASES: [(usize, u128, u64); 13] = [
     (
@@ -87,10 +87,11 @@ fn represented_integer_family(sample_count: usize) -> Vec<i128> {
 }
 
 fn represented_f64_family(sample_count: usize) -> Vec<f64> {
-    represented_integer_family(sample_count)
-        .into_iter()
-        .map(|value| value as f64)
-        .collect()
+    assert!((4..=16).contains(&sample_count));
+    let mut values = Vec::with_capacity(sample_count);
+    values.extend([0.0, 1.0]);
+    values.extend((2..sample_count).map(|_| DIAMETER));
+    values
 }
 
 fn exact_integer_pair_square_sum(values: &[i128]) -> u128 {
@@ -161,8 +162,8 @@ fn neutral_zero_route_recovers_a_represented_geometry_that_direct_pair_subtracti
     let exact_integers = [-DIAMETER_INTEGER, 0, 1, DIAMETER_INTEGER];
 
     assert_eq!(
-        -DIAMETER - 1.0,
-        -DIAMETER,
+        (-DIAMETER - 1.0).to_bits(),
+        (-DIAMETER).to_bits(),
         "direct binary64 pair subtraction rounds away the unit difference at -2^53"
     );
     assert_eq!(
