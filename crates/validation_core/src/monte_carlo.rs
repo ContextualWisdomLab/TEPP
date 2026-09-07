@@ -3,8 +3,7 @@
 use crate::ValidationError;
 use crate::input::require_finite;
 use crate::numeric::{
-    deterministic_compensated_sum, deterministic_representable_mean,
-    same_numeric_value,
+    deterministic_compensated_sum, deterministic_representable_mean, same_numeric_value,
 };
 
 const STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
@@ -116,8 +115,7 @@ impl MonteCarloSummary {
             let scaled_support = (self.standard_deviation / scale) * moment_factor;
             if !scaled_deviation.is_finite()
                 || !scaled_support.is_finite()
-                || scaled_deviation
-                    > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+                || scaled_deviation > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
             {
                 return Err(ValidationError::InvalidInput);
             }
@@ -354,10 +352,7 @@ fn represented_correction_le_exact_product_roundoff(
     debug_assert!(correction.is_finite() && correction != 0.0);
     debug_assert!(rounded_product.is_finite() && rounded_product > 0.0);
     debug_assert!(
-        same_numeric_value(
-            factor_a.mul_add(factor_b, -rounded_product),
-            correction
-        ),
+        same_numeric_value(factor_a.mul_add(factor_b, -rounded_product), correction),
         "caller must provide the equal nonzero projected product correction"
     );
 
