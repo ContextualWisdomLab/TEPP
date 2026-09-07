@@ -4,6 +4,7 @@ use crate::ValidationError;
 use crate::coverage::{
     interval_covered_count, represented_coverage_from_counts, wilson_coverage_interval_from_counts,
 };
+use crate::numeric::same_numeric_value;
 use serde::{Deserialize, Serialize};
 
 const SCHEMA: &str = "tepp.wilson_coverage_evidence.v1";
@@ -109,9 +110,9 @@ impl WilsonCoverageEvidenceV1 {
         )
         .map_err(|_| ValidationError::InvalidInput)?;
 
-        if self.empirical_coverage != expected_coverage
-            || self.wilson_lower != expected_lower
-            || self.wilson_upper != expected_upper
+        if !same_numeric_value(self.empirical_coverage, expected_coverage)
+            || !same_numeric_value(self.wilson_lower, expected_lower)
+            || !same_numeric_value(self.wilson_upper, expected_upper)
         {
             return Err(ValidationError::InvalidInput);
         }

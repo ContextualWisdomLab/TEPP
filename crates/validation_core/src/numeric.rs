@@ -49,12 +49,23 @@ pub(crate) fn deterministic_compensated_sum(values: Vec<f64>) -> f64 {
     sum + correction
 }
 
+/// Test exact finite binary64 numeric identity while treating signed zero as one value.
+///
+/// Validation contracts use represented-value equality rather than an epsilon. Comparing
+/// encoded bits preserves every nonzero represented value exactly, while the shifted-bit
+/// zero check keeps IEEE `-0.0` and `+0.0` in the same scientific zero state.
+pub(crate) fn same_numeric_value(left: f64, right: f64) -> bool {
+    let left_bits = left.to_bits();
+    let right_bits = right.to_bits();
+    left_bits == right_bits || (left_bits << 1 == 0 && right_bits << 1 == 0)
+}
+
 pub(crate) fn exact_power_of_two_scale(max_magnitude: f64) -> f64 {
     let bits = max_magnitude.to_bits();
     let exponent = (bits >> 52) & 0x7ff;
     if exponent == 0 {
         let significand = bits & 0x000f_ffff_ffff_ffff;
-        let highest_bit = 63 - significand.leading_zeros();
+        let highest_bit = significand.ilog2();
         f64::from_bits(1_u64 << highest_bit)
     } else {
         f64::from_bits(exponent << 52)
@@ -73,7 +84,7 @@ fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, 
         let negative = values.iter().any(|value| *value < 0.0);
         let total_units: u128 = values
             .iter()
-            .map(|value| (value.to_bits() & 0x000f_ffff_ffff_ffff) as u128)
+            .map(|value| u128::from(value.to_bits() & 0x000f_ffff_ffff_ffff))
             .sum();
         let denominator = total_count as u128;
         let mut rounded_units = total_units / denominator;
@@ -89,7 +100,9 @@ fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, 
         }
 
         let sign = if negative { 1_u64 << 63 } else { 0 };
-        return Ok(f64::from_bits(sign | rounded_units as u64));
+        let rounded_units =
+            u64::try_from(rounded_units).map_err(|_| ValidationError::InvalidInput)?;
+        return Ok(f64::from_bits(sign | rounded_units));
     }
 
     let scale = exact_power_of_two_scale(max_magnitude);
@@ -145,10 +158,10 @@ fn round_candidate_with_tail(candidate: f64, tail_head: f64, tail_tail: f64) -> 
         return candidate;
     }
 
-    let upward = if tail != 0.0 {
-        tail.is_sign_positive()
-    } else {
+    let upward = if tail == 0.0 {
         tail_roundoff.is_sign_positive()
+    } else {
+        tail.is_sign_positive()
     };
     let neighbor = adjacent_float(candidate, upward);
     if !neighbor.is_finite() {
@@ -261,7 +274,7 @@ pub(crate) fn deterministic_representable_sum_over_count(
     }
 
     positives.sort_by(|left, right| right.total_cmp(left));
-    negatives.sort_by(|left, right| left.total_cmp(right));
+    negatives.sort_by(f64::total_cmp);
 
     let mut positive_index = 0_usize;
     let mut negative_index = 0_usize;
