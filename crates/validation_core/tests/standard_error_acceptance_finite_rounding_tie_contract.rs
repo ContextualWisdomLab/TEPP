@@ -106,8 +106,8 @@ fn negative_rounded_difference_uses_absolute_residual_correction_sign() {
 #[test]
 fn subnormal_bound_rounding_must_not_hide_a_strict_rejection() {
     let minimum_subnormal = f64::from_bits(1);
-    let multiplier = f64::from_bits(0x1e5_8000_0000_0000); // 1.5 * 2^-538
-    let standard_error = f64::from_bits(0x1e6_0000_0000_0000); // 2^-537
+    let multiplier = f64::from_bits(0x1e58_0000_0000_0000); // 1.5 * 2^-538
+    let standard_error = f64::from_bits(0x1e60_0000_0000_0000); // 2^-537
 
     assert_eq!(
         (multiplier * standard_error).to_bits(),
