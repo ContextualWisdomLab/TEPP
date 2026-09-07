@@ -17,7 +17,7 @@ fn valid_report() -> ValidationReport {
     }
 }
 
-fn assert_invalid(report: ValidationReport) {
+fn assert_invalid(report: &ValidationReport) {
     assert_eq!(report.validate(), Err(ValidationError::InvalidInput));
 }
 
@@ -26,7 +26,7 @@ fn point_rmse_refuses_nonfinite_relative_standard_error() {
     let mut report = valid_report();
     report.rmse = f64::from_bits(1);
     report.rmse_standard_error = 1.0;
-    assert_invalid(report);
+    assert_invalid(&report);
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn probability_fields_and_wilson_identity_fail_closed_independently() {
     ] {
         let mut report = valid_report();
         mutate(&mut report);
-        assert_invalid(report);
+        assert_invalid(&report);
     }
 }
 
@@ -100,6 +100,6 @@ fn rmse_monte_carlo_slot_refuses_signed_and_impossible_nonnegative_support() {
         summary.validate().expect("generic signed-metric summary");
         let mut report = valid_report();
         report.monte_carlo_rmse = Some(summary);
-        assert_invalid(report);
+        assert_invalid(&report);
     }
 }
