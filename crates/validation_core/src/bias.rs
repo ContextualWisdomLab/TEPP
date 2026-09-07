@@ -4,7 +4,7 @@ use crate::ValidationError;
 use crate::input::require_paired_finite;
 use crate::numeric::{
     deterministic_compensated_sum, deterministic_representable_mean,
-    deterministic_representable_sum_over_count, exact_power_of_two_scale,
+    deterministic_representable_sum_over_count, exact_power_of_two_scale, same_numeric_value,
 };
 
 fn signed_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, ValidationError> {
@@ -172,9 +172,9 @@ fn exact_subnormal_rational_scale(
     let exponent = ((magnitude_bits >> 52) & 0x7ff) as u32;
     let fraction = magnitude_bits & 0x000f_ffff_ffff_ffff;
     let significand = if exponent == 0 {
-        fraction as u128
+        u128::from(fraction)
     } else {
-        ((1_u64 << 52) | fraction) as u128
+        u128::from((1_u64 << 52) | fraction)
     };
     let product = significand * numerator as u128;
     let unit_shift = if exponent == 0 { 0 } else { exponent - 1 };
@@ -198,7 +198,11 @@ fn exact_subnormal_rational_scale(
     if rounded_units == minimum_normal_units {
         return Some(Ok(f64::MIN_POSITIVE));
     }
-    Some(Ok(f64::from_bits(rounded_units as u64)))
+    let rounded_units = match u64::try_from(rounded_units) {
+        Ok(units) => units,
+        Err(_) => return Some(Err(ValidationError::InvalidInput)),
+    };
+    Some(Ok(f64::from_bits(rounded_units)))
 }
 
 fn exact_three_level_standard_error(
@@ -234,8 +238,8 @@ fn exact_three_level_standard_error(
             || !normalized_second.is_finite()
             || (first_offset != 0.0 && normalized_first == 0.0)
             || (second_offset != 0.0 && normalized_second == 0.0)
-            || normalized_first * scale != first_offset
-            || normalized_second * scale != second_offset
+            || !same_numeric_value(normalized_first * scale, first_offset)
+            || !same_numeric_value(normalized_second * scale, second_offset)
         {
             return Ok(None);
         }
@@ -410,7 +414,7 @@ fn exact_translated_residual_standard_error(
         if value == 0.0 {
             zero_count += 1;
         } else if let Some(gap) = repeated_gap {
-            if value != gap {
+            if !same_numeric_value(value, gap) {
                 exactly_two_levels = false;
                 break;
             }
@@ -620,7 +624,11 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
         return Ok(half_difference.abs());
     }
 
-    if has_subtraction_roundoff && diffs.iter().all(|residual| *residual == diffs[0]) {
+    if has_subtraction_roundoff
+        && diffs
+            .iter()
+            .all(|residual| same_numeric_value(*residual, diffs[0]))
+    {
         let zero_roundoffs = vec![0.0; subtraction_roundoffs.len()];
         if let Some(standard_error) =
             exact_translated_residual_standard_error(&subtraction_roundoffs, &zero_roundoffs)?
@@ -631,12 +639,11 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
         return scaled_standard_error(&subtraction_roundoffs, roundoff_mean);
     }
 
-    if diffs.len() > 2 {
-        if let Some(standard_error) =
+    if diffs.len() > 2
+        && let Some(standard_error) =
             exact_translated_residual_standard_error(&diffs, &subtraction_roundoffs)?
-        {
-            return Ok(standard_error);
-        }
+    {
+        return Ok(standard_error);
     }
 
     let mean = deterministic_representable_mean(&diffs)?;
