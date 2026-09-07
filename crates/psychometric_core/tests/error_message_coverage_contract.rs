@@ -1,3 +1,5 @@
+//! Regression coverage for public psychometric manifest-variance error messages.
+
 use psychometric_core::PsychometricError;
 
 #[test]
