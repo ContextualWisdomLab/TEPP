@@ -24,7 +24,7 @@ fn exact_count_all_covered_preserves_large_z_denominator_residual() {
         .expect("three covered intervals with finite positive z must produce Wilson evidence");
 
     assert_eq!(lower.to_bits(), 0x3c48_0000_0000_0001);
-    assert_eq!(upper, 1.0);
+    assert_eq!(upper.to_bits(), 1.0_f64.to_bits());
 }
 
 #[test]
@@ -43,5 +43,5 @@ fn exact_count_all_covered_keeps_correct_power_of_two_large_z_rounding() {
         .expect("large finite power-of-two z must remain valid Wilson evidence");
 
     assert_eq!(lower.to_bits(), 0x3c48_0000_0000_0000);
-    assert_eq!(upper, 1.0);
+    assert_eq!(upper.to_bits(), 1.0_f64.to_bits());
 }
