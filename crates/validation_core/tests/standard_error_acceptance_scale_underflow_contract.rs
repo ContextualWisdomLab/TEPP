@@ -19,7 +19,7 @@ fn positive_standard_error_bound_survives_scale_reduction() {
     assert!(represented_residual.is_finite());
     assert!(represented_bound.is_finite());
     assert!(represented_residual <= represented_bound);
-    assert_eq!(standard_error / estimate, 0.0);
+    assert_eq!((standard_error / estimate).to_bits(), 0.0_f64.to_bits());
 
     assert_eq!(
         accept_within_standard_errors(estimate, target, standard_error, multiplier),
@@ -40,7 +40,7 @@ fn scale_underflow_repair_does_not_accept_a_smaller_finite_bound() {
     assert!(represented_residual.is_finite());
     assert!(represented_bound.is_finite());
     assert!(represented_residual > represented_bound);
-    assert_eq!(standard_error / estimate, 0.0);
+    assert_eq!((standard_error / estimate).to_bits(), 0.0_f64.to_bits());
 
     assert_eq!(
         accept_within_standard_errors(estimate, target, standard_error, multiplier),
@@ -66,7 +66,10 @@ fn both_overflow_fallback_does_not_round_an_exact_rejection_into_acceptance() {
         .max(1.0);
     let predecessor_scaled_error = (estimate / scale) - (target / scale);
     let predecessor_scaled_bound = multiplier * (standard_error / scale);
-    assert_eq!(predecessor_scaled_error, predecessor_scaled_bound);
+    assert_eq!(
+        predecessor_scaled_error.to_bits(),
+        predecessor_scaled_bound.to_bits()
+    );
 
     assert_eq!(
         accept_within_standard_errors(estimate, target, standard_error, multiplier),
