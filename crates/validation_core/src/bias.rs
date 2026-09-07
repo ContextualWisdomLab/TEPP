@@ -198,9 +198,8 @@ fn exact_subnormal_rational_scale(
     if rounded_units == minimum_normal_units {
         return Some(Ok(f64::MIN_POSITIVE));
     }
-    let rounded_units = match u64::try_from(rounded_units) {
-        Ok(units) => units,
-        Err(_) => return Some(Err(ValidationError::InvalidInput)),
+    let Ok(rounded_units) = u64::try_from(rounded_units) else {
+        return Some(Err(ValidationError::InvalidInput));
     };
     Some(Ok(f64::from_bits(rounded_units)))
 }
