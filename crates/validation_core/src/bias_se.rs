@@ -778,8 +778,11 @@ mod tests {
             None
         );
         assert_eq!(
-            exact_pair_distance_standard_error(&truth, &[f64::MAX, -f64::MAX, 0.0, 0.0]),
-            None
+            exact_pair_distance_standard_error(&truth, &[f64::MAX, -f64::MAX, 0.0, 0.0])
+                .expect("extreme neutral-zero geometry is exactly admitted")
+                .expect("finite standard error remains representable")
+                .to_bits(),
+            0x7fda_20bd_700c_2c3d
         );
 
         let tiny = 2.0_f64.powi(-54);
