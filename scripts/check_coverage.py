@@ -211,6 +211,8 @@ def is_executable_source_line(
     root (same fail-closed rule as LCOV ``SF:`` loading).
     """
 
+    if repository_root is None:
+        _read_source_lines.cache_clear()
     try:
         path = (
             resolve_repository_source_path(source_path, repository_root)
