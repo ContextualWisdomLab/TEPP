@@ -660,8 +660,9 @@ mod tests {
         assert_eq!(
             exact_pair_distance_standard_error(&truth, &scaled)
                 .expect("scaled admitted")
-                .expect("scaled representable"),
-            expected
+                .expect("scaled representable")
+                .to_bits(),
+            expected.to_bits()
         );
     }
 
