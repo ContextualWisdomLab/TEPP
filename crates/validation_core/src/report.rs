@@ -2,6 +2,7 @@
 
 use crate::MonteCarloSummary;
 use crate::ValidationError;
+use crate::numeric::same_numeric_value;
 use serde::{Deserialize, Serialize};
 
 const RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
@@ -43,14 +44,17 @@ fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool
     if p == 0.0 {
         return true;
     }
-    if p == 1.0 {
+    if same_numeric_value(p, 1.0) {
         return lower > 0.0;
     }
 
     if p < 0.5 && lower == 0.0 && !minority_zero_lower_is_rounding_feasible(p, upper) {
         return false;
     }
-    if p > 0.5 && upper == 1.0 && !minority_zero_lower_is_rounding_feasible(1.0 - p, 1.0 - lower) {
+    if p > 0.5
+        && same_numeric_value(upper, 1.0)
+        && !minority_zero_lower_is_rounding_feasible(1.0 - p, 1.0 - lower)
+    {
         return false;
     }
 
