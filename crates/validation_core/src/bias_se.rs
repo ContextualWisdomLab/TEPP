@@ -806,8 +806,11 @@ mod tests {
             None
         );
         assert_eq!(
-            exact_pair_distance_standard_error(&truth, &[0.0, 1.0, 2.0, 67_108_864.0]),
-            None
+            exact_pair_distance_standard_error(&truth, &[0.0, 1.0, 2.0, 67_108_864.0])
+                .expect("wide neutral-zero geometry remains exactly admitted")
+                .expect("finite standard error remains representable")
+                .to_bits(),
+            0x416f_ffff_f800_0003
         );
     }
 }
