@@ -12,9 +12,9 @@ fn distinct_percentile_endpoints_exhaust_a_two_replication_sample() {
     let attainable = summarize_replications(&[-0.5, 0.5], 0.5, 1.0)
         .expect("two-replication nearest-rank summary");
     assert_eq!(attainable.replication_count, 2);
-    assert_eq!(attainable.mean, 0.0);
-    assert_eq!(attainable.percentile_lower, -0.5);
-    assert_eq!(attainable.percentile_upper, 0.5);
+    assert_eq!(attainable.mean.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(attainable.percentile_lower.to_bits(), (-0.5_f64).to_bits());
+    assert_eq!(attainable.percentile_upper.to_bits(), 0.5_f64.to_bits());
     assert!(attainable.validate().is_ok());
 
     // With exactly two retained replications, two distinct nearest-rank endpoint
