@@ -664,7 +664,7 @@ mod tests {
         assert!((mean_bias(&truth, &recovered).expect("bias") - 1.0).abs() < 1e-12);
         assert_eq!(mean_bias(&[1.0], &[1.0]), Ok(0.0));
         let se = bias_standard_error(&truth, &recovered).expect("se");
-        assert_eq!(se, 0.0);
+        assert_eq!(se.to_bits(), 0.0_f64.to_bits());
         assert_eq!(mean_bias(&[], &[]), Err(ValidationError::InvalidInput));
         assert_eq!(
             mean_bias(&[1.0], &[1.0, 2.0]),
@@ -679,7 +679,7 @@ mod tests {
             Err(ValidationError::InvalidInput)
         );
         let se_var = bias_standard_error(&[0.0, 0.0], &[1.0, -1.0]).expect("se");
-        assert_eq!(se_var, 1.0);
+        assert_eq!(se_var.to_bits(), 1.0_f64.to_bits());
         assert_eq!(
             mean_bias(&[f64::MAX], &[-f64::MAX]),
             Err(ValidationError::InvalidInput)
