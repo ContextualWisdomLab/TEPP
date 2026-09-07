@@ -24,8 +24,8 @@ fn representable_extreme_symmetric_moments_survive_intermediate_overflow() {
         ((summary.standard_error - expected_standard_error) / expected_standard_error).abs()
             <= 2.0 * f64::EPSILON
     );
-    assert_eq!(summary.percentile_lower, -f64::MAX);
-    assert_eq!(summary.percentile_upper, f64::MAX);
+    assert_eq!(summary.percentile_lower.to_bits(), (-f64::MAX).to_bits());
+    assert_eq!(summary.percentile_upper.to_bits(), f64::MAX.to_bits());
 }
 
 #[test]
