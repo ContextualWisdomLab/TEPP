@@ -50,26 +50,26 @@ fn mean_bias_rounds_subnormal_halfway_cases_to_even_units() {
 fn mean_bias_uses_exact_subnormal_units_when_float_compensation_hits_a_halfway_case() {
     let truth = [0.0; 16];
     let recovered = [
-        f64::from_bits(0x0cb6_6819_cb62_2e),
-        f64::from_bits(0x0947_199e_fa89_8b),
-        f64::from_bits(0x06f1_7b1c_5d14_35),
-        f64::from_bits(0x0017_01d7_09e8_e5),
-        f64::from_bits(0x0c4f_af0b_45b7_f2),
-        f64::from_bits(0x0618_7545_3090_72),
-        f64::from_bits(0x0a85_ae8e_ad81_bb),
-        f64::from_bits(0x08c0_d3d1_61a3_65),
-        f64::from_bits(0x0dd3_b523_39f6_96),
-        f64::from_bits(0x0d7e_53f0_d4c2_46),
-        f64::from_bits(0x0175_247a_3171_15),
-        f64::from_bits(0x0c74_caf9_0802_51),
-        f64::from_bits(0x0a8a_2b1f_baba_e0),
-        f64::from_bits(0x04dd_bbf2_5f17_35),
-        f64::from_bits(0x0efe_fdfe_b832_bd),
-        f64::from_bits(0x0887_8ef3_1114_1d),
+        f64::from_bits(0x000c_b668_19cb_622e),
+        f64::from_bits(0x0009_4719_9efa_898b),
+        f64::from_bits(0x0006_f17b_1c5d_1435),
+        f64::from_bits(0x0000_1701_d709_e8e5),
+        f64::from_bits(0x000c_4faf_0b45_b7f2),
+        f64::from_bits(0x0006_1875_4530_9072),
+        f64::from_bits(0x000a_85ae_8ead_81bb),
+        f64::from_bits(0x0008_c0d3_d161_a365),
+        f64::from_bits(0x000d_d3b5_2339_f696),
+        f64::from_bits(0x000d_7e53_f0d4_c246),
+        f64::from_bits(0x0001_7524_7a31_7115),
+        f64::from_bits(0x000c_74ca_f908_0251),
+        f64::from_bits(0x000a_8a2b_1fba_bae0),
+        f64::from_bits(0x0004_ddbb_f25f_1735),
+        f64::from_bits(0x000e_fefd_feb8_32bd),
+        f64::from_bits(0x0008_878e_f311_141d),
     ];
 
     // The exact unit sum leaves remainder 8 on division by 16, exactly halfway
     // between adjacent subnormals. The lower candidate is even and must win.
     let bias = mean_bias(&truth, &recovered).expect("halfway represented mean bias");
-    assert_eq!(bias.to_bits(), 0x092d_f11e_7dd9_b8);
+    assert_eq!(bias.to_bits(), 0x0009_2df1_1e7d_d9b8);
 }
