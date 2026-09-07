@@ -103,7 +103,7 @@ impl Wide256 {
         if self < right {
             return None;
         }
-        let borrow = if self.low < right.low { 1_u128 } else { 0_u128 };
+        let borrow = u128::from(self.low < right.low);
         Some(Self {
             high: self.high.checked_sub(right.high)?.checked_sub(borrow)?,
             low: self.low.wrapping_sub(right.low),
@@ -367,8 +367,11 @@ fn exact_neutral_zero_linear_pair_square_sum(residuals: &[f64]) -> Option<(u128,
     let sample_count = u128::try_from(residuals.len()).ok()?;
     let scaled_square_sum = Wide256::multiply_u128(sample_count, square_sum);
     let signed_sum_magnitude = positive_sum.abs_diff(negative_sum);
-    let squared_sum = Wide256::multiply_u128(signed_sum_magnitude, signed_sum_magnitude);
-    let numerator = scaled_square_sum.checked_sub(squared_sum)?.to_u128()?;
+    let signed_first_moment_square =
+        Wide256::multiply_u128(signed_sum_magnitude, signed_sum_magnitude);
+    let numerator = scaled_square_sum
+        .checked_sub(signed_first_moment_square)?
+        .to_u128()?;
     Some((numerator, unit_exponent))
 }
 
@@ -441,8 +444,13 @@ fn exact_pair_distance_standard_error(
 /// linear proof and then the pairwise-difference reference when the bounded linear
 /// proof refuses. Each admitted route uses the same exact pair-distance identity
 /// and exact dyadic midpoint rounding. All other samples retain the established
-/// bias implementation
-/// and its existing fail-closed behavior.
+/// bias implementation and its existing fail-closed behavior.
+///
+/// # Errors
+///
+/// Returns [`ValidationError`] when the fallback bias implementation rejects the
+/// input contract, including mismatched arrays, fewer than two observations, or a
+/// non-representable intermediate/result after the bounded exact route refuses.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     if let Some(result) = exact_pair_distance_standard_error(truth, recovered) {
         return result;
