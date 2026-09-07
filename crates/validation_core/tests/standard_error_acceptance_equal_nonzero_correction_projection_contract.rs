@@ -21,7 +21,10 @@ fn equal_nonzero_correction_projection_preserves_exact_rejection() {
     let k = f64::from_bits(0x20d9_5434_7757_68c7);
     let standard_error = f64::from_bits(0x2124_696e_33e2_baaa);
 
-    assert_eq!((estimate - target).to_bits(), (k * standard_error).to_bits());
+    assert_eq!(
+        (estimate - target).to_bits(),
+        (k * standard_error).to_bits()
+    );
     assert!(
         !accept_within_standard_errors(estimate, target, standard_error, k)
             .expect("finite represented inputs")
@@ -40,7 +43,10 @@ fn equal_nonzero_correction_projection_preserves_exact_acceptance() {
     let k = f64::from_bits(0x20c8_7ace_8d72_9746);
     let standard_error = f64::from_bits(0x20ea_1585_cc49_24ca);
 
-    assert_eq!((estimate - target).to_bits(), (k * standard_error).to_bits());
+    assert_eq!(
+        (estimate - target).to_bits(),
+        (k * standard_error).to_bits()
+    );
     assert!(
         accept_within_standard_errors(estimate, target, standard_error, k)
             .expect("finite represented inputs")
@@ -59,7 +65,10 @@ fn equal_negative_correction_projection_preserves_exact_rejection() {
     let k = f64::from_bits(0x2c6f_de1e_a0d4_de3d);
     let standard_error = f64::from_bits(0x150b_cc8f_a576_9411);
 
-    assert_eq!((estimate - target).to_bits(), (k * standard_error).to_bits());
+    assert_eq!(
+        (estimate - target).to_bits(),
+        (k * standard_error).to_bits()
+    );
     assert!(
         !accept_within_standard_errors(estimate, target, standard_error, k)
             .expect("finite represented inputs")

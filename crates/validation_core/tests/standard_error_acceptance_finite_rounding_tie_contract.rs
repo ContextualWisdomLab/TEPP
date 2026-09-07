@@ -109,11 +109,16 @@ fn subnormal_bound_rounding_must_not_hide_a_strict_rejection() {
     let multiplier = f64::from_bits(0x1e5_8000_0000_0000); // 1.5 * 2^-538
     let standard_error = f64::from_bits(0x1e6_0000_0000_0000); // 2^-537
 
-    assert_eq!((multiplier * standard_error).to_bits(), minimum_subnormal.to_bits());
+    assert_eq!(
+        (multiplier * standard_error).to_bits(),
+        minimum_subnormal.to_bits()
+    );
     // The exact represented product is 3/4 of the minimum subnormal. Its FMA
     // correction is only -1/4 ULP at zero and therefore rounds to signed zero.
     assert_eq!(
-        multiplier.mul_add(standard_error, -minimum_subnormal).to_bits(),
+        multiplier
+            .mul_add(standard_error, -minimum_subnormal)
+            .to_bits(),
         (-0.0_f64).to_bits()
     );
 
@@ -140,12 +145,17 @@ fn minimum_normal_bound_rounding_must_not_hide_a_strict_rejection() {
     let standard_error = f64::from_bits(0x1fff_ffff_fc00_0000); // (1 - 2^-27) * 2^-511
     let multiplier = f64::from_bits(0x2000_0000_0200_0000); // (1 + 2^-27) * 2^-511
 
-    assert_eq!((multiplier * standard_error).to_bits(), minimum_normal.to_bits());
+    assert_eq!(
+        (multiplier * standard_error).to_bits(),
+        minimum_normal.to_bits()
+    );
     // The exact represented product is (1 - 2^-54) * 2^-1022,
     // one quarter of a minimum-subnormal ULP below the minimum normal. The
     // multiplication rounds up, while its FMA correction itself rounds to zero.
     assert_eq!(
-        multiplier.mul_add(standard_error, -minimum_normal).to_bits(),
+        multiplier
+            .mul_add(standard_error, -minimum_normal)
+            .to_bits(),
         (-0.0_f64).to_bits()
     );
 
