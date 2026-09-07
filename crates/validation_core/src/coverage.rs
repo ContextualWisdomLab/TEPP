@@ -409,9 +409,18 @@ mod tests {
 
     #[test]
     fn exact_integer_ratio_rounding_covers_binary64_boundaries() {
-        assert_eq!(correctly_rounded_unit_ratio(0, 3).to_bits(), 0.0_f64.to_bits());
-        assert_eq!(correctly_rounded_unit_ratio(1, 1).to_bits(), 1.0_f64.to_bits());
-        assert_eq!(correctly_rounded_unit_ratio(1, 2).to_bits(), 0.5_f64.to_bits());
+        assert_eq!(
+            correctly_rounded_unit_ratio(0, 3).to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert_eq!(
+            correctly_rounded_unit_ratio(1, 1).to_bits(),
+            1.0_f64.to_bits()
+        );
+        assert_eq!(
+            correctly_rounded_unit_ratio(1, 2).to_bits(),
+            0.5_f64.to_bits()
+        );
         assert_eq!(
             correctly_rounded_unit_ratio(1, 3).to_bits(),
             (1.0_f64 / 3.0).to_bits()
