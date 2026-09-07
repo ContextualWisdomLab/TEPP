@@ -181,6 +181,13 @@ fn exact_pair_numerator(sample_count: usize) -> u128 {
         .expect("pair numerator fits u128")
 }
 
+fn decimal_integer_to_binary64(value: u128) -> f64 {
+    value
+        .to_string()
+        .parse::<f64>()
+        .expect("u128 decimal is representable as finite binary64")
+}
+
 #[test]
 fn represented_n2050_candidate_and_midpoint_order_without_large_shift_materialization() {
     const SAMPLE_COUNT: usize = 2_050;
@@ -193,7 +200,11 @@ fn represented_n2050_candidate_and_midpoint_order_without_large_shift_materializ
     assert_eq!(numerator, 332_306_998_946_228_931_332_463_617_650_984_961);
     assert_eq!(denominator, 8_610_922_500);
 
-    let candidate = ((numerator as f64) / (denominator as f64)).sqrt();
+    let numerator_binary64 = decimal_integer_to_binary64(numerator);
+    let denominator_binary64 = decimal_integer_to_binary64(denominator);
+    assert_eq!(numerator_binary64.to_bits(), 0x474f_ffff_ffff_ffff);
+    assert_eq!(denominator_binary64.to_bits(), 0x4200_0a02_0020_0000);
+    let candidate = (numerator_binary64 / denominator_binary64).sqrt();
     assert_eq!(candidate.to_bits(), 0x4296_998e_1aff_78de);
     let (candidate_significand, candidate_exponent) =
         positive_dyadic(candidate).expect("candidate is positive dyadic");
