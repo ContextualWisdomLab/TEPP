@@ -320,15 +320,31 @@ fn emit(
     );
 }
 
+#[derive(Clone, Copy)]
+enum NarrowHybridRoute {
+    Linear,
+    PairwiseFallback,
+}
+
+#[derive(Clone, Copy)]
+enum WideHybridRoute {
+    Linear,
+    WideProduct,
+}
+
 fn assert_and_measure_geometry(
     geometry: &str,
     values: &[u128],
     samples: usize,
-    expect_linear_admission: bool,
-    expect_hybrid_fallback: bool,
-    expect_wide_hybrid_wide_product: bool,
-    expect_wide_hybrid_pair_fallback: bool,
+    expected_narrow_route: NarrowHybridRoute,
+    expected_wide_route: WideHybridRoute,
 ) {
+    let expect_linear_admission = matches!(expected_narrow_route, NarrowHybridRoute::Linear);
+    assert_eq!(
+        matches!(expected_wide_route, WideHybridRoute::Linear),
+        expect_linear_admission,
+        "narrow and wide hybrids must agree on direct linear admission"
+    );
     let buffered = pair_square_sum_quadratic_buffered(values)
         .expect("buffered quadratic result stays within u128");
     let two_pass = pair_square_sum_quadratic_two_pass(values)
@@ -361,16 +377,18 @@ fn assert_and_measure_geometry(
         "narrow-wide-pair hybrid must preserve the exact pair numerator"
     );
     assert_eq!(
-        hybrid.used_pairwise_fallback, expect_hybrid_fallback,
+        hybrid.used_pairwise_fallback,
+        matches!(expected_narrow_route, NarrowHybridRoute::PairwiseFallback),
         "narrow-pair fallback observation must match the declared geometry"
     );
     assert_eq!(
-        wide_hybrid.used_wide_product, expect_wide_hybrid_wide_product,
+        wide_hybrid.used_wide_product,
+        matches!(expected_wide_route, WideHybridRoute::WideProduct),
         "wide-route observation must match the declared geometry"
     );
-    assert_eq!(
-        wide_hybrid.used_pairwise_fallback, expect_wide_hybrid_pair_fallback,
-        "wide-hybrid pair fallback observation must match the declared geometry"
+    assert!(
+        !wide_hybrid.used_pairwise_fallback,
+        "wide-hybrid pair fallback is outside the measured proof-budget geometries"
     );
 
     match pair_square_sum_linear(values) {
@@ -423,7 +441,13 @@ fn main() {
     );
     for sample_count in [16_usize, 64, 256, 1_024, 2_047] {
         let values = fixture(sample_count);
-        assert_and_measure_geometry("compact_admit", &values, samples, true, false, false, false);
+        assert_and_measure_geometry(
+            "compact_admit",
+            &values,
+            samples,
+            NarrowHybridRoute::Linear,
+            WideHybridRoute::Linear,
+        );
     }
 
     let power_of_two_values = boundary_fixture(65, 1_u128 << 58);
@@ -431,10 +455,8 @@ fn main() {
         "power_of_two_normalized_admit",
         &power_of_two_values,
         samples,
-        true,
-        false,
-        false,
-        false,
+        NarrowHybridRoute::Linear,
+        WideHybridRoute::Linear,
     );
 
     let odd_diameter = (1_u128 << 58) + 1;
@@ -443,10 +465,8 @@ fn main() {
         "odd_boundary_admit",
         &odd_64,
         samples,
-        true,
-        false,
-        false,
-        false,
+        NarrowHybridRoute::Linear,
+        WideHybridRoute::Linear,
     );
 
     let odd_65 = boundary_fixture(65, odd_diameter);
@@ -454,9 +474,7 @@ fn main() {
         "odd_boundary_wide_recovery",
         &odd_65,
         samples,
-        false,
-        true,
-        true,
-        false,
+        NarrowHybridRoute::PairwiseFallback,
+        WideHybridRoute::WideProduct,
     );
 }
