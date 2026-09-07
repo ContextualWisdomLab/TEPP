@@ -55,10 +55,12 @@ fn product_bit_upper_bound(left: u128, right: u128) -> u32 {
 }
 
 fn assert_pair_admission_implies_wide_linear_product_capacity() {
-    assert!(
-        usize::BITS <= u128::BITS,
-        "the supported target must convert Vec length to u128 without truncation"
-    );
+    const {
+        assert!(
+            usize::BITS <= u128::BITS,
+            "the supported target must convert Vec length to u128 without truncation"
+        );
+    }
 
     // Pair admission gives P <= u128::MAX. For canonical nonnegative
     // anchor-relative coefficients with at least one zero, S1 <= S2 <= P.
