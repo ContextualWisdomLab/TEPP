@@ -31,7 +31,7 @@ fn inexact_durable_count_preserves_positive_all_covered_lower_at_extreme_z() {
 
     assert_eq!(evidence.wilson_lower.to_bits(), 0x3af1_6c26_2777_579d);
     assert!(evidence.wilson_lower > 0.0);
-    assert_eq!(evidence.wilson_upper, 1.0);
+    assert_eq!(evidence.wilson_upper.to_bits(), 1.0_f64.to_bits());
 }
 
 #[test]
@@ -54,6 +54,6 @@ fn inexact_durable_count_handles_subnormal_squared_critical_value_scale() {
     let evidence: WilsonCoverageEvidenceV1 = serde_json::from_str(json)
         .expect("subnormal z-squared scale must remain a valid deterministic boundary case");
 
-    assert_eq!(evidence.wilson_lower, 1.0);
-    assert_eq!(evidence.wilson_upper, 1.0);
+    assert_eq!(evidence.wilson_lower.to_bits(), 1.0_f64.to_bits());
+    assert_eq!(evidence.wilson_upper.to_bits(), 1.0_f64.to_bits());
 }

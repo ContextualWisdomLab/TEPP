@@ -15,7 +15,7 @@ fn all_uncovered_wilson_upper_bound_does_not_round_to_false_one() {
     let z = 134_217_728.0_f64; // 2^27, so z^2 / n = 2^53 exactly for n = 2.
 
     let z_squared = z * z;
-    assert_eq!(z_squared, 18_014_398_509_481_984.0_f64); // 2^54.
+    assert_eq!(z_squared.to_bits(), 18_014_398_509_481_984.0_f64.to_bits()); // 2^54.
 
     // For p-hat = 0, the Wilson upper endpoint is z^2 / (n + z^2).
     // At this represented input its correctly rounded binary64 value is the
@@ -25,7 +25,7 @@ fn all_uncovered_wilson_upper_bound_does_not_round_to_false_one() {
     let (actual_lower, actual_upper) =
         wilson_coverage_interval(&truth, &lower, &upper, z).expect("finite Wilson interval");
 
-    assert_eq!(actual_lower, 0.0);
+    assert_eq!(actual_lower.to_bits(), 0.0_f64.to_bits());
     assert_eq!(actual_upper.to_bits(), expected_upper.to_bits());
 }
 

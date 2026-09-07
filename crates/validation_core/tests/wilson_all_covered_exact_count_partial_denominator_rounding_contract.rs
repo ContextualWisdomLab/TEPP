@@ -26,7 +26,7 @@ fn exact_count_all_covered_preserves_partial_denominator_residual() {
         .expect("one covered interval with finite positive z must produce Wilson evidence");
 
     assert_eq!(lower.to_bits(), 0x3fef_ffff_ffff_ffff);
-    assert_eq!(upper, 1.0);
+    assert_eq!(upper.to_bits(), 1.0_f64.to_bits());
 }
 
 #[test]
@@ -45,5 +45,5 @@ fn exact_count_partial_denominator_compensation_keeps_correct_direct_rounding() 
         .expect("one covered interval with finite positive z must produce Wilson evidence");
 
     assert_eq!(lower.to_bits(), 0x3fef_ffff_ffff_fffc);
-    assert_eq!(upper, 1.0);
+    assert_eq!(upper.to_bits(), 1.0_f64.to_bits());
 }

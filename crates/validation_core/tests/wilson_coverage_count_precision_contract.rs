@@ -31,7 +31,7 @@ fn durable_counts_do_not_collapse_one_uncovered_case_to_all_covered() {
     assert_eq!(evidence.covered_count as u64, 9_007_199_254_740_992);
     assert_eq!(evidence.empirical_coverage.to_bits(), 0x3fef_ffff_ffff_ffff);
     assert_eq!(evidence.wilson_lower.to_bits(), 0x3fef_ffff_ffff_fffa);
-    assert_eq!(evidence.wilson_upper, 1.0);
+    assert_eq!(evidence.wilson_upper.to_bits(), 1.0_f64.to_bits());
 
     let round_trip = evidence.to_json().expect("validated durable evidence");
     let decoded: WilsonCoverageEvidenceV1 =

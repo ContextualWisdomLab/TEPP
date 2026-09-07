@@ -60,5 +60,5 @@ fn durable_all_covered_lower_does_not_round_exact_sample_size_away() {
         .expect("all-covered exact count provenance must retain Wilson uncertainty");
 
     assert_eq!(evidence.wilson_lower.to_bits(), 1.0_f64.to_bits() - 1);
-    assert_eq!(evidence.wilson_upper, 1.0);
+    assert_eq!(evidence.wilson_upper.to_bits(), 1.0_f64.to_bits());
 }

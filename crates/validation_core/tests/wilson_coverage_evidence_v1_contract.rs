@@ -20,8 +20,8 @@ fn versioned_wilson_coverage_evidence_round_trips_denominator_and_critical_value
     let evidence = canonical_evidence();
     assert_eq!(evidence.sample_count, 4);
     assert_eq!(evidence.covered_count, 3);
-    assert_eq!(evidence.empirical_coverage, 0.75);
-    assert_eq!(evidence.normal_critical_value, 1.96);
+    assert_eq!(evidence.empirical_coverage.to_bits(), 0.75_f64.to_bits());
+    assert_eq!(evidence.normal_critical_value.to_bits(), 1.96_f64.to_bits());
     assert!(evidence.wilson_lower <= evidence.empirical_coverage);
     assert!(evidence.empirical_coverage <= evidence.wilson_upper);
 

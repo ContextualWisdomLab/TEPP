@@ -16,7 +16,7 @@ fn exact_count_all_covered_preserves_representable_small_z_uncertainty() {
         .expect("one covered interval with finite positive z must produce Wilson evidence");
 
     assert_eq!(lower.to_bits(), 0x3fef_ffff_ffff_ffff);
-    assert_eq!(upper, 1.0);
+    assert_eq!(upper.to_bits(), 1.0_f64.to_bits());
 }
 
 #[test]
@@ -31,6 +31,6 @@ fn exact_count_all_covered_keeps_unrepresentable_tiny_uncertainty_at_one() {
     let (lower, upper) = wilson_coverage_interval(&[0.0], &[-1.0], &[1.0], z)
         .expect("finite positive z below the representable miss threshold remains valid");
 
-    assert_eq!(lower, 1.0);
-    assert_eq!(upper, 1.0);
+    assert_eq!(lower.to_bits(), 1.0_f64.to_bits());
+    assert_eq!(upper.to_bits(), 1.0_f64.to_bits());
 }

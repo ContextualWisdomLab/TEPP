@@ -19,5 +19,5 @@ fn all_covered_wilson_lower_bound_survives_finite_extreme_z() {
         wilson_coverage_interval(&truth, &lower, &upper, z).expect("finite Wilson interval");
 
     assert_eq!(actual_lower.to_bits(), expected_lower.to_bits());
-    assert_eq!(actual_upper, 1.0);
+    assert_eq!(actual_upper.to_bits(), 1.0_f64.to_bits());
 }
