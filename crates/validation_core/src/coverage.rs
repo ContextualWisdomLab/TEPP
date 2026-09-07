@@ -1,6 +1,7 @@
 //! Interval coverage for recovered confidence/credible intervals.
 
 use crate::ValidationError;
+use crate::numeric::same_numeric_value;
 
 pub(crate) fn interval_covered_count(
     truth: &[f64],
@@ -38,8 +39,8 @@ fn correctly_rounded_unit_ratio(numerator: u64, denominator: u64) -> f64 {
     // u64/u64 lies in [2^-64, 1], so its binary64 result is always normal.
     // Determine floor(log2(numerator/denominator)) without first rounding either
     // integer to f64, then round the exact scaled significand ties-to-even.
-    let numerator_bits = 64_i32 - numerator.leading_zeros() as i32;
-    let denominator_bits = 64_i32 - denominator.leading_zeros() as i32;
+    let numerator_bits = 64_i32 - numerator.leading_zeros().cast_signed();
+    let denominator_bits = 64_i32 - denominator.leading_zeros().cast_signed();
     let mut exponent = numerator_bits - denominator_bits;
     if exponent == 0 {
         if numerator < denominator {
@@ -47,14 +48,14 @@ fn correctly_rounded_unit_ratio(numerator: u64, denominator: u64) -> f64 {
         }
     } else {
         let exponent_shift = (-exponent) as u32;
-        if (numerator as u128) << exponent_shift < denominator as u128 {
+        if u128::from(numerator) << exponent_shift < u128::from(denominator) {
             exponent -= 1;
         }
     }
 
     let significand_shift = (52 - exponent) as u32;
-    let scaled_numerator = (numerator as u128) << significand_shift;
-    let denominator_u128 = denominator as u128;
+    let scaled_numerator = u128::from(numerator) << significand_shift;
+    let denominator_u128 = u128::from(denominator);
     let quotient = scaled_numerator / denominator_u128;
     let remainder = scaled_numerator % denominator_u128;
     let twice_remainder = remainder << 1;
@@ -69,7 +70,8 @@ fn correctly_rounded_unit_ratio(numerator: u64, denominator: u64) -> f64 {
 
     debug_assert!((1_u128 << 52..1_u128 << 53).contains(&significand));
     let biased_exponent = (exponent + 1023) as u64;
-    let fraction = significand as u64 - (1_u64 << 52);
+    let fraction = u64::try_from(significand).expect("binary64 significand is at most 53 bits")
+        - (1_u64 << 52);
     f64::from_bits((biased_exponent << 52) | fraction)
 }
 
@@ -198,7 +200,7 @@ fn all_covered_wilson_lower_from_inexact_sample_count(sample_count: u64, z2: f64
 fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
     let denominator = n + z2;
     let direct_lower = n / denominator;
-    if direct_lower == 1.0 && z2 > 0.0 {
+    if same_numeric_value(direct_lower, 1.0) && z2 > 0.0 {
         // A tiny positive z² can be absorbed when the denominator is formed even
         // though the Wilson miss mass is still representable immediately below
         // one. Preserve that boundary through the complementary miss fraction.
@@ -227,7 +229,8 @@ fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
                 * ulp_toward_exact.mul_add(denominator, ulp_toward_exact * denominator_residual);
             let residual_magnitude = exact_residual.abs();
             if residual_magnitude > midpoint_residual
-                || (residual_magnitude == midpoint_residual && direct_lower.to_bits() & 1 == 1)
+                || (same_numeric_value(residual_magnitude, midpoint_residual)
+                    && direct_lower.to_bits() & 1 == 1)
             {
                 return neighbor.clamp(0.0, 1.0);
             }
@@ -248,7 +251,7 @@ fn wilson_bounds_from_represented_proportion(n: f64, p: f64, z: f64, z2: f64) ->
     let radical = (p * (1.0 - p) / n) + z2 / (4.0 * n * n);
     let margin = z * radical.sqrt();
     let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
-    let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
+    let high = if same_numeric_value(direct_high, 1.0) && p < 1.0 && z2 > 0.0 {
         let uncovered_lower = rationalized_wilson_positive_lower(n, 1.0 - p, z, z2);
         (1.0 - uncovered_lower).clamp(0.0, 1.0)
     } else {
@@ -275,7 +278,7 @@ fn wilson_bounds_from_represented_proportion_and_inverse_sample_count(
     let radical = p * (1.0 - p) * inverse_n + z2 * inverse_n * inverse_n / 4.0;
     let margin = z * radical.sqrt();
     let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
-    let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
+    let high = if same_numeric_value(direct_high, 1.0) && p < 1.0 && z2 > 0.0 {
         let uncovered_lower =
             rationalized_wilson_positive_lower_from_inverse_sample_count(inverse_n, 1.0 - p, z, z2);
         (1.0 - uncovered_lower).clamp(0.0, 1.0)
@@ -358,7 +361,7 @@ pub(crate) fn wilson_coverage_interval_from_counts(
 /// all-covered sample, the exact Wilson lower endpoint is algebraically
 /// `n / (n + z²)`. When an exactly representable sample count and positive
 /// finite `z²` make the denominator sum inexact, the implementation recovers
-/// the TwoSum residual and uses an FMA quotient residual to compare the exact
+/// the `TwoSum` residual and uses an FMA quotient residual to compare the exact
 /// represented-input quotient with the adjacent binary64 midpoint before
 /// changing the direct result. A boundary-specific complementary miss fraction
 /// preserves representable uncertainty when the direct quotient has already
