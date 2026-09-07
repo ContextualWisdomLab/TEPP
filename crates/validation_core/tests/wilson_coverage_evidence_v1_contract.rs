@@ -59,7 +59,7 @@ fn tampered_denominator_critical_value_or_endpoint_fails_closed() {
     assert_eq!(wrong_lower.validate(), Err(ValidationError::InvalidInput));
 
     let mut wrong_upper = evidence;
-    wrong_upper.wilson_upper = (wrong_upper.wilson_upper + 1.0) / 2.0;
+    wrong_upper.wilson_upper = f64::midpoint(wrong_upper.wilson_upper, 1.0);
     assert_eq!(wrong_upper.validate(), Err(ValidationError::InvalidInput));
 
     let mut wrong_coverage = evidence;
