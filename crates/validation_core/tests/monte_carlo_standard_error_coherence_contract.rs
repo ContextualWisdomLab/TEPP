@@ -20,8 +20,8 @@ fn summary(
         mean: 0.5,
         standard_deviation,
         standard_error,
-        percentile_lower: -2.0,
-        percentile_upper: 3.0,
+        percentile_lower: 0.0,
+        percentile_upper: 1.0,
     }
 }
 
@@ -68,6 +68,6 @@ fn monte_carlo_summary_rejects_impossible_standard_error_evidence() {
         Err(ValidationError::InvalidInput)
     );
 
-    let payload = r#"{"replication_count":4,"mean":0.5,"standard_deviation":0.5,"standard_error":0.2,"percentile_lower":-2.0,"percentile_upper":3.0}"#;
+    let payload = r#"{"replication_count":4,"mean":0.5,"standard_deviation":0.5,"standard_error":0.2,"percentile_lower":0.0,"percentile_upper":1.0}"#;
     assert!(serde_json::from_str::<MonteCarloSummary>(payload).is_err());
 }
