@@ -30,7 +30,7 @@ fn canonical_wilson_pair_remains_admissible() {
     let lower = [-1.0, 0.0, 3.0, 4.0];
     let upper = [1.0, 2.0, 4.0, 5.0];
     let coverage = interval_coverage(&truth, &lower, &upper).expect("coverage");
-    assert_eq!(coverage, 0.5);
+    assert_eq!(coverage.to_bits(), 0.5_f64.to_bits());
     let (wilson_lower, wilson_upper) =
         wilson_coverage_interval(&truth, &lower, &upper, 1.96).expect("wilson");
 
@@ -52,7 +52,7 @@ fn complementary_identity_accepts_non_symmetric_canonical_pair() {
     let lower = [-1.0, 2.0, 3.0, 4.0];
     let upper = [1.0, 3.0, 4.0, 5.0];
     let coverage = interval_coverage(&truth, &lower, &upper).expect("coverage");
-    assert_eq!(coverage, 0.25);
+    assert_eq!(coverage.to_bits(), 0.25_f64.to_bits());
     let (wilson_lower, wilson_upper) =
         wilson_coverage_interval(&truth, &lower, &upper, 1.96).expect("wilson");
 
