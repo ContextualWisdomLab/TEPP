@@ -34,9 +34,7 @@ fn zero_lower_cannot_hide_representable_wilson_peer_root() {
     assert_eq!(artifact.to_json(), Err(ValidationError::InvalidInput));
 
     let raw = format!(
-        r#"{{"study_label":"wilson-boundary-pair","rmse":1.0,"rmse_standard_error":0.0,"mean_bias":0.0,"bias_standard_error":0.0,"interval_coverage":{coverage},"coverage_wilson_lower":0.0,"coverage_wilson_upper":{upper},"temporal_order_accuracy":1.0,"monte_carlo_rmse":null}}"#,
-        coverage = COVERAGE_ONE_IN_ONE_HUNDRED_MILLION,
-        upper = PRODUCER_UPPER,
+        r#"{{"study_label":"wilson-boundary-pair","rmse":1.0,"rmse_standard_error":0.0,"mean_bias":0.0,"bias_standard_error":0.0,"interval_coverage":{COVERAGE_ONE_IN_ONE_HUNDRED_MILLION},"coverage_wilson_lower":0.0,"coverage_wilson_upper":{PRODUCER_UPPER},"temporal_order_accuracy":1.0,"monte_carlo_rmse":null}}"#,
     );
     assert!(serde_json::from_str::<ValidationReport>(&raw).is_err());
 }
