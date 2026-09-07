@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from functools import cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -186,6 +187,13 @@ def resolve_repository_source_path(source_path: str, repository_root: Path) -> P
     return resolved
 
 
+@cache
+def _read_source_lines(path: Path) -> list[str]:
+    """Read one source snapshot for authored-line classification."""
+
+    return path.read_text(encoding="utf-8").splitlines()
+
+
 def is_executable_source_line(
     source_path: str,
     line_number: int,
@@ -209,7 +217,7 @@ def is_executable_source_line(
             if repository_root is not None
             else Path(source_path)
         )
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = _read_source_lines(path)
     except OSError:
         return True
     # Stale LCOV rows past EOF are instrumentation noise, not production gaps.
@@ -702,6 +710,7 @@ def load_lcov_line_totals(
     """Load authored source-line totals from a fully framed LLVM LCOV report."""
 
     root = (repository_root or Path.cwd()).resolve()
+    _read_source_lines.cache_clear()
     source_path: str | None = None
     line_counts: dict[tuple[str, int], int] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
