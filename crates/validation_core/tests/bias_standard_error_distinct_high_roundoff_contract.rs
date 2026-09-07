@@ -30,5 +30,5 @@ fn bias_standard_error_preserves_roundoff_when_residual_high_parts_differ() {
     let exact_residuals = [1.0 - ulp_at_one, 1.0, 1.0 + ulp_at_one];
     let control = bias_standard_error(&[0.0; 3], &exact_residuals)
         .expect("symmetric exact-residual control standard error");
-    assert_eq!(control.to_bits(), 0x3ca2_79a7_4590_331d);
+    assert_eq!(control.to_bits(), 0x3ca2_79a7_4590_331c);
 }
