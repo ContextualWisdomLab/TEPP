@@ -50,28 +50,84 @@ fn validation_evidence_v1_round_trips_report_and_wilson_provenance() {
 }
 
 #[test]
-fn report_projection_must_match_the_versioned_coverage_evidence() {
-    let coverage = canonical_coverage();
-    let mut report = canonical_report(coverage);
-    report.interval_coverage = 0.5;
+fn report_projection_must_match_the_same_versioned_coverage_evidence() {
+    let canonical = canonical_coverage();
+    let truth = [0.0, 1.0, 2.0, 3.0];
+
+    let all_covered = WilsonCoverageEvidenceV1::from_intervals(
+        &truth,
+        &[-0.5, 0.5, 1.5, 2.5],
+        &[0.5, 1.5, 2.5, 3.5],
+        1.96,
+    )
+    .expect("all-covered evidence");
+    assert_ne!(
+        all_covered.empirical_coverage.to_bits(),
+        canonical.empirical_coverage.to_bits()
+    );
     assert_eq!(
-        ValidationEvidenceV1::new(report, coverage),
+        ValidationEvidenceV1::new(canonical_report(all_covered), canonical),
         Err(ValidationError::InvalidInput)
     );
 
-    let coverage = canonical_coverage();
-    let mut report = canonical_report(coverage);
-    report.coverage_wilson_lower = 0.0;
+    let same_count_different_critical_value = WilsonCoverageEvidenceV1::from_intervals(
+        &truth,
+        &[-0.5, 0.5, 1.0, 4.0],
+        &[0.5, 1.5, 2.5, 5.0],
+        2.576,
+    )
+    .expect("same-count evidence with a different critical value");
     assert_eq!(
-        ValidationEvidenceV1::new(report, coverage),
+        same_count_different_critical_value
+            .empirical_coverage
+            .to_bits(),
+        canonical.empirical_coverage.to_bits()
+    );
+    assert_ne!(
+        same_count_different_critical_value.wilson_lower.to_bits(),
+        canonical.wilson_lower.to_bits()
+    );
+    assert_eq!(
+        ValidationEvidenceV1::new(
+            canonical_report(same_count_different_critical_value),
+            canonical,
+        ),
         Err(ValidationError::InvalidInput)
     );
 
-    let coverage = canonical_coverage();
-    let mut report = canonical_report(coverage);
-    report.coverage_wilson_upper = 1.0;
+    let none_covered = WilsonCoverageEvidenceV1::from_intervals(
+        &truth,
+        &[4.0, 4.0, 4.0, 4.0],
+        &[5.0, 5.0, 5.0, 5.0],
+        1.96,
+    )
+    .expect("none-covered evidence");
+    let none_covered_different_critical_value = WilsonCoverageEvidenceV1::from_intervals(
+        &truth,
+        &[4.0, 4.0, 4.0, 4.0],
+        &[5.0, 5.0, 5.0, 5.0],
+        2.576,
+    )
+    .expect("none-covered evidence with a different critical value");
     assert_eq!(
-        ValidationEvidenceV1::new(report, coverage),
+        none_covered_different_critical_value
+            .empirical_coverage
+            .to_bits(),
+        none_covered.empirical_coverage.to_bits()
+    );
+    assert_eq!(
+        none_covered_different_critical_value.wilson_lower.to_bits(),
+        none_covered.wilson_lower.to_bits()
+    );
+    assert_ne!(
+        none_covered_different_critical_value.wilson_upper.to_bits(),
+        none_covered.wilson_upper.to_bits()
+    );
+    assert_eq!(
+        ValidationEvidenceV1::new(
+            canonical_report(none_covered_different_critical_value),
+            none_covered,
+        ),
         Err(ValidationError::InvalidInput)
     );
 }
