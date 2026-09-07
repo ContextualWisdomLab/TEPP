@@ -19,6 +19,10 @@ fn subtraction_roundoff(recovered: f64, truth: f64, residual: f64) -> f64 {
     recovered_roundoff + truth_roundoff
 }
 
+fn is_ieee_zero(value: f64) -> bool {
+    value.to_bits() << 1 == 0
+}
+
 fn exact_pair_numerator(coefficients: &[u128]) -> u128 {
     let mut total = 0_u128;
     for left in 0..coefficients.len() {
@@ -43,17 +47,19 @@ fn anchor_linear_identity_survives_a_rounded_non_anchor_pair_difference() {
 
     for residual in residuals {
         let anchored = residual - 0.0;
-        assert_eq!(
-            subtraction_roundoff(residual, 0.0, anchored),
-            0.0,
+        assert!(
+            is_ieee_zero(subtraction_roundoff(residual, 0.0, anchored)),
             "minimum-anchor coordinates must be represented exactly"
         );
     }
 
     let rounded_non_anchor_pair = residuals[1] - residuals[2];
-    assert_ne!(
-        subtraction_roundoff(residuals[1], residuals[2], rounded_non_anchor_pair),
-        0.0,
+    assert!(
+        !is_ieee_zero(subtraction_roundoff(
+            residuals[1],
+            residuals[2],
+            rounded_non_anchor_pair
+        )),
         "the fixture must remain outside the current pairwise-f64 subtraction proof"
     );
 
@@ -63,7 +69,7 @@ fn anchor_linear_identity_survives_a_rounded_non_anchor_pair_difference() {
     let coefficient_sum = coefficients
         .iter()
         .copied()
-        .try_fold(0_u128, |sum, value| sum.checked_add(value))
+        .try_fold(0_u128, u128::checked_add)
         .expect("bounded coefficient sum fits u128");
     let square_sum = coefficients
         .iter()
