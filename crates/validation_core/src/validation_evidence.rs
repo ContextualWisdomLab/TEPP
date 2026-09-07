@@ -1,7 +1,7 @@
 //! Versioned durable envelope for validation projections and their scientific provenance.
 
-use crate::{ValidationError, ValidationReport, WilsonCoverageEvidenceV1};
 use crate::numeric::same_numeric_value;
+use crate::{ValidationError, ValidationReport, WilsonCoverageEvidenceV1};
 use serde::{Deserialize, Serialize};
 
 const SCHEMA: &str = "tepp.validation_evidence.v1";
@@ -56,8 +56,7 @@ impl ValidationEvidenceV1 {
         ) || !same_numeric_value(
             self.report.coverage_wilson_upper,
             self.coverage.wilson_upper,
-        )
-        {
+        ) {
             return Err(ValidationError::InvalidInput);
         }
         Ok(())
