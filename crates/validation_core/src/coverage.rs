@@ -409,15 +409,18 @@ mod tests {
 
     #[test]
     fn exact_integer_ratio_rounding_covers_binary64_boundaries() {
-        assert_eq!(correctly_rounded_unit_ratio(0, 3), 0.0);
-        assert_eq!(correctly_rounded_unit_ratio(1, 1), 1.0);
-        assert_eq!(correctly_rounded_unit_ratio(1, 2), 0.5);
-        assert_eq!(correctly_rounded_unit_ratio(1, 3), 1.0 / 3.0);
+        assert_eq!(correctly_rounded_unit_ratio(0, 3).to_bits(), 0.0_f64.to_bits());
+        assert_eq!(correctly_rounded_unit_ratio(1, 1).to_bits(), 1.0_f64.to_bits());
+        assert_eq!(correctly_rounded_unit_ratio(1, 2).to_bits(), 0.5_f64.to_bits());
+        assert_eq!(
+            correctly_rounded_unit_ratio(1, 3).to_bits(),
+            (1.0_f64 / 3.0).to_bits()
+        );
 
         // Halfway between 0.5 and its successor: lower significand is even.
         assert_eq!(
-            correctly_rounded_unit_ratio((1_u64 << 53) + 1, 1_u64 << 54),
-            0.5
+            correctly_rounded_unit_ratio((1_u64 << 53) + 1, 1_u64 << 54).to_bits(),
+            0.5_f64.to_bits()
         );
         // Just above that midpoint rounds upward.
         assert_eq!(
@@ -426,14 +429,14 @@ mod tests {
         );
         // Just below the midpoint rounds downward.
         assert_eq!(
-            correctly_rounded_unit_ratio((1_u64 << 54) + 1, 1_u64 << 55),
-            0.5
+            correctly_rounded_unit_ratio((1_u64 << 54) + 1, 1_u64 << 55).to_bits(),
+            0.5_f64.to_bits()
         );
         // Halfway between predecessor(1.0) and 1.0: 1.0 has the even
         // significand, so ties-to-even rounds upward and renormalizes.
         assert_eq!(
-            correctly_rounded_unit_ratio((1_u64 << 54) - 1, 1_u64 << 54),
-            1.0
+            correctly_rounded_unit_ratio((1_u64 << 54) - 1, 1_u64 << 54).to_bits(),
+            1.0_f64.to_bits()
         );
     }
 
@@ -450,10 +453,13 @@ mod tests {
     #[test]
     fn inexact_u64_scaled_ratio_avoids_reciprocal_product_double_rounding() {
         let sample_count = (1_u64 << 53) + 1;
-        assert_eq!(positive_f64_over_inexact_u64(0.0, sample_count), 0.0);
         assert_eq!(
-            positive_f64_over_inexact_u64(f64::MIN_POSITIVE, sample_count),
-            0.0
+            positive_f64_over_inexact_u64(0.0, sample_count).to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert_eq!(
+            positive_f64_over_inexact_u64(f64::MIN_POSITIVE, sample_count).to_bits(),
+            0.0_f64.to_bits()
         );
         assert_eq!(
             positive_f64_over_inexact_u64(1e40, sample_count).to_bits(),
