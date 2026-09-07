@@ -31,7 +31,7 @@ fn canonical_all_covered_wilson_lower_remains_strictly_positive() {
         wilson_coverage_interval(&truth, &lower, &upper, 1.0e154).expect("wilson");
 
     assert!(wilson_lower > 0.0);
-    assert_eq!(wilson_upper, 1.0);
+    assert_eq!(wilson_upper.to_bits(), 1.0_f64.to_bits());
     assert_eq!(all_covered_report(wilson_lower).validate(), Ok(()));
 }
 
