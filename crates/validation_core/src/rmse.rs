@@ -115,9 +115,7 @@ fn rmse_standard_error_from_residuals(residuals: &[f64]) -> Result<f64, Validati
     let denominator = 2.0 * scaled.normalized_rmse * n.sqrt();
     let normalized_standard_error = normalized_sample_variance.sqrt() / denominator;
     let standard_error = scaled.scale * normalized_standard_error;
-    if !standard_error.is_finite()
-        || (standard_error == 0.0 && normalized_standard_error != 0.0)
-    {
+    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
         Err(ValidationError::InvalidInput)
     } else if standard_error == 0.0 {
         Ok(0.0)

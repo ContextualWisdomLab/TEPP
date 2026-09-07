@@ -50,10 +50,7 @@ fn wilson_pair_is_algebraically_coherent(p: f64, lower: f64, upper: f64) -> bool
     if p < 0.5 && lower == 0.0 && !minority_zero_lower_is_rounding_feasible(p, upper) {
         return false;
     }
-    if p > 0.5
-        && upper == 1.0
-        && !minority_zero_lower_is_rounding_feasible(1.0 - p, 1.0 - lower)
-    {
+    if p > 0.5 && upper == 1.0 && !minority_zero_lower_is_rounding_feasible(1.0 - p, 1.0 - lower) {
         return false;
     }
 
@@ -204,8 +201,7 @@ impl ValidationReport {
             } else {
                 let relative_standard_error = summary.standard_error / summary.mean;
                 if !relative_standard_error.is_finite()
-                    || relative_standard_error
-                        > 1.0 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
+                    || relative_standard_error > 1.0 + RMSE_STANDARD_ERROR_RELATIVE_TOLERANCE
                 {
                     return Err(ValidationError::InvalidInput);
                 }
@@ -214,8 +210,7 @@ impl ValidationReport {
                 let replication_support = summary.replication_count as f64;
                 if !relative_upper_percentile.is_finite()
                     || relative_upper_percentile
-                        > replication_support
-                            * (1.0 + MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE)
+                        > replication_support * (1.0 + MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE)
                 {
                     return Err(ValidationError::InvalidInput);
                 }

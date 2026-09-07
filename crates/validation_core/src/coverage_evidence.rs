@@ -176,7 +176,9 @@ impl<'de> Deserialize<'de> for WilsonCoverageEvidenceV1 {
             || raw.critical_value_kind != CRITICAL_VALUE_KIND
             || raw.interval_sidedness != INTERVAL_SIDEDNESS
         {
-            return Err(serde::de::Error::custom("unsupported Wilson coverage evidence schema"));
+            return Err(serde::de::Error::custom(
+                "unsupported Wilson coverage evidence schema",
+            ));
         }
         let evidence = Self {
             sample_count: raw.sample_count,

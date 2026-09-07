@@ -9,8 +9,8 @@ fn bias_standard_error_preserves_exact_integer_divisor_two_level_geometry() {
         0.0, 0.0, 0.0, repeated, repeated, repeated, repeated, repeated, repeated,
     ];
 
-    let standard_error = bias_standard_error(&[0.0; 9], &recovered)
-        .expect("represented-input standard error");
+    let standard_error =
+        bias_standard_error(&[0.0; 9], &recovered).expect("represented-input standard error");
     // With three observations at one exact residual level and six at the other,
     // m(n-m)/(n^2(n-1)) = 3*6/(9^2*8) = 1/36. Therefore SE(mean) is exactly
     // |gap|/6. The predecessor translated sum/square/sqrt path returns the

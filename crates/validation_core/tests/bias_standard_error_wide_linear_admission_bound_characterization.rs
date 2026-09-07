@@ -115,10 +115,7 @@ fn pair_admitted_bound_survives_known_compact_and_boundary_geometries() {
     }
 
     assert_pair_admission_bounds_linear_accumulators(&boundary_fixture(65, 1_u128 << 58));
-    assert_pair_admission_bounds_linear_accumulators(&boundary_fixture(
-        65,
-        (1_u128 << 58) + 1,
-    ));
+    assert_pair_admission_bounds_linear_accumulators(&boundary_fixture(65, (1_u128 << 58) + 1));
 }
 
 #[test]

@@ -28,10 +28,10 @@ mod rmse;
 mod temporal_order;
 mod validation_evidence;
 
-/// Standard error of mean signed bias.
-pub use bias_se::bias_standard_error;
 /// Mean signed bias.
 pub use bias::mean_bias;
+/// Standard error of mean signed bias.
+pub use bias_se::bias_standard_error;
 /// Four ADR 0014 claim authorities.
 pub use claim::ClaimAuthority;
 /// One evidence item offered for promotion.

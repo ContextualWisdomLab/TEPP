@@ -16,8 +16,7 @@ fn representable_extreme_symmetric_moments_survive_intermediate_overflow() {
     let expected_standard_error = expected_standard_deviation / 2.0;
     assert_eq!(summary.mean.to_bits(), 0.0_f64.to_bits());
     assert!(
-        ((summary.standard_deviation - expected_standard_deviation)
-            / expected_standard_deviation)
+        ((summary.standard_deviation - expected_standard_deviation) / expected_standard_deviation)
             .abs()
             <= 2.0 * f64::EPSILON
     );

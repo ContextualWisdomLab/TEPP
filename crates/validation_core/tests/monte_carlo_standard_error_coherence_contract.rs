@@ -10,7 +10,11 @@
 
 use validation_core::{MonteCarloSummary, ValidationError};
 
-fn summary(replication_count: usize, standard_deviation: f64, standard_error: f64) -> MonteCarloSummary {
+fn summary(
+    replication_count: usize,
+    standard_deviation: f64,
+    standard_error: f64,
+) -> MonteCarloSummary {
     MonteCarloSummary {
         replication_count,
         mean: 0.5,
@@ -40,7 +44,10 @@ fn monte_carlo_summary_rejects_impossible_standard_error_evidence() {
     );
 
     let larger_than_sd = summary(4, 0.5, 1.0);
-    assert_eq!(larger_than_sd.validate(), Err(ValidationError::InvalidInput));
+    assert_eq!(
+        larger_than_sd.validate(),
+        Err(ValidationError::InvalidInput)
+    );
     assert!(serde_json::to_string(&larger_than_sd).is_err());
 
     let false_zero_uncertainty = summary(4, 0.5, 0.0);

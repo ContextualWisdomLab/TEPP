@@ -97,7 +97,9 @@ impl<'de> Deserialize<'de> for ValidationEvidenceV1 {
 
         let raw = Raw::deserialize(deserializer)?;
         if raw.schema != SCHEMA {
-            return Err(serde::de::Error::custom("unsupported validation evidence schema"));
+            return Err(serde::de::Error::custom(
+                "unsupported validation evidence schema",
+            ));
         }
         Self::new(raw.report, raw.coverage).map_err(serde::de::Error::custom)
     }

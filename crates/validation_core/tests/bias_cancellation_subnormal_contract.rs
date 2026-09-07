@@ -20,7 +20,8 @@ fn extreme_cancellation_preserves_representable_subnormal_bias() {
         twice_minimum_subnormal,
         -f64::MAX,
     ];
-    let recovered_positive = mean_bias(&truth, &positive_bias).expect("representable positive bias");
+    let recovered_positive =
+        mean_bias(&truth, &positive_bias).expect("representable positive bias");
     assert_eq!(recovered_positive.to_bits(), minimum_subnormal.to_bits());
 
     let negative_bias = [
@@ -29,11 +30,9 @@ fn extreme_cancellation_preserves_representable_subnormal_bias() {
         -twice_minimum_subnormal,
         f64::MAX,
     ];
-    let recovered_negative = mean_bias(&truth, &negative_bias).expect("representable negative bias");
-    assert_eq!(
-        recovered_negative.to_bits(),
-        (-minimum_subnormal).to_bits()
-    );
+    let recovered_negative =
+        mean_bias(&truth, &negative_bias).expect("representable negative bias");
+    assert_eq!(recovered_negative.to_bits(), (-minimum_subnormal).to_bits());
 }
 
 #[test]
@@ -57,12 +56,7 @@ fn mixed_sign_bias_is_canonical_under_transport_permutation() {
 fn full_range_exact_cancellation_remains_exact_zero() {
     let minimum_subnormal = f64::from_bits(1);
     let truth = [0.0; 4];
-    let recovered = [
-        f64::MAX,
-        minimum_subnormal,
-        -f64::MAX,
-        -minimum_subnormal,
-    ];
+    let recovered = [f64::MAX, minimum_subnormal, -f64::MAX, -minimum_subnormal];
 
     assert_eq!(mean_bias(&truth, &recovered), Ok(0.0));
 }

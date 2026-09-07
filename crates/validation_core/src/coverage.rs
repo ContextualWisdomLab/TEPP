@@ -150,9 +150,8 @@ fn rationalized_wilson_positive_lower(n: f64, p: f64, z: f64, z2: f64) -> f64 {
         // This form avoids subtracting nearly equal O(z²) terms and avoids
         // materializing the O(z²) denominator sum directly.
         let normalized_numerator = 2.0 * n * p * p / z2;
-        let normalized_denominator = 1.0
-            + 2.0 * n * p / z2
-            + (1.0 + 4.0 * n * p * (1.0 - p) / z2).sqrt();
+        let normalized_denominator =
+            1.0 + 2.0 * n * p / z2 + (1.0 + 4.0 * n * p * (1.0 - p) / z2).sqrt();
         return (normalized_numerator / normalized_denominator).clamp(0.0, 1.0);
     }
 
@@ -160,8 +159,7 @@ fn rationalized_wilson_positive_lower(n: f64, p: f64, z: f64, z2: f64) -> f64 {
     // endpoint is ordinary and representable. Evaluate the same rationalized
     // root on its natural scale instead.
     let numerator = 2.0 * n * p * p;
-    let denominator =
-        z2 + 2.0 * n * p + z * (z2 + 4.0 * n * p * (1.0 - p)).sqrt();
+    let denominator = z2 + 2.0 * n * p + z * (z2 + 4.0 * n * p * (1.0 - p)).sqrt();
     (numerator / denominator).clamp(0.0, 1.0)
 }
 
@@ -214,12 +212,10 @@ fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
     // beyond the adjacent binary64 midpoint. Adding a rounded correction can
     // itself force a one-ULP move when the true correction is below that midpoint.
     let z2_virtual = denominator - n;
-    let denominator_residual =
-        (n - (denominator - z2_virtual)) + (z2 - z2_virtual);
+    let denominator_residual = (n - (denominator - z2_virtual)) + (z2 - z2_virtual);
     if denominator_residual != 0.0 {
         let division_residual = (-direct_lower).mul_add(denominator, n);
-        let exact_residual =
-            (-direct_lower).mul_add(denominator_residual, division_residual);
+        let exact_residual = (-direct_lower).mul_add(denominator_residual, division_residual);
         if exact_residual != 0.0 {
             let neighbor = if exact_residual.is_sign_negative() {
                 f64::from_bits(direct_lower.to_bits() - 1)
@@ -228,10 +224,7 @@ fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
             };
             let ulp_toward_exact = (neighbor - direct_lower).abs();
             let midpoint_residual = 0.5
-                * ulp_toward_exact.mul_add(
-                    denominator,
-                    ulp_toward_exact * denominator_residual,
-                );
+                * ulp_toward_exact.mul_add(denominator, ulp_toward_exact * denominator_residual);
             let residual_magnitude = exact_residual.abs();
             if residual_magnitude > midpoint_residual
                 || (residual_magnitude == midpoint_residual && direct_lower.to_bits() & 1 == 1)
@@ -243,12 +236,7 @@ fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
     direct_lower
 }
 
-fn wilson_bounds_from_represented_proportion(
-    n: f64,
-    p: f64,
-    z: f64,
-    z2: f64,
-) -> (f64, f64) {
+fn wilson_bounds_from_represented_proportion(n: f64, p: f64, z: f64, z2: f64) -> (f64, f64) {
     let low = if p > 0.0 {
         rationalized_wilson_positive_lower(n, p, z, z2)
     } else {
@@ -288,12 +276,8 @@ fn wilson_bounds_from_represented_proportion_and_inverse_sample_count(
     let margin = z * radical.sqrt();
     let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
     let high = if direct_high == 1.0 && p < 1.0 && z2 > 0.0 {
-        let uncovered_lower = rationalized_wilson_positive_lower_from_inverse_sample_count(
-            inverse_n,
-            1.0 - p,
-            z,
-            z2,
-        );
+        let uncovered_lower =
+            rationalized_wilson_positive_lower_from_inverse_sample_count(inverse_n, 1.0 - p, z, z2);
         (1.0 - uncovered_lower).clamp(0.0, 1.0)
     } else {
         direct_high

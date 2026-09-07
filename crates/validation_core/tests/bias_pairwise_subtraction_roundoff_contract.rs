@@ -12,8 +12,8 @@ fn assert_bias_bits(truth: [f64; 2], recovered: [f64; 2], expected: u64) {
 
     let mirrored_truth = truth.map(|value| -value);
     let mirrored_recovered = recovered.map(|value| -value);
-    let mirrored_bias = mean_bias(&mirrored_truth, &mirrored_recovered)
-        .expect("mirrored represented mean bias");
+    let mirrored_bias =
+        mean_bias(&mirrored_truth, &mirrored_recovered).expect("mirrored represented mean bias");
     assert_eq!(mirrored_bias.to_bits(), expected | (1_u64 << 63));
 }
 

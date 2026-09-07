@@ -44,5 +44,8 @@ fn mixed_sign_bias_roundoff_contract_is_sign_symmetric() {
     let bias = mean_bias(&truth, &recovered)
         .expect("the represented-input mean bias is finite and representable");
 
-    assert_eq!(bias.to_bits(), (-f64::from_bits(0x3fc9_9999_9999_9998)).to_bits());
+    assert_eq!(
+        bias.to_bits(),
+        (-f64::from_bits(0x3fc9_9999_9999_9998)).to_bits()
+    );
 }

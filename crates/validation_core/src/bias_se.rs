@@ -455,8 +455,8 @@ mod tests {
     use super::{
         Wide256, compare_scaled_wide, correctly_rounded_scaled_sqrt_ratio,
         exact_neutral_zero_linear_pair_square_sum, exact_pair_distance_standard_error,
-        exact_pairwise_pair_square_sum, exact_power_of_two,
-        midpoint_dyadic, multiply_by_power_of_two, positive_dyadic,
+        exact_pairwise_pair_square_sum, exact_power_of_two, midpoint_dyadic,
+        multiply_by_power_of_two, positive_dyadic,
     };
     use core::cmp::Ordering;
 

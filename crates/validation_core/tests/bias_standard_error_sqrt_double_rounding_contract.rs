@@ -14,7 +14,8 @@ fn bias_standard_error_rounds_the_final_normalized_se_once() {
     let truth = [0.0; 3];
     let recovered = [-unit, 0.0, unit];
 
-    let standard_error = bias_standard_error(&truth, &recovered).expect("represented standard error");
+    let standard_error =
+        bias_standard_error(&truth, &recovered).expect("represented standard error");
     assert_eq!(standard_error.to_bits(), 0x3c72_79a7_4590_331c);
 
     let mirrored_recovered = recovered.map(|value| -value);

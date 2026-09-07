@@ -59,10 +59,7 @@ fn finite_rounded_tie_accepts_when_exact_product_is_above_the_residual() {
 
 #[test]
 fn finite_exact_tie_remains_accepted_when_product_has_no_roundoff() {
-    assert_eq!(
-        accept_within_standard_errors(1.0, 0.0, 1.0, 1.0),
-        Ok(true)
-    );
+    assert_eq!(accept_within_standard_errors(1.0, 0.0, 1.0, 1.0), Ok(true));
 }
 
 #[test]

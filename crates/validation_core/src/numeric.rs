@@ -62,10 +62,7 @@ pub(crate) fn exact_power_of_two_scale(max_magnitude: f64) -> f64 {
 }
 
 fn same_sign_mean_over_total(values: &[f64], total_count: usize) -> Result<f64, ValidationError> {
-    let max_magnitude = values
-        .iter()
-        .map(|value| value.abs())
-        .fold(0.0, f64::max);
+    let max_magnitude = values.iter().map(|value| value.abs()).fold(0.0, f64::max);
 
     if max_magnitude < f64::MIN_POSITIVE && total_count >= values.len() {
         // Subnormal values are exact integer multiples of 2^-1074. With a divisor
@@ -183,10 +180,7 @@ fn mixed_remainder_mean_over_total(
     values: &[f64],
     total_count: usize,
 ) -> Result<f64, ValidationError> {
-    let max_magnitude = values
-        .iter()
-        .map(|value| value.abs())
-        .fold(0.0, f64::max);
+    let max_magnitude = values.iter().map(|value| value.abs()).fold(0.0, f64::max);
     if max_magnitude == 0.0 {
         return Ok(0.0);
     }
@@ -195,10 +189,7 @@ fn mixed_remainder_mean_over_total(
     let normalized = values.iter().map(|value| *value / scale).collect();
     let (normalized_sum, normalized_correction, normalized_correction_tail) =
         deterministic_compensated_parts_with_tail(normalized);
-    if normalized_sum == 0.0
-        && normalized_correction == 0.0
-        && normalized_correction_tail == 0.0
-    {
+    if normalized_sum == 0.0 && normalized_correction == 0.0 && normalized_correction_tail == 0.0 {
         return Ok(0.0);
     }
 

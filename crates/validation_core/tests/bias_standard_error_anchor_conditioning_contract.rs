@@ -27,12 +27,16 @@ fn represented_three_observation_rounding_is_order_and_sign_invariant() {
     ];
 
     for recovered in permutations {
-        let standard_error = bias_standard_error(&truth, &recovered).expect("finite standard error");
+        let standard_error =
+            bias_standard_error(&truth, &recovered).expect("finite standard error");
         assert_eq!(standard_error.to_bits(), EXPECTED_STANDARD_ERROR_BITS);
 
         let mirrored = recovered.map(|value| -value);
         let mirrored_standard_error =
             bias_standard_error(&truth, &mirrored).expect("finite mirrored standard error");
-        assert_eq!(mirrored_standard_error.to_bits(), EXPECTED_STANDARD_ERROR_BITS);
+        assert_eq!(
+            mirrored_standard_error.to_bits(),
+            EXPECTED_STANDARD_ERROR_BITS
+        );
     }
 }

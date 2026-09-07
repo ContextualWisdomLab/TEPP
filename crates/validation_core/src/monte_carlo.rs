@@ -90,8 +90,7 @@ impl MonteCarloSummary {
             if expected_standard_error == 0.0 {
                 return Err(ValidationError::InvalidInput);
             }
-            let relative_error =
-                (self.standard_error / expected_standard_error - 1.0).abs();
+            let relative_error = (self.standard_error / expected_standard_error - 1.0).abs();
             if !relative_error.is_finite() || relative_error > STANDARD_ERROR_RELATIVE_TOLERANCE {
                 return Err(ValidationError::InvalidInput);
             }
@@ -179,8 +178,7 @@ fn standard_deviation_from_deviations(deviations: &[f64]) -> Result<f64, Validat
         })
         .collect();
     let square_sum = deterministic_compensated_sum(normalized_squares);
-    let normalized_standard_deviation =
-        (square_sum / (deviations.len() as f64 - 1.0)).sqrt();
+    let normalized_standard_deviation = (square_sum / (deviations.len() as f64 - 1.0)).sqrt();
     let standard_deviation = scale * normalized_standard_deviation;
     if !standard_deviation.is_finite()
         || (standard_deviation == 0.0 && normalized_standard_deviation != 0.0)
@@ -214,8 +212,7 @@ fn scaled_sample_standard_deviation(samples: &[f64], mean: f64) -> Result<f64, V
         .iter()
         .map(|value| (*value / outer_scale) - normalized_mean)
         .collect();
-    let normalized_standard_deviation =
-        standard_deviation_from_deviations(&normalized_deviations)?;
+    let normalized_standard_deviation = standard_deviation_from_deviations(&normalized_deviations)?;
     let standard_deviation = outer_scale * normalized_standard_deviation;
     if !standard_deviation.is_finite()
         || (standard_deviation == 0.0 && normalized_standard_deviation != 0.0)
@@ -352,8 +349,7 @@ fn represented_correction_le_exact_product_roundoff(
     let (b_significand, b_exponent) = binary64_magnitude_components(factor_b);
     let product_significand = (a_significand as u128) * (b_significand as u128);
     let product_exponent = a_exponent + b_exponent;
-    let (rounded_significand, rounded_exponent) =
-        binary64_magnitude_components(rounded_product);
+    let (rounded_significand, rounded_exponent) = binary64_magnitude_components(rounded_product);
     let common_exponent = product_exponent.min(rounded_exponent);
     let product_shift = (product_exponent - common_exponent) as u32;
     let rounded_shift = (rounded_exponent - common_exponent) as u32;
@@ -391,14 +387,8 @@ fn represented_correction_le_exact_product_roundoff(
 }
 
 /// Compare the exact represented residual magnitude with `k * SE` after both direct operations overflow.
-fn both_overflow_acceptance(
-    estimate: f64,
-    target: f64,
-    standard_error: f64,
-    k: f64,
-) -> bool {
-    let (estimate_significand, estimate_exponent) =
-        binary64_magnitude_components(estimate.abs());
+fn both_overflow_acceptance(estimate: f64, target: f64, standard_error: f64, k: f64) -> bool {
+    let (estimate_significand, estimate_exponent) = binary64_magnitude_components(estimate.abs());
     let (target_significand, target_exponent) = binary64_magnitude_components(target.abs());
     let common_residual_exponent = estimate_exponent.min(target_exponent);
     let estimate_shift = (estimate_exponent - common_residual_exponent) as u32;

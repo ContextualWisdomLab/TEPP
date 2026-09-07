@@ -103,9 +103,7 @@ fn midpoint_dyadic(left: f64, right: f64) -> Option<(u128, i32)> {
     let (right_significand, right_exponent) = positive_dyadic(right)?;
     let common_exponent = left_exponent.min(right_exponent);
     let left_shift = left_exponent.checked_sub(common_exponent)?.unsigned_abs();
-    let right_shift = right_exponent
-        .checked_sub(common_exponent)?
-        .unsigned_abs();
+    let right_shift = right_exponent.checked_sub(common_exponent)?.unsigned_abs();
     let left_units = left_significand.checked_mul(1_u128.checked_shl(left_shift)?)?;
     let right_units = right_significand.checked_mul(1_u128.checked_shl(right_shift)?)?;
     let mut midpoint_significand = left_units.checked_add(right_units)?;

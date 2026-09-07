@@ -27,11 +27,8 @@ fn report_with_wilson_pair(coverage: f64, lower: f64, upper: f64) -> ValidationR
 /// Rejects a zero lower endpoint when the peer endpoint implies a representable positive root.
 #[test]
 fn zero_lower_cannot_hide_representable_wilson_peer_root() {
-    let artifact = report_with_wilson_pair(
-        COVERAGE_ONE_IN_ONE_HUNDRED_MILLION,
-        0.0,
-        PRODUCER_UPPER,
-    );
+    let artifact =
+        report_with_wilson_pair(COVERAGE_ONE_IN_ONE_HUNDRED_MILLION, 0.0, PRODUCER_UPPER);
 
     assert_eq!(artifact.validate(), Err(ValidationError::InvalidInput));
     assert_eq!(artifact.to_json(), Err(ValidationError::InvalidInput));

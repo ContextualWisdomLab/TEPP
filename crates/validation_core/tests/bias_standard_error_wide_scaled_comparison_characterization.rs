@@ -97,10 +97,8 @@ fn compare_scaled_wide(
 
     let left_bits = left.bit_len();
     let right_bits = right.bit_len();
-    let left_top = left_exponent
-        .checked_add(i32::try_from(left_bits.checked_sub(1)?).ok()?)?;
-    let right_top = right_exponent
-        .checked_add(i32::try_from(right_bits.checked_sub(1)?).ok()?)?;
+    let left_top = left_exponent.checked_add(i32::try_from(left_bits.checked_sub(1)?).ok()?)?;
+    let right_top = right_exponent.checked_add(i32::try_from(right_bits.checked_sub(1)?).ok()?)?;
     match left_top.cmp(&right_top) {
         Ordering::Less => return Some(Ordering::Less),
         Ordering::Greater => return Some(Ordering::Greater),
@@ -204,13 +202,18 @@ fn represented_n2050_candidate_and_midpoint_order_without_large_shift_materializ
         .expect("binary64 candidate significand square fits u128");
     assert!(denominator.checked_mul(candidate_square).is_none());
     let candidate_right = Wide256::multiply_u128(denominator, candidate_square);
-    assert_ne!(candidate_right.high, 0, "comparison really needs more than u128");
+    assert_ne!(
+        candidate_right.high, 0,
+        "comparison really needs more than u128"
+    );
     assert_eq!(
         compare_scaled_wide(
             Wide256::from_u128(numerator),
             0,
             candidate_right,
-            candidate_exponent.checked_mul(2).expect("candidate exponent doubles"),
+            candidate_exponent
+                .checked_mul(2)
+                .expect("candidate exponent doubles"),
         ),
         Some(Ordering::Greater),
         "exact target lies above the floating candidate square"
@@ -230,7 +233,9 @@ fn represented_n2050_candidate_and_midpoint_order_without_large_shift_materializ
             Wide256::from_u128(numerator),
             0,
             midpoint_right,
-            midpoint_exponent.checked_mul(2).expect("midpoint exponent doubles"),
+            midpoint_exponent
+                .checked_mul(2)
+                .expect("midpoint exponent doubles"),
         ),
         Some(Ordering::Less),
         "exact target lies below the upward midpoint square"

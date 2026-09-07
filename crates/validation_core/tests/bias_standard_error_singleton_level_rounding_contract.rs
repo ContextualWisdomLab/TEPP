@@ -11,8 +11,8 @@ fn bias_standard_error_preserves_singleton_repeated_level_identity_beyond_three_
     let repeated = f64::from_bits(0x3fef_ffff_ffff_ffff);
     let recovered = [0.0, repeated, repeated, repeated];
 
-    let standard_error = bias_standard_error(&[0.0; 4], &recovered)
-        .expect("represented-input standard error");
+    let standard_error =
+        bias_standard_error(&[0.0; 4], &recovered).expect("represented-input standard error");
     // For an exactly represented four-observation two-level sample [0, a, a, a],
     // the sample standard error of the mean simplifies to |a| / 4. The generic
     // translated second-moment path squares and square-roots the exact gap and

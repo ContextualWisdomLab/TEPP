@@ -21,9 +21,7 @@ fn interior_wilson_lower_bound_survives_finite_extreme_z() {
     // Algebraically rationalized Wilson lower endpoint. This form avoids the
     // nearly-equal center-minus-margin subtraction used by the predecessor.
     let expected_lower = (2.0 * n * p * p / z_squared)
-        / (1.0
-            + 2.0 * n * p / z_squared
-            + (1.0 + 4.0 * n * p * (1.0 - p) / z_squared).sqrt());
+        / (1.0 + 2.0 * n * p / z_squared + (1.0 + 4.0 * n * p * (1.0 - p) / z_squared).sqrt());
     assert!(expected_lower.is_finite());
     assert!(expected_lower > 0.0);
 

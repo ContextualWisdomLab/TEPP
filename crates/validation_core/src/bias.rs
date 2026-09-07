@@ -58,12 +58,9 @@ fn standard_error_from_deviations(deviations: &[f64]) -> Result<f64, ValidationE
     // rounding sqrt(sample_variance) and sqrt(n) can move the final binary64
     // standard error by one ULP even when the represented squared-deviation
     // ratio is exact.
-    let normalized_standard_error =
-        (square_sum / (sample_count * (sample_count - 1.0))).sqrt();
+    let normalized_standard_error = (square_sum / (sample_count * (sample_count - 1.0))).sqrt();
     let standard_error = scale * normalized_standard_error;
-    if !standard_error.is_finite()
-        || (standard_error == 0.0 && normalized_standard_error != 0.0)
-    {
+    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
         Err(ValidationError::InvalidInput)
     } else if standard_error == 0.0 {
         Ok(0.0)
@@ -96,9 +93,7 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
         .collect();
     let normalized_standard_error = standard_error_from_deviations(&normalized_deviations)?;
     let standard_error = outer_scale * normalized_standard_error;
-    if !standard_error.is_finite()
-        || (standard_error == 0.0 && normalized_standard_error != 0.0)
-    {
+    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
         Err(ValidationError::InvalidInput)
     } else if standard_error == 0.0 {
         Ok(0.0)
@@ -189,9 +184,7 @@ fn exact_subnormal_rational_scale(
     let mut rounded_units = scaled_numerator / denominator;
     let remainder = scaled_numerator % denominator;
     let twice_remainder = remainder * 2;
-    if twice_remainder > denominator
-        || (twice_remainder == denominator && rounded_units & 1 == 1)
-    {
+    if twice_remainder > denominator || (twice_remainder == denominator && rounded_units & 1 == 1) {
         rounded_units += 1;
     }
 
@@ -339,16 +332,12 @@ fn translated_residuals_from_anchor(
 
     for (&high, &low) in diffs.iter().zip(roundoffs) {
         let high_delta = high - anchor_high;
-        if !high_delta.is_finite()
-            || subtraction_roundoff(high, anchor_high, high_delta) != 0.0
-        {
+        if !high_delta.is_finite() || subtraction_roundoff(high, anchor_high, high_delta) != 0.0 {
             return None;
         }
 
         let low_delta = low - anchor_low;
-        if !low_delta.is_finite()
-            || subtraction_roundoff(low, anchor_low, low_delta) != 0.0
-        {
+        if !low_delta.is_finite() || subtraction_roundoff(low, anchor_low, low_delta) != 0.0 {
             return None;
         }
 
@@ -366,7 +355,8 @@ fn canonical_exact_translated_residuals(diffs: &[f64], roundoffs: &[f64]) -> Opt
     let mut best: Option<(usize, f64, Vec<f64>)> = None;
 
     for anchor_index in 0..diffs.len() {
-        let Some(translated) = translated_residuals_from_anchor(diffs, roundoffs, anchor_index) else {
+        let Some(translated) = translated_residuals_from_anchor(diffs, roundoffs, anchor_index)
+        else {
             continue;
         };
         let max_magnitude = translated
@@ -491,16 +481,11 @@ fn exact_translated_residual_standard_error(
     }
 
     let normalized_sum = deterministic_compensated_sum(normalized.clone());
-    let normalized_square_sum = deterministic_compensated_sum(
-        normalized
-            .iter()
-            .map(|value| value * value)
-            .collect(),
-    );
+    let normalized_square_sum =
+        deterministic_compensated_sum(normalized.iter().map(|value| value * value).collect());
     let sample_count = translated.len() as f64;
     let scaled_square_sum = sample_count * normalized_square_sum;
-    let dispersion_numerator =
-        (-normalized_sum).mul_add(normalized_sum, scaled_square_sum);
+    let dispersion_numerator = (-normalized_sum).mul_add(normalized_sum, scaled_square_sum);
     if !dispersion_numerator.is_finite() || dispersion_numerator <= 0.0 {
         return Ok(None);
     }
@@ -508,9 +493,7 @@ fn exact_translated_residual_standard_error(
     let denominator = sample_count * sample_count * (sample_count - 1.0);
     let normalized_standard_error = (dispersion_numerator / denominator).sqrt();
     let standard_error = scale * normalized_standard_error;
-    if !standard_error.is_finite()
-        || (standard_error == 0.0 && normalized_standard_error != 0.0)
-    {
+    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
         Err(ValidationError::InvalidInput)
     } else {
         Ok(Some(standard_error))
@@ -622,7 +605,9 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
             subtraction_roundoff(*recovered_value, *truth_value, *residual)
         })
         .collect();
-    let has_subtraction_roundoff = subtraction_roundoffs.iter().any(|roundoff| *roundoff != 0.0);
+    let has_subtraction_roundoff = subtraction_roundoffs
+        .iter()
+        .any(|roundoff| *roundoff != 0.0);
 
     if diffs.len() == 2 {
         let half_difference = if has_subtraction_roundoff {
@@ -701,10 +686,7 @@ mod tests {
 
     #[test]
     fn representable_extreme_constant_bias_does_not_fail_on_raw_sum_overflow() {
-        assert_eq!(
-            mean_bias(&[0.0, 0.0], &[f64::MAX, f64::MAX]),
-            Ok(f64::MAX)
-        );
+        assert_eq!(mean_bias(&[0.0, 0.0], &[f64::MAX, f64::MAX]), Ok(f64::MAX));
         assert_eq!(
             bias_standard_error(&[0.0, 0.0], &[f64::MAX, f64::MAX]),
             Ok(0.0)
@@ -728,10 +710,7 @@ mod tests {
             Ok(f64::MAX)
         );
         let huge = 1e200;
-        assert_eq!(
-            bias_standard_error(&[0.0, 0.0], &[huge, -huge]),
-            Ok(huge)
-        );
+        assert_eq!(bias_standard_error(&[0.0, 0.0], &[huge, -huge]), Ok(huge));
         let square_sum_overflows = 1e154;
         assert_eq!(
             bias_standard_error(&[0.0, 0.0], &[square_sum_overflows, -square_sum_overflows]),
@@ -748,11 +727,9 @@ mod tests {
 
     #[test]
     fn overflowing_direct_deviation_uses_scaled_reference() {
-        let standard_error = bias_standard_error(
-            &[0.0, 0.0, 0.0],
-            &[f64::MAX, -f64::MAX, -f64::MAX],
-        )
-        .expect("scaled deviation path");
+        let standard_error =
+            bias_standard_error(&[0.0, 0.0, 0.0], &[f64::MAX, -f64::MAX, -f64::MAX])
+                .expect("scaled deviation path");
         assert!(standard_error.is_finite());
         assert!(standard_error > 0.0);
     }
@@ -780,7 +757,10 @@ mod tests {
             exact_subnormal_rational_scale(f64::from_bits(0x004d_5555_5555_5555), 3, 44),
             Some(Ok(f64::MIN_POSITIVE))
         );
-        assert_eq!(exact_subnormal_rational_scale(f64::MIN_POSITIVE * 2.0, 1, 1), None);
+        assert_eq!(
+            exact_subnormal_rational_scale(f64::MIN_POSITIVE * 2.0, 1, 1),
+            None
+        );
         assert_eq!(exact_subnormal_rational_scale(f64::MAX, 1, 1), None);
     }
 
@@ -820,8 +800,7 @@ mod tests {
             None
         );
         assert_eq!(
-            exact_three_level_standard_error(1.0, 2.0_f64.powi(-27))
-                .expect("inexact-sum fallback"),
+            exact_three_level_standard_error(1.0, 2.0_f64.powi(-27)).expect("inexact-sum fallback"),
             None
         );
     }

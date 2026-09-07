@@ -26,12 +26,16 @@ fn nonzero_three_level_standard_error_survives_square_underflow() {
     ];
 
     for recovered in permutations {
-        let standard_error = bias_standard_error(&truth, &recovered).expect("finite standard error");
+        let standard_error =
+            bias_standard_error(&truth, &recovered).expect("finite standard error");
         assert_eq!(standard_error.to_bits(), EXPECTED_STANDARD_ERROR_BITS);
 
         let mirrored = recovered.map(|value| -value);
         let mirrored_standard_error =
             bias_standard_error(&truth, &mirrored).expect("finite mirrored standard error");
-        assert_eq!(mirrored_standard_error.to_bits(), EXPECTED_STANDARD_ERROR_BITS);
+        assert_eq!(
+            mirrored_standard_error.to_bits(),
+            EXPECTED_STANDARD_ERROR_BITS
+        );
     }
 }
