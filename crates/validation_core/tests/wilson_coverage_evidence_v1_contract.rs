@@ -133,6 +133,10 @@ fn constructor_preserves_existing_input_and_configuration_error_contracts() {
         Err(ValidationError::InvalidConfiguration)
     );
     assert_eq!(
+        WilsonCoverageEvidenceV1::from_intervals(&[0.0], &[-1.0], &[1.0], f64::NAN),
+        Err(ValidationError::InvalidConfiguration)
+    );
+    assert_eq!(
         WilsonCoverageEvidenceV1::from_intervals(&[0.0], &[-1.0], &[1.0], 1e200),
         Err(ValidationError::InvalidConfiguration)
     );
