@@ -201,12 +201,15 @@ mod tests {
 
     #[test]
     fn overflowing_occasion_mean_residual_fails_closed() {
+        // Three units at t=1 yield occasion mean -MAX/3; MAX - (-MAX/3) overflows.
         assert_eq!(
             center_occasion_mean_event_lags(&[
-                timed(1, 0.0, -f64::MAX),
-                timed(1, 1.0, -f64::MAX),
-                timed(2, 0.0, -f64::MAX),
-                timed(2, 1.0, f64::MAX),
+                timed(1, 0.0, 0.0),
+                timed(1, 1.0, f64::MAX),
+                timed(2, 0.0, 0.0),
+                timed(2, 1.0, -f64::MAX),
+                timed(3, 0.0, 0.0),
+                timed(3, 1.0, -f64::MAX),
             ]),
             Err(LongitudinalError::InvalidObservationPayload)
         );
