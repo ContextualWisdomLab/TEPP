@@ -32,7 +32,7 @@ fn centered_log_rate_survives_nonrepresentable_intermediate_ratios() {
     assert_eq!(overflow_recovered.to_bits(), overflow_expected.to_bits());
 
     let underflow_pair = LaggedWithinResidual::new(f64::MAX, f64::MIN_POSITIVE, interval);
-    assert_eq!(f64::MIN_POSITIVE / f64::MAX, 0.0);
+    assert_eq!((f64::MIN_POSITIVE / f64::MAX).to_bits(), 0.0_f64.to_bits());
     let underflow_expected = f64::MIN_POSITIVE.ln() - f64::MAX.ln();
     let underflow_recovered = recover_centered_irregular_residual_log_rate(&[underflow_pair])
         .expect("finite log-domain rate despite underflowing direct ratio");
