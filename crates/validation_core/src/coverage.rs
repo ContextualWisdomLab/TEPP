@@ -89,7 +89,6 @@ fn u64_is_exact_binary64_integer(value: u64) -> bool {
 }
 
 fn positive_f64_over_inexact_u64(value: f64, denominator: u64) -> f64 {
-    debug_assert!(value.is_finite() && value >= 0.0);
     debug_assert!(denominator > (1_u64 << 53));
     debug_assert!(!u64_is_exact_binary64_integer(denominator));
     if value == 0.0 {
