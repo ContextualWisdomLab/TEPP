@@ -259,7 +259,7 @@ fn correctly_rounded_scaled_sqrt_ratio(
             }
             f64::from_bits(bits - 1)
         };
-        if !neighbor.is_finite() || neighbor <= 0.0 {
+        if !neighbor.is_finite() {
             return None;
         }
         let (midpoint_significand, midpoint_exponent) = midpoint_dyadic(candidate, neighbor)?;
