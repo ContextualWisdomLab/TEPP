@@ -210,9 +210,6 @@ fn scaled_sample_standard_deviation(samples: &[f64], mean: f64) -> Result<f64, V
     }
 
     let outer_scale = samples.iter().map(|value| value.abs()).fold(0.0, f64::max);
-    if outer_scale == 0.0 {
-        return Ok(0.0);
-    }
     let normalized_mean = mean / outer_scale;
     let normalized_deviations: Vec<_> = samples
         .iter()
@@ -220,12 +217,8 @@ fn scaled_sample_standard_deviation(samples: &[f64], mean: f64) -> Result<f64, V
         .collect();
     let normalized_standard_deviation = standard_deviation_from_deviations(&normalized_deviations)?;
     let standard_deviation = outer_scale * normalized_standard_deviation;
-    if !standard_deviation.is_finite()
-        || (standard_deviation == 0.0 && normalized_standard_deviation != 0.0)
-    {
+    if !standard_deviation.is_finite() || standard_deviation == 0.0 {
         Err(ValidationError::InvalidInput)
-    } else if standard_deviation == 0.0 {
-        Ok(0.0)
     } else {
         Ok(standard_deviation)
     }
