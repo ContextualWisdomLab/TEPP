@@ -34,9 +34,6 @@ fn positive_dyadic(value: f64) -> Option<(u128, i32)> {
             exponent_bits - 1023 - 52,
         )
     };
-    if significand == 0 {
-        return None;
-    }
     let trailing = significand.trailing_zeros();
     significand >>= trailing;
     exponent += i32::try_from(trailing).ok()?;
