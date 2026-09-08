@@ -25,7 +25,6 @@ PROTECTED_REPOSITORY_WORKFLOW_PATHS = frozenset(
         ".github/workflows/ci.yml",
         ".github/workflows/docs-quality.yml",
         ".github/workflows/hourly-nim-product-development.yml",
-        ".github/workflows/hourly-pr-maintenance.yml",
     }
 )
 _DISABLED_WORKFLOW_STATES = frozenset(
