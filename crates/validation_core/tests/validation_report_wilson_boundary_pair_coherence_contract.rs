@@ -78,11 +78,7 @@ fn rounded_zero_and_one_pair_remains_admissible_when_peer_root_is_unrepresentabl
 /// representable positive lower endpoint.
 #[test]
 fn exact_one_upper_remains_admissible_for_finite_extreme_producer() {
-    let artifact = report_with_wilson_pair(
-        LARGEST_COVERAGE_BELOW_ONE,
-        EXTREME_PRODUCER_LOWER,
-        1.0,
-    );
+    let artifact = report_with_wilson_pair(LARGEST_COVERAGE_BELOW_ONE, EXTREME_PRODUCER_LOWER, 1.0);
 
     assert!(artifact.validate().is_ok());
 }
