@@ -548,8 +548,18 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
                     )
         self.assertTrue(applier.call_args.kwargs["apply_changes"])
 
-        with self.assertRaises(SystemExit):
-            fleet.main(["wat"], environ={"GITHUB_TOKEN": "token"}, stdout=io.StringIO())
+        unknown_stderr = io.StringIO()
+        with self.assertRaises(SystemExit) as unknown_command:
+            fleet.main(
+                ["not-a-fleet-command"],
+                environ={"GITHUB_TOKEN": "token"},
+                stdout=io.StringIO(),
+                stderr=unknown_stderr,
+            )
+        self.assertEqual(unknown_command.exception.code, 2)
+        self.assertIn("invalid choice", unknown_stderr.getvalue())
+        self.assertIn("audit", unknown_stderr.getvalue())
+        self.assertIn("disable-orphans", unknown_stderr.getvalue())
 
     def test_cli_reads_process_environment_when_environ_omitted(self) -> None:
         """Invoking the CLI without an environ argument uses the real process environment."""
