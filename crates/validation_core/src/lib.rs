@@ -95,4 +95,10 @@ mod numeric_contract_tests {
                 .expect("expanded subnormal sum with original denominator");
         assert_eq!(represented.to_bits(), f64::from_bits(2).to_bits());
     }
+
+    #[test]
+    fn same_sign_nonzero_quotient_below_binary64_range_fails_closed() {
+        let result = deterministic_representable_sum_over_count(&[f64::MIN_POSITIVE], usize::MAX);
+        assert!(matches!(result, Err(crate::ValidationError::InvalidInput)));
+    }
 }
