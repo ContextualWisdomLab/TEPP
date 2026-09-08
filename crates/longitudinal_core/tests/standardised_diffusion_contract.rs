@@ -34,13 +34,13 @@ fn continuous_diffusion_candidate_does_not_lose_cancellation_to_subnormal_roundi
     let minimum_subnormal = f64::from_bits(1);
     let recovered = recover_event_time_standardised_continuous_diffusion(minimum_subnormal, -0.75)
         .expect("positive rounded stationary variance remains admissible");
-    assert_eq!(recovered, 1.5);
+    assert_eq!(recovered.to_bits(), 1.5_f64.to_bits());
 
     let slightly_larger_subnormal = f64::from_bits(3);
     let recovered_larger =
         recover_event_time_standardised_continuous_diffusion(slightly_larger_subnormal, -0.75)
             .expect("scale must not alter the standardized scalar identity");
-    assert_eq!(recovered_larger, 1.5);
+    assert_eq!(recovered_larger.to_bits(), 1.5_f64.to_bits());
 }
 
 #[test]
