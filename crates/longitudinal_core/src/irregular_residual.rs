@@ -668,11 +668,15 @@ mod tests {
     }
 
     fn overflowing_cwc_rate_rows(unit: u32, growing: bool) -> [EventTimedObservation; 3] {
+        // Use a representable nonzero leftover after MAX/-MAX cancellation so the
+        // unit mean does not underflow to a false zero (ae5081 fail-closed). A
+        // unit score of 1.0 still yields an astronomical same-sign log-rate once
+        // divided by the 1e-305 event interval, so pairwise rate sums still overflow.
         let delta = 1e-305_f64;
         let (first, second) = if growing {
-            (f64::from_bits(1), f64::MAX)
+            (1.0, f64::MAX)
         } else {
-            (f64::MAX, f64::from_bits(1))
+            (f64::MAX, 1.0)
         };
         [
             timed(unit, 0.0, first),
@@ -932,17 +936,20 @@ mod tests {
 
     #[test]
     fn overflowing_same_sign_cwc_pairs_keep_stable_log() {
+        // Representable unit mean: after MAX/-MAX cancel, leftover 1.0 yields mean
+        // 1/3 and same-sign CWC residuals (2/3, MAX). Subnormal leftovers underflow
+        // that mean to a false zero and fail closed before rate recovery.
         let overflowed_both = recover_within_unit_irregular_residual_log_rate(&[
-            timed(1, 0.0, f64::from_bits(1)),
+            timed(1, 0.0, 1.0),
             timed(1, 1.0, f64::MAX),
             timed(1, 2.0, -f64::MAX),
-            timed(2, 0.0, f64::from_bits(1)),
+            timed(2, 0.0, 1.0),
             timed(2, 1.0, f64::MAX),
             timed(2, 2.0, -f64::MAX),
         ])
         .expect("stable log of overflowed same-sign CWC pairs");
-        let overflow_rate = driver_same_sign_log_rate(f64::from_bits(1), f64::MAX, unit_interval())
-            .expect("tiny/MAX");
+        let overflow_rate = driver_same_sign_log_rate(2.0 / 3.0, f64::MAX, unit_interval())
+            .expect("two-thirds/MAX after representable CWC mean");
         assert!((overflowed_both - overflow_rate).abs() < 1e-9);
     }
 

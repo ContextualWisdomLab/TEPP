@@ -9,6 +9,7 @@ credentials are the standard ``GITHUB_TOKEN`` or ``GH_TOKEN`` variables.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import http.client
 import json
 import os
@@ -575,7 +576,12 @@ def main(
     err = stderr if stderr is not None else sys.stderr
     env = dict(os.environ) if environ is None else environ
     try:
-        parsed = parser.parse_args(list(arguments if arguments is not None else sys.argv[1:]))
+        # Argparse writes usage/errors to sys.stderr; bind that to the caller-provided
+        # stream so unknown-command and other parse failures are observable in tests.
+        with contextlib.redirect_stderr(err):
+            parsed = parser.parse_args(
+                list(arguments if arguments is not None else sys.argv[1:])
+            )
         transport = build_transport(env)
         audit = audit_repository(transport, parsed.owner, parsed.repo)
         if parsed.command == "audit":
