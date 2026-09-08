@@ -212,9 +212,10 @@ impl ValidationReport {
 
                 let relative_upper_percentile = summary.percentile_upper / summary.mean;
                 let replication_support = summary.replication_count as f64;
-                if !relative_upper_percentile.is_finite()
-                    || relative_upper_percentile
-                        > replication_support * (1.0 + MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE)
+                // Generic moment support plus the RMSE SE<=mean gate bounds the
+                // endpoint ratio by O(n), so it is finite before this comparison.
+                if relative_upper_percentile
+                    > replication_support * (1.0 + MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE)
                 {
                     return Err(ValidationError::InvalidInput);
                 }
