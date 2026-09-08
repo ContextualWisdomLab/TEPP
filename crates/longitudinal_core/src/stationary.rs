@@ -89,7 +89,7 @@ mod tests {
     fn avoids_doubling_overflow_when_final_stationary_variance_is_representable() {
         let stationary = recover_stationary_within_variance(f64::MAX, -f64::MAX)
             .expect("q / (-2a) remains representable");
-        assert_eq!(stationary, 0.5);
+        assert_eq!(stationary.to_bits(), 0.5_f64.to_bits());
     }
 
     #[test]
@@ -108,8 +108,8 @@ mod tests {
         // The exact q / (-2a) rounds to the minimum positive subnormal. The
         // predecessor fallback rounded once during division and again during
         // its final quarter-scale, returning two subnormal ulps instead.
-        let diffusion = f64::from_bits(0x3cdad6b3492a639e);
-        let log_rate = -f64::from_bits(0x7fe2342c95642bec);
+        let diffusion = f64::from_bits(0x3cda_d6b3_492a_639e);
+        let log_rate = -f64::from_bits(0x7fe2_342c_9564_2bec);
         let stationary = recover_stationary_within_variance(diffusion, log_rate)
             .expect("the final stationary variance is representable");
         assert_eq!(stationary.to_bits(), 1);

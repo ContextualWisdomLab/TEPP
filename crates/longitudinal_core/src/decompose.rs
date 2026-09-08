@@ -205,9 +205,9 @@ mod tests {
         .expect("representable unit mean must not fail on an overflowing partial sum");
 
         assert_eq!(recovered[0].level(), ComponentLevel::Between);
-        assert_eq!(recovered[0].value(), f64::MAX);
-        assert_eq!(recovered[1].value(), 0.0);
-        assert_eq!(recovered[2].value(), 0.0);
+        assert_eq!(recovered[0].value().to_bits(), f64::MAX.to_bits());
+        assert_eq!(recovered[1].value().to_bits(), 0.0_f64.to_bits());
+        assert_eq!(recovered[2].value().to_bits(), 0.0_f64.to_bits());
     }
 
     #[test]

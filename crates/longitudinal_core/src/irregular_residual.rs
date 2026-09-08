@@ -635,7 +635,7 @@ mod tests {
         assert!(same_sign.is_finite());
         assert!((same_sign - large).abs() < 1.0);
         let negative = scaled_compensated_mean(&[-4.0, -2.0]).expect("negative same-sign mean");
-        assert_eq!(negative, -3.0);
+        assert_eq!(negative.to_bits(), (-3.0_f64).to_bits());
         let mixed = scaled_compensated_mean(&[large, -large]).expect("mixed mean");
         assert!(mixed.abs() < 1.0);
 

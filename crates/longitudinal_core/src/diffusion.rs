@@ -205,12 +205,12 @@ mod tests {
         let continuous_underflow =
             recover_event_time_standardised_continuous_diffusion(minimum_subnormal, -1.0)
                 .expect("q/p cancels a positive real stationary variance below binary64 range");
-        assert_eq!(continuous_underflow, 2.0);
+        assert_eq!(continuous_underflow.to_bits(), 2.0_f64.to_bits());
 
         let continuous_overflow =
             recover_event_time_standardised_continuous_diffusion(f64::MAX, -0.25)
                 .expect("q/p cancels a positive real stationary variance above binary64 range");
-        assert_eq!(continuous_overflow, 0.5);
+        assert_eq!(continuous_overflow.to_bits(), 0.5_f64.to_bits());
 
         let interval = EventTimeInterval::new(1.0).expect("unit event interval");
         let discrete_underflow =
