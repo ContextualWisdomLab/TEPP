@@ -312,9 +312,6 @@ fn exact_pairwise_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
             pair_dyadics.push(Some(dyadic));
         }
     }
-    if unit_exponent == i32::MAX {
-        return Some((0, 0));
-    }
 
     let mut pair_square_sum = 0_u128;
     for dyadic in pair_dyadics.into_iter().flatten() {
