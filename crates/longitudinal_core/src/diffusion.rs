@@ -109,10 +109,10 @@ pub fn recover_event_time_standardised_discrete_diffusion(
     }
 
     let ratio = -exponent.exp_m1();
-    // The exact finite-interval ratio is strictly inside (0, 1). If exp_m1
-    // rounds it to either endpoint, reporting zero/one would erase a nonzero
-    // remainder and turn a numerical limitation into a scientific boundary.
-    if !ratio.is_finite() || ratio <= 0.0 || ratio >= 1.0 {
+    // Stable a < 0 with positive Δ yields a strictly negative exponent, so
+    // -exp_m1 is in (0, 1] when finite. The only false scientific boundary that
+    // remains is rounding up to the exact unit endpoint.
+    if ratio >= 1.0 {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     Ok(ratio)

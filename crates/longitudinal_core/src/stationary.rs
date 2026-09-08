@@ -144,4 +144,13 @@ mod tests {
             Err(LongitudinalError::InvalidTemporalTransformInput)
         );
     }
+
+    #[test]
+    fn overflowed_stationary_variance_fails_closed() {
+        assert_eq!(
+            recover_stationary_within_variance(f64::MAX, -f64::from_bits(1)),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+    }
 }
+
