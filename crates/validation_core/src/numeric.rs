@@ -194,10 +194,6 @@ fn mixed_remainder_mean_over_total(
     total_count: usize,
 ) -> Result<f64, ValidationError> {
     let max_magnitude = values.iter().map(|value| value.abs()).fold(0.0, f64::max);
-    if max_magnitude == 0.0 {
-        return Ok(0.0);
-    }
-
     let scale = exact_power_of_two_scale(max_magnitude);
     let normalized = values.iter().map(|value| *value / scale).collect();
     let (normalized_sum, normalized_correction, normalized_correction_tail) =
