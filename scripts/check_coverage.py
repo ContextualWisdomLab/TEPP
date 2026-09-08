@@ -200,6 +200,13 @@ def _cfg_test_module_line_numbers_for_path(path: Path) -> frozenset[int]:
     return frozenset(_cfg_test_module_line_numbers(_read_source_lines(path)))
 
 
+@cache
+def _cfg_not_feature_line_numbers_for_path(path: Path) -> frozenset[int]:
+    """Return one cached cfg(not(feature)) classification snapshot for *path*."""
+
+    return frozenset(_cfg_not_feature_line_numbers(_read_source_lines(path)))
+
+
 def is_executable_source_line(
     source_path: str,
     line_number: int,
@@ -220,6 +227,7 @@ def is_executable_source_line(
     if repository_root is None:
         _read_source_lines.cache_clear()
         _cfg_test_module_line_numbers_for_path.cache_clear()
+        _cfg_not_feature_line_numbers_for_path.cache_clear()
     try:
         path = (
             resolve_repository_source_path(source_path, repository_root)
@@ -234,7 +242,7 @@ def is_executable_source_line(
         return False
     if line_number in _cfg_test_module_line_numbers_for_path(path):
         return False
-    if _line_in_cfg_not_feature_block(lines, line_number):
+    if line_number in _cfg_not_feature_line_numbers_for_path(path):
         return False
     if _line_in_multiline_string_literal(lines, line_number):
         return False
@@ -470,6 +478,7 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
             )
     return False
 
+
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""
 
@@ -551,13 +560,10 @@ def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
     return test_lines
 
 
-def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
-    """Return True when *line_number* is inside ``#[cfg(not(feature = ...))]`` code.
+def _cfg_not_feature_line_numbers(lines: list[str]) -> set[int]:
+    """Return lines inside ``#[cfg(not(feature = ...))]`` blocks."""
 
-    Workspace CI builds with ``--all-features``, so these inactive alternatives
-    must not fail the authored-line gate when LLVM still emits zero DA rows.
-    """
-
+    excluded_lines: set[int] = set()
     index = 0
     while index < len(lines):
         stripped = lines[index].strip()
@@ -570,15 +576,24 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
                 depth += raw.count("{") - raw.count("}")
                 if "{" in raw:
                     started = True
-                if cursor + 1 == line_number:
-                    return True
+                excluded_lines.add(cursor + 1)
                 if started and depth <= 0:
                     break
                 cursor += 1
             index = cursor + 1
             continue
         index += 1
-    return False
+    return excluded_lines
+
+
+def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
+    """Return True when *line_number* is inside ``#[cfg(not(feature = ...))]`` code.
+
+    Workspace CI builds with ``--all-features``, so these inactive alternatives
+    must not fail the authored-line gate when LLVM still emits zero DA rows.
+    """
+
+    return line_number in _cfg_not_feature_line_numbers(lines)
 
 
 def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
@@ -721,6 +736,7 @@ def load_lcov_line_totals(
     root = (repository_root or Path.cwd()).resolve()
     _read_source_lines.cache_clear()
     _cfg_test_module_line_numbers_for_path.cache_clear()
+    _cfg_not_feature_line_numbers_for_path.cache_clear()
     source_path: str | None = None
     line_counts: dict[tuple[str, int], int] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
