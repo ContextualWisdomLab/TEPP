@@ -25,7 +25,6 @@ Protected production paths are never disabled:
 - `.github/workflows/ci.yml`
 - `.github/workflows/docs-quality.yml`
 - `.github/workflows/hourly-nim-product-development.yml`
-- `.github/workflows/hourly-pr-maintenance.yml`
 
 ## Credentials
 
@@ -68,11 +67,12 @@ Retain the JSON inventory (workflow ID, path, state, classification,
 default-branch SHA, timestamp, and pagination receipts). Re-run the
 read-only audit after any workflow deletion. Coordinate with
 `ContextualWisdomLab/.github#945` and `ContextualWisdomLab/appguardrail#929`.
-Do not recreate deleted bootstrap or repair YAML.
+Do not recreate deleted bootstrap, repair, or repository-local PR-maintenance
+YAML. PR review and merge scheduling belongs to the central required workflow.
 
 ## 2026-08-13 live remediation
 
 Inventory bound to `main` SHA `3810bb73e3606431e1e19497b9746a8335e5d379`
 reported 15 identities and 10 orphans. After `--apply`, those 10 records
-were `disabled_manually` and `orphan_count` was 0. The four protected
+were `disabled_manually` and `orphan_count` was 0. The then-current protected
 repository workflows and GitHub-owned CodeQL remained `active`.
