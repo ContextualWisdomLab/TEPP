@@ -58,6 +58,26 @@ fn rmse_slot_rejects_zero_mean_positive_spread() {
 }
 
 #[test]
+fn rmse_slot_rejects_nonfinite_relative_standard_error() {
+    let summary = MonteCarloSummary {
+        replication_count: 4,
+        mean: f64::MIN_POSITIVE,
+        standard_deviation: f64::MAX,
+        standard_error: f64::MAX / 2.0,
+        percentile_lower: f64::MIN_POSITIVE,
+        percentile_upper: f64::MIN_POSITIVE,
+    };
+    summary
+        .validate()
+        .expect("generic summary is coherent before applying nonnegative RMSE support");
+
+    assert_eq!(
+        report_with(summary).validate(),
+        Err(ValidationError::InvalidInput)
+    );
+}
+
+#[test]
 fn rmse_slot_rejects_standard_error_beyond_nonnegative_support() {
     let summary = MonteCarloSummary {
         replication_count: 4,
