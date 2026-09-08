@@ -66,3 +66,11 @@ fn rounded_zero_and_one_pair_remains_admissible_when_peer_root_is_unrepresentabl
 
     assert!(artifact.validate().is_ok());
 }
+
+/// Preserves the complement-symmetric unresolved boundary above one-half coverage.
+#[test]
+fn rounded_zero_and_one_pair_remains_admissible_above_half_coverage() {
+    let artifact = report_with_wilson_pair(0.75, 0.0, 1.0);
+
+    assert!(artifact.validate().is_ok());
+}
