@@ -121,6 +121,6 @@ mod numeric_contract_tests {
         let represented =
             deterministic_representable_sum_over_count(&[one_down, one_down, ulp_at_one, -2.0], 4)
                 .expect("exact compensated cancellation");
-        assert_eq!(represented, 0.0);
+        assert_eq!(represented.to_bits(), 0);
     }
 }
