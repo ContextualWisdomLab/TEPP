@@ -82,3 +82,19 @@ pub use rmse::root_mean_square_error;
 pub use temporal_order::temporal_order_accuracy;
 /// Versioned durable validation envelope binding projections to scientific provenance.
 pub use validation_evidence::ValidationEvidenceV1;
+
+#[cfg(test)]
+mod numeric_contract_tests {
+    use super::numeric::deterministic_representable_sum_over_count;
+
+    #[test]
+    fn expanded_subnormal_sum_preserves_original_denominator() {
+        let minimum_subnormal = f64::from_bits(1);
+        let represented = deterministic_representable_sum_over_count(
+            &[minimum_subnormal, minimum_subnormal],
+            1,
+        )
+        .expect("expanded subnormal sum with original denominator");
+        assert_eq!(represented.to_bits(), f64::from_bits(2).to_bits());
+    }
+}
