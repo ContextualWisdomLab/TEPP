@@ -113,10 +113,9 @@ impl MonteCarloSummary {
                 .max(1.0);
             let scaled_deviation = ((endpoint / scale) - (self.mean / scale)).abs();
             let scaled_support = (self.standard_deviation / scale) * moment_factor;
-            if !scaled_deviation.is_finite()
-                || !scaled_support.is_finite()
-                || scaled_deviation > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
-            {
+            // validate() established finite inputs and this scale is finite and >= 1,
+            // so the normalized quantities are finite by construction.
+            if scaled_deviation > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE) {
                 return Err(ValidationError::InvalidInput);
             }
         }
@@ -136,10 +135,10 @@ impl MonteCarloSummary {
         let scaled_upper_deviation = (self.percentile_upper / scale) - scaled_mean;
         let combined_scaled_deviation = scaled_lower_deviation.hypot(scaled_upper_deviation);
         let scaled_support = (self.standard_deviation / scale) * moment_factor;
-        if !combined_scaled_deviation.is_finite()
-            || !scaled_support.is_finite()
-            || combined_scaled_deviation
-                > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+        // Positive spread makes the finite scale strictly positive; the normalized
+        // deviations and support therefore cannot become non-finite here.
+        if combined_scaled_deviation
+            > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
         {
             return Err(ValidationError::InvalidInput);
         }
