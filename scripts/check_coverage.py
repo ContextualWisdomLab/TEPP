@@ -672,9 +672,13 @@ def _multiline_data_line_numbers(lines: list[str]) -> set[int]:
                 target_has_executable_suffix = True
             raw_start = _raw_string_start(raw, cursor)
             if raw_start is not None:
+                if not target_data and not raw[:cursor].strip():
+                    target_data = True
                 raw_hashes, cursor = raw_start
                 continue
             if raw[cursor] == '"':
+                if not target_data and not raw[:cursor].strip():
+                    target_data = True
                 in_string = True
                 cursor += 1
                 continue
