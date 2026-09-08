@@ -8,6 +8,7 @@ const PRODUCER_UPPER: f64 = f64::from_bits(0x3fe0_0000_055e_63b8);
 const COMPLEMENT_COVERAGE: f64 = f64::from_bits(0x3fef_ffff_faa1_9c47);
 const COMPLEMENT_LOWER: f64 = f64::from_bits(0x3fdf_ffff_f543_3890);
 const MINIMUM_U64_COVERAGE: f64 = f64::from_bits(0x3bf0_0000_0000_0000);
+const LARGEST_COVERAGE_BELOW_ONE: f64 = f64::from_bits(0x3fef_ffff_ffff_ffff);
 
 fn report_with_wilson_pair(coverage: f64, lower: f64, upper: f64) -> ValidationReport {
     ValidationReport {
@@ -67,10 +68,10 @@ fn rounded_zero_and_one_pair_remains_admissible_when_peer_root_is_unrepresentabl
     assert!(artifact.validate().is_ok());
 }
 
-/// Preserves the complement-symmetric unresolved boundary above one-half coverage.
+/// Preserves the complement-symmetric unresolved boundary immediately below full coverage.
 #[test]
-fn rounded_zero_and_one_pair_remains_admissible_above_half_coverage() {
-    let artifact = report_with_wilson_pair(0.75, 0.0, 1.0);
+fn rounded_zero_and_one_pair_remains_admissible_below_full_coverage() {
+    let artifact = report_with_wilson_pair(LARGEST_COVERAGE_BELOW_ONE, 0.0, 1.0);
 
     assert!(artifact.validate().is_ok());
 }
