@@ -228,11 +228,13 @@ mod tests {
 
     #[test]
     fn overflowing_within_residual_after_finite_mean_fails_closed() {
-        // Mean remains finite while MAX - (-MAX/3)-class residuals overflow.
+        // Need >=2 units for admission. Unit 0 mean is MAX/3; -MAX - MAX/3 overflows.
         let rows = [
             OccasionObservation::new(0, 0, f64::MAX),
             OccasionObservation::new(0, 1, f64::MAX),
             OccasionObservation::new(0, 2, -f64::MAX),
+            OccasionObservation::new(1, 0, 1.0),
+            OccasionObservation::new(1, 1, 0.5),
         ];
         assert_eq!(
             decompose_within_between(&rows),

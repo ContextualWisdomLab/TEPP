@@ -1014,4 +1014,26 @@ mod tests {
         );
         assert_eq!(require_finite(1.5), Ok(1.5));
     }
+
+    #[test]
+    fn non_finite_event_time_or_score_fails_closed() {
+        assert_eq!(
+            center_within_unit_event_lags(&[
+                timed(1, f64::NAN, 1.0),
+                timed(1, 1.0, 0.5),
+                timed(2, 0.0, 2.0),
+                timed(2, 1.0, 1.0),
+            ]),
+            Err(LongitudinalError::InvalidObservationPayload)
+        );
+        assert_eq!(
+            center_within_unit_event_lags(&[
+                timed(1, 0.0, f64::INFINITY),
+                timed(1, 1.0, 0.5),
+                timed(2, 0.0, 2.0),
+                timed(2, 1.0, 1.0),
+            ]),
+            Err(LongitudinalError::InvalidObservationPayload)
+        );
+    }
 }

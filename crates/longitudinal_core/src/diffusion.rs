@@ -242,4 +242,13 @@ mod tests {
             Err(LongitudinalError::InvalidTemporalTransformInput)
         );
     }
+
+    #[test]
+    fn underflowed_exact_exponent_fails_closed() {
+        let tiny = EventTimeInterval::new(1e-300).expect("tiny interval");
+        assert_eq!(
+            recover_event_time_standardised_discrete_diffusion(1.0, -1e-300, tiny),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+    }
 }
