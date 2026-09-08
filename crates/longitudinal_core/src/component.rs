@@ -188,7 +188,7 @@ pub fn component_root_mean_square_error(
 
 #[cfg(test)]
 mod tests {
-    use super::{add_scaled_square, component_root_mean_square_error, ComponentValue};
+    use super::{ComponentValue, add_scaled_square, component_root_mean_square_error};
     use crate::{ComponentLevel, LongitudinalError};
 
     #[test]

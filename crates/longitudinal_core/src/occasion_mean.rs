@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::irregular_residual::{
-    scaled_compensated_mean, EventTimedObservation, LaggedWithinResidual,
+    EventTimedObservation, LaggedWithinResidual, scaled_compensated_mean,
 };
 use crate::stable_irregular_rate::recover_centered_irregular_residual_log_rate;
 use crate::{EventTimeInterval, LongitudinalError};
@@ -164,8 +164,8 @@ mod tests {
     use super::{
         center_occasion_mean_event_lags, recover_occasion_mean_centered_irregular_residual_log_rate,
     };
-    use crate::irregular_residual::EventTimedObservation;
     use crate::LongitudinalError;
+    use crate::irregular_residual::EventTimedObservation;
 
     fn timed(unit: u32, event_time: f64, score: f64) -> EventTimedObservation {
         EventTimedObservation::new(unit, event_time, score)

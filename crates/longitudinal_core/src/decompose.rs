@@ -127,7 +127,7 @@ pub fn decompose_within_between(
 
 #[cfg(test)]
 mod tests {
-    use super::{decompose_within_between, OccasionObservation};
+    use super::{OccasionObservation, decompose_within_between};
     use crate::{ComponentLevel, LongitudinalError};
 
     #[test]
