@@ -78,6 +78,30 @@ fn rmse_slot_rejects_nonfinite_relative_standard_error() {
 }
 
 #[test]
+fn rmse_slot_accepts_finite_percentile_ratio_at_maximum_replication_count() {
+    let replication_support = usize::MAX as f64;
+    let summary = MonteCarloSummary {
+        replication_count: usize::MAX,
+        mean: 1.0,
+        standard_deviation: replication_support.sqrt(),
+        standard_error: 1.0,
+        percentile_lower: 1.0,
+        percentile_upper: replication_support,
+    };
+    summary
+        .validate()
+        .expect("maximum-count summary remains within generic empirical support");
+
+    assert!(
+        (summary.percentile_upper / summary.mean).is_finite(),
+        "an addressable replication count cannot overflow the RMSE percentile ratio"
+    );
+    report_with(summary)
+        .validate()
+        .expect("maximum-count endpoint remains inside nonnegative RMSE support");
+}
+
+#[test]
 fn rmse_slot_rejects_standard_error_beyond_nonnegative_support() {
     let summary = MonteCarloSummary {
         replication_count: 4,
