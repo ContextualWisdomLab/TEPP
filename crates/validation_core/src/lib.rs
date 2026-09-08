@@ -103,6 +103,16 @@ mod numeric_contract_tests {
     }
 
     #[test]
+    fn mixed_sign_nonzero_quotient_below_binary64_range_fails_closed() {
+        let minimum_subnormal = f64::from_bits(1);
+        let result = deterministic_representable_sum_over_count(
+            &[f64::MIN_POSITIVE * 4.0, -minimum_subnormal],
+            usize::MAX,
+        );
+        assert!(matches!(result, Err(crate::ValidationError::InvalidInput)));
+    }
+
+    #[test]
     fn mixed_sign_tail_rounds_below_the_adjacent_midpoint() {
         let half_ulp_at_one = 2.0_f64.powi(-53);
         let ulp_at_one = 2.0_f64.powi(-52);
