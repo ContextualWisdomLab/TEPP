@@ -190,12 +190,8 @@ fn standard_deviation_from_deviations(deviations: &[f64]) -> Result<f64, Validat
     let square_sum = deterministic_compensated_sum(normalized_squares);
     let normalized_standard_deviation = (square_sum / (deviations.len() as f64 - 1.0)).sqrt();
     let standard_deviation = scale * normalized_standard_deviation;
-    if !standard_deviation.is_finite()
-        || (standard_deviation == 0.0 && normalized_standard_deviation != 0.0)
-    {
+    if !standard_deviation.is_finite() || standard_deviation == 0.0 {
         Err(ValidationError::InvalidInput)
-    } else if standard_deviation == 0.0 {
-        Ok(0.0)
     } else {
         Ok(standard_deviation)
     }
