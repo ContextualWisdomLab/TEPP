@@ -5,7 +5,6 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 from scripts import validate_documentation as docs
 
@@ -75,7 +74,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             "| [0001](0001-one.md) | One again | Accepted | partial | duplicate |\n",
             {"0001-one.md": "0001"},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "duplicate ADR index identity"):
                 docs.validate_adr_graph()
 
@@ -86,7 +85,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             "| [0001](0001-one.md) | One | Accepted | partial | canonical |\n",
             {"0001-one.md": "0001", "0001-two.md": "0001"},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "duplicate ADR file identity"):
                 docs.validate_adr_graph()
 
@@ -98,7 +97,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             "| [0002](0001-one.md) | Two mislabeled | Accepted | partial | bad link |\n",
             {"0001-one.md": "0001", "0002-two.md": "0002"},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "ADR index target identity mismatch"):
                 docs.validate_adr_graph()
 
@@ -110,7 +109,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             "| [0002](0001-one.md) | Two | Accepted | partial | duplicate target |\n",
             {"0001-one.md": "0001", "0002-two.md": "0002"},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "duplicate ADR index target"):
                 docs.validate_adr_graph()
 
@@ -122,7 +121,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             '| [0001](0001-one.md "duplicate") | One again | Accepted | partial | duplicate |\n',
             {"0001-one.md": "0001"},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "duplicate ADR index identity"):
                 docs.validate_adr_graph()
 
@@ -133,7 +132,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             "| [0001](0001-one.md) | One | Accepted | active-PR | drift |\n",
             {"0001-one.md": "0001"},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "ADR index maturity mismatch"):
                 docs.validate_adr_graph()
 
@@ -144,7 +143,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             "| [0001](0001-one.md) | One | Proposed | partial | drift |\n",
             {"0001-one.md": "0001"},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "ADR index decision-status mismatch"):
                 docs.validate_adr_graph()
 
@@ -160,7 +159,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             {"0001-one.md": "0001"},
             {"0001-one.md": body},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "multiple Implementation maturity"):
                 docs.validate_adr_graph()
 
@@ -176,7 +175,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             {"0001-one.md": "0001"},
             {"0001-one.md": body},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "multiple Implementation maturity"):
                 docs.validate_adr_graph()
 
@@ -192,7 +191,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             {"0001-one.md": "0001"},
             {"0001-one.md": body},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "multiple Decision status"):
                 docs.validate_adr_graph()
 
@@ -208,7 +207,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             {"0001-one.md": "0001"},
             {"0001-one.md": body},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             with self.assertRaisesRegex(AssertionError, "multiple Decision status"):
                 docs.validate_adr_graph()
 
@@ -220,7 +219,7 @@ class AdrIdentityUniquenessTests(unittest.TestCase):
             "| [0002](0002-two.md) | Two | Accepted | partial | canonical |\n",
             {"0001-one.md": "0001", "0002-two.md": "0002"},
         )
-        with mock.patch.object(docs, "ROOT", root):
+        with unittest.mock.patch.object(docs, "ROOT", root):
             docs.validate_adr_graph()
 
 

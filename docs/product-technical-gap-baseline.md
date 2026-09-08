@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-07T09:19:00Z  
+**Snapshot:** 2026-09-08T02:25:00Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
@@ -24,20 +24,18 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 
 Passing, queued, skipped, or predecessor-head checks on an open PR never promote that PR to implemented-main. Organization-admin bypass is not normal delivery evidence.
 
-## Current priority evidence
+## Current priority open pull-request evidence
 
-#435 intentionally omits its own mutable branch SHA from this file.
+Closure evidence is kept in this exact-head inventory; every row remains
+unshipped until protected-main integration and required evidence are complete.
+#435 intentionally omits its own mutable branch SHA to avoid a self-referential
+receipt.
 
-| PR / issue | Exact current evidence | Disposition |
-| --- | --- | --- |
-| #492 | `794ba9e6dda9f043aa499920fdf609b81b075d7e`, Ready for Review, base `main` | Canonical foundation repair for the stale repository-local cron contract exposed after #490 centralized hourly admission. Both CodeRabbit findings are repaired; both review threads are resolved and outdated. Rust Foundation `34011189084`, Documentation Quality, Security Scan, and Semgrep are exact-head GREEN. CodeQL `34011189081` is terminal failure before scan execution because canonical `.github` metadata binding sees `opencode-agent[bot]` while the owner allowlist remains `github-actions[bot]`; authorizing that app principal is an owner security decision. Fresh review submissions are COMMENTED only, with no qualifying `APPROVED`. |
-| #488 | `b77e485e956f15be35eba5d3b8420023b7a43c80`, Draft, base `fix/central-hourly-admission-contract@794ba9e6...` | Validation Evidence landing vehicle. Production proof order remains `neutral_zero_linear -> pairwise_reference -> generic_fallback`; exact sample admission remains `n=4..=16`. Exact predecessor `3e7c394cfe9525a57e9a9740683127add612f412` / Rust Foundation `34101173548` has formatting GREEN, then exactly two test-only `cast_precision_loss` Clippy findings; line and nightly branch coverage each fail during test execution before export/enforcement on the same stale extreme represented-result assertion, not on a measured coverage percentage. `b859c0a4...` makes the characterization candidate seed rounding explicit without changing exact arithmetic. Current head `b77e485e...` updates only the stale `[f64::MAX,-f64::MAX,0,0]` contract to the correctly rounded finite bits `0x7fda20bd700c2c3d`. Production arithmetic, fixtures, admission, skip/xfail state, and coverage denominators are unchanged. Rust Foundation `34104669388` is queued and Documentation Quality `34104669365` is pending at this snapshot; no current-head full GREEN or qualifying review is claimed. |
-| #491 | open | Replace the sample-count staircase with a measured exact-proof budget. Independent admitted-domain oracle breadth covers every `n=4..=16`; wider `n>16` Wide256/midpoint arithmetic remains characterization-only. The extreme symmetric represented witness `[f64::MAX,-f64::MAX,0,0]` is now explicitly admitted at `SE=f64::MAX/sqrt(6)` with bits `0x7fda20bd700c2c3d`. Before a production budget change, require same-head GREEN, truthful route telemetry, exact-rounding invariants, Rust 1.98.0 release-mode timing and allocator/RSS evidence, normal #492 landing, and code-current TRACEABILITY. |
-| #416 | `aa730c63563eb4a33048d822b581036c8487bd47`, Draft | Validation / Analysis Run landing vehicle. Generic cutoff-before-identity repair remains inherited; fold children keep unique source/tests/doctoring until conflict-resolving inheritance is verified. |
-| #310 | `c6680450152b1e0a2c9abb553772d74a23923335`, Draft | Longitudinal Modeling vehicle. Stable `Between` recovery is unit-level with canonical occasion `0`; `Within` retains actual occasion identity. Older base remains a non-destructive restack finding. |
-| #480 | `5b2637f7b6142573ba1385a652c56632ecc9faa5`, Draft/conflicted | contextual-orchestrator released-contract fail-closed integration vehicle. Mutable owner main is evidence only; #480 must non-force inherit protected #489/#490 while preserving its valid released-owner routing/security deltas. |
-
-Exact-head evidence becomes stale after any source push.
+| PR | Exact current head | Draft | Base | Disposition |
+| --- | --- | --- | --- | --- |
+| #492 | `794ba9e6dda9f043aa499920fdf609b81b075d7e` | false | main | Foundation repair; source checks are GREEN, but canonical CodeQL authorization and qualifying approval remain open. |
+| #488 | `4a103e9bf195db5a05b530220ce64c2636843fc0` | true | fix/central-hourly-admission-contract | Validation Evidence lane; current descendant carries additional numerical and coverage work, so predecessor `b77e485e...` results do not promote this head. |
+| #435 | `d428a51fde35ebb32f488a9c37db0d37bcbbc385` | true | main | README and delivery-authority lane; this recorded predecessor is superseded by any commit that updates this register and is never treated as exact-head GREEN. |
 
 ## Domain ownership
 
