@@ -99,6 +99,47 @@ class LcovSourceClassificationCacheTests(unittest.TestCase):
                 "source-wide cfg(test) classification must execute once per source",
             )
 
+    def test_cfg_not_feature_scan_does_not_repeat_for_da_rows(self) -> None:
+        """All-features cfg exclusion must not rescan one source per DA row."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "sample.rs"
+            source.write_text(
+                "fn sample() {\n"
+                "    first();\n"
+                "    second();\n"
+                "    third();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            report = root / "coverage.lcov"
+            report.write_text(
+                f"SF:{source}\n"
+                "DA:2,1\n"
+                "DA:3,1\n"
+                "DA:4,1\n"
+                "end_of_record\n",
+                encoding="utf-8",
+            )
+
+            original_scan = coverage_contract._line_in_cfg_not_feature_block
+            with mock.patch.object(
+                coverage_contract,
+                "_line_in_cfg_not_feature_block",
+                wraps=original_scan,
+            ) as scan:
+                self.assertEqual(
+                    coverage_contract.load_lcov_line_totals(report, repository_root=root),
+                    {"lines": {"count": 3, "covered": 3}},
+                )
+
+            self.assertLessEqual(
+                scan.call_count,
+                1,
+                "cfg(not(feature)) classification must not rescan a source for each DA row",
+            )
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
