@@ -31,6 +31,14 @@ pub(crate) fn validate_stationary_process_inputs(
 /// actually returns `p`, so the stationary variance itself must be representable
 /// as binary64. Callers decide whether zero stationary variance is admissible
 /// for their named estimand.
+///
+/// # Errors
+///
+/// Returns [`LongitudinalError::InvalidTemporalTransformInput`] for non-finite
+/// diffusion/drift inputs, negative diffusion, or when a strictly positive real
+/// stationary variance is not representable as binary64 (including collapse to
+/// exact zero). Returns
+/// [`LongitudinalError::StationaryVarianceRequiresStableDrift`] unless `a < 0`.
 pub fn recover_stationary_within_variance(
     continuous_diffusion: f64,
     log_rate: f64,

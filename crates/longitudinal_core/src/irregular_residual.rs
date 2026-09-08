@@ -328,7 +328,7 @@ pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, Longitudina
     }
 
     positives.sort_by(|left, right| right.total_cmp(left));
-    negatives.sort_by(|left, right| left.total_cmp(right));
+    negatives.sort_by(f64::total_cmp);
 
     let mut positive_index = 0_usize;
     let mut negative_index = 0_usize;
@@ -408,7 +408,7 @@ fn exact_power_of_two_scale(max_magnitude: f64) -> f64 {
     let exponent = (bits >> 52) & 0x7ff;
     if exponent == 0 {
         let significand = bits & 0x000f_ffff_ffff_ffff;
-        let highest_bit = 63 - significand.leading_zeros();
+        let highest_bit = significand.ilog2();
         f64::from_bits(1_u64 << highest_bit)
     } else {
         f64::from_bits(exponent << 52)
@@ -456,7 +456,9 @@ pub(crate) fn driver_same_sign_log_rate(
         }
     };
     let rate = log_ratio / event_interval.as_f64();
-    if !rate.is_finite() || (rate == 0.0 && later_magnitude != earlier_magnitude) {
+    if !rate.is_finite()
+        || (rate == 0.0 && later_magnitude.to_bits() != earlier_magnitude.to_bits())
+    {
         Err(LongitudinalError::InvalidTemporalTransformInput)
     } else {
         Ok(rate)
@@ -474,11 +476,11 @@ fn require_finite(value: f64) -> Result<f64, LongitudinalError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        EventTimedObservation, LaggedWithinResidual, center_within_unit_event_lags,
-        driver_same_sign_log_rate, recover_centered_irregular_residual_log_rate,
+        center_within_unit_event_lags, driver_same_sign_log_rate,
+        recover_centered_irregular_residual_log_rate,
         recover_within_unit_irregular_residual_log_rate,
         refuse_cwc_residual_log_rate_as_raw_process_drift, same_sign_nonzero,
-        scaled_compensated_mean,
+        scaled_compensated_mean, EventTimedObservation, LaggedWithinResidual,
     };
     use crate::{EventTimeInterval, LongitudinalError};
 
@@ -749,16 +751,12 @@ mod tests {
             timed(2, 2.0, -0.8),
         ])
         .expect("extract");
-        assert!(
-            extracted
-                .iter()
-                .any(|pair| pair.later_residual().to_bits() == 0.0_f64.to_bits())
-        );
-        assert!(
-            extracted
-                .iter()
-                .any(|pair| pair.earlier_residual().to_bits() == 0.0_f64.to_bits())
-        );
+        assert!(extracted
+            .iter()
+            .any(|pair| pair.later_residual().to_bits() == 0.0_f64.to_bits()));
+        assert!(extracted
+            .iter()
+            .any(|pair| pair.earlier_residual().to_bits() == 0.0_f64.to_bits()));
         assert!(extracted.iter().any(|pair| same_sign_nonzero(
             pair.earlier_residual(),
             pair.later_residual()

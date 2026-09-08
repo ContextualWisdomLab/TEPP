@@ -28,8 +28,8 @@ fn scaled_integer_leq(
     right_significand: u128,
     right_exponent: i32,
 ) -> bool {
-    let left_bits = (u128::BITS - left_significand.leading_zeros()) as i32;
-    let right_bits = (u128::BITS - right_significand.leading_zeros()) as i32;
+    let left_bits = (u128::BITS - left_significand.leading_zeros()).cast_signed();
+    let right_bits = (u128::BITS - right_significand.leading_zeros()).cast_signed();
     let left_order = left_exponent + left_bits;
     let right_order = right_exponent + right_bits;
     if left_order != right_order {
@@ -39,10 +39,10 @@ fn scaled_integer_leq(
         return left_significand <= right_significand;
     }
     if left_exponent > right_exponent {
-        let shift = (left_exponent - right_exponent) as u32;
+        let shift = (left_exponent - right_exponent).cast_unsigned();
         return (left_significand << shift) <= right_significand;
     }
-    let shift = (right_exponent - left_exponent) as u32;
+    let shift = (right_exponent - left_exponent).cast_unsigned();
     left_significand <= (right_significand << shift)
 }
 

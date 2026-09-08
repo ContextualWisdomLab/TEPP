@@ -1,6 +1,6 @@
 //! Event-time standardisation for scalar continuous-time drift.
 
-use crate::{EventTimeInterval, LongitudinalError, stationary::validate_stationary_process_inputs};
+use crate::{stationary::validate_stationary_process_inputs, EventTimeInterval, LongitudinalError};
 
 /// Recover the scalar p. 16 `discreteDRIFTstd` on event time.
 ///
@@ -53,7 +53,7 @@ pub fn recover_event_time_standardised_discrete_drift(
     // transition lies strictly inside (0, 1). Returning either endpoint would
     // erase a nonzero scientific effect solely because binary64 cannot express
     // it, so both endpoint collapses fail closed.
-    if discrete_drift == 0.0 || discrete_drift == 1.0 {
+    if discrete_drift == 0.0 || discrete_drift.to_bits() == 1.0_f64.to_bits() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
     }
     Ok(discrete_drift)
