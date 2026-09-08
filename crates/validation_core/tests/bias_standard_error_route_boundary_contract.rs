@@ -1,3 +1,5 @@
+//! Route-boundary regression tests for representability and sample-budget fallbacks.
+
 use validation_core::{ValidationError, bias_standard_error};
 
 #[test]
