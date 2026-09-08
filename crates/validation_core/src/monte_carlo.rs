@@ -137,8 +137,7 @@ impl MonteCarloSummary {
         let scaled_support = (self.standard_deviation / scale) * moment_factor;
         // Positive spread makes the finite scale strictly positive; the normalized
         // deviations and support therefore cannot become non-finite here.
-        if combined_scaled_deviation
-            > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
+        if combined_scaled_deviation > scaled_support * (1.0 + EMPIRICAL_SUPPORT_RELATIVE_TOLERANCE)
         {
             return Err(ValidationError::InvalidInput);
         }

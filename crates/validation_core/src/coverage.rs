@@ -518,9 +518,8 @@ mod tests {
         // Exercise the inexact-u64 reciprocal path without allocating an
         // impossible >2^53 observation vector.
         let inexact_sample_count = (1_u64 << 53) + 1;
-        let (lower, upper) =
-            wilson_coverage_interval_from_counts(0, inexact_sample_count, 1.96)
-                .expect("zero-covered interval for exact retained count");
+        let (lower, upper) = wilson_coverage_interval_from_counts(0, inexact_sample_count, 1.96)
+            .expect("zero-covered interval for exact retained count");
         assert_eq!(lower.to_bits(), 0.0_f64.to_bits());
         assert!(upper > 0.0);
         assert!(upper < 1.0);
