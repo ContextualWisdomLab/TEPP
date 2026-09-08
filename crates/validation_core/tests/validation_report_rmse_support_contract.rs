@@ -79,14 +79,20 @@ fn rmse_slot_rejects_nonfinite_relative_standard_error() {
 
 #[test]
 fn rmse_slot_accepts_finite_percentile_ratio_at_maximum_replication_count() {
-    let replication_support = usize::MAX as f64;
+    #[cfg(target_pointer_width = "64")]
+    const REPLICATION_SUPPORT: f64 = 18_446_744_073_709_551_616.0;
+    #[cfg(target_pointer_width = "32")]
+    const REPLICATION_SUPPORT: f64 = 4_294_967_295.0;
+    #[cfg(target_pointer_width = "16")]
+    const REPLICATION_SUPPORT: f64 = 65_535.0;
+
     let summary = MonteCarloSummary {
         replication_count: usize::MAX,
         mean: 1.0,
-        standard_deviation: replication_support.sqrt(),
+        standard_deviation: REPLICATION_SUPPORT.sqrt(),
         standard_error: 1.0,
         percentile_lower: 1.0,
-        percentile_upper: replication_support,
+        percentile_upper: REPLICATION_SUPPORT,
     };
     summary
         .validate()
