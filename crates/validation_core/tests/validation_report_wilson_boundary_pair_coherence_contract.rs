@@ -9,6 +9,7 @@ const COMPLEMENT_COVERAGE: f64 = f64::from_bits(0x3fef_ffff_faa1_9c47);
 const COMPLEMENT_LOWER: f64 = f64::from_bits(0x3fdf_ffff_f543_3890);
 const MINIMUM_U64_COVERAGE: f64 = f64::from_bits(0x3bf0_0000_0000_0000);
 const LARGEST_COVERAGE_BELOW_ONE: f64 = f64::from_bits(0x3fef_ffff_ffff_ffff);
+const EXTREME_PRODUCER_LOWER: f64 = f64::from_bits(0x0360_0000_0000_0000);
 
 fn report_with_wilson_pair(coverage: f64, lower: f64, upper: f64) -> ValidationReport {
     ValidationReport {
@@ -68,10 +69,20 @@ fn rounded_zero_and_one_pair_remains_admissible_when_peer_root_is_unrepresentabl
     assert!(artifact.validate().is_ok());
 }
 
-/// Preserves the complement-symmetric unresolved boundary immediately below full coverage.
+/// Preserves a finite-producer pair whose uncovered peer root rounds to zero.
+///
+/// For `n = 2^53`, `covered = n - 1`, and finite
+/// `z = f64::from_bits(0x5fdf_ffff_ffff_ffff)`, the rationalized producer
+/// returns lower `2^-969` while the complement lower root underflows to zero;
+/// the stored upper endpoint is therefore exact one without erasing the
+/// representable positive lower endpoint.
 #[test]
-fn rounded_zero_and_one_pair_remains_admissible_below_full_coverage() {
-    let artifact = report_with_wilson_pair(LARGEST_COVERAGE_BELOW_ONE, 0.0, 1.0);
+fn exact_one_upper_remains_admissible_for_finite_extreme_producer() {
+    let artifact = report_with_wilson_pair(
+        LARGEST_COVERAGE_BELOW_ONE,
+        EXTREME_PRODUCER_LOWER,
+        1.0,
+    );
 
     assert!(artifact.validate().is_ok());
 }
