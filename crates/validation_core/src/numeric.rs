@@ -158,11 +158,9 @@ fn round_candidate_with_tail(candidate: f64, tail_head: f64, tail_tail: f64) -> 
         return candidate;
     }
 
-    let upward = if tail == 0.0 {
-        tail_roundoff.is_sign_positive()
-    } else {
-        tail.is_sign_positive()
-    };
+    // For finite binary64 inputs, a zero error-free sum is exact cancellation,
+    // so its roundoff is also zero. The early return therefore leaves a nonzero tail.
+    let upward = tail.is_sign_positive();
     let neighbor = adjacent_float(candidate, upward);
     if !neighbor.is_finite() {
         return neighbor;
