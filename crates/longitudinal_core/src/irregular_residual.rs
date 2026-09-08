@@ -172,9 +172,8 @@ pub fn center_within_unit_event_lags(
             ));
         }
     }
-    if pairs.is_empty() {
-        return Err(LongitudinalError::InvalidObservationPayload);
-    }
+    // Two lag-contributing units each yield at least one validated window, so
+    // the pair list cannot be empty once the admission checks above succeed.
     Ok(pairs)
 }
 
@@ -479,8 +478,8 @@ mod tests {
         EventTimedObservation, LaggedWithinResidual, center_within_unit_event_lags,
         driver_same_sign_log_rate, recover_centered_irregular_residual_log_rate,
         recover_within_unit_irregular_residual_log_rate,
-        refuse_cwc_residual_log_rate_as_raw_process_drift, same_sign_nonzero,
-        scaled_compensated_mean,
+        refuse_cwc_residual_log_rate_as_raw_process_drift, require_finite, same_sign_nonzero,
+        same_sign_mean_over_total, scaled_compensated_mean,
     };
     use crate::{EventTimeInterval, LongitudinalError};
 
@@ -978,4 +977,42 @@ mod tests {
             Err(LongitudinalError::InvalidObservationPayload)
         );
     }
+
+    #[test]
+    fn singleton_unit_is_skipped_once_two_lag_units_admit() {
+        let rows = [
+            timed(1, 0.0, 1.0),
+            timed(1, 1.0, 0.5),
+            timed(2, 0.0, 2.0),
+            timed(2, 1.0, 1.0),
+            timed(3, 0.0, 9.0),
+        ];
+        let pairs = center_within_unit_event_lags(&rows).expect("singleton skipped");
+        assert_eq!(pairs.len(), 2);
+    }
+
+    #[test]
+    fn continued_exact_cancel_keeps_remaining_same_sign_terms() {
+        let mean = scaled_compensated_mean(&[3.0, 1.0, -3.0, -1.0]).expect("continued cancel");
+        assert_eq!(mean.to_bits(), 0.0_f64.to_bits());
+    }
+
+    #[test]
+    fn same_sign_mean_over_total_accepts_all_zero_magnitudes() {
+        assert_eq!(same_sign_mean_over_total(&[0.0, 0.0], 2), Ok(0.0));
+    }
+
+    #[test]
+    fn require_finite_rejects_non_finite_values() {
+        assert_eq!(
+            require_finite(f64::INFINITY),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+        assert_eq!(
+            require_finite(f64::NAN),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+        assert_eq!(require_finite(1.5), Ok(1.5));
+    }
 }
+

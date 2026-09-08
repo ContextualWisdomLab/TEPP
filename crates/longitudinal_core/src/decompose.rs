@@ -225,4 +225,19 @@ mod tests {
         assert_eq!(recovered[0].level(), ComponentLevel::Between);
         assert_eq!(recovered[0].value().to_bits(), minimum_subnormal.to_bits());
     }
+
+    #[test]
+    fn overflowing_within_residual_after_finite_mean_fails_closed() {
+        // Mean remains finite while MAX - (-MAX/3)-class residuals overflow.
+        let rows = [
+            OccasionObservation::new(0, 0, f64::MAX),
+            OccasionObservation::new(0, 1, f64::MAX),
+            OccasionObservation::new(0, 2, -f64::MAX),
+        ];
+        assert_eq!(
+            decompose_within_between(&rows),
+            Err(LongitudinalError::InvalidObservationPayload)
+        );
+    }
 }
+

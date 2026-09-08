@@ -136,4 +136,13 @@ mod tests {
             Err(LongitudinalError::InvalidTemporalTransformInput)
         );
     }
+
+    #[test]
+    fn overflowed_twice_rate_rejects_underflowed_stationary_variance() {
+        assert_eq!(
+            recover_stationary_within_variance(f64::from_bits(1), -f64::MAX),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+    }
 }
+

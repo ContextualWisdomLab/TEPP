@@ -233,4 +233,14 @@ mod tests {
             Err(LongitudinalError::InvalidTemporalTransformInput)
         );
     }
+
+    #[test]
+    fn doubled_interval_overflow_rejects_nonfinite_half_exponent() {
+        let huge = EventTimeInterval::new(f64::MAX).expect("finite positive interval");
+        assert_eq!(
+            recover_event_time_standardised_discrete_diffusion(1.0, -f64::MAX, huge),
+            Err(LongitudinalError::InvalidTemporalTransformInput)
+        );
+    }
 }
+

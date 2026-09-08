@@ -188,7 +188,7 @@ pub fn component_root_mean_square_error(
 
 #[cfg(test)]
 mod tests {
-    use super::{ComponentValue, component_root_mean_square_error};
+    use super::{ComponentValue, add_scaled_square, component_root_mean_square_error};
     use crate::{ComponentLevel, LongitudinalError};
 
     #[test]
@@ -302,4 +302,30 @@ mod tests {
             3
         );
     }
+
+    #[test]
+    fn duplicate_decided_identity_fails_closed() {
+        let truth = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, 0.5),
+            ComponentValue::new(1, 0, ComponentLevel::Between, 0.25),
+        ];
+        let decided = [
+            ComponentValue::new(0, 0, ComponentLevel::Between, 0.5),
+            ComponentValue::new(0, 0, ComponentLevel::Between, 0.4),
+        ];
+        assert_eq!(
+            component_root_mean_square_error(&truth, &decided),
+            Err(LongitudinalError::InvalidComponentPayload)
+        );
+    }
+
+    #[test]
+    fn zero_ratio_scaled_square_is_a_no_op() {
+        let mut scale = 2.0_f64;
+        let mut sum = 3.0_f64;
+        add_scaled_square(&mut scale, &mut sum, 4.0, 0.0);
+        assert_eq!(scale.to_bits(), 2.0_f64.to_bits());
+        assert_eq!(sum.to_bits(), 3.0_f64.to_bits());
+    }
 }
+

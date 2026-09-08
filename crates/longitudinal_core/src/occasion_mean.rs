@@ -111,9 +111,8 @@ pub fn center_occasion_mean_event_lags(
         }
     }
 
-    if pairs.is_empty() {
-        return Err(LongitudinalError::InvalidObservationPayload);
-    }
+    // Two lag-contributing units each yield at least one validated window, so
+    // the pair list cannot be empty once occasion means and intervals validate.
     Ok(pairs)
 }
 
@@ -158,4 +157,70 @@ fn canonical_event_time_key(event_time: f64) -> u64 {
 
 fn occasion_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     scaled_compensated_mean(values).map_err(|_| LongitudinalError::InvalidObservationPayload)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        center_occasion_mean_event_lags, recover_occasion_mean_centered_irregular_residual_log_rate,
+    };
+    use crate::irregular_residual::EventTimedObservation;
+    use crate::LongitudinalError;
+
+    fn timed(unit: u32, event_time: f64, score: f64) -> EventTimedObservation {
+        EventTimedObservation::new(unit, event_time, score)
+    }
+
+    #[test]
+    fn fewer_than_two_lag_units_fail_closed() {
+        assert_eq!(
+            center_occasion_mean_event_lags(&[
+                timed(1, 0.0, 1.0),
+                timed(1, 1.0, 0.5),
+                timed(2, 0.0, 2.0),
+            ]),
+            Err(LongitudinalError::InvalidObservationPayload)
+        );
+    }
+
+    #[test]
+    fn singleton_unit_is_skipped_when_two_lag_units_admit() {
+        // Units 1 and 2 contribute lags; unit 3 appears only once at a shared time so
+        // occasion means still have >=2 units while the singleton is skipped in the
+        // per-unit lag loop.
+        let pairs = center_occasion_mean_event_lags(&[
+            timed(1, 0.0, 1.0),
+            timed(1, 1.0, 0.5),
+            timed(2, 0.0, 2.0),
+            timed(2, 1.0, 1.0),
+            timed(3, 0.0, 9.0),
+        ])
+        .expect("singleton unit skipped");
+        assert_eq!(pairs.len(), 2);
+    }
+
+    #[test]
+    fn overflowing_occasion_mean_residual_fails_closed() {
+        assert_eq!(
+            center_occasion_mean_event_lags(&[
+                timed(1, 0.0, -f64::MAX),
+                timed(1, 1.0, -f64::MAX),
+                timed(2, 0.0, -f64::MAX),
+                timed(2, 1.0, f64::MAX),
+            ]),
+            Err(LongitudinalError::InvalidObservationPayload)
+        );
+    }
+
+    #[test]
+    fn happy_path_recovers_finite_log_rate() {
+        let rate = recover_occasion_mean_centered_irregular_residual_log_rate(&[
+            timed(1, 0.0, 1.0),
+            timed(1, 1.0, 0.5),
+            timed(2, 0.0, 2.0),
+            timed(2, 1.0, 1.0),
+        ])
+        .expect("occasion-mean rate");
+        assert!(rate.is_finite());
+    }
 }
