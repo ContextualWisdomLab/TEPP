@@ -1,6 +1,6 @@
 //! Empirical-support regressions for externally constructed Monte Carlo summaries.
 
-use validation_core::{MonteCarloSummary, ValidationError};
+use validation_core::{MonteCarloSummary, ValidationError, summarize_replications};
 
 fn three_replication_summary(lower: f64, upper: f64) -> MonteCarloSummary {
     MonteCarloSummary {
@@ -27,4 +27,12 @@ fn summary_rejects_distinct_endpoints_that_exceed_joint_deviation_budget() {
     // Each endpoint separately fits SD * sqrt(n - 1); the pair does not fit
     // the shared (n - 1) * SD^2 deviation budget.
     assert_eq!(summary.validate(), Err(ValidationError::InvalidInput));
+}
+
+#[test]
+fn summarization_refuses_unrepresentable_full_range_sample_spread() {
+    assert_eq!(
+        summarize_replications(&[-f64::MAX, f64::MAX], 0.0, 1.0),
+        Err(ValidationError::InvalidInput)
+    );
 }
