@@ -188,18 +188,18 @@ impl ValidationReport {
 
         if let Some(summary) = self.monte_carlo_rmse {
             let summary = summary.validate()?;
-            if summary.mean < 0.0
-                || summary.percentile_lower < 0.0
-                || summary.percentile_upper < 0.0
-            {
+            // Generic summary validation already proves lower <= upper. Once the
+            // lower RMSE percentile is nonnegative, the upper endpoint cannot be
+            // negative, so a second upper-endpoint sign guard would be unreachable.
+            if summary.mean < 0.0 || summary.percentile_lower < 0.0 {
                 return Err(ValidationError::InvalidInput);
             }
             if summary.mean == 0.0 {
-                if summary.standard_deviation != 0.0
-                    || summary.standard_error != 0.0
-                    || summary.percentile_lower != 0.0
-                    || summary.percentile_upper != 0.0
-                {
+                // For zero generic spread, MonteCarloSummary::validate requires
+                // zero standard error and both endpoints to equal the represented
+                // mean. After the RMSE nonnegative-support check above, positive
+                // spread is therefore the only remaining impossible zero-mean state.
+                if summary.standard_deviation != 0.0 {
                     return Err(ValidationError::InvalidInput);
                 }
             } else {
