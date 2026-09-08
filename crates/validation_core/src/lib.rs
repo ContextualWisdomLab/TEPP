@@ -101,4 +101,28 @@ mod numeric_contract_tests {
         let result = deterministic_representable_sum_over_count(&[f64::MIN_POSITIVE], usize::MAX);
         assert!(matches!(result, Err(crate::ValidationError::InvalidInput)));
     }
+
+    #[test]
+    fn mixed_sign_tail_rounds_below_the_adjacent_midpoint() {
+        let half_ulp_at_one = 2.0_f64.powi(-53);
+        let ulp_at_one = 2.0_f64.powi(-52);
+        let represented = deterministic_representable_sum_over_count(
+            &[half_ulp_at_one, -ulp_at_one, -(1.0 + ulp_at_one)],
+            3,
+        )
+        .expect("represented mixed-sign mean");
+        assert_eq!(represented.to_bits(), 0xbfd5_5555_5555_5557);
+    }
+
+    #[test]
+    fn mixed_sign_compensation_can_resolve_to_exact_zero() {
+        let one_down = f64::from_bits(1.0_f64.to_bits() - 1);
+        let ulp_at_one = 2.0_f64.powi(-52);
+        let represented = deterministic_representable_sum_over_count(
+            &[one_down, one_down, ulp_at_one, -2.0],
+            4,
+        )
+        .expect("exact compensated cancellation");
+        assert_eq!(represented, 0.0);
+    }
 }
