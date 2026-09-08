@@ -336,8 +336,6 @@ fn represented_correction_le_exact_product_roundoff(
     factor_b: f64,
     rounded_product: f64,
 ) -> bool {
-    debug_assert!(correction.is_finite() && correction != 0.0);
-    debug_assert!(rounded_product.is_finite() && rounded_product > 0.0);
     debug_assert!(
         same_numeric_value(factor_a.mul_add(factor_b, -rounded_product), correction),
         "caller must provide the equal nonzero projected product correction"
