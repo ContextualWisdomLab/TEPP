@@ -668,15 +668,16 @@ mod tests {
     }
 
     fn overflowing_cwc_rate_rows(unit: u32, growing: bool) -> [EventTimedObservation; 3] {
-        // Use a representable nonzero leftover after MAX/-MAX cancellation so the
-        // unit mean does not underflow to a false zero (ae5081 fail-closed). A
-        // unit score of 1.0 still yields an astronomical same-sign log-rate once
-        // divided by the 1e-305 event interval, so pairwise rate sums still overflow.
+        // Representable leftover after MAX/-MAX cancellation (ae5081 false-zero
+        // mean fail-closed). 1e-100 keeps the unit mean nonzero while ln(MAX/r)/Δt
+        // with Δt=1e-305 still exceeds MAX/2 so two pairwise rates overflow when
+        // added, exercising compensated-mean recovery of the overflowed sum.
         let delta = 1e-305_f64;
+        let leftover = 1e-100_f64;
         let (first, second) = if growing {
-            (1.0, f64::MAX)
+            (leftover, f64::MAX)
         } else {
-            (f64::MAX, 1.0)
+            (f64::MAX, leftover)
         };
         [
             timed(unit, 0.0, first),
