@@ -1,3 +1,5 @@
+//! Regression contract for extreme Wilson evidence on an inexact retained count.
+
 use validation_core::WilsonCoverageEvidenceV1;
 
 #[test]
