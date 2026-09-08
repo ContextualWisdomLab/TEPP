@@ -207,6 +207,13 @@ def _cfg_not_feature_line_numbers_for_path(path: Path) -> frozenset[int]:
     return frozenset(_cfg_not_feature_line_numbers(_read_source_lines(path)))
 
 
+@cache
+def _multiline_data_line_numbers_for_path(path: Path) -> frozenset[int]:
+    """Return one cached multiline data/comment classification for *path*."""
+
+    return frozenset(_multiline_data_line_numbers(_read_source_lines(path)))
+
+
 def is_executable_source_line(
     source_path: str,
     line_number: int,
@@ -228,6 +235,7 @@ def is_executable_source_line(
         _read_source_lines.cache_clear()
         _cfg_test_module_line_numbers_for_path.cache_clear()
         _cfg_not_feature_line_numbers_for_path.cache_clear()
+        _multiline_data_line_numbers_for_path.cache_clear()
     try:
         path = (
             resolve_repository_source_path(source_path, repository_root)
@@ -244,7 +252,7 @@ def is_executable_source_line(
         return False
     if line_number in _cfg_not_feature_line_numbers_for_path(path):
         return False
-    if _line_in_multiline_string_literal(lines, line_number):
+    if line_number in _multiline_data_line_numbers_for_path(path):
         return False
     text = lines[line_number - 1].strip()
     if not text:
@@ -594,20 +602,15 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
     return line_number in _cfg_not_feature_line_numbers(lines)
 
 
-def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
-    """Return whether a line is only multiline string or block-comment data.
+def _multiline_data_line_numbers(lines: list[str]) -> set[int]:
+    """Return lines that contain only multiline literal or block-comment data."""
 
-    The scanner tracks normal strings, raw strings, nested block comments, and
-    character literals. A continuation or block-comment line remains excluded
-    only when closing the data leaves no executable suffix on that same line.
-    """
-
+    data_lines: set[int] = set()
     in_string = False
     raw_hashes: int | None = None
     block_comment_depth = 0
     for index, raw in enumerate(lines, start=1):
-        target_continuation = (in_string or raw_hashes is not None) and index == line_number
-        target_block_comment = block_comment_depth > 0 and index == line_number
+        target_data = in_string or raw_hashes is not None or block_comment_depth > 0
         target_closing_cursor: int | None = None
         target_has_executable_suffix = False
         cursor = 0
@@ -620,7 +623,7 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                     block_comment_depth -= 1
                     cursor += 2
                     if (
-                        target_block_comment
+                        target_data
                         and block_comment_depth == 0
                         and target_closing_cursor is None
                     ):
@@ -636,7 +639,7 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                 else:
                     raw_hashes = None
                     cursor = closing + len(delimiter)
-                    if target_continuation and target_closing_cursor is None:
+                    if target_data and target_closing_cursor is None:
                         target_closing_cursor = cursor
                 continue
             if in_string:
@@ -646,7 +649,7 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                 elif character == '"':
                     in_string = False
                     cursor += 1
-                    if target_continuation and target_closing_cursor is None:
+                    if target_data and target_closing_cursor is None:
                         target_closing_cursor = cursor
                 else:
                     cursor += 1
@@ -657,15 +660,12 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
             if raw.startswith("//", cursor):
                 break
             if raw.startswith("/*", cursor):
-                if index == line_number and not raw[:cursor].strip():
-                    target_block_comment = True
+                if not target_data and not raw[:cursor].strip():
+                    target_data = True
                 block_comment_depth += 1
                 cursor += 2
                 continue
-            if (
-                (target_continuation or target_block_comment)
-                and target_closing_cursor is not None
-            ):
+            if target_data and target_closing_cursor is not None:
                 if raw[cursor] in ",;)]}":
                     cursor += 1
                     continue
@@ -684,11 +684,17 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                     cursor = character_end
                     continue
             cursor += 1
-        if target_continuation or target_block_comment:
-            if target_closing_cursor is None:
-                return True
-            return not target_has_executable_suffix
-    return False
+        if target_data and (
+            target_closing_cursor is None or not target_has_executable_suffix
+        ):
+            data_lines.add(index)
+    return data_lines
+
+
+def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
+    """Return whether a line is only multiline string or block-comment data."""
+
+    return line_number in _multiline_data_line_numbers(lines)
 
 
 def _raw_string_start(line: str, cursor: int) -> tuple[int, int] | None:
@@ -747,6 +753,7 @@ def load_lcov_line_totals(
     _read_source_lines.cache_clear()
     _cfg_test_module_line_numbers_for_path.cache_clear()
     _cfg_not_feature_line_numbers_for_path.cache_clear()
+    _multiline_data_line_numbers_for_path.cache_clear()
     source_path: str | None = None
     line_counts: dict[tuple[str, int], int] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
