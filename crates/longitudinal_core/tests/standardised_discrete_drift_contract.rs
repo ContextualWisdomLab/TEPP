@@ -39,7 +39,8 @@ fn known_truth_grid_has_machine_precision_rmse() {
         let truth = (rate * delta).exp();
         squared_error_sum += (recovered - truth).powi(2);
     }
-    let rmse = (squared_error_sum / cases.len() as f64).sqrt();
+    let case_count = u32::try_from(cases.len()).expect("known-truth grid fits in u32");
+    let rmse = (squared_error_sum / f64::from(case_count)).sqrt();
     assert!(rmse <= f64::EPSILON);
 }
 
