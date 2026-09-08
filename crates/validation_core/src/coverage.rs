@@ -251,7 +251,10 @@ fn wilson_bounds_from_represented_proportion(n: f64, p: f64, z: f64, z2: f64) ->
     let radical = (p * (1.0 - p) / n) + z2 / (4.0 * n * n);
     let margin = z * radical.sqrt();
     let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
-    let high = if same_numeric_value(direct_high, 1.0) && p < 1.0 && z2 > 0.0 {
+    // This helper is reached only for a non-all-covered count. Its p is either
+    // the smaller uncovered proportion or covered/sample with covered<=uncovered,
+    // so p<1; direct_high==1 also cannot arise from an underflowed z²==0.
+    let high = if same_numeric_value(direct_high, 1.0) {
         let uncovered_lower = rationalized_wilson_positive_lower(n, 1.0 - p, z, z2);
         (1.0 - uncovered_lower).clamp(0.0, 1.0)
     } else {
@@ -278,7 +281,8 @@ fn wilson_bounds_from_represented_proportion_and_inverse_sample_count(
     let radical = p * (1.0 - p) * inverse_n + z2 * inverse_n * inverse_n / 4.0;
     let margin = z * radical.sqrt();
     let direct_high = ((center + margin) / denominator).clamp(0.0, 1.0);
-    let high = if same_numeric_value(direct_high, 1.0) && p < 1.0 && z2 > 0.0 {
+    // The same non-all-covered caller invariant holds for the reciprocal-count path.
+    let high = if same_numeric_value(direct_high, 1.0) {
         let uncovered_lower =
             rationalized_wilson_positive_lower_from_inverse_sample_count(inverse_n, 1.0 - p, z, z2);
         (1.0 - uncovered_lower).clamp(0.0, 1.0)
@@ -403,7 +407,8 @@ pub fn wilson_coverage_interval(
 mod tests {
     use super::{
         correctly_rounded_unit_ratio, interval_coverage, positive_f64_over_inexact_u64,
-        u64_is_exact_binary64_integer, wilson_coverage_interval,
+        represented_coverage_from_counts, u64_is_exact_binary64_integer, wilson_coverage_interval,
+        wilson_coverage_interval_from_counts,
     };
     use crate::ValidationError;
 
@@ -474,6 +479,51 @@ mod tests {
             positive_f64_over_inexact_u64(1e40, sample_count).to_bits(),
             0x44ed_6329_f1c3_5ca4
         );
+    }
+
+    #[test]
+    fn count_level_coverage_guards_and_extreme_counts_fail_or_project_correctly() {
+        assert_eq!(
+            represented_coverage_from_counts(0, 0),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            represented_coverage_from_counts(2, 1),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            wilson_coverage_interval_from_counts(0, 0, 1.96),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            wilson_coverage_interval_from_counts(2, 1, 1.96),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            wilson_coverage_interval_from_counts(0, 1, f64::NAN),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        assert_eq!(
+            wilson_coverage_interval_from_counts(0, 1, 0.0),
+            Err(ValidationError::InvalidConfiguration)
+        );
+
+        // A positive z can square to exact zero. All-covered evidence remains
+        // exactly [1,1] instead of fabricating finite-sample uncertainty.
+        assert_eq!(
+            wilson_coverage_interval_from_counts(1, 1, f64::MIN_POSITIVE),
+            Ok((1.0, 1.0))
+        );
+
+        // Exercise the inexact-u64 reciprocal path without allocating an
+        // impossible >2^53 observation vector.
+        let inexact_sample_count = (1_u64 << 53) + 1;
+        let (lower, upper) =
+            wilson_coverage_interval_from_counts(0, inexact_sample_count, 1.96)
+                .expect("zero-covered interval for exact retained count");
+        assert_eq!(lower.to_bits(), 0.0_f64.to_bits());
+        assert!(upper > 0.0);
+        assert!(upper < 1.0);
     }
 
     #[test]
