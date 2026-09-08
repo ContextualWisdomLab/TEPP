@@ -10,6 +10,5 @@
 /// Re-exports [`crate::irregular_residual::recover_centered_irregular_residual_log_rate`]
 /// and [`crate::irregular_residual::recover_within_unit_irregular_residual_log_rate`].
 pub use crate::irregular_residual::{
-    recover_centered_irregular_residual_log_rate,
-    recover_within_unit_irregular_residual_log_rate,
+    recover_centered_irregular_residual_log_rate, recover_within_unit_irregular_residual_log_rate,
 };
