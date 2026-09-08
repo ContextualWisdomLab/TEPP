@@ -35,7 +35,6 @@ receipt.
 | --- | --- | --- | --- | --- |
 | #492 | `794ba9e6dda9f043aa499920fdf609b81b075d7e` | false | main | Foundation repair; source checks are GREEN, but canonical CodeQL authorization and qualifying approval remain open. |
 | #488 | `4a103e9bf195db5a05b530220ce64c2636843fc0` | true | fix/central-hourly-admission-contract | Validation Evidence lane; current descendant carries additional numerical and coverage work, so predecessor `b77e485e...` results do not promote this head. |
-| #435 | `d428a51fde35ebb32f488a9c37db0d37bcbbc385` | true | main | README and delivery-authority lane; this recorded predecessor is superseded by any commit that updates this register and is never treated as exact-head GREEN. |
 
 ## Domain ownership
 
