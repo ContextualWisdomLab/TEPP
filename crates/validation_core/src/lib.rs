@@ -118,11 +118,9 @@ mod numeric_contract_tests {
     fn mixed_sign_compensation_can_resolve_to_exact_zero() {
         let one_down = f64::from_bits(1.0_f64.to_bits() - 1);
         let ulp_at_one = 2.0_f64.powi(-52);
-        let represented = deterministic_representable_sum_over_count(
-            &[one_down, one_down, ulp_at_one, -2.0],
-            4,
-        )
-        .expect("exact compensated cancellation");
+        let represented =
+            deterministic_representable_sum_over_count(&[one_down, one_down, ulp_at_one, -2.0], 4)
+                .expect("exact compensated cancellation");
         assert_eq!(represented, 0.0);
     }
 }
