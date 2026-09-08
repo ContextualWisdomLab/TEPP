@@ -638,9 +638,8 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
         return scaled_standard_error(&subtraction_roundoffs, roundoff_mean);
     }
 
-    if diffs.len() > 2
-        && let Some(standard_error) =
-            exact_translated_residual_standard_error(&diffs, &subtraction_roundoffs)?
+    if let Some(standard_error) =
+        exact_translated_residual_standard_error(&diffs, &subtraction_roundoffs)?
     {
         return Ok(standard_error);
     }
