@@ -64,7 +64,6 @@ def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int
     return coordinates, true_count, false_count
 
 
-
 def is_live_sqlx_transport_source(filename: str) -> bool:
     """Return whether *filename* is the live-server SQLx transport source.
 
@@ -194,6 +193,13 @@ def _read_source_lines(path: Path) -> list[str]:
     return path.read_text(encoding="utf-8").splitlines()
 
 
+@cache
+def _cfg_test_module_line_numbers_for_path(path: Path) -> frozenset[int]:
+    """Return one cached cfg(test) classification snapshot for *path*."""
+
+    return frozenset(_cfg_test_module_line_numbers(_read_source_lines(path)))
+
+
 def is_executable_source_line(
     source_path: str,
     line_number: int,
@@ -213,6 +219,7 @@ def is_executable_source_line(
 
     if repository_root is None:
         _read_source_lines.cache_clear()
+        _cfg_test_module_line_numbers_for_path.cache_clear()
     try:
         path = (
             resolve_repository_source_path(source_path, repository_root)
@@ -225,7 +232,7 @@ def is_executable_source_line(
     # Stale LCOV rows past EOF are instrumentation noise, not production gaps.
     if line_number <= 0 or line_number > len(lines):
         return False
-    if line_number in _cfg_test_module_line_numbers(lines):
+    if line_number in _cfg_test_module_line_numbers_for_path(path):
         return False
     if _line_in_cfg_not_feature_block(lines, line_number):
         return False
@@ -713,6 +720,7 @@ def load_lcov_line_totals(
 
     root = (repository_root or Path.cwd()).resolve()
     _read_source_lines.cache_clear()
+    _cfg_test_module_line_numbers_for_path.cache_clear()
     source_path: str | None = None
     line_counts: dict[tuple[str, int], int] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():
