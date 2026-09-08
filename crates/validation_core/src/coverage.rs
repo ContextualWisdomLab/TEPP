@@ -224,8 +224,8 @@ fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
             f64::from_bits(direct_lower.to_bits() + 1)
         };
         let ulp_toward_exact = (neighbor - direct_lower).abs();
-        let midpoint_residual = 0.5
-            * ulp_toward_exact.mul_add(denominator, ulp_toward_exact * denominator_residual);
+        let midpoint_residual =
+            0.5 * ulp_toward_exact.mul_add(denominator, ulp_toward_exact * denominator_residual);
         let residual_magnitude = exact_residual.abs();
         if residual_magnitude > midpoint_residual
             || (same_numeric_value(residual_magnitude, midpoint_residual)
