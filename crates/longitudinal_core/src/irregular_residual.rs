@@ -475,11 +475,12 @@ fn require_finite(value: f64) -> Result<f64, LongitudinalError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        EventTimedObservation, LaggedWithinResidual, center_within_unit_event_lags,
-        driver_same_sign_log_rate, recover_centered_irregular_residual_log_rate,
+        center_within_unit_event_lags, driver_same_sign_log_rate,
+        recover_centered_irregular_residual_log_rate,
         recover_within_unit_irregular_residual_log_rate,
-        refuse_cwc_residual_log_rate_as_raw_process_drift, require_finite, same_sign_nonzero,
-        same_sign_mean_over_total, scaled_compensated_mean,
+        refuse_cwc_residual_log_rate_as_raw_process_drift, require_finite,
+        same_sign_mean_over_total, same_sign_nonzero, scaled_compensated_mean,
+        EventTimedObservation, LaggedWithinResidual,
     };
     use crate::{EventTimeInterval, LongitudinalError};
 
@@ -755,16 +756,12 @@ mod tests {
             timed(2, 2.0, -0.8),
         ])
         .expect("extract");
-        assert!(
-            extracted
-                .iter()
-                .any(|pair| pair.later_residual().to_bits() == 0.0_f64.to_bits())
-        );
-        assert!(
-            extracted
-                .iter()
-                .any(|pair| pair.earlier_residual().to_bits() == 0.0_f64.to_bits())
-        );
+        assert!(extracted
+            .iter()
+            .any(|pair| pair.later_residual().to_bits() == 0.0_f64.to_bits()));
+        assert!(extracted
+            .iter()
+            .any(|pair| pair.earlier_residual().to_bits() == 0.0_f64.to_bits()));
         assert!(extracted.iter().any(|pair| same_sign_nonzero(
             pair.earlier_residual(),
             pair.later_residual()
@@ -1015,4 +1012,3 @@ mod tests {
         assert_eq!(require_finite(1.5), Ok(1.5));
     }
 }
-

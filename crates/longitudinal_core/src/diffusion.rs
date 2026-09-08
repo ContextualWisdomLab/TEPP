@@ -9,7 +9,7 @@
 //! research-candidate extensions, not canonical ctsem output and not a DSEM or
 //! ctsem estimator.
 
-use crate::{EventTimeInterval, LongitudinalError, stationary::validate_stationary_process_inputs};
+use crate::{stationary::validate_stationary_process_inputs, EventTimeInterval, LongitudinalError};
 
 /// Recover the scalar research-candidate `DIFFUSIONstd = q / p` map.
 ///
@@ -243,4 +243,3 @@ mod tests {
         );
     }
 }
-

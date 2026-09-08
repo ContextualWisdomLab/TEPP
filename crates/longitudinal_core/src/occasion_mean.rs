@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::irregular_residual::{
-    EventTimedObservation, LaggedWithinResidual, scaled_compensated_mean,
+    scaled_compensated_mean, EventTimedObservation, LaggedWithinResidual,
 };
 use crate::stable_irregular_rate::recover_centered_irregular_residual_log_rate;
 use crate::{EventTimeInterval, LongitudinalError};

@@ -188,7 +188,7 @@ pub fn component_root_mean_square_error(
 
 #[cfg(test)]
 mod tests {
-    use super::{ComponentValue, add_scaled_square, component_root_mean_square_error};
+    use super::{add_scaled_square, component_root_mean_square_error, ComponentValue};
     use crate::{ComponentLevel, LongitudinalError};
 
     #[test]
@@ -328,4 +328,3 @@ mod tests {
         assert_eq!(sum.to_bits(), 3.0_f64.to_bits());
     }
 }
-
