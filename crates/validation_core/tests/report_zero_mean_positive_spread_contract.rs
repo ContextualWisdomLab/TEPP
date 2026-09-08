@@ -1,3 +1,5 @@
+//! RMSE-specific support regression for a generically valid zero-mean signed summary.
+
 use validation_core::{MonteCarloSummary, ValidationError, ValidationReport};
 
 #[test]
