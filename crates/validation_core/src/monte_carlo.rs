@@ -217,7 +217,7 @@ fn scaled_sample_standard_deviation(samples: &[f64], mean: f64) -> Result<f64, V
         .collect();
     let normalized_standard_deviation = standard_deviation_from_deviations(&normalized_deviations)?;
     let standard_deviation = outer_scale * normalized_standard_deviation;
-    if !standard_deviation.is_finite() || standard_deviation == 0.0 {
+    if !standard_deviation.is_finite() {
         Err(ValidationError::InvalidInput)
     } else {
         Ok(standard_deviation)
