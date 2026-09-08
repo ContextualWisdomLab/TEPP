@@ -1,3 +1,8 @@
+//! Known-truth component RMSE is invariant to recovered-row transport order.
+//!
+//! Recovered components are matched by scientific identity rather than slice
+//! position, so a transport permutation cannot change admission or RMSE.
+
 use longitudinal_core::{ComponentLevel, ComponentValue, component_root_mean_square_error};
 
 #[test]

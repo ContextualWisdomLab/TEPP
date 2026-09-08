@@ -1,3 +1,8 @@
+//! Known-truth component RMSE is invariant to truth-row serialization order.
+//!
+//! Residuals accumulate in canonical scientific identity order, so permuting
+//! the truth slice cannot change the deterministic binary64 recovery metric.
+
 use longitudinal_core::{ComponentLevel, ComponentValue, component_root_mean_square_error};
 
 #[test]

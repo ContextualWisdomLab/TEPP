@@ -1,3 +1,8 @@
+//! Stable Between components keep a canonical occasion identity of zero.
+//!
+//! Longitudinal decomposition emits one Between component per unit. An occasion
+//! alias must not become a second stable target or an implicit RMSE weight.
+
 use longitudinal_core::{
     ComponentLevel, ComponentValue, LongitudinalError, component_root_mean_square_error,
 };
