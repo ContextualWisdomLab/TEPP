@@ -246,8 +246,6 @@ def is_executable_source_line(
         return False
     if _line_in_multiline_string_literal(lines, line_number):
         return False
-    if _line_in_multiline_string(lines, line_number):
-        return False
     text = lines[line_number - 1].strip()
     if not text:
         return False
@@ -597,11 +595,11 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
 
 
 def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
-    """Return whether a line is inside a Rust string continuation.
+    """Return whether a line is only multiline string or block-comment data.
 
-    The scanner tracks normal strings, raw strings, block comments, and character
-    literals so quotes in comments or literal contents cannot change the state of
-    a later source line.
+    The scanner tracks normal strings, raw strings, nested block comments, and
+    character literals. A continuation or block-comment line remains excluded
+    only when closing the data leaves no executable suffix on that same line.
     """
 
     in_string = False
@@ -609,6 +607,7 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
     block_comment_depth = 0
     for index, raw in enumerate(lines, start=1):
         target_continuation = (in_string or raw_hashes is not None) and index == line_number
+        target_block_comment = block_comment_depth > 0 and index == line_number
         target_closing_cursor: int | None = None
         target_has_executable_suffix = False
         cursor = 0
@@ -620,6 +619,12 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                 elif raw.startswith("*/", cursor):
                     block_comment_depth -= 1
                     cursor += 2
+                    if (
+                        target_block_comment
+                        and block_comment_depth == 0
+                        and target_closing_cursor is None
+                    ):
+                        target_closing_cursor = cursor
                 else:
                     cursor += 1
                 continue
@@ -652,10 +657,15 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
             if raw.startswith("//", cursor):
                 break
             if raw.startswith("/*", cursor):
+                if index == line_number and not raw[:cursor].strip():
+                    target_block_comment = True
                 block_comment_depth += 1
                 cursor += 2
                 continue
-            if target_continuation and target_closing_cursor is not None:
+            if (
+                (target_continuation or target_block_comment)
+                and target_closing_cursor is not None
+            ):
                 if raw[cursor] in ",;)]}":
                     cursor += 1
                     continue
@@ -674,7 +684,7 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                     cursor = character_end
                     continue
             cursor += 1
-        if target_continuation:
+        if target_continuation or target_block_comment:
             if target_closing_cursor is None:
                 return True
             return not target_has_executable_suffix
