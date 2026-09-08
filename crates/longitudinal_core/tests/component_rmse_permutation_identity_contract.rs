@@ -1,6 +1,4 @@
-use longitudinal_core::{
-    ComponentLevel, ComponentValue, component_root_mean_square_error,
-};
+use longitudinal_core::{ComponentLevel, ComponentValue, component_root_mean_square_error};
 
 #[test]
 fn component_rmse_aligns_by_scientific_identity_not_row_position() {

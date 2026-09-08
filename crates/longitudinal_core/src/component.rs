@@ -86,8 +86,7 @@ fn add_scaled_square(
         *scaled_sum_squares = residual_ratio * residual_ratio;
     } else if residual_scale > *scale {
         let ratio = *scale / residual_scale;
-        *scaled_sum_squares =
-            *scaled_sum_squares * ratio * ratio + residual_ratio * residual_ratio;
+        *scaled_sum_squares = *scaled_sum_squares * ratio * ratio + residual_ratio * residual_ratio;
         *scale = residual_scale;
     } else {
         let ratio = residual_scale / *scale;
@@ -162,12 +161,7 @@ pub fn component_root_mean_square_error(
 
         let residual = decided_row.value() - truth_row.value();
         if residual.is_finite() {
-            add_scaled_square(
-                &mut scale,
-                &mut scaled_sum_squares,
-                residual.abs(),
-                1.0,
-            );
+            add_scaled_square(&mut scale, &mut scaled_sum_squares, residual.abs(), 1.0);
         } else {
             let endpoint_scale = truth_row.value().abs().max(decided_row.value().abs());
             let normalized_residual =

@@ -65,12 +65,7 @@ mod tests {
     fn public_boundary_does_not_report_underflowed_nonzero_correlation_as_zero() {
         let interval = EventTimeInterval::new(1.0).expect("valid event time");
         assert_eq!(
-            recover_event_time_lagged_correlation(
-                f64::from_bits(1),
-                f64::MAX,
-                f64::MAX,
-                interval,
-            ),
+            recover_event_time_lagged_correlation(f64::from_bits(1), f64::MAX, f64::MAX, interval,),
             Err(LongitudinalError::InvalidTemporalAssociationInput)
         );
     }

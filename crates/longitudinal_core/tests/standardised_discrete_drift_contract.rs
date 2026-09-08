@@ -55,12 +55,9 @@ fn extreme_stable_rate_preserves_representable_stationary_result() {
 
 #[test]
 fn standardised_drift_does_not_materialise_a_cancelled_stationary_variance() {
-    let underflowed_stationary = recover_event_time_standardised_discrete_drift(
-        f64::from_bits(1),
-        -1.0,
-        event_time(1.0),
-    )
-    .expect("positive real stationary variance cancels from the scalar standardisation");
+    let underflowed_stationary =
+        recover_event_time_standardised_discrete_drift(f64::from_bits(1), -1.0, event_time(1.0))
+            .expect("positive real stationary variance cancels from the scalar standardisation");
     assert!((underflowed_stationary - (-1.0_f64).exp()).abs() <= f64::EPSILON);
 
     let overflowed_stationary =

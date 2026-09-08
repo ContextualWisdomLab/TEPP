@@ -1,8 +1,6 @@
 //! Event-time standardisation for scalar continuous-time drift.
 
-use crate::{
-    EventTimeInterval, LongitudinalError, stationary::validate_stationary_process_inputs,
-};
+use crate::{EventTimeInterval, LongitudinalError, stationary::validate_stationary_process_inputs};
 
 /// Recover the scalar p. 16 `discreteDRIFTstd` on event time.
 ///

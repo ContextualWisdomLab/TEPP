@@ -213,12 +213,9 @@ mod tests {
         assert_eq!(continuous_overflow, 0.5);
 
         let interval = EventTimeInterval::new(1.0).expect("unit event interval");
-        let discrete_underflow = recover_event_time_standardised_discrete_diffusion(
-            minimum_subnormal,
-            -1.0,
-            interval,
-        )
-        .expect("Q_delta/p cancels the unrepresentable stationary intermediate");
+        let discrete_underflow =
+            recover_event_time_standardised_discrete_diffusion(minimum_subnormal, -1.0, interval)
+                .expect("Q_delta/p cancels the unrepresentable stationary intermediate");
         let underflow_truth = -(-2.0_f64).exp_m1();
         assert!((discrete_underflow - underflow_truth).abs() <= f64::EPSILON);
 

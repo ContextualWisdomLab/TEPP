@@ -64,13 +64,10 @@ fn covariance_binary_bound_relation(
         positive_binary_components(covariance_magnitude);
     let (earlier_significand, earlier_exponent) =
         positive_binary_components(earlier_total_variance);
-    let (later_significand, later_exponent) =
-        positive_binary_components(later_total_variance);
+    let (later_significand, later_exponent) = positive_binary_components(later_total_variance);
 
-    let covariance_square =
-        u128::from(covariance_significand) * u128::from(covariance_significand);
-    let variance_product =
-        u128::from(earlier_significand) * u128::from(later_significand);
+    let covariance_square = u128::from(covariance_significand) * u128::from(covariance_significand);
+    let variance_product = u128::from(earlier_significand) * u128::from(later_significand);
     let covariance_square_exponent = covariance_exponent * 2;
     let variance_product_exponent = earlier_exponent + later_exponent;
     let within = scaled_integer_leq(
@@ -240,21 +237,11 @@ mod tests {
     #[test]
     fn exact_binary_bound_accepts_extreme_and_subnormal_boundaries() {
         assert_eq!(
-            recover_event_time_lagged_correlation(
-                f64::MAX,
-                f64::MAX,
-                f64::MAX,
-                event_time(1.0),
-            ),
+            recover_event_time_lagged_correlation(f64::MAX, f64::MAX, f64::MAX, event_time(1.0),),
             Ok(1.0)
         );
         assert_eq!(
-            recover_event_time_lagged_correlation(
-                -f64::MAX,
-                f64::MAX,
-                f64::MAX,
-                event_time(1.0),
-            ),
+            recover_event_time_lagged_correlation(-f64::MAX, f64::MAX, f64::MAX, event_time(1.0),),
             Ok(-1.0)
         );
         let minimum_subnormal = f64::from_bits(1);

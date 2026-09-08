@@ -58,7 +58,10 @@ fn cwc_mean_is_deterministic_under_input_row_permutation() {
 
     let expected = center_within_unit_event_lags(&canonical).expect("canonical ordering");
     let reordered = center_within_unit_event_lags(&shuffled).expect("shuffled ordering");
-    assert_eq!(reordered, expected, "CWC output must not depend on input row order");
+    assert_eq!(
+        reordered, expected,
+        "CWC output must not depend on input row order"
+    );
 }
 
 #[test]
@@ -98,9 +101,11 @@ fn cwc_mean_survives_overflowing_raw_sum_when_centered_values_are_finite() {
     let pairs = center_within_unit_event_lags(&rows)
         .expect("finite CWC residuals must not be rejected because a raw sum overflows");
     assert_eq!(pairs.len(), 3);
-    assert!(pairs.iter().all(|pair| {
-        pair.earlier_residual().is_finite() && pair.later_residual().is_finite()
-    }));
+    assert!(
+        pairs.iter().all(|pair| {
+            pair.earlier_residual().is_finite() && pair.later_residual().is_finite()
+        })
+    );
 }
 
 #[test]

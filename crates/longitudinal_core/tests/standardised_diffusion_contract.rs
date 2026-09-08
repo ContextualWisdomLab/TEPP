@@ -7,8 +7,7 @@
 //! research-candidate extensions rather than canonical ctsem output.
 
 use longitudinal_core::{
-    EventTimeInterval, LongitudinalError,
-    recover_event_time_standardised_continuous_diffusion,
+    EventTimeInterval, LongitudinalError, recover_event_time_standardised_continuous_diffusion,
     recover_event_time_standardised_discrete_diffusion,
     refuse_standardised_continuous_diffusion_as_standardised_discrete_diffusion,
     refuse_total_variance_scaled_diffusion_as_standardised_diffusion,
@@ -56,7 +55,10 @@ fn discrete_diffusion_candidate_preserves_event_interval_semantics() {
 
     let later = recover_event_time_standardised_discrete_diffusion(0.4, -0.25, two)
         .expect("later event interval");
-    assert!(later > recovered, "stable-process noise fraction must accumulate with event time");
+    assert!(
+        later > recovered,
+        "stable-process noise fraction must accumulate with event time"
+    );
     assert!(later < 1.0);
 
     let rescaled = recover_event_time_standardised_discrete_diffusion(1.6, -0.25, one)

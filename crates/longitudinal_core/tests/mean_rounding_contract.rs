@@ -24,7 +24,10 @@ fn cwc_mean_rounds_halfway_subnormal_to_even_after_normalization() {
         (-f64::from_bits(7)).to_bits(),
         "the exact 7.5-ULP unit mean must round to the even 8-ULP value"
     );
-    assert_eq!(pairs[0].later_residual().to_bits(), f64::from_bits(6).to_bits());
+    assert_eq!(
+        pairs[0].later_residual().to_bits(),
+        f64::from_bits(6).to_bits()
+    );
 }
 
 #[test]

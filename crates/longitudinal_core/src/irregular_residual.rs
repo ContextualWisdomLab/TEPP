@@ -441,12 +441,9 @@ pub(crate) fn driver_same_sign_log_rate(
     let log_ratio = if later_magnitude >= earlier_magnitude
         && later_magnitude <= earlier_magnitude * 2.0
     {
-        let relative_loss_from_later =
-            (later_magnitude - earlier_magnitude) / later_magnitude;
+        let relative_loss_from_later = (later_magnitude - earlier_magnitude) / later_magnitude;
         -(-relative_loss_from_later).ln_1p()
-    } else if earlier_magnitude > later_magnitude
-        && earlier_magnitude <= later_magnitude * 2.0
-    {
+    } else if earlier_magnitude > later_magnitude && earlier_magnitude <= later_magnitude * 2.0 {
         let relative_change_from_earlier =
             (later_magnitude - earlier_magnitude) / earlier_magnitude;
         relative_change_from_earlier.ln_1p()
