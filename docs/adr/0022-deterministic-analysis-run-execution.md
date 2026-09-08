@@ -3,7 +3,7 @@
 **Decision status:** Accepted
 **Implementation maturity:** active-PR — composed on the active product branch; not implemented-main
 **Date:** 2026-08-21
-**Supersedes:** None; complements ADR 0002, ADR 0003, ADR 0011, ADR 0013, and the terminal-result contract.
+**Supersedes:** The pre-normalization colliding `0021-deterministic-analysis-run-execution.md` identity, whose original bytes are retained at `archive/pre-normalization-0021-deterministic-analysis-run-execution.md`; complements ADR 0002, ADR 0003, ADR 0011, ADR 0013, and the terminal-result contract.
 **Figma File ID:** N/A — this increment changes a Rust service crate and has no user-interface surface.
 **Storybook inventory:** N/A — no reusable web object or interaction changed.
 
@@ -13,6 +13,12 @@ TEPP already accepts an analysis request and can describe a completed result,
 but a consumer needs a demonstrable path between those contracts. Without one
 bounded execution slice, an accepted run is only a receipt and consumers cannot
 verify cutoff safety, multiple-membership preservation, or artifact identity.
+
+The branch-era decision originally reused ADR 0021, which later also identified
+the LineageWeave project-history boundary. Repository-wide ADR identity cannot
+be branch-local, so deterministic analysis-run execution is canonicalized as
+ADR 0022 and the earlier colliding bytes are retained only as historical
+provenance.
 
 ## Decision
 
@@ -56,6 +62,8 @@ produce a consumer-verifiable terminal outcome.
    scientific execution would become one service boundary.
 3. Add a bounded standalone engine behind the existing contracts — accepted
    because it is independently testable and composable without shared tables.
+4. Keep both decisions under ADR 0021 — rejected because one repository-wide
+   architecture identity cannot denote two independent decisions.
 
 ## Consequences
 
@@ -69,6 +77,9 @@ semantics before raising the bound.
 LineageWeave may consume the topic-lineage artifact as completed model evidence
 beside, but never inside, the project-history temporal-association claim. The
 two contracts keep separate schema identities and inference-status copy.
+
+The archived pre-normalization ADR 0021 text is historical evidence only. New
+architecture references use ADR 0022 for deterministic analysis-run execution.
 
 ## Verification
 
@@ -97,3 +108,7 @@ the readiness artifact while preserving the request and terminal-result DTOs.
 No persisted schema migration is introduced. Supersession requires a new ADR
 if execution changes cutoff semantics, artifact authority, privacy fields, or
 scientific estimands.
+
+Identity-normalization rollback never reuses ADR 0021 for this decision. If ADR
+0022 is superseded, its number remains historical and a new ADR records the
+successor.
