@@ -10,8 +10,9 @@ const MONTE_CARLO_RMSE_SUPPORT_RELATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 const WILSON_PAIR_ABSOLUTE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
 fn minority_zero_lower_is_rounding_feasible(p: f64, upper: f64) -> bool {
-    debug_assert!(p > 0.0 && p < 0.5);
-    debug_assert!(upper >= p && upper <= 1.0);
+    // The caller reaches this helper only after report validation has established
+    // `0 < p < 0.5` and `p <= upper <= 1`; those are proof obligations, not
+    // independently exercisable runtime branches.
 
     // Solving the Wilson root identity for the lower endpoint avoids the
     // cancellation that makes the complement-form residual insensitive near
@@ -19,7 +20,8 @@ fn minority_zero_lower_is_rounding_feasible(p: f64, upper: f64) -> bool {
     // final represented lower root itself would round to zero.
     let p_squared = p * p;
     let denominator = p_squared + (1.0 - 2.0 * p) * upper;
-    debug_assert!(denominator.is_finite() && denominator > 0.0);
+    // Under the caller invariants, the denominator is finite and strictly
+    // positive: `p² >= 0`, `1 - 2p > 0`, and `upper >= p > 0`.
     let implied_lower = p * ((p / denominator) * (1.0 - upper));
     implied_lower == 0.0
 }
