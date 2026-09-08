@@ -226,10 +226,12 @@ fn all_covered_wilson_lower_from_exact_sample_count(n: f64, z2: f64) -> f64 {
         let midpoint_residual =
             0.5 * ulp_toward_exact.mul_add(denominator, ulp_toward_exact * denominator_residual);
         let residual_magnitude = exact_residual.abs();
-        if residual_magnitude > midpoint_residual
-            || (same_numeric_value(residual_magnitude, midpoint_residual)
-                && direct_lower.to_bits() & 1 == 1)
-        {
+        // An exact midpoint tie is impossible on this exact-count path. A normal
+        // binary64 midpoint has a reduced odd numerator wider than 53 bits, while
+        // an exactly representable integer sample count has an odd part of at
+        // most 53 bits; dyadic z² would require that midpoint numerator to divide
+        // n. A subnormal midpoint would require z² beyond finite binary64 range.
+        if residual_magnitude > midpoint_residual {
             return neighbor.clamp(0.0, 1.0);
         }
     }
