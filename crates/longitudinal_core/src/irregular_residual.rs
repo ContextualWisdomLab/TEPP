@@ -476,11 +476,11 @@ fn require_finite(value: f64) -> Result<f64, LongitudinalError> {
 #[cfg(test)]
 mod tests {
     use super::{
-        center_within_unit_event_lags, driver_same_sign_log_rate,
-        recover_centered_irregular_residual_log_rate,
+        EventTimedObservation, LaggedWithinResidual, center_within_unit_event_lags,
+        driver_same_sign_log_rate, recover_centered_irregular_residual_log_rate,
         recover_within_unit_irregular_residual_log_rate,
         refuse_cwc_residual_log_rate_as_raw_process_drift, same_sign_nonzero,
-        scaled_compensated_mean, EventTimedObservation, LaggedWithinResidual,
+        scaled_compensated_mean,
     };
     use crate::{EventTimeInterval, LongitudinalError};
 
@@ -751,12 +751,16 @@ mod tests {
             timed(2, 2.0, -0.8),
         ])
         .expect("extract");
-        assert!(extracted
-            .iter()
-            .any(|pair| pair.later_residual().to_bits() == 0.0_f64.to_bits()));
-        assert!(extracted
-            .iter()
-            .any(|pair| pair.earlier_residual().to_bits() == 0.0_f64.to_bits()));
+        assert!(
+            extracted
+                .iter()
+                .any(|pair| pair.later_residual().to_bits() == 0.0_f64.to_bits())
+        );
+        assert!(
+            extracted
+                .iter()
+                .any(|pair| pair.earlier_residual().to_bits() == 0.0_f64.to_bits())
+        );
         assert!(extracted.iter().any(|pair| same_sign_nonzero(
             pair.earlier_residual(),
             pair.later_residual()
