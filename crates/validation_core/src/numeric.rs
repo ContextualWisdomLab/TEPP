@@ -154,7 +154,7 @@ fn adjacent_float(value: f64, upward: bool) -> f64 {
 
 fn round_candidate_with_tail(candidate: f64, tail_head: f64, tail_tail: f64) -> f64 {
     let (tail, tail_roundoff) = error_free_sum(tail_head, tail_tail);
-    if tail == 0.0 && tail_roundoff == 0.0 {
+    if tail == 0.0 {
         return candidate;
     }
 
