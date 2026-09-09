@@ -29,7 +29,11 @@ fn equal_rounded_residuals_preserve_nontranslatable_low_term_dispersion() {
 #[test]
 fn unequal_rounded_residuals_refuse_inexact_low_term_anchor_deltas() {
     let minimum_subnormal = f64::from_bits(1);
-    let truth = [f64::from_bits(0x3c90_0000_0000_0000), minimum_subnormal, 0.0];
+    let truth = [
+        f64::from_bits(0x3c90_0000_0000_0000),
+        minimum_subnormal,
+        0.0,
+    ];
     let recovered = [1.0, 1.0, 2.0];
 
     // The first two represented residual highs are 1.0 with exact subtraction
