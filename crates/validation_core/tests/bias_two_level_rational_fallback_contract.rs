@@ -46,3 +46,24 @@ fn balanced_low_term_levels_use_normal_rational_restoration_after_exact_route_re
         .expect("permutation preserves represented low-term dispersion");
     assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
 }
+
+#[test]
+fn balanced_four_observation_low_terms_fall_through_nonrational_count_scale() {
+    let quarter_ulp_at_one = 2.0_f64.powi(-54);
+    let truth = [quarter_ulp_at_one, quarter_ulp_at_one, 0.0, 0.0];
+    let recovered = [1.0; 4];
+
+    // Subtraction roundoff makes the bounded pair-distance route refuse. The
+    // fallback then sees two exact translated levels with counts 2 and 2. Their
+    // count-only SE factor is 1/sqrt(12), which is not a rational square root, so
+    // the rational-scale shortcut must decline and the general represented-input
+    // path must return the correctly rounded 2^-54/sqrt(12).
+    let standard_error = bias_standard_error(&truth, &recovered)
+        .expect("nonrational two-level count geometry remains representable");
+    assert_eq!(standard_error.to_bits(), 0x3c72_79a7_4590_331c);
+
+    let permuted_truth = [quarter_ulp_at_one, 0.0, quarter_ulp_at_one, 0.0];
+    let permuted_standard_error = bias_standard_error(&permuted_truth, &recovered)
+        .expect("permutation preserves nonrational two-level geometry");
+    assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
+}
