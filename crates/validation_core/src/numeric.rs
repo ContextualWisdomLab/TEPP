@@ -196,8 +196,16 @@ fn mixed_remainder_mean_over_total(
     let normalized = values.iter().map(|value| *value / scale).collect();
     let (normalized_sum, normalized_correction, normalized_correction_tail) =
         deterministic_compensated_parts_with_tail(normalized);
-    if normalized_sum == 0.0 && normalized_correction == 0.0 && normalized_correction_tail == 0.0 {
-        return Ok(0.0);
+    if normalized_sum == 0.0 && normalized_correction == 0.0 {
+        if normalized_correction_tail == 0.0 {
+            return Ok(0.0);
+        }
+        // When the leading and first-order masses cancel exactly, this tail is
+        // the retained value itself rather than a rounding perturbation of zero.
+        // Restore the exact power-of-two scale before applying the scientific
+        // denominator so midpoint rounding stays local to a nonzero candidate.
+        let retained_mass = normalized_correction_tail * scale;
+        return same_sign_mean_over_total(&[retained_mass], total_count);
     }
 
     let denominator = total_count as f64;
