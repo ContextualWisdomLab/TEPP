@@ -263,15 +263,15 @@ fn normalized_three_level_standard_error(
     first_offset: f64,
     second_offset: f64,
 ) -> Result<Option<f64>, ValidationError> {
-    // The caller has already proved two distinct, nonzero finite offsets, so the
-    // maximum magnitude is finite and nonzero and the power-of-two scale is valid.
+    // The caller has already proved two distinct, nonzero finite offsets. The
+    // exact leading-binade power returned by `exact_power_of_two_scale` is finite
+    // and positive, and each input magnitude is below twice that scale. Dividing
+    // by it can underflow a smaller offset to zero but cannot produce a non-finite
+    // normalized value; the reachable zero cases remain handled below.
     let max_magnitude = first_offset.abs().max(second_offset.abs());
     let scale = exact_power_of_two_scale(max_magnitude);
     let normalized_first = first_offset / scale;
     let normalized_second = second_offset / scale;
-    if !normalized_first.is_finite() || !normalized_second.is_finite() {
-        return Ok(None);
-    }
 
     // A lost nonzero offset is at most 2^-1075 of the dominant scale. For
     // `[0,m,d]`, that perturbation cannot cross a binary64 midpoint around
