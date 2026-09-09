@@ -87,7 +87,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.98.0 --profile minimal --component clippy --component rustfmt
+        run: rustup toolchain install 1.98.1 --profile minimal --component clippy --component rustfmt
       - name: Restore pinned Rust quality tools
         id: rust-tools-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -128,7 +128,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned Rust toolchain with LLVM tools
-        run: rustup toolchain install 1.98.0 --profile minimal --component llvm-tools-preview
+        run: rustup toolchain install 1.98.1 --profile minimal --component llvm-tools-preview
       - name: Install pinned nightly with LLVM tools
         run: rustup toolchain install nightly-2026-08-21 --profile minimal --component llvm-tools-preview
       - name: Restore pinned cargo-llvm-cov
@@ -261,6 +261,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Install pinned Rust toolchain
-        run: rustup toolchain install 1.98.0 --profile minimal
+        run: rustup toolchain install 1.98.1 --profile minimal
       - name: Run live-sqlx PostgreSQL integration
         run: cargo test -p persistence_postgres --features live-sqlx --test live_postgres -- --nocapture
