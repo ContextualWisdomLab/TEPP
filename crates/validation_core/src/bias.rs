@@ -221,13 +221,11 @@ fn normalized_three_level_standard_error(
     // `[0,m,d]`, that perturbation cannot cross a binary64 midpoint around
     // dyadic `|d|/3`; division by odd denominator 3 cannot itself be midpoint.
     if normalized_first == 0.0 {
-        let standard_error =
-            deterministic_representable_sum_over_count(&[second_offset.abs()], 3)?;
+        let standard_error = deterministic_representable_sum_over_count(&[second_offset.abs()], 3)?;
         return Ok(Some(standard_error));
     }
     if normalized_second == 0.0 {
-        let standard_error =
-            deterministic_representable_sum_over_count(&[first_offset.abs()], 3)?;
+        let standard_error = deterministic_representable_sum_over_count(&[first_offset.abs()], 3)?;
         return Ok(Some(standard_error));
     }
 
