@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import tomllib
 import unittest
 from pathlib import Path
@@ -92,9 +93,16 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         """Stable and branch-coverage compilers remain explicit review boundaries."""
 
         manifest = tomllib.loads(RUST_TOOLCHAIN.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["toolchain"]["channel"], "1.98.0")
+        stable_channel = manifest["toolchain"]["channel"]
+        self.assertRegex(stable_channel, re.compile(r"^\d+\.\d+\.\d+$"))
 
         workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        self.assertEqual(
+            workflow.count(f"rustup toolchain install {stable_channel} "),
+            3,
+            "every stable CI lane must explicitly install rust-toolchain.toml's exact channel",
+        )
+        self.assertNotIn("rustup toolchain install stable", workflow)
         self.assertEqual(workflow.count("nightly-2026-08-21"), 3)
         self.assertNotIn("nightly-2026-08-01", workflow)
 
