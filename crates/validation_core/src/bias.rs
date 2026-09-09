@@ -407,6 +407,7 @@ fn exact_translated_residual_standard_error(
 
     let mut zero_count = 0_usize;
     let mut repeated_gap = 0.0_f64;
+    let mut second_distinct_gap = 0.0_f64;
     let mut gap_count = 0_usize;
     let mut exactly_two_levels = true;
     for &value in &translated {
@@ -416,6 +417,7 @@ fn exact_translated_residual_standard_error(
             repeated_gap = value;
             gap_count = 1;
         } else if !same_numeric_value(value, repeated_gap) {
+            second_distinct_gap = value;
             exactly_two_levels = false;
             break;
         } else {
@@ -458,14 +460,12 @@ fn exact_translated_residual_standard_error(
     }
 
     if translated.len() == 3 {
-        let nonzero_offsets: Vec<_> = translated
-            .iter()
-            .copied()
-            .filter(|value| *value != 0.0)
-            .collect();
-        if nonzero_offsets.len() == 2
-            && let Some(standard_error) =
-                exact_three_level_standard_error(nonzero_offsets[0], nonzero_offsets[1])?
+        // Canonical anchor translation contributes one exact zero. Reaching this
+        // block after the two-level path means the scan observed two distinct
+        // nonzero offsets, recorded as `repeated_gap` and `second_distinct_gap`.
+        // With exactly three observations there is no fourth state to inspect.
+        if let Some(standard_error) =
+            exact_three_level_standard_error(repeated_gap, second_distinct_gap)?
         {
             return Ok(Some(standard_error));
         }
