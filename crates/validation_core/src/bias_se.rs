@@ -610,6 +610,16 @@ mod tests {
     }
 
     #[test]
+    fn pairwise_reference_preserves_duplicate_residual_pairs() {
+        let residuals = [0.0, 1.0, 1.0, 2.0];
+        assert_eq!(exact_pairwise_pair_square_sum(&residuals), Some((8, 0)));
+        assert_eq!(
+            exact_pairwise_pair_square_sum(&residuals),
+            exact_neutral_zero_linear_pair_square_sum(&residuals)
+        );
+    }
+
+    #[test]
     fn neutral_zero_linear_route_recovers_pairwise_refusal_geometries() {
         let tiny = 2.0_f64.powi(-54);
         let small = [0.0, 1.0, tiny, 2.0];
