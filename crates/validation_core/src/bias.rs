@@ -239,16 +239,9 @@ fn exact_three_level_standard_error(
             return Ok(None);
         }
 
-        // A nonzero offset can round to zero under this exact power-of-two
-        // normalization only when its magnitude is at most 2^-1075 of `scale`.
-        // The other offset is the finite dominant term in [scale, 2*scale). For
-        // `[0, m, d]`, `SE = |d|*sqrt(1-r+r^2)/3` with `r=m/d`; that lost term
-        // perturbs `|d|/3` by far less than one binary64 midpoint interval. Since
-        // a dyadic `|d|/3` cannot itself be a binary midpoint (the denominator 3
-        // is odd), correctly rounding the exact three-level SE is identical to
-        // correctly rounding `|d|/3`. Retain the represented minor level in the
-        // proof rather than sending the sample through the one-ULP-prone generic
-        // mean/deviation fallback.
+        // A lost nonzero offset is at most 2^-1075 of the dominant scale. For
+        // `[0,m,d]`, that perturbation cannot cross a binary64 midpoint around
+        // dyadic `|d|/3`; division by odd denominator 3 cannot itself be midpoint.
         if normalized_first == 0.0 {
             let standard_error =
                 deterministic_representable_sum_over_count(&[second_offset.abs()], 3)?;
