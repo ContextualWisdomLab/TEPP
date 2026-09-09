@@ -63,3 +63,24 @@ fn exact_three_level_products_fall_back_when_symmetric_square_sum_overflows() {
         .expect("permutation preserves symmetric square-sum-overflow dispersion");
     assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
 }
+
+#[test]
+fn exact_three_level_products_fall_back_when_only_radicand_overflows() {
+    let truth = [0.0; 3];
+    let magnitude = f64::from_bits(0x5fe4_0000_0000_0000); // 1.25 × 2^511
+    let recovered = [-magnitude, 0.0, magnitude];
+
+    // Each represented square and their sum remain finite and exact at this
+    // magnitude, while subtracting the negative exact cross-product overflows.
+    // The exact three-level shortcut must refuse that unsafe radicand without
+    // rejecting the finite represented-input target; the translated moment path
+    // returns magnitude / sqrt(3), correctly rounded below.
+    let standard_error = bias_standard_error(&truth, &recovered)
+        .expect("representable dispersion survives radicand overflow");
+    assert_eq!(standard_error.to_bits(), 0x5fd7_1811_16f4_3fe3);
+
+    let permuted = [magnitude, -magnitude, 0.0];
+    let permuted_standard_error = bias_standard_error(&truth, &permuted)
+        .expect("permutation preserves radicand-overflow dispersion");
+    assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
+}
