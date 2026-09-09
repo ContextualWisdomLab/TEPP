@@ -203,6 +203,65 @@ fn exact_subnormal_rational_scale(
     Some(Ok(f64::from_bits(rounded_units)))
 }
 
+/// Decompose a positive normal binary64 into an integer significand and unit exponent.
+///
+/// The normalized three-level caller proves its radicand lies in `[3/4, 12)` and
+/// `sqrt(radicand) / 3` lies in `[sqrt(3)/6, 2/sqrt(3))`, so every value passed
+/// here is normal and carries the implicit leading significand bit.
+fn normal_dyadic_parts(value: f64) -> (u128, i32) {
+    let bits = value.to_bits();
+    let exponent = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & 0x000f_ffff_ffff_ffff;
+    (
+        u128::from((1_u64 << 52) | fraction),
+        exponent - 1075,
+    )
+}
+
+/// Compare the exact target `sqrt(radicand) / 3` with the midpoint above `lower`.
+///
+/// If `lower = S·2^e`, its midpoint to the next binary64 is
+/// `(2S + 1)·2^(e-1)`. Squaring both positive sides compares the exact dyadic
+/// radicand with nine times that midpoint squared. The normalized three-level
+/// bounds keep the aligned integers below 128 bits.
+fn sqrt_over_three_midpoint_order(radicand: f64, lower: f64) -> std::cmp::Ordering {
+    let (radicand_significand, radicand_exponent) = normal_dyadic_parts(radicand);
+    let (lower_significand, lower_exponent) = normal_dyadic_parts(lower);
+    let midpoint_significand = (lower_significand << 1) | 1;
+    let midpoint_exponent = lower_exponent - 1;
+    let radicand_shift = (radicand_exponent - 2 * midpoint_exponent) as u32;
+    let aligned_radicand = radicand_significand << radicand_shift;
+    let nine_midpoint_squares = 9 * midpoint_significand * midpoint_significand;
+    aligned_radicand.cmp(&nine_midpoint_squares)
+}
+
+/// Correct one binary64 candidate for `sqrt(radicand) / 3` by exact midpoint tests.
+fn adjust_sqrt_over_three_candidate(radicand: f64, candidate: f64) -> f64 {
+    let candidate_bits = candidate.to_bits();
+    let previous = f64::from_bits(candidate_bits - 1);
+    let lower_order = sqrt_over_three_midpoint_order(radicand, previous);
+    let upper_order = sqrt_over_three_midpoint_order(radicand, candidate);
+    let odd_candidate = candidate_bits & 1;
+    let decrement = u64::from(lower_order.is_lt())
+        | (u64::from(lower_order.is_eq()) & odd_candidate);
+    let increment = u64::from(upper_order.is_gt())
+        | (u64::from(upper_order.is_eq()) & odd_candidate);
+    f64::from_bits(candidate_bits - decrement + increment)
+}
+
+/// Correctly round an exact normalized three-level radicand to `sqrt(radicand) / 3`.
+///
+/// Hardware sqrt followed by division can double-round by an ULP. Both operations
+/// are correctly rounded, so the initial candidate is within two result ULPs;
+/// repeated exact midpoint correction converges monotonically and the third pass
+/// is an idempotent guard against the compound-rounding boundary.
+fn correctly_rounded_sqrt_over_three(radicand: f64) -> f64 {
+    let initial = radicand.sqrt() / 3.0;
+    let first = adjust_sqrt_over_three_candidate(radicand, initial);
+    let second = adjust_sqrt_over_three_candidate(radicand, first);
+    adjust_sqrt_over_three_candidate(radicand, second)
+}
+
 fn normalized_three_level_standard_error(
     first_offset: f64,
     second_offset: f64,
@@ -269,14 +328,16 @@ fn normalized_three_level_standard_error(
         return Ok(None);
     }
 
-    let normalized_exact_root = normalized_radicand.sqrt();
-    if normalized_exact_root.mul_add(normalized_exact_root, -normalized_radicand) != 0.0 {
-        return Ok(None);
-    }
-    let normalized_standard_error =
-        deterministic_representable_sum_over_count(&[normalized_exact_root], 3)?;
+    let normalized_standard_error = correctly_rounded_sqrt_over_three(normalized_radicand);
     let standard_error = scale * normalized_standard_error;
-    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
+    if standard_error.is_subnormal() {
+        // Restoring a normal correctly-rounded candidate into the subnormal range
+        // can introduce a second rounding boundary. Keep that unresolved case on
+        // the general represented path rather than asserting an exact admission.
+        Ok(None)
+    } else if !standard_error.is_finite()
+        || (standard_error == 0.0 && normalized_standard_error != 0.0)
+    {
         Err(ValidationError::InvalidInput)
     } else {
         Ok(Some(standard_error))
@@ -289,12 +350,11 @@ fn exact_three_level_standard_error(
 ) -> Result<Option<f64>, ValidationError> {
     // For a translated three-observation sample `[0, x, y]`,
     // `SE(mean)^2 = (x^2 + y^2 - xy) / 9`. Admit the direct identity only when
-    // every binary64 product/addition is proven error-free and the numerator is
-    // itself an exact represented square. If raw products overflow or underflow
-    // to zero, retry the same proof after an exactly reversible power-of-two
-    // normalization; this preserves the represented geometry instead of making
-    // proof admission depend on magnitude alone. Other failed proofs stay on the
-    // general translated path.
+    // every binary64 product/addition is proven error-free. If raw products,
+    // their exact square sum, or the exact radicand leave binary64 range, retry
+    // the same proof after exactly reversible power-of-two normalization. The
+    // normalized dyadic radicand is rounded against exact binary64 midpoints, so
+    // an irrational square root does not force a double-rounded generic fallback.
     let first_square = first_offset * first_offset;
     let second_square = second_offset * second_offset;
     let cross_product = first_offset * second_offset;
@@ -320,13 +380,17 @@ fn exact_three_level_standard_error(
     }
 
     let square_sum = first_square + second_square;
-    if !square_sum.is_finite()
-        || subtraction_roundoff(first_square, -second_square, square_sum) != 0.0
-    {
+    if !square_sum.is_finite() {
+        return normalized_three_level_standard_error(first_offset, second_offset);
+    }
+    if subtraction_roundoff(first_square, -second_square, square_sum) != 0.0 {
         return Ok(None);
     }
     let radicand = square_sum - cross_product;
-    if !radicand.is_finite() || subtraction_roundoff(square_sum, cross_product, radicand) != 0.0 {
+    if !radicand.is_finite() {
+        return normalized_three_level_standard_error(first_offset, second_offset);
+    }
+    if subtraction_roundoff(square_sum, cross_product, radicand) != 0.0 {
         return Ok(None);
     }
 
@@ -602,20 +666,21 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
 /// reconstruction; if that exact rational result is subnormal, TEPP rounds once
 /// in represented minimum-subnormal units instead of normalizing and restoring
 /// through a second binary64 rounding boundary. An exactly translated three-level
-/// sample also uses `SE(mean)^2 = (x² + y² - xy) / 9` when every product and
-/// addition is proven error-free and that numerator is itself an exact represented
-/// square; if those raw products overflow or underflow to zero, the same proof is
-/// retried on an exactly reversible power-of-two normalization so the identity is
-/// scale-invariant and a representable nonzero dispersion cannot be mistaken for
-/// zero. The exact root is divided by three once instead of reconstructing the
-/// same rational square through rounded normalized moments. The general translated
-/// path avoids making a rounded residual mean authoritative before dispersion is
-/// evaluated. Its normalization uses an exact power-of-two scale so the translated
-/// geometry is not re-rounded through an arbitrary magnitude before the final SE
-/// is restored. Cases that cannot prove those translated deltas or exact three-level
-/// identity representable retain the predecessor translated or rounded-residual
-/// path. Individual signed residuals must still be representable because their
-/// dispersion is itself part of the requested scientific result.
+/// sample also uses `SE(mean)^2 = (x² + y² - xy) / 9` when its represented
+/// products and additions are proven error-free. If a raw product, exact square
+/// sum, or exact radicand leaves binary64 range, TEPP retries the identity after
+/// an exactly reversible power-of-two normalization. The resulting normalized
+/// dyadic radicand is rounded against exact binary64 midpoints for
+/// `sqrt(radicand) / 3`, avoiding a one-ULP double-rounding error before exact
+/// power-of-two restoration. Direct in-range admission still requires an exact
+/// represented root. The general translated path avoids making a rounded
+/// residual mean authoritative before dispersion is evaluated. Its normalization
+/// uses an exact power-of-two scale so the translated geometry is not re-rounded
+/// through an arbitrary magnitude before the final SE is restored. Cases that
+/// cannot prove those translated deltas or exact three-level arithmetic retain
+/// the predecessor translated or rounded-residual path. Individual signed
+/// residuals must still be representable because their dispersion is itself part
+/// of the requested scientific result.
 ///
 /// # Errors
 ///
@@ -813,6 +878,26 @@ mod tests {
                 .expect("normalized rational-square path")
                 .to_bits(),
             0x64f9_5555_5555_5555
+        );
+
+        let radicand_overflow = 5.0 * 2.0_f64.powi(509);
+        assert_eq!(
+            exact_three_level_standard_error(-radicand_overflow, radicand_overflow)
+                .expect("raw radicand overflow")
+                .expect("normalized correctly-rounded path")
+                .to_bits(),
+            0x5fd7_1811_16f4_3fe3
+        );
+        let radicand_overflow_no_adjustment = 11.0 * 2.0_f64.powi(508);
+        assert_eq!(
+            exact_three_level_standard_error(
+                -radicand_overflow_no_adjustment,
+                radicand_overflow_no_adjustment,
+            )
+            .expect("second raw radicand overflow")
+            .expect("already-nearest normalized candidate")
+            .to_bits(),
+            0x5fd9_6745_ffa6_4647
         );
 
         let huge = f64::from_bits(0x7fe0_0000_0000_0000);
