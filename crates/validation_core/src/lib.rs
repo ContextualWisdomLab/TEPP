@@ -114,8 +114,7 @@ mod numeric_contract_tests {
 
     #[test]
     fn mixed_sign_nonzero_quotient_above_binary64_range_fails_closed() {
-        let result =
-            deterministic_representable_sum_over_count(&[f64::MAX, f64::MAX, -1.0], 1);
+        let result = deterministic_representable_sum_over_count(&[f64::MAX, f64::MAX, -1.0], 1);
         assert!(matches!(result, Err(crate::ValidationError::InvalidInput)));
     }
 
