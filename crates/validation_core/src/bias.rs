@@ -203,6 +203,88 @@ fn exact_subnormal_rational_scale(
     Some(Ok(f64::from_bits(rounded_units)))
 }
 
+fn normalized_three_level_standard_error(
+    first_offset: f64,
+    second_offset: f64,
+) -> Result<Option<f64>, ValidationError> {
+    // The caller has already proved two distinct, nonzero finite offsets, so the
+    // maximum magnitude is finite and nonzero and the power-of-two scale is valid.
+    let max_magnitude = first_offset.abs().max(second_offset.abs());
+    let scale = exact_power_of_two_scale(max_magnitude);
+    let normalized_first = first_offset / scale;
+    let normalized_second = second_offset / scale;
+    if !normalized_first.is_finite() || !normalized_second.is_finite() {
+        return Ok(None);
+    }
+
+    // A lost nonzero offset is at most 2^-1075 of the dominant scale. For
+    // `[0,m,d]`, that perturbation cannot cross a binary64 midpoint around
+    // dyadic `|d|/3`; division by odd denominator 3 cannot itself be midpoint.
+    if normalized_first == 0.0 {
+        let standard_error =
+            deterministic_representable_sum_over_count(&[second_offset.abs()], 3)?;
+        return Ok(Some(standard_error));
+    }
+    if normalized_second == 0.0 {
+        let standard_error =
+            deterministic_representable_sum_over_count(&[first_offset.abs()], 3)?;
+        return Ok(Some(standard_error));
+    }
+
+    if !same_numeric_value(normalized_first * scale, first_offset)
+        || !same_numeric_value(normalized_second * scale, second_offset)
+    {
+        return Ok(None);
+    }
+
+    let normalized_first_square = normalized_first * normalized_first;
+    let normalized_second_square = normalized_second * normalized_second;
+    let normalized_cross_product = normalized_first * normalized_second;
+    if !normalized_first_square.is_finite()
+        || !normalized_second_square.is_finite()
+        || !normalized_cross_product.is_finite()
+        || normalized_first.mul_add(normalized_first, -normalized_first_square) != 0.0
+        || normalized_second.mul_add(normalized_second, -normalized_second_square) != 0.0
+        || normalized_first.mul_add(normalized_second, -normalized_cross_product) != 0.0
+    {
+        return Ok(None);
+    }
+
+    let normalized_square_sum = normalized_first_square + normalized_second_square;
+    if !normalized_square_sum.is_finite()
+        || subtraction_roundoff(
+            normalized_first_square,
+            -normalized_second_square,
+            normalized_square_sum,
+        ) != 0.0
+    {
+        return Ok(None);
+    }
+    let normalized_radicand = normalized_square_sum - normalized_cross_product;
+    if !normalized_radicand.is_finite()
+        || subtraction_roundoff(
+            normalized_square_sum,
+            normalized_cross_product,
+            normalized_radicand,
+        ) != 0.0
+    {
+        return Ok(None);
+    }
+
+    let normalized_exact_root = normalized_radicand.sqrt();
+    if normalized_exact_root.mul_add(normalized_exact_root, -normalized_radicand) != 0.0 {
+        return Ok(None);
+    }
+    let normalized_standard_error =
+        deterministic_representable_sum_over_count(&[normalized_exact_root], 3)?;
+    let standard_error = scale * normalized_standard_error;
+    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
+        Err(ValidationError::InvalidInput)
+    } else {
+        Ok(Some(standard_error))
+    }
+}
+
 fn exact_three_level_standard_error(
     first_offset: f64,
     second_offset: f64,
@@ -229,83 +311,7 @@ fn exact_three_level_standard_error(
         || second_square == 0.0
         || cross_product == 0.0;
     if products_leave_represented_range {
-        // The same caller invariant makes the maximum magnitude finite and
-        // nonzero; there is no independent invalid-magnitude state here.
-        let max_magnitude = first_offset.abs().max(second_offset.abs());
-        let scale = exact_power_of_two_scale(max_magnitude);
-        let normalized_first = first_offset / scale;
-        let normalized_second = second_offset / scale;
-        if !normalized_first.is_finite() || !normalized_second.is_finite() {
-            return Ok(None);
-        }
-
-        // A lost nonzero offset is at most 2^-1075 of the dominant scale. For
-        // `[0,m,d]`, that perturbation cannot cross a binary64 midpoint around
-        // dyadic `|d|/3`; division by odd denominator 3 cannot itself be midpoint.
-        if normalized_first == 0.0 {
-            let standard_error =
-                deterministic_representable_sum_over_count(&[second_offset.abs()], 3)?;
-            return Ok(Some(standard_error));
-        }
-        if normalized_second == 0.0 {
-            let standard_error =
-                deterministic_representable_sum_over_count(&[first_offset.abs()], 3)?;
-            return Ok(Some(standard_error));
-        }
-
-        if !same_numeric_value(normalized_first * scale, first_offset)
-            || !same_numeric_value(normalized_second * scale, second_offset)
-        {
-            return Ok(None);
-        }
-
-        let normalized_first_square = normalized_first * normalized_first;
-        let normalized_second_square = normalized_second * normalized_second;
-        let normalized_cross_product = normalized_first * normalized_second;
-        if !normalized_first_square.is_finite()
-            || !normalized_second_square.is_finite()
-            || !normalized_cross_product.is_finite()
-            || normalized_first.mul_add(normalized_first, -normalized_first_square) != 0.0
-            || normalized_second.mul_add(normalized_second, -normalized_second_square) != 0.0
-            || normalized_first.mul_add(normalized_second, -normalized_cross_product) != 0.0
-        {
-            return Ok(None);
-        }
-
-        let normalized_square_sum = normalized_first_square + normalized_second_square;
-        if !normalized_square_sum.is_finite()
-            || subtraction_roundoff(
-                normalized_first_square,
-                -normalized_second_square,
-                normalized_square_sum,
-            ) != 0.0
-        {
-            return Ok(None);
-        }
-        let normalized_radicand = normalized_square_sum - normalized_cross_product;
-        if !normalized_radicand.is_finite()
-            || subtraction_roundoff(
-                normalized_square_sum,
-                normalized_cross_product,
-                normalized_radicand,
-            ) != 0.0
-        {
-            return Ok(None);
-        }
-
-        let normalized_exact_root = normalized_radicand.sqrt();
-        if normalized_exact_root.mul_add(normalized_exact_root, -normalized_radicand) != 0.0 {
-            return Ok(None);
-        }
-        let normalized_standard_error =
-            deterministic_representable_sum_over_count(&[normalized_exact_root], 3)?;
-        let standard_error = scale * normalized_standard_error;
-        if !standard_error.is_finite()
-            || (standard_error == 0.0 && normalized_standard_error != 0.0)
-        {
-            return Err(ValidationError::InvalidInput);
-        }
-        return Ok(Some(standard_error));
+        return normalized_three_level_standard_error(first_offset, second_offset);
     }
 
     if first_offset.mul_add(first_offset, -first_square) != 0.0
