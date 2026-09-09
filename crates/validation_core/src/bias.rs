@@ -339,7 +339,11 @@ fn translated_residuals_from_anchor(
         }
 
         let low_delta = low - anchor_low;
-        if !low_delta.is_finite() || subtraction_roundoff(low, anchor_low, low_delta) != 0.0 {
+        // A TwoDiff correction from a finite rounded subtraction is at most half
+        // an ulp of that finite result. Even at the largest finite binade each
+        // correction is bounded by 2^970, so their difference is bounded by
+        // 2^971 and cannot overflow binary64.
+        if subtraction_roundoff(low, anchor_low, low_delta) != 0.0 {
             return None;
         }
 
