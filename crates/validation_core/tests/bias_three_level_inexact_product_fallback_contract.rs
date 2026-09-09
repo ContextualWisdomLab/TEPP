@@ -22,24 +22,23 @@ fn later_inexact_three_level_square_falls_back_without_changing_represented_disp
 }
 
 #[test]
-fn exact_three_level_products_fall_back_when_their_square_sum_overflows() {
+fn exact_three_level_products_fall_back_when_symmetric_square_sum_overflows() {
     let truth = [0.0; 3];
-    let first = f64::from_bits(0x5fe8_0000_0000_0000); // 1.5 × 2^511
-    let second = f64::from_bits(0x5fe6_0000_0000_0000); // 1.375 × 2^511
-    let recovered = [0.0, first, second];
+    let magnitude = f64::from_bits(0x5fe8_0000_0000_0000); // 1.5 × 2^511
+    let recovered = [-magnitude, 0.0, magnitude];
 
-    // Both squares and the cross product are finite and exactly represented,
-    // but first² + second² exceeds binary64 even though
-    // first² + second² - first·second, and therefore SE(mean), are representable.
-    // The exact represented-input identity rounds to the audited binary64 below;
-    // the shortcut must refuse the overflowing intermediate and preserve it via
-    // the general power-of-two translated-moment path.
+    // Canonical translation anchors at zero, so the shortcut sees offsets
+    // [-magnitude, magnitude]. Each square and the cross product is finite and
+    // exact, while square + square overflows binary64. The represented-input
+    // identity is SE(mean) = magnitude / sqrt(3), which remains finite and rounds
+    // to the audited binary64 below. The shortcut must refuse only its unsafe
+    // intermediate and let the general translated-moment path preserve the result.
     let standard_error = bias_standard_error(&truth, &recovered)
-        .expect("representable three-level dispersion survives square-sum overflow");
-    assert_eq!(standard_error.to_bits(), 0x5fce_c0e5_647d_d2ed);
+        .expect("representable symmetric dispersion survives square-sum overflow");
+    assert_eq!(standard_error.to_bits(), 0x5fdb_b67a_e858_4caa);
 
-    let permuted = [second, 0.0, first];
+    let permuted = [magnitude, -magnitude, 0.0];
     let permuted_standard_error = bias_standard_error(&truth, &permuted)
-        .expect("permutation preserves overflowing-square-sum dispersion");
+        .expect("permutation preserves symmetric square-sum-overflow dispersion");
     assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
 }
