@@ -22,6 +22,27 @@ fn later_inexact_three_level_square_falls_back_without_changing_represented_disp
 }
 
 #[test]
+fn distinct_exact_three_level_values_exit_two_level_state() {
+    let truth = [0.0; 3];
+    let recovered = [0.0, 1.0, 2.0];
+
+    // Canonical translation anchors at the middle level and produces [-1, 0, 1].
+    // The first nonzero value establishes the candidate repeated gap; the later
+    // opposite-signed nonzero value is a distinct represented level, so the
+    // two-level state must be abandoned before the three-level shortcut is tried.
+    // Its radicand is exactly 3 but sqrt(3) is not an exact binary64 square root,
+    // leaving the general translated moment path to return sqrt(1/3).
+    let standard_error = bias_standard_error(&truth, &recovered)
+        .expect("distinct represented levels retain finite dispersion");
+    assert_eq!(standard_error.to_bits(), 0x3fe2_79a7_4590_331c);
+
+    let permuted = [2.0, 0.0, 1.0];
+    let permuted_standard_error = bias_standard_error(&truth, &permuted)
+        .expect("canonical translation preserves permutation invariance");
+    assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
+}
+
+#[test]
 fn exact_three_level_products_fall_back_when_symmetric_square_sum_overflows() {
     let truth = [0.0; 3];
     let magnitude = f64::from_bits(0x5fe8_0000_0000_0000); // 1.5 × 2^511
