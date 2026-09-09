@@ -347,8 +347,8 @@ pub(crate) fn deterministic_representable_mean(values: &[f64]) -> Result<f64, Va
 #[cfg(test)]
 mod tests {
     use super::{
-        deterministic_compensated_sum, deterministic_representable_mean,
-        deterministic_representable_sum_over_count,
+        adjacent_float, deterministic_compensated_sum, deterministic_representable_mean,
+        deterministic_representable_sum_over_count, round_candidate_with_tail,
     };
     use crate::ValidationError;
 
@@ -357,6 +357,22 @@ mod tests {
         let left = deterministic_compensated_sum(vec![1.0, 1e-100, -1.0]);
         let right = deterministic_compensated_sum(vec![-1.0, 1.0, 1e-100]);
         assert_eq!(left.to_bits(), right.to_bits());
+    }
+
+    #[test]
+    fn rounding_helpers_preserve_zero_subnormal_and_range_boundaries() {
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(adjacent_float(0.0, true), minimum_subnormal);
+        assert_eq!(adjacent_float(0.0, false), -minimum_subnormal);
+        assert_eq!(
+            round_candidate_with_tail(0.0, minimum_subnormal, 0.0),
+            minimum_subnormal
+        );
+        assert_eq!(
+            round_candidate_with_tail(1.0, f64::EPSILON, 0.0).to_bits(),
+            (1.0_f64.to_bits() + 1)
+        );
+        assert!(round_candidate_with_tail(f64::MAX, 1.0, 0.0).is_infinite());
     }
 
     #[test]
