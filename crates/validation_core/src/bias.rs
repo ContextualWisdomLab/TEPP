@@ -82,9 +82,9 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
     }
 
     let outer_scale = values.iter().map(|value| value.abs()).fold(0.0, f64::max);
-    if outer_scale == 0.0 {
-        return Ok(0.0);
-    }
+    // This fallback is entered only after a finite value minus the finite
+    // representable mean overflowed. At least one finite input magnitude is
+    // therefore nonzero, so `outer_scale == 0.0` is unreachable here.
     let normalized_values: Vec<_> = values.iter().map(|value| *value / outer_scale).collect();
     let normalized_mean = deterministic_representable_mean(&normalized_values)?;
     let normalized_deviations: Vec<_> = normalized_values
@@ -125,9 +125,9 @@ fn exact_two_level_rational_scale(
 ) -> Option<(usize, usize)> {
     let sample_count = (first_count as u128).checked_add(second_count as u128)?;
     let count_product = (first_count as u128).checked_mul(second_count as u128)?;
-    if count_product == 0 {
-        return None;
-    }
+    // Canonical anchor translation always contributes at least one exact zero;
+    // reaching this helper also requires a repeated nonzero gap. Both counts are
+    // therefore strictly positive at the sole call site.
     let target = sample_count
         .checked_mul(sample_count)?
         .checked_mul(sample_count.checked_sub(1)?)?;
