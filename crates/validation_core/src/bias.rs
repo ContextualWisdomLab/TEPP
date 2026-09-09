@@ -235,11 +235,32 @@ fn exact_three_level_standard_error(
         let scale = exact_power_of_two_scale(max_magnitude);
         let normalized_first = first_offset / scale;
         let normalized_second = second_offset / scale;
-        if !normalized_first.is_finite()
-            || !normalized_second.is_finite()
-            || (first_offset != 0.0 && normalized_first == 0.0)
-            || (second_offset != 0.0 && normalized_second == 0.0)
-            || !same_numeric_value(normalized_first * scale, first_offset)
+        if !normalized_first.is_finite() || !normalized_second.is_finite() {
+            return Ok(None);
+        }
+
+        // A nonzero offset can round to zero under this exact power-of-two
+        // normalization only when its magnitude is at most 2^-1075 of `scale`.
+        // The other offset is the finite dominant term in [scale, 2*scale). For
+        // `[0, m, d]`, `SE = |d|*sqrt(1-r+r^2)/3` with `r=m/d`; that lost term
+        // perturbs `|d|/3` by far less than one binary64 midpoint interval. Since
+        // a dyadic `|d|/3` cannot itself be a binary midpoint (the denominator 3
+        // is odd), correctly rounding the exact three-level SE is identical to
+        // correctly rounding `|d|/3`. Retain the represented minor level in the
+        // proof rather than sending the sample through the one-ULP-prone generic
+        // mean/deviation fallback.
+        if normalized_first == 0.0 {
+            let standard_error =
+                deterministic_representable_sum_over_count(&[second_offset.abs()], 3)?;
+            return Ok(Some(standard_error));
+        }
+        if normalized_second == 0.0 {
+            let standard_error =
+                deterministic_representable_sum_over_count(&[first_offset.abs()], 3)?;
+            return Ok(Some(standard_error));
+        }
+
+        if !same_numeric_value(normalized_first * scale, first_offset)
             || !same_numeric_value(normalized_second * scale, second_offset)
         {
             return Ok(None);
@@ -796,6 +817,25 @@ mod tests {
                 .to_bits(),
             0x64f9_5555_5555_5555
         );
+
+        let huge = f64::from_bits(0x7fe0_0000_0000_0000);
+        let tiny = f64::from_bits(1);
+        let expected = 0x7fc5_5555_5555_5555;
+        assert_eq!(
+            exact_three_level_standard_error(tiny, huge)
+                .expect("minor-first extreme ratio")
+                .expect("dominant-over-three rounding proof")
+                .to_bits(),
+            expected
+        );
+        assert_eq!(
+            exact_three_level_standard_error(huge, tiny)
+                .expect("minor-second extreme ratio")
+                .expect("dominant-over-three rounding proof")
+                .to_bits(),
+            expected
+        );
+
         assert_eq!(
             exact_three_level_standard_error(-f64::MIN_POSITIVE, f64::MIN_POSITIVE)
                 .expect("underflow-normalized fallback"),
