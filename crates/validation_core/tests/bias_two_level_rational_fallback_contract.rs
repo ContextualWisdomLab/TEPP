@@ -67,3 +67,24 @@ fn balanced_four_observation_low_terms_fall_through_nonrational_count_scale() {
         .expect("permutation preserves nonrational two-level geometry");
     assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
 }
+
+#[test]
+fn unbalanced_five_observation_low_terms_refuse_nonsquare_reduced_numerator() {
+    let quarter_ulp_at_one = 2.0_f64.powi(-54);
+    let truth = [quarter_ulp_at_one, quarter_ulp_at_one, 0.0, 0.0, 0.0];
+    let recovered = [1.0; 5];
+
+    // The bounded exact pair-distance route refuses because two subtractions
+    // carry error-free low terms. The fallback sees two exact levels with counts
+    // 2 and 3. Reducing m(n-m) / (n^2(n-1)) gives 3/50, whose numerator is not a
+    // perfect square, so the rational shortcut must decline at its numerator
+    // proof and the generic translated path must round 2^-54 * sqrt(3/50).
+    let standard_error = bias_standard_error(&truth, &recovered)
+        .expect("nonsquare numerator geometry remains representable");
+    assert_eq!(standard_error.to_bits(), 0x3c6f_5a7c_ecdb_684a);
+
+    let permuted_truth = [quarter_ulp_at_one, 0.0, 0.0, quarter_ulp_at_one, 0.0];
+    let permuted_standard_error = bias_standard_error(&permuted_truth, &recovered)
+        .expect("permutation preserves nonsquare numerator geometry");
+    assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
+}
