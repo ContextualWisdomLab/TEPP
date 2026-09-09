@@ -453,7 +453,7 @@ fn exact_translated_residual_standard_error(
         if standard_error != 0.0 {
             return Ok(Some(standard_error));
         }
-        if zero_count == 1 || gap_count == 1 || rational_scale.is_some() {
+        if zero_count == 1 || gap_count == 1 {
             return Err(ValidationError::InvalidInput);
         }
     }
