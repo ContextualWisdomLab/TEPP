@@ -304,13 +304,15 @@ fn normalized_three_level_standard_error(
         return Ok(None);
     }
 
+    // Each exact normalized square is below 4, so their binary64 sum is below 8
+    // and cannot overflow. The remaining roundoff predicate still proves whether
+    // that finite addition preserved the exact represented square sum.
     let normalized_square_sum = normalized_first_square + normalized_second_square;
-    if !normalized_square_sum.is_finite()
-        || subtraction_roundoff(
-            normalized_first_square,
-            -normalized_second_square,
-            normalized_square_sum,
-        ) != 0.0
+    if subtraction_roundoff(
+        normalized_first_square,
+        -normalized_second_square,
+        normalized_square_sum,
+    ) != 0.0
     {
         return Ok(None);
     }
