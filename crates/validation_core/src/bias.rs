@@ -362,11 +362,12 @@ fn exact_three_level_standard_error(
     let cross_product = first_offset * second_offset;
     // The sole production call site reaches this helper only after canonical
     // exact translation of three observations has recorded two distinct,
-    // nonzero finite offsets. The zero-product predicates therefore express
-    // underflow only; they do not need separate input-nonzero guards.
+    // nonzero finite offsets. Once both rounded squares are finite, the exact
+    // product magnitude |xy| <= max(x², y²) remains below binary64's
+    // round-to-nearest overflow boundary, so the cross-product cannot be the
+    // first non-finite product. Zero-product predicates still express underflow.
     let products_leave_represented_range = !first_square.is_finite()
         || !second_square.is_finite()
-        || !cross_product.is_finite()
         || first_square == 0.0
         || second_square == 0.0
         || cross_product == 0.0;
