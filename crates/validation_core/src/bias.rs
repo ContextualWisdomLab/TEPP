@@ -137,11 +137,12 @@ fn exact_two_level_rational_scale(
     let reduced_denominator = target / divisor;
     let numerator = reduced_numerator.isqrt();
     let denominator = reduced_denominator.isqrt();
+    // `reduced_numerator <= first_count * second_count`, so its integer square
+    // root cannot exceed the larger `usize` input count.
     if numerator.checked_mul(numerator)? != reduced_numerator
         || denominator.checked_mul(denominator)? != reduced_denominator
         || numerator == 0
         || denominator == 0
-        || numerator > usize::MAX as u128
         || denominator > usize::MAX as u128
     {
         return None;
