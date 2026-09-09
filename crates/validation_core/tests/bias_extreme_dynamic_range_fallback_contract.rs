@@ -27,3 +27,28 @@ fn extreme_dynamic_range_preserves_representable_standard_error_after_normalizat
         .expect("permutation preserves the represented residual geometry");
     assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
 }
+
+#[test]
+fn unrepresentable_anchor_deltas_refuse_exact_translation_and_preserve_scaled_fallback() {
+    let truth = [0.0; 3];
+    let recovered = [f64::MAX, -f64::MAX, 1.0];
+
+    // The bounded exact n=3 route first refuses its neutral-zero proof because
+    // the 1.0 residual makes the common dyadic unit too fine for the MAX-value
+    // coefficient to fit u128. Its pairwise reference then refuses the
+    // unrepresentable distance MAX - (-MAX). The general bias route must also
+    // reject every exact translation anchor: the two extreme anchors overflow
+    // their opposite-sign high delta, while the 1.0 anchor loses that unit when
+    // forming MAX - 1.0 and therefore fails the error-free subtraction proof.
+    // The existing scaled-deviation fallback remains finite and permutation
+    // invariant. Its normalized squared deviations round to [1, 1, 0], so
+    // SE(mean) is MAX * sqrt(1/3), represented as 0x7fe279a74590331b.
+    let standard_error = bias_standard_error(&truth, &recovered)
+        .expect("unrepresentable anchor deltas retain a finite scaled fallback");
+    assert_eq!(standard_error.to_bits(), 0x7fe2_79a7_4590_331b);
+
+    let permuted_recovered = [1.0, f64::MAX, -f64::MAX];
+    let permuted_standard_error = bias_standard_error(&truth, &permuted_recovered)
+        .expect("anchor refusal is permutation invariant");
+    assert_eq!(permuted_standard_error.to_bits(), standard_error.to_bits());
+}
