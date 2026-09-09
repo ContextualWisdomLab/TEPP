@@ -572,6 +572,8 @@ mod tests {
     #[test]
     fn exact_ratio_sqrt_refuses_outside_bounded_proof() {
         let too_large_denominator = (1_u128 << 53) + 1;
+        let fraction_denominator = 1_u128 << 52;
+        let finite_seed_with_infinite_neighbor = 4 * fraction_denominator - 3;
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(0, 48, 0), None);
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 0, 0), None);
         assert_eq!(
@@ -580,6 +582,15 @@ mod tests {
         );
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 48, 1024), None);
         assert_eq!(correctly_rounded_scaled_sqrt_ratio(1, 48, -1075), None);
+        assert_eq!(correctly_rounded_scaled_sqrt_ratio(16, 1, 1023), None);
+        assert_eq!(
+            correctly_rounded_scaled_sqrt_ratio(
+                finite_seed_with_infinite_neighbor,
+                fraction_denominator,
+                1023,
+            ),
+            None
+        );
     }
 
     #[test]
