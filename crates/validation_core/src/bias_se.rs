@@ -373,11 +373,11 @@ fn exact_pair_distance_standard_error(
     truth: &[f64],
     recovered: &[f64],
 ) -> Option<Result<f64, ValidationError>> {
-    // Keep the exact proof deliberately bounded. n=2 and n=3 have cheaper exact
-    // identities in `bias.rs`; four through sixteen observations are the smallest
-    // remaining sample sizes with demonstrated one-ULP errors in translated
-    // floating moment/sqrt paths.
-    if truth.len() != recovered.len() || !(4..=16).contains(&truth.len()) {
+    // Keep the exact proof deliberately bounded. n=2 retains its cheaper exact
+    // identity in `bias.rs`; three through sixteen observations use the exact
+    // pair-distance proof because the n=3 direct fallback can lose one ULP after
+    // an otherwise finite target encounters an overflowing three-level radicand.
+    if truth.len() != recovered.len() || !(3..=16).contains(&truth.len()) {
         return None;
     }
     let sample_count = truth.len();
@@ -434,7 +434,7 @@ fn exact_pair_distance_standard_error(
 
 /// Standard error of mean signed bias.
 ///
-/// Four- through sixteen-observation samples first attempt an exact neutral-zero
+/// Three- through sixteen-observation samples first attempt an exact neutral-zero
 /// linear proof and then the pairwise-difference reference when the bounded linear
 /// proof refuses. Each admitted route uses the same exact pair-distance identity
 /// and exact dyadic midpoint rounding. All other samples retain the established
@@ -754,8 +754,12 @@ mod tests {
             Some(Ok(0.0))
         );
         assert_eq!(
-            exact_pair_distance_standard_error(&truth[..3], &[0.0; 3]),
+            exact_pair_distance_standard_error(&truth[..2], &[0.0; 2]),
             None
+        );
+        assert_eq!(
+            exact_pair_distance_standard_error(&truth[..3], &[0.0; 3]),
+            Some(Ok(0.0))
         );
         assert_eq!(
             exact_pair_distance_standard_error(&[0.0; 10], &[0.0; 10]),
