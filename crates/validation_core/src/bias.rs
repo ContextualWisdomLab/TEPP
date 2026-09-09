@@ -199,8 +199,7 @@ fn exact_subnormal_rational_scale(
         return Some(Ok(f64::MIN_POSITIVE));
     }
     // The preceding bounds leave fewer than 2^52 units, so conversion cannot fail.
-    let rounded_units =
-        u64::try_from(rounded_units).expect("rounded units are bounded below 2^52");
+    let rounded_units = u64::try_from(rounded_units).expect("rounded units are bounded below 2^52");
     Some(Ok(f64::from_bits(rounded_units)))
 }
 
