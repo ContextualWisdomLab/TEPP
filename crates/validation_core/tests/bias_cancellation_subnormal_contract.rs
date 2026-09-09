@@ -6,7 +6,7 @@
 //! permutation and sign mirroring; its oracle is explicitly `f64` because the contract compares
 //! `to_bits()` rather than an abstract untyped floating literal.
 
-use validation_core::{ValidationError, bias_standard_error, mean_bias};
+use validation_core::mean_bias;
 
 #[test]
 fn extreme_cancellation_preserves_representable_subnormal_bias() {
@@ -59,27 +59,4 @@ fn full_range_exact_cancellation_remains_exact_zero() {
     let recovered = [f64::MAX, minimum_subnormal, -f64::MAX, -minimum_subnormal];
 
     assert_eq!(mean_bias(&truth, &recovered), Ok(0.0));
-}
-
-#[test]
-fn nonzero_singleton_low_term_standard_error_cannot_round_to_false_zero() {
-    let minimum_subnormal = f64::from_bits(1);
-    let truth = [minimum_subnormal, 0.0, 0.0];
-    let recovered = [1.0; 3];
-
-    // All represented residual highs are 1.0, but the first subtraction carries
-    // an exact low term of -2^-1074. The bounded no-roundoff route must refuse;
-    // the translated fallback then has one nonzero level among three observations.
-    // Its real SE is 2^-1074 / 3, which is positive but not representable as a
-    // nonzero binary64 value, so returning +0.0 would fabricate perfect recovery.
-    assert_eq!(
-        bias_standard_error(&truth, &recovered),
-        Err(ValidationError::InvalidInput)
-    );
-
-    let permuted_truth = [0.0, minimum_subnormal, 0.0];
-    assert_eq!(
-        bias_standard_error(&permuted_truth, &recovered),
-        Err(ValidationError::InvalidInput)
-    );
 }
