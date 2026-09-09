@@ -291,13 +291,13 @@ fn normalized_three_level_standard_error(
         return Ok(None);
     }
 
+    // Both normalized magnitudes are finite and below 2. Their squares and
+    // cross-product are therefore finite with magnitude below 4. Keep the FMA
+    // residual checks below: those prove exact representability, not finiteness.
     let normalized_first_square = normalized_first * normalized_first;
     let normalized_second_square = normalized_second * normalized_second;
     let normalized_cross_product = normalized_first * normalized_second;
-    if !normalized_first_square.is_finite()
-        || !normalized_second_square.is_finite()
-        || !normalized_cross_product.is_finite()
-        || normalized_first.mul_add(normalized_first, -normalized_first_square) != 0.0
+    if normalized_first.mul_add(normalized_first, -normalized_first_square) != 0.0
         || normalized_second.mul_add(normalized_second, -normalized_second_square) != 0.0
         || normalized_first.mul_add(normalized_second, -normalized_cross_product) != 0.0
     {
