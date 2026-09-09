@@ -406,24 +406,27 @@ fn exact_translated_residual_standard_error(
     }
 
     let mut zero_count = 0_usize;
-    let mut repeated_gap = None;
+    let mut repeated_gap = 0.0_f64;
     let mut gap_count = 0_usize;
     let mut exactly_two_levels = true;
     for &value in &translated {
         if value == 0.0 {
             zero_count += 1;
-        } else if let Some(gap) = repeated_gap {
-            if !same_numeric_value(value, gap) {
-                exactly_two_levels = false;
-                break;
-            }
-            gap_count += 1;
-        } else {
-            repeated_gap = Some(value);
+        } else if gap_count == 0 {
+            repeated_gap = value;
             gap_count = 1;
+        } else if !same_numeric_value(value, repeated_gap) {
+            exactly_two_levels = false;
+            break;
+        } else {
+            gap_count += 1;
         }
     }
-    if exactly_two_levels && let Some(gap) = repeated_gap {
+    if exactly_two_levels {
+        // `max_magnitude != 0.0` proves that at least one translated value is
+        // nonzero. The first such value initializes `repeated_gap`, so there is
+        // no independent missing-gap state once the sample remains two-level.
+        let gap = repeated_gap;
         let rational_scale = exact_two_level_rational_scale(zero_count, gap_count);
         let standard_error = if zero_count == 1 || gap_count == 1 {
             // For an exactly translated two-level sample where either level
