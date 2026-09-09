@@ -212,10 +212,7 @@ fn normal_dyadic_parts(value: f64) -> (u128, i32) {
     let bits = value.to_bits();
     let exponent = ((bits >> 52) & 0x7ff) as i32;
     let fraction = bits & 0x000f_ffff_ffff_ffff;
-    (
-        u128::from((1_u64 << 52) | fraction),
-        exponent - 1075,
-    )
+    (u128::from((1_u64 << 52) | fraction), exponent - 1075)
 }
 
 /// Compare the exact target `sqrt(radicand) / 3` with the midpoint above `lower`.
@@ -242,10 +239,10 @@ fn adjust_sqrt_over_three_candidate(radicand: f64, candidate: f64) -> f64 {
     let lower_order = sqrt_over_three_midpoint_order(radicand, previous);
     let upper_order = sqrt_over_three_midpoint_order(radicand, candidate);
     let odd_candidate = candidate_bits & 1;
-    let decrement = u64::from(lower_order.is_lt())
-        | (u64::from(lower_order.is_eq()) & odd_candidate);
-    let increment = u64::from(upper_order.is_gt())
-        | (u64::from(upper_order.is_eq()) & odd_candidate);
+    let decrement =
+        u64::from(lower_order.is_lt()) | (u64::from(lower_order.is_eq()) & odd_candidate);
+    let increment =
+        u64::from(upper_order.is_gt()) | (u64::from(upper_order.is_eq()) & odd_candidate);
     f64::from_bits(candidate_bits - decrement + increment)
 }
 
