@@ -317,12 +317,15 @@ fn normalized_three_level_standard_error(
         return Ok(None);
     }
     let normalized_radicand = normalized_square_sum - normalized_cross_product;
-    if !normalized_radicand.is_finite()
-        || subtraction_roundoff(
-            normalized_square_sum,
-            normalized_cross_product,
-            normalized_radicand,
-        ) != 0.0
+    // The admitted square sum is finite and below 8, while the admitted exact
+    // cross-product has magnitude below 4. Their subtraction therefore stays
+    // finite with magnitude below 12; only exact subtraction roundoff remains
+    // a meaningful admission predicate here.
+    if subtraction_roundoff(
+        normalized_square_sum,
+        normalized_cross_product,
+        normalized_radicand,
+    ) != 0.0
     {
         return Ok(None);
     }
