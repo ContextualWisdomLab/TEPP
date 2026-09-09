@@ -225,10 +225,11 @@ fn exact_three_level_standard_error(
         || (second_offset != 0.0 && second_square == 0.0)
         || (first_offset != 0.0 && second_offset != 0.0 && cross_product == 0.0);
     if products_leave_represented_range {
+        // The sole production call site reaches this helper only after canonical
+        // exact translation of three observations has recorded two distinct,
+        // nonzero finite offsets. Their maximum magnitude is therefore finite
+        // and nonzero; there is no independent invalid-magnitude state here.
         let max_magnitude = first_offset.abs().max(second_offset.abs());
-        if max_magnitude == 0.0 || !max_magnitude.is_finite() {
-            return Ok(None);
-        }
         let scale = exact_power_of_two_scale(max_magnitude);
         let normalized_first = first_offset / scale;
         let normalized_second = second_offset / scale;
