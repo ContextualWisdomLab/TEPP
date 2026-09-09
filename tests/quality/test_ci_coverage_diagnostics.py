@@ -10,6 +10,9 @@ from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+HOURLY_PRODUCT_WORKFLOW = (
+    REPOSITORY_ROOT / ".github" / "workflows" / "hourly-nim-product-development.yml"
+)
 RUST_TOOLCHAIN = REPOSITORY_ROOT / "rust-toolchain.toml"
 DEPENDABOT = REPOSITORY_ROOT / ".github" / "dependabot.yml"
 
@@ -95,16 +98,25 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         manifest = tomllib.loads(RUST_TOOLCHAIN.read_text(encoding="utf-8"))
         stable_channel = manifest["toolchain"]["channel"]
         self.assertRegex(stable_channel, re.compile(r"^\d+\.\d+\.\d+$"))
+        stable_install = f"rustup toolchain install {stable_channel} "
 
         workflow = CI_WORKFLOW.read_text(encoding="utf-8")
         self.assertEqual(
-            workflow.count(f"rustup toolchain install {stable_channel} "),
+            workflow.count(stable_install),
             3,
             "every stable CI lane must explicitly install rust-toolchain.toml's exact channel",
         )
         self.assertNotIn("rustup toolchain install stable", workflow)
         self.assertEqual(workflow.count("nightly-2026-08-21"), 3)
         self.assertNotIn("nightly-2026-08-01", workflow)
+
+        hourly_workflow = HOURLY_PRODUCT_WORKFLOW.read_text(encoding="utf-8")
+        self.assertEqual(
+            hourly_workflow.count(stable_install),
+            1,
+            "the commercial verifier must use rust-toolchain.toml's exact stable channel",
+        )
+        self.assertNotIn("rustup toolchain install stable", hourly_workflow)
 
         dependabot = DEPENDABOT.read_text(encoding="utf-8")
         self.assertIn('package-ecosystem: "rust-toolchain"', dependabot)
