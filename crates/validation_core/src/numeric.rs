@@ -348,7 +348,8 @@ pub(crate) fn deterministic_representable_mean(values: &[f64]) -> Result<f64, Va
 mod tests {
     use super::{
         adjacent_float, deterministic_compensated_sum, deterministic_representable_mean,
-        deterministic_representable_sum_over_count, round_candidate_with_tail,
+        deterministic_representable_sum_over_count, mixed_remainder_mean_over_total,
+        round_candidate_with_tail,
     };
     use crate::ValidationError;
 
@@ -379,6 +380,30 @@ mod tests {
             1.0_f64.to_bits() + 1
         );
         assert!(round_candidate_with_tail(f64::MAX, 1.0, 0.0).is_infinite());
+    }
+
+    #[test]
+    fn mixed_remainder_preserves_second_order_tail_and_underflow_refusal() {
+        let half_below_512 = f64::from_bits(512.0_f64.to_bits() - 1);
+        let second_order_tail = [
+            -1024.0,
+            -half_below_512,
+            2.0_f64.powi(-110),
+            half_below_512,
+            1024.0,
+        ];
+        assert_eq!(
+            mixed_remainder_mean_over_total(&second_order_tail, 5)
+                .expect("second-order retained mass remains representable")
+                .to_bits(),
+            0x38e9_9999_9999_999a
+        );
+
+        let minimum_subnormal = f64::from_bits(1);
+        assert_eq!(
+            mixed_remainder_mean_over_total(&[-1.0, minimum_subnormal, 1.0], usize::MAX),
+            Err(ValidationError::InvalidInput)
+        );
     }
 
     #[test]
