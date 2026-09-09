@@ -1,3 +1,5 @@
+//! Regression for the generic bias-SE fallback when exact low-term translation refuses.
+
 use validation_core::bias_standard_error;
 
 #[test]
