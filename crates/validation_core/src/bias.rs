@@ -218,17 +218,19 @@ fn exact_three_level_standard_error(
     let first_square = first_offset * first_offset;
     let second_square = second_offset * second_offset;
     let cross_product = first_offset * second_offset;
+    // The sole production call site reaches this helper only after canonical
+    // exact translation of three observations has recorded two distinct,
+    // nonzero finite offsets. The zero-product predicates therefore express
+    // underflow only; they do not need separate input-nonzero guards.
     let products_leave_represented_range = !first_square.is_finite()
         || !second_square.is_finite()
         || !cross_product.is_finite()
-        || (first_offset != 0.0 && first_square == 0.0)
-        || (second_offset != 0.0 && second_square == 0.0)
-        || (first_offset != 0.0 && second_offset != 0.0 && cross_product == 0.0);
+        || first_square == 0.0
+        || second_square == 0.0
+        || cross_product == 0.0;
     if products_leave_represented_range {
-        // The sole production call site reaches this helper only after canonical
-        // exact translation of three observations has recorded two distinct,
-        // nonzero finite offsets. Their maximum magnitude is therefore finite
-        // and nonzero; there is no independent invalid-magnitude state here.
+        // The same caller invariant makes the maximum magnitude finite and
+        // nonzero; there is no independent invalid-magnitude state here.
         let max_magnitude = first_offset.abs().max(second_offset.abs());
         let scale = exact_power_of_two_scale(max_magnitude);
         let normalized_first = first_offset / scale;
