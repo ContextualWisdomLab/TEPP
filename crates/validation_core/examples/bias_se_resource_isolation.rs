@@ -152,8 +152,7 @@ fn pair_square_sum_quadratic_buffered(values: &[u128]) -> Option<KernelObservati
         }
     }
     let scratch_records = records.capacity();
-    let scratch_payload_bytes =
-        scratch_records.checked_mul(size_of::<Option<(u128, i32)>>())?;
+    let scratch_payload_bytes = scratch_records.checked_mul(size_of::<Option<(u128, i32)>>())?;
     let mut pair_square_sum = 0_u128;
     for (difference, _) in records.into_iter().flatten() {
         pair_square_sum = pair_square_sum.checked_add(difference.checked_mul(difference)?)?;
