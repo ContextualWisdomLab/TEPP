@@ -598,7 +598,15 @@ fn exact_translated_residual_standard_error(
     let denominator = sample_count * sample_count * (sample_count - 1.0);
     let normalized_standard_error = (dispersion_numerator / denominator).sqrt();
     let standard_error = scale * normalized_standard_error;
-    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
+    // Positive translated dispersion cannot produce a zero normalized SE on the
+    // supported `usize` domain: with `|sum| < 1` the numerator exceeds 2, while
+    // `|sum| >= 1` leaves a positive fused dyadic residual of at least 2^-104;
+    // dividing by at most a 2^192 denominator and taking sqrt stays normal. Every
+    // normalized magnitude is below 2, so normalized SE is below sqrt(2); with a
+    // finite power-of-two scale at most 2^1023, restoration cannot overflow.
+    // The remaining invalid result is therefore only positive SE rounding to zero
+    // at the final scale-restoration boundary.
+    if standard_error == 0.0 {
         Err(ValidationError::InvalidInput)
     } else {
         Ok(Some(standard_error))
