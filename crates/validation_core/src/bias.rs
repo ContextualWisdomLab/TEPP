@@ -94,10 +94,15 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
         .collect();
     let normalized_standard_error = standard_error_from_deviations(&normalized_deviations)?;
     let standard_error = outer_scale * normalized_standard_error;
-    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
+    // This fallback is reachable only after one finite `value - mean` overflowed.
+    // The represented arithmetic mean stays inside the finite input envelope, so
+    // that exact deviation is bounded by `2 * outer_scale`; overflow therefore
+    // places `outer_scale` in the upper binary64 range. The helper above has
+    // already rejected a represented zero SE. Restoring any positive binary64 SE
+    // at that outer scale cannot round back to zero. Keep the independent
+    // non-finite refusal until its upper bound is proved across the full mean path.
+    if !standard_error.is_finite() {
         Err(ValidationError::InvalidInput)
-    } else if standard_error == 0.0 {
-        Ok(0.0)
     } else {
         Ok(standard_error)
     }
