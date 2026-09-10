@@ -1,0 +1,91 @@
+name: Bias SE Exact-Proof Budget
+
+on:
+  pull_request:
+    paths:
+      - "rust-toolchain.toml"
+      - "Cargo.lock"
+      - "crates/validation_core/src/bias.rs"
+      - "crates/validation_core/src/bias_se.rs"
+      - "crates/validation_core/examples/bias_se_exact_proof_budget.rs"
+      - "crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs"
+      - ".github/workflows/bias-se-proof-budget.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tepp-bias-se-proof-budget-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  characterize:
+    name: Release CPU, allocation shape, and RSS evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
+        with:
+          persist-credentials: false
+
+      - name: Install repository-selected Rust toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          channel="$(python3 - <<'PY'
+          import tomllib
+          with open("rust-toolchain.toml", "rb") as handle:
+              print(tomllib.load(handle)["toolchain"]["channel"])
+          PY
+          )"
+          test -n "$channel"
+          rustup toolchain install "$channel" --profile minimal
+
+      - name: Build exact-proof budget harness in release mode
+        run: cargo build --locked --release -p validation_core --example bias_se_exact_proof_budget
+
+      - name: Capture exact environment and resource evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bias-se-proof-budget-evidence
+          {
+            printf 'git_sha=%s\n' "$GITHUB_SHA"
+            printf 'runner_os=%s\n' "$RUNNER_OS"
+            printf 'runner_arch=%s\n' "$RUNNER_ARCH"
+            printf 'rustup_active_toolchain='
+            rustup show active-toolchain
+            rustc -Vv
+            cargo -V
+            uname -a
+            getconf LONG_BIT | sed 's/^/pointer_width_bits=/'
+            lscpu
+          } > bias-se-proof-budget-evidence/environment.txt
+
+          LC_ALL=C /usr/bin/time -v \
+            -o bias-se-proof-budget-evidence/process-resource.txt \
+            ./target/release/examples/bias_se_exact_proof_budget \
+            > bias-se-proof-budget-evidence/bias-se-proof-budget.csv
+
+          header="geometry,sample_count,kernel,p95_ns,timing_samples,unit_exponent,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_wide_product,used_pairwise_fallback"
+          test "$(head -n 1 bias-se-proof-budget-evidence/bias-se-proof-budget.csv)" = "$header"
+          grep -q '^compact_admit,2047,' bias-se-proof-budget-evidence/bias-se-proof-budget.csv
+          grep -q '^odd_boundary_wide_recovery,65,hybrid_narrow_pair,' bias-se-proof-budget-evidence/bias-se-proof-budget.csv
+          grep -q '^odd_boundary_wide_recovery,65,hybrid_narrow_wide_pair,' bias-se-proof-budget-evidence/bias-se-proof-budget.csv
+          grep -q 'Maximum resident set size (kbytes):' bias-se-proof-budget-evidence/process-resource.txt
+
+          sha256sum \
+            bias-se-proof-budget-evidence/environment.txt \
+            bias-se-proof-budget-evidence/process-resource.txt \
+            bias-se-proof-budget-evidence/bias-se-proof-budget.csv \
+            > bias-se-proof-budget-evidence/SHA256SUMS
+
+      - name: Upload exact-head characterization evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: bias-se-proof-budget-${{ github.sha }}
+          path: bias-se-proof-budget-evidence/
+          if-no-files-found: error
+          retention-days: 30
