@@ -337,10 +337,6 @@ fn normalized_three_level_standard_error(
         // can introduce a second rounding boundary. Keep that unresolved case on
         // the general represented path rather than asserting an exact admission.
         Ok(None)
-    } else if !standard_error.is_finite()
-        || (standard_error == 0.0 && normalized_standard_error != 0.0)
-    {
-        Err(ValidationError::InvalidInput)
     } else {
         Ok(Some(standard_error))
     }
