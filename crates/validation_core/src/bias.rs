@@ -587,7 +587,11 @@ fn exact_translated_residual_standard_error(
     let sample_count = translated.len() as f64;
     let scaled_square_sum = sample_count * normalized_square_sum;
     let dispersion_numerator = (-normalized_sum).mul_add(normalized_sum, scaled_square_sum);
-    if !dispersion_numerator.is_finite() || dispersion_numerator <= 0.0 {
+    // Every normalized magnitude is below 2. On Rust's supported pointer widths,
+    // `n <= usize::MAX <= 2^64 - 1`, so both `n * sum(x^2)` and `sum(x)^2`
+    // remain below 2^131, far inside binary64's finite range. The fused
+    // subtraction therefore cannot be the first non-finite operation here.
+    if dispersion_numerator <= 0.0 {
         return Ok(None);
     }
 
