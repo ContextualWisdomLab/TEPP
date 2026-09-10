@@ -4,8 +4,9 @@
 //! neutral-zero identity only when every integer-width, exponent-alignment,
 //! denominator-reduction, and exact midpoint-rounding proof succeeds. A refusal
 //! delegates to the established fallback. These fixtures preserve exact represented
-//! results, permutation/repeat determinism, and false-zero refusal without turning
-//! one sample count into a production staircase.
+//! results, permutation/repeat determinism, false-zero refusal, and a realistic
+//! exact-proof width refusal without turning one sample count into a production
+//! staircase.
 
 use validation_core::bias_standard_error;
 
@@ -76,4 +77,20 @@ fn large_sample_two_level_reference_preserves_false_zero_refusal() {
         let result = bias_standard_error(&truth, &recovered);
         assert_eq!(result, Err(validation_core::ValidationError::InvalidInput));
     }
+}
+
+#[test]
+fn wider_exact_proof_refusal_delegates_without_false_zero() {
+    // All residual subtractions are exact because truth is neutral zero, but the
+    // represented span from 1.0 to 2^-200 cannot be aligned into the checked u128
+    // coefficient kernel. Above sixteen observations that refusal must delegate
+    // directly instead of allocating the quadratic pairwise reference.
+    let truth = [0.0; 17];
+    let mut recovered = [2.0_f64.powi(-200); 17];
+    recovered[0] = 1.0;
+
+    let first = bias_standard_error(&truth, &recovered).expect("fallback remains representable");
+    let second = bias_standard_error(&truth, &recovered).expect("repeat remains representable");
+    assert!(first.is_finite() && first > 0.0);
+    assert_eq!(first.to_bits(), second.to_bits());
 }
