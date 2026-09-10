@@ -8,6 +8,7 @@ on:
       - "crates/validation_core/src/bias.rs"
       - "crates/validation_core/src/bias_se.rs"
       - "crates/validation_core/examples/bias_se_exact_proof_budget.rs"
+      - "crates/validation_core/examples/bias_se_resource_isolation.rs"
       - "crates/validation_core/tests/bias_standard_error_exact_proof_budget_characterization.rs"
       - ".github/workflows/bias-se-proof-budget.yml"
   workflow_dispatch:
@@ -53,8 +54,11 @@ jobs:
           test -n "$channel"
           rustup toolchain install "$channel" --profile minimal
 
-      - name: Build exact-proof budget harness in release mode
-        run: cargo build --locked --release -p validation_core --example bias_se_exact_proof_budget
+      - name: Build exact-proof budget harnesses in release mode
+        run: >-
+          cargo build --locked --release -p validation_core
+          --example bias_se_exact_proof_budget
+          --example bias_se_resource_isolation
 
       - name: Capture exact environment and resource evidence
         shell: bash
@@ -86,10 +90,52 @@ jobs:
           grep -q '^odd_boundary_wide_recovery,65,hybrid_narrow_wide_pair,' bias-se-proof-budget-evidence/bias-se-proof-budget.csv
           grep -q 'Maximum resident set size (kbytes):' bias-se-proof-budget-evidence/process-resource.txt
 
+          LC_ALL=C /usr/bin/time -v \
+            -o bias-se-proof-budget-evidence/candidate-process-resource.txt \
+            ./target/release/examples/bias_se_resource_isolation candidate 25 \
+            > bias-se-proof-budget-evidence/candidate.csv
+          LC_ALL=C /usr/bin/time -v \
+            -o bias-se-proof-budget-evidence/fallback-process-resource.txt \
+            ./target/release/examples/bias_se_resource_isolation fallback 25 \
+            > bias-se-proof-budget-evidence/fallback.csv
+
+          isolated_header="mode,sample_count,kernel,p95_ns,timing_samples,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_wide_product,used_pairwise_fallback"
+          test "$(head -n 1 bias-se-proof-budget-evidence/candidate.csv)" = "$isolated_header"
+          test "$(head -n 1 bias-se-proof-budget-evidence/fallback.csv)" = "$isolated_header"
+          grep -q '^candidate,2047,narrow_wide_candidate,' bias-se-proof-budget-evidence/candidate.csv
+          grep -q '^fallback,2047,narrow_pair_fallback,' bias-se-proof-budget-evidence/fallback.csv
+
+          candidate_scratch_records="$(awk -F, 'NR==2 {print $6}' bias-se-proof-budget-evidence/candidate.csv)"
+          candidate_scratch_bytes="$(awk -F, 'NR==2 {print $7}' bias-se-proof-budget-evidence/candidate.csv)"
+          fallback_scratch_records="$(awk -F, 'NR==2 {print $6}' bias-se-proof-budget-evidence/fallback.csv)"
+          fallback_scratch_bytes="$(awk -F, 'NR==2 {print $7}' bias-se-proof-budget-evidence/fallback.csv)"
+          test "$candidate_scratch_records" -eq 0
+          test "$candidate_scratch_bytes" -eq 0
+          test "$fallback_scratch_records" -eq 2094081
+          test "$fallback_scratch_bytes" -gt 0
+
+          candidate_rss_kb="$(awk -F: '/Maximum resident set size \(kbytes\)/ {gsub(/[[:space:]]/, "", $2); print $2}' bias-se-proof-budget-evidence/candidate-process-resource.txt)"
+          fallback_rss_kb="$(awk -F: '/Maximum resident set size \(kbytes\)/ {gsub(/[[:space:]]/, "", $2); print $2}' bias-se-proof-budget-evidence/fallback-process-resource.txt)"
+          test -n "$candidate_rss_kb"
+          test -n "$fallback_rss_kb"
+          test "$candidate_rss_kb" -gt 0
+          test "$fallback_rss_kb" -gt "$candidate_rss_kb"
+
+          {
+            printf 'mode,max_rss_kb,scratch_records,scratch_payload_bytes\n'
+            printf 'candidate,%s,%s,%s\n' "$candidate_rss_kb" "$candidate_scratch_records" "$candidate_scratch_bytes"
+            printf 'fallback,%s,%s,%s\n' "$fallback_rss_kb" "$fallback_scratch_records" "$fallback_scratch_bytes"
+          } > bias-se-proof-budget-evidence/isolated-rss-summary.csv
+
           sha256sum \
             bias-se-proof-budget-evidence/environment.txt \
             bias-se-proof-budget-evidence/process-resource.txt \
             bias-se-proof-budget-evidence/bias-se-proof-budget.csv \
+            bias-se-proof-budget-evidence/candidate-process-resource.txt \
+            bias-se-proof-budget-evidence/candidate.csv \
+            bias-se-proof-budget-evidence/fallback-process-resource.txt \
+            bias-se-proof-budget-evidence/fallback.csv \
+            bias-se-proof-budget-evidence/isolated-rss-summary.csv \
             > bias-se-proof-budget-evidence/SHA256SUMS
 
       - name: Upload exact-head characterization evidence
