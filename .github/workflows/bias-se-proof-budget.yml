@@ -15,6 +15,9 @@ on:
 permissions:
   contents: read
 
+env:
+  EVIDENCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 concurrency:
   group: tepp-bias-se-proof-budget-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -28,7 +31,14 @@ jobs:
       - name: Checkout exact head
         uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
         with:
+          ref: ${{ env.EVIDENCE_SHA }}
           persist-credentials: false
+
+      - name: Verify exact-head checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EVIDENCE_SHA"
 
       - name: Install repository-selected Rust toolchain
         shell: bash
@@ -52,7 +62,7 @@ jobs:
           set -euo pipefail
           mkdir -p bias-se-proof-budget-evidence
           {
-            printf 'git_sha=%s\n' "$GITHUB_SHA"
+            printf 'git_sha=%s\n' "$EVIDENCE_SHA"
             printf 'runner_os=%s\n' "$RUNNER_OS"
             printf 'runner_arch=%s\n' "$RUNNER_ARCH"
             printf 'rustup_active_toolchain='
@@ -85,7 +95,7 @@ jobs:
       - name: Upload exact-head characterization evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: bias-se-proof-budget-${{ github.sha }}
+          name: bias-se-proof-budget-${{ env.EVIDENCE_SHA }}
           path: bias-se-proof-budget-evidence/
           if-no-files-found: error
           retention-days: 30
