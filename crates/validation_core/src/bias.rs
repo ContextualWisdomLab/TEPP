@@ -101,10 +101,10 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
     // already rejected a represented zero SE. Restoring any positive binary64 SE
     // at that outer scale cannot round back to zero. Keep the independent
     // non-finite refusal until its upper bound is proved across the full mean path.
-    if !standard_error.is_finite() {
-        Err(ValidationError::InvalidInput)
-    } else {
+    if standard_error.is_finite() {
         Ok(standard_error)
+    } else {
+        Err(ValidationError::InvalidInput)
     }
 }
 
