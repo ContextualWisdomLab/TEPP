@@ -152,7 +152,8 @@ fn pair_square_sum_quadratic_buffered(values: &[u128]) -> Option<KernelObservati
         }
     }
     let scratch_records = records.capacity();
-    let scratch_payload_bytes = scratch_records.checked_mul(size_of::<Option<(u128, i32)>>())?;
+    let scratch_payload_bytes =
+        scratch_records.checked_mul(size_of::<Option<(u128, i32)>>())?;
     let mut pair_square_sum = 0_u128;
     for (difference, _) in records.into_iter().flatten() {
         pair_square_sum = pair_square_sum.checked_add(difference.checked_mul(difference)?)?;
@@ -205,7 +206,11 @@ fn measure(values: &[u128], samples: usize, kernel: Kernel) -> (Duration, Kernel
 fn expected_pair_square_sum() -> u128 {
     u128::try_from(SAMPLE_COUNT - 1)
         .expect("sample count fits u128")
-        .checked_mul(DIAMETER.checked_mul(DIAMETER).expect("diameter square fits u128"))
+        .checked_mul(
+            DIAMETER
+                .checked_mul(DIAMETER)
+                .expect("diameter square fits u128"),
+        )
         .expect("odd-boundary pair-square sum fits u128")
 }
 
@@ -217,7 +222,10 @@ fn main() {
         .and_then(|value| value.parse::<usize>().ok())
         .unwrap_or(25)
         .max(1);
-    assert!(arguments.next().is_none(), "expected mode and optional timing sample count only");
+    assert!(
+        arguments.next().is_none(),
+        "expected mode and optional timing sample count only"
+    );
 
     let values = boundary_fixture();
     let (kernel_name, kernel): (&str, Kernel) = match mode.as_str() {
@@ -226,7 +234,10 @@ fn main() {
         _ => panic!("mode must be 'candidate' or 'fallback'"),
     };
     let (p95, observation) = measure(&values, samples, kernel);
-    assert_eq!(observation.aligned_pair_square_sum, expected_pair_square_sum());
+    assert_eq!(
+        observation.aligned_pair_square_sum,
+        expected_pair_square_sum()
+    );
     match mode.as_str() {
         "candidate" => {
             assert!(observation.used_wide_product);
@@ -242,7 +253,9 @@ fn main() {
         _ => unreachable!("mode validated above"),
     }
 
-    println!("mode,sample_count,kernel,p95_ns,timing_samples,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_wide_product,used_pairwise_fallback");
+    println!(
+        "mode,sample_count,kernel,p95_ns,timing_samples,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_wide_product,used_pairwise_fallback"
+    );
     println!(
         "{mode},{SAMPLE_COUNT},{kernel_name},{},{samples},{},{},{},{},{}",
         p95.as_nanos(),
