@@ -35,6 +35,39 @@ fn large_sample_two_level_reference_is_bitwise_permutation_invariant() {
 }
 
 #[test]
+fn large_sample_non_singleton_two_level_reference_tracks_exact_count_geometry() {
+    // For two represented levels with m zero residuals and n-m copies of gap,
+    // SE(mean)^2 = gap^2 * m(n-m) / [n^2(n-1)]. These hard-coded binary64
+    // references were selected from that count-only identity, not from either
+    // TEPP implementation path. The cases cross the current n=16 boundary and
+    // then increase the count scale while keeping both levels non-singleton.
+    let gap = f64::from_bits(0x4330_0000_0000_0001);
+    let cases = [
+        (17_usize, 5_usize, 0x42fd_294a_104a_a492_u64),
+        (63, 21, 0x42ee_a713_4c43_1b35),
+        (255, 85, 0x42de_49d6_e90b_6ea0),
+        (1_023, 341, 0x42ce_330b_92b8_7e1b),
+    ];
+
+    for (sample_count, zero_count, expected_bits) in cases {
+        let truth = vec![0.0; sample_count];
+        let mut prefix = vec![gap; sample_count];
+        prefix[..zero_count].fill(0.0);
+        let mut suffix = prefix.clone();
+        suffix.reverse();
+        let mut rotated = prefix.clone();
+        rotated.rotate_left(sample_count / 3);
+
+        for recovered in [&prefix, &suffix, &rotated] {
+            let first = bias_standard_error(&truth, recovered);
+            let second = bias_standard_error(&truth, recovered);
+            assert_eq!(first.map(f64::to_bits), Ok(expected_bits));
+            assert_eq!(second.map(f64::to_bits), Ok(expected_bits));
+        }
+    }
+}
+
+#[test]
 fn large_sample_two_level_reference_preserves_false_zero_refusal() {
     // With gap = 2^-1074 and one zero anchor, exact SE(mean) = gap / 2047 is
     // positive but lies below the binary64 half-subnormal boundary. The public
