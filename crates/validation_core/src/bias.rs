@@ -95,19 +95,14 @@ fn scaled_standard_error(values: &[f64], mean: f64) -> Result<f64, ValidationErr
         .map(|value| *value - normalized_mean)
         .collect();
     let normalized_standard_error = standard_error_from_deviations(&normalized_deviations)?;
-    let standard_error = outer_scale * normalized_standard_error;
-    // This fallback is reachable only after one finite `value - mean` overflowed.
-    // The represented arithmetic mean stays inside the finite input envelope, so
-    // that exact deviation is bounded by `2 * outer_scale`; overflow therefore
-    // places `outer_scale` in the upper binary64 range. The helper above has
-    // already rejected a represented zero SE. Restoring any positive binary64 SE
-    // at that outer scale cannot round back to zero. Keep the independent
-    // non-finite refusal until its upper bound is proved across the full mean path.
-    if standard_error.is_finite() {
-        Ok(standard_error)
-    } else {
-        Err(ValidationError::InvalidInput)
-    }
+    // This fallback is entered only for n >= 3 after a finite direct deviation
+    // overflowed. Division by the finite `outer_scale` puts every value in
+    // [-1, 1], and the deterministic represented mean preserves that arithmetic
+    // mean. The resulting SE(mean) is therefore at most 1/sqrt(n - 1), strictly
+    // below one. Restoring it by the finite `outer_scale` cannot overflow. The
+    // helper above has already rejected a represented zero normalized SE; this
+    // fallback's large outer scale also cannot restore that positive value to zero.
+    Ok(outer_scale * normalized_standard_error)
 }
 
 fn greatest_common_divisor(mut left: u128, mut right: u128) -> u128 {
