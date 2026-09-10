@@ -57,13 +57,14 @@ fn standard_error_from_deviations(deviations: &[f64]) -> Result<f64, ValidationE
     // Form SE directly as sqrt(sum(d²) / (n * (n - 1))). Separately
     // rounding sqrt(sample_variance) and sqrt(n) can move the final binary64
     // standard error by one ULP even when the represented squared-deviation
-    // ratio is exact.
+    // ratio is exact. The sole production callers have n >= 3. Once scale is
+    // positive, at least one normalized square is exactly 1, so the normalized
+    // SE is positive and at most 1/sqrt(n - 1). Restoring it cannot overflow a
+    // finite scale; a zero restoration is therefore only false-zero underflow.
     let normalized_standard_error = (square_sum / (sample_count * (sample_count - 1.0))).sqrt();
     let standard_error = scale * normalized_standard_error;
-    if !standard_error.is_finite() || (standard_error == 0.0 && normalized_standard_error != 0.0) {
+    if standard_error == 0.0 {
         Err(ValidationError::InvalidInput)
-    } else if standard_error == 0.0 {
-        Ok(0.0)
     } else {
         Ok(standard_error)
     }
