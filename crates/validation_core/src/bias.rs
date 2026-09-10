@@ -402,12 +402,12 @@ fn exact_three_level_standard_error(
         return Ok(None);
     }
 
-    let standard_error =
-        if let Some(subnormal_result) = exact_subnormal_rational_scale(exact_root, 1, 3) {
-            subnormal_result?
-        } else {
-            deterministic_representable_sum_over_count(&[exact_root], 3)?
-        };
+    // Any positive represented radicand is at least 2^-1074. Reaching this
+    // direct exact-root path therefore proves `exact_root >= 2^-537`, so
+    // `exact_root / 3` remains normal by an enormous margin. The shared
+    // subnormal rational helper remains required by the two-level path, but it
+    // cannot activate at this three-level call site.
+    let standard_error = deterministic_representable_sum_over_count(&[exact_root], 3)?;
     Ok(Some(standard_error))
 }
 
