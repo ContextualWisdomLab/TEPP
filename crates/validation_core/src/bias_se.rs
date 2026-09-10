@@ -1,11 +1,11 @@
 //! Exact represented-input admission for mean-bias standard error.
 //!
-//! The general bias implementation remains the fallback authority. This module
-//! admits a bounded small-sample exact pair-distance identity when represented
-//! residuals admit a neutral-zero linear proof or error-free pairwise differences;
-//! the exact rational square root is
-//! then rounded against binary64 midpoints without first rounding the ratio under
-//! the square root.
+//! The general bias implementation remains the fallback authority. Samples with at
+//! least three exactly represented residuals first attempt the checked O(n)
+//! neutral-zero pair-distance identity. The O(n²) pairwise-difference reference is
+//! retained only through sixteen observations when the linear proof refuses. Every
+//! admitted ratio is rounded against exact binary64 midpoints without first making
+//! a rounded square-root ratio authoritative.
 
 use crate::ValidationError;
 use core::cmp::Ordering;
@@ -392,11 +392,11 @@ fn exact_pair_distance_standard_error(
     truth: &[f64],
     recovered: &[f64],
 ) -> Option<Result<f64, ValidationError>> {
-    // Keep the exact proof deliberately bounded. n=2 retains its cheaper exact
-    // identity in `bias.rs`; three through sixteen observations use the exact
-    // pair-distance proof because the n=3 direct fallback can lose one ULP after
-    // an otherwise finite target encounters an overflowing three-level radicand.
-    if truth.len() != recovered.len() || !(3..=16).contains(&truth.len()) {
+    // n=2 retains its cheaper identity in `bias.rs`. For n>=3, first attempt the
+    // checked O(n) neutral-zero identity. This is an arithmetic-proof admission,
+    // not a sample-count staircase: integer width, exponent alignment, denominator
+    // reduction, or exact midpoint proof can still refuse and delegate safely.
+    if truth.len() != recovered.len() || truth.len() < 3 {
         return None;
     }
     let sample_count = truth.len();
@@ -417,14 +417,16 @@ fn exact_pair_distance_standard_error(
         residuals.push(residual);
     }
 
-    // Attempt the neutral-zero two-pass proof first: finite represented residuals
-    // are exact coordinates around zero, so this is O(n) with O(1) proof storage.
-    // Keep pairwise O(n²) only as a fail-closed comparison reference while broader
-    // represented-input equivalence and release-mode budgets are characterized.
-    // The former conditioned observed-anchor scan was removed because no production
-    // fixture demonstrated unique admission after the neutral-zero proof refused.
-    let (pair_square_sum, unit_exponent) = exact_neutral_zero_linear_pair_square_sum(&residuals)
-        .or_else(|| exact_pairwise_pair_square_sum(&residuals))?;
+    // The linear proof is O(n) with O(1) proof storage beyond represented
+    // residuals and is therefore eligible at every n>=3. Preserve the O(n²)
+    // pairwise implementation only as a bounded comparison/fallback reference for
+    // n<=16; a wider linear-proof refusal must never allocate quadratic scratch.
+    let (pair_square_sum, unit_exponent) =
+        match exact_neutral_zero_linear_pair_square_sum(&residuals) {
+            Some(exact) => exact,
+            None if sample_count <= 16 => exact_pairwise_pair_square_sum(&residuals)?,
+            None => return None,
+        };
     if pair_square_sum == 0 {
         return Some(Ok(0.0));
     }
@@ -453,17 +455,18 @@ fn exact_pair_distance_standard_error(
 
 /// Standard error of mean signed bias.
 ///
-/// Three- through sixteen-observation samples first attempt an exact neutral-zero
-/// linear proof and then the pairwise-difference reference when the bounded linear
-/// proof refuses. Each admitted route uses the same exact pair-distance identity
-/// and exact dyadic midpoint rounding. All other samples retain the established
-/// bias implementation and its existing fail-closed behavior.
+/// Samples with at least three exactly represented residuals first attempt the
+/// checked O(n) neutral-zero pair-distance proof. When that proof refuses, only
+/// samples through sixteen observations may use the O(n²) pairwise reference;
+/// larger samples delegate directly to the established bias implementation. An
+/// exact ratio is admitted only when the bounded dyadic-midpoint rounder proves
+/// its binary64 result, so proof failure preserves the existing fail-closed path.
 ///
 /// # Errors
 ///
 /// Returns [`ValidationError`] when the fallback bias implementation rejects the
 /// input contract, including mismatched arrays, fewer than two observations, or a
-/// non-representable intermediate/result after the bounded exact route refuses.
+/// non-representable intermediate/result after the exact route refuses.
 pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationError> {
     if let Some(result) = exact_pair_distance_standard_error(truth, recovered) {
         return result;
@@ -772,7 +775,7 @@ mod tests {
     }
 
     #[test]
-    fn bounded_pair_distance_identity_covers_exact_zero_and_fallbacks() {
+    fn proof_driven_linear_identity_and_bounded_pairwise_fallbacks() {
         let truth = [0.0; 4];
         assert_eq!(
             exact_pair_distance_standard_error(&truth, &[3.0; 4]),
@@ -786,38 +789,27 @@ mod tests {
             exact_pair_distance_standard_error(&truth[..3], &[0.0; 3]),
             Some(Ok(0.0))
         );
+        for sample_count in 10..=17 {
+            let zeros = vec![0.0; sample_count];
+            assert_eq!(
+                exact_pair_distance_standard_error(&zeros, &zeros),
+                Some(Ok(0.0))
+            );
+        }
+
+        let narrow_refusal = [0.0, 1.0, 2.0_f64.powi(-200), 2.0];
         assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 10], &[0.0; 10]),
-            Some(Ok(0.0))
-        );
-        assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 11], &[0.0; 11]),
-            Some(Ok(0.0))
-        );
-        assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 12], &[0.0; 12]),
-            Some(Ok(0.0))
-        );
-        assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 13], &[0.0; 13]),
-            Some(Ok(0.0))
-        );
-        assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 14], &[0.0; 14]),
-            Some(Ok(0.0))
-        );
-        assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 15], &[0.0; 15]),
-            Some(Ok(0.0))
-        );
-        assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 16], &[0.0; 16]),
-            Some(Ok(0.0))
-        );
-        assert_eq!(
-            exact_pair_distance_standard_error(&[0.0; 17], &[0.0; 17]),
+            exact_pair_distance_standard_error(&truth, &narrow_refusal),
             None
         );
+        let wide_refusal = vec![2.0_f64.powi(-200); 17];
+        let mut wide_refusal_truth = vec![0.0; 17];
+        wide_refusal_truth[0] = -1.0;
+        assert_eq!(
+            exact_pair_distance_standard_error(&wide_refusal_truth, &wide_refusal),
+            None
+        );
+
         assert_eq!(
             exact_pair_distance_standard_error(&truth, &[0.0, 1.0, f64::INFINITY, 2.0]),
             None
@@ -855,6 +847,21 @@ mod tests {
                 .expect("finite standard error remains representable")
                 .to_bits(),
             0x416f_ffff_f800_0003
+        );
+    }
+
+    #[test]
+    fn seventeen_observation_non_singleton_two_level_identity_is_exact() {
+        let truth = [0.0; 17];
+        let gap = f64::from_bits(0x4330_0000_0000_0001);
+        let mut recovered = [gap; 17];
+        recovered[..5].fill(0.0);
+        assert_eq!(
+            exact_pair_distance_standard_error(&truth, &recovered)
+                .expect("checked linear proof admits this geometry")
+                .expect("exact result is representable")
+                .to_bits(),
+            0x42fd_294a_104a_a492
         );
     }
 }
