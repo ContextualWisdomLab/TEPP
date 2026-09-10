@@ -213,8 +213,7 @@ fn adjacent_midpoint_dyadic(left: f64, right: f64) -> (u64, i32) {
     let mut midpoint_exponent = common_exponent - 1;
     let trailing = midpoint_significand.trailing_zeros();
     midpoint_significand >>= trailing;
-    midpoint_exponent +=
-        i32::try_from(trailing).expect("u128 trailing-zero count fits i32");
+    midpoint_exponent += i32::try_from(trailing).expect("u128 trailing-zero count fits i32");
     (
         u64::try_from(midpoint_significand)
             .expect("adjacent binary64 midpoint significand fits u64"),
