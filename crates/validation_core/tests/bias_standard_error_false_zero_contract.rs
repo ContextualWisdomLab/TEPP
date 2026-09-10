@@ -1,3 +1,5 @@
+//! Public regression for positive bias-SE values below binary64 range.
+
 use validation_core::{ValidationError, bias_standard_error};
 
 #[test]
