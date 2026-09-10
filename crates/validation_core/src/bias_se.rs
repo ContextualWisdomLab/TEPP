@@ -19,25 +19,27 @@ fn subtraction_roundoff(recovered: f64, truth: f64, residual: f64) -> f64 {
     recovered_roundoff + truth_roundoff
 }
 
+fn positive_finite_dyadic(value: f64) -> (u64, i32) {
+    let bits = value.to_bits();
+    let exponent_bits = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & 0x000f_ffff_ffff_ffff;
+    let (mut significand, mut exponent) = if exponent_bits == 0 {
+        (fraction, -1074)
+    } else {
+        ((1_u64 << 52) | fraction, exponent_bits - 1023 - 52)
+    };
+    let trailing = significand.trailing_zeros();
+    significand >>= trailing;
+    exponent += trailing as i32;
+    (significand, exponent)
+}
+
 fn positive_dyadic(value: f64) -> Option<(u128, i32)> {
     if !value.is_finite() || value <= 0.0 {
         return None;
     }
-    let bits = value.to_bits();
-    let exponent_bits = i32::try_from((bits >> 52) & 0x7ff).ok()?;
-    let fraction = bits & 0x000f_ffff_ffff_ffff;
-    let (mut significand, mut exponent) = if exponent_bits == 0 {
-        (u128::from(fraction), -1074)
-    } else {
-        (
-            u128::from((1_u64 << 52) | fraction),
-            exponent_bits - 1023 - 52,
-        )
-    };
-    let trailing = significand.trailing_zeros();
-    significand >>= trailing;
-    exponent += i32::try_from(trailing).ok()?;
-    Some((significand, exponent))
+    let (significand, exponent) = positive_finite_dyadic(value);
+    Some((u128::from(significand), exponent))
 }
 
 fn multiply_by_power_of_two(value: u128, shift: u32) -> Option<u128> {
@@ -135,24 +137,27 @@ impl Wide256 {
 
 fn compare_scaled_wide(
     left: Wide256,
-    left_exponent: i32,
+    left_exponent: i64,
     right: Wide256,
-    right_exponent: i32,
-) -> Option<Ordering> {
+    right_exponent: i64,
+) -> Ordering {
     match (left.is_zero(), right.is_zero()) {
-        (true, true) => return Some(Ordering::Equal),
-        (true, false) => return Some(Ordering::Less),
-        (false, true) => return Some(Ordering::Greater),
+        (true, true) => return Ordering::Equal,
+        (true, false) => return Ordering::Less,
+        (false, true) => return Ordering::Greater,
         (false, false) => {}
     }
 
     let left_bits = left.bit_len();
     let right_bits = right.bit_len();
-    let left_top = left_exponent.checked_add(i32::try_from(left_bits.checked_sub(1)?).ok()?)?;
-    let right_top = right_exponent.checked_add(i32::try_from(right_bits.checked_sub(1)?).ok()?)?;
+    // The exponents originate in binary64 dyadics, but use i128 for the top-bit
+    // comparison so this helper is total even if a future caller widens that
+    // exponent domain. Wide256 contributes at most 255 to either exponent.
+    let left_top = i128::from(left_exponent) + i128::from(left_bits - 1);
+    let right_top = i128::from(right_exponent) + i128::from(right_bits - 1);
     match left_top.cmp(&right_top) {
-        Ordering::Less => return Some(Ordering::Less),
-        Ordering::Greater => return Some(Ordering::Greater),
+        Ordering::Less => return Ordering::Less,
+        Ordering::Greater => return Ordering::Greater,
         Ordering::Equal => {}
     }
 
@@ -161,23 +166,28 @@ fn compare_scaled_wide(
         let left_bit = offset < left_bits && left.bit(left_bits - 1 - offset);
         let right_bit = offset < right_bits && right.bit(right_bits - 1 - offset);
         match left_bit.cmp(&right_bit) {
-            Ordering::Less => return Some(Ordering::Less),
-            Ordering::Greater => return Some(Ordering::Greater),
+            Ordering::Less => return Ordering::Less,
+            Ordering::Greater => return Ordering::Greater,
             Ordering::Equal => {}
         }
     }
-    Some(Ordering::Equal)
+    Ordering::Equal
 }
 
 fn compare_scaled_ratio_to_dyadic_square(
     numerator: u128,
-    numerator_exponent: i32,
+    numerator_exponent: i64,
     denominator: u128,
-    significand: u128,
+    significand: u64,
     exponent: i32,
-) -> Option<Ordering> {
-    let square = significand.checked_mul(significand)?;
-    let square_exponent = exponent.checked_mul(2)?;
+) -> Ordering {
+    // A positive binary64 value has at most 53 significand bits. The midpoint of
+    // two adjacent positive binary64 values has at most 54. Both fit u64, so the
+    // square fits u128 exactly; multiplying that square by any u128 denominator
+    // is total in Wide256. Exponent doubling is performed in i64.
+    let significand = u128::from(significand);
+    let square = significand * significand;
+    let square_exponent = i64::from(exponent) * 2;
     let right = Wide256::multiply_u128(denominator, square);
     compare_scaled_wide(
         Wide256::from_u128(numerator),
@@ -187,20 +197,24 @@ fn compare_scaled_ratio_to_dyadic_square(
     )
 }
 
-fn midpoint_dyadic(left: f64, right: f64) -> Option<(u128, i32)> {
-    let (left_significand, left_exponent) = positive_dyadic(left)?;
-    let (right_significand, right_exponent) = positive_dyadic(right)?;
+fn adjacent_midpoint_dyadic(left: f64, right: f64) -> (u64, i32) {
+    // The sole caller supplies `candidate` and its immediate positive finite
+    // binary64 neighbor. Adjacent values differ by at most 53 powers of two after
+    // trailing-zero reduction, and their exact midpoint has at most 54
+    // significand bits, so every operation below is total in u128/u64.
+    let (left_significand, left_exponent) = positive_finite_dyadic(left);
+    let (right_significand, right_exponent) = positive_finite_dyadic(right);
     let common_exponent = left_exponent.min(right_exponent);
-    let left_shift = left_exponent.checked_sub(common_exponent)?.unsigned_abs();
-    let right_shift = right_exponent.checked_sub(common_exponent)?.unsigned_abs();
-    let left_units = multiply_by_power_of_two(left_significand, left_shift)?;
-    let right_units = multiply_by_power_of_two(right_significand, right_shift)?;
-    let mut midpoint_significand = left_units.checked_add(right_units)?;
-    let mut midpoint_exponent = common_exponent.checked_sub(1)?;
+    let left_shift = (left_exponent - common_exponent) as u32;
+    let right_shift = (right_exponent - common_exponent) as u32;
+    let left_units = u128::from(left_significand) << left_shift;
+    let right_units = u128::from(right_significand) << right_shift;
+    let mut midpoint_significand = left_units + right_units;
+    let mut midpoint_exponent = common_exponent - 1;
     let trailing = midpoint_significand.trailing_zeros();
     midpoint_significand >>= trailing;
-    midpoint_exponent += i32::try_from(trailing).ok()?;
-    Some((midpoint_significand, midpoint_exponent))
+    midpoint_exponent += trailing as i32;
+    (midpoint_significand as u64, midpoint_exponent)
 }
 
 fn exact_power_of_two(exponent: i32) -> Option<f64> {
@@ -234,17 +248,17 @@ fn correctly_rounded_scaled_sqrt_ratio(
     if !candidate.is_finite() || candidate <= 0.0 {
         return None;
     }
-    let target_exponent = unit_exponent.checked_mul(2)?;
+    let target_exponent = i64::from(unit_exponent) * 2;
 
     for _ in 0..4 {
-        let (candidate_significand, candidate_exponent) = positive_dyadic(candidate)?;
+        let (candidate_significand, candidate_exponent) = positive_finite_dyadic(candidate);
         let candidate_comparison = compare_scaled_ratio_to_dyadic_square(
             numerator,
             target_exponent,
             denominator,
             candidate_significand,
             candidate_exponent,
-        )?;
+        );
         if candidate_comparison == Ordering::Equal {
             return Some(candidate);
         }
@@ -262,14 +276,15 @@ fn correctly_rounded_scaled_sqrt_ratio(
         if !neighbor.is_finite() {
             return None;
         }
-        let (midpoint_significand, midpoint_exponent) = midpoint_dyadic(candidate, neighbor)?;
+        let (midpoint_significand, midpoint_exponent) =
+            adjacent_midpoint_dyadic(candidate, neighbor);
         let midpoint_comparison = compare_scaled_ratio_to_dyadic_square(
             numerator,
             target_exponent,
             denominator,
             midpoint_significand,
             midpoint_exponent,
-        )?;
+        );
 
         let neighbor_is_closer = if upward {
             midpoint_comparison == Ordering::Greater
@@ -455,9 +470,9 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 #[cfg(test)]
 mod tests {
     use super::{
-        Wide256, compare_scaled_wide, correctly_rounded_scaled_sqrt_ratio,
-        exact_neutral_zero_linear_pair_square_sum, exact_pair_distance_standard_error,
-        exact_pairwise_pair_square_sum, exact_power_of_two, midpoint_dyadic,
+        Wide256, adjacent_midpoint_dyadic, compare_scaled_wide,
+        correctly_rounded_scaled_sqrt_ratio, exact_neutral_zero_linear_pair_square_sum,
+        exact_pair_distance_standard_error, exact_pairwise_pair_square_sum, exact_power_of_two,
         multiply_by_power_of_two, positive_dyadic,
     };
     use core::cmp::Ordering;
@@ -527,29 +542,14 @@ mod tests {
         assert_eq!(one.bit_len(), 1);
         assert!(!one.bit(128));
 
-        assert_eq!(compare_scaled_wide(zero, 0, zero, 0), Some(Ordering::Equal));
-        assert_eq!(
-            compare_scaled_wide(zero, -2_148, one, 2_047),
-            Some(Ordering::Less)
-        );
-        assert_eq!(
-            compare_scaled_wide(one, 2_047, zero, -2_148),
-            Some(Ordering::Greater)
-        );
-        assert_eq!(
-            compare_scaled_wide(one, -2_148, two, -2_149),
-            Some(Ordering::Equal)
-        );
-        assert_eq!(
-            compare_scaled_wide(one, -2_148, three, -2_149),
-            Some(Ordering::Less)
-        );
-        assert_eq!(
-            compare_scaled_wide(three, 2_046, one, 2_047),
-            Some(Ordering::Greater)
-        );
-        assert_eq!(compare_scaled_wide(one, 1, one, 0), Some(Ordering::Greater));
-        assert_eq!(compare_scaled_wide(one, 0, one, 1), Some(Ordering::Less));
+        assert_eq!(compare_scaled_wide(zero, 0, zero, 0), Ordering::Equal);
+        assert_eq!(compare_scaled_wide(zero, -2_148, one, 2_047), Ordering::Less);
+        assert_eq!(compare_scaled_wide(one, 2_047, zero, -2_148), Ordering::Greater);
+        assert_eq!(compare_scaled_wide(one, -2_148, two, -2_149), Ordering::Equal);
+        assert_eq!(compare_scaled_wide(one, -2_148, three, -2_149), Ordering::Less);
+        assert_eq!(compare_scaled_wide(three, 2_046, one, 2_047), Ordering::Greater);
+        assert_eq!(compare_scaled_wide(one, 1, one, 0), Ordering::Greater);
+        assert_eq!(compare_scaled_wide(one, 0, one, 1), Ordering::Less);
     }
 
     #[test]
@@ -607,8 +607,14 @@ mod tests {
         assert_eq!(multiply_by_power_of_two(3, 2), Some(12));
         assert_eq!(multiply_by_power_of_two(1, 128), None);
         assert_eq!(multiply_by_power_of_two(u128::MAX, 1), None);
-        assert!(midpoint_dyadic(1.0, f64::from_bits(1.0_f64.to_bits() + 1)).is_some());
-        assert_eq!(midpoint_dyadic(0.0, f64::from_bits(1)), None);
+        assert_eq!(
+            adjacent_midpoint_dyadic(1.0, f64::from_bits(1.0_f64.to_bits() + 1)),
+            (9_007_199_254_740_993, -53)
+        );
+        assert_eq!(
+            adjacent_midpoint_dyadic(f64::from_bits(1), f64::from_bits(2)),
+            (3, -1075)
+        );
     }
 
     #[test]
