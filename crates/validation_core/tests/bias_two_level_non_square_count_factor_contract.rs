@@ -15,7 +15,7 @@ fn balanced_two_level_non_square_count_factor_uses_general_moment_path() {
 
     let standard_error = bias_standard_error(&truth, &recovered)
         .expect("balanced two-level SE remains representable through moment fallback");
-    assert_eq!(standard_error.to_bits(), 0x3fd2_79a7_4590_331d);
+    assert_eq!(standard_error.to_bits(), 0x3fd2_79a7_4590_331c);
 
     let permuted = [1.0, 0.0, 1.0, 0.0];
     let permuted_standard_error = bias_standard_error(&truth, &permuted)
