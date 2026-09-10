@@ -27,8 +27,10 @@ fn large_sample_two_level_reference_is_bitwise_permutation_invariant() {
 
     for anchor_index in [0, SAMPLE_COUNT / 2, SAMPLE_COUNT - 1] {
         let (truth, recovered) = two_level_fixture(anchor_index, gap);
-        let first = bias_standard_error(&truth, &recovered).expect("large-sample reference result");
-        let second = bias_standard_error(&truth, &recovered).expect("deterministic repeated result");
+        let first = bias_standard_error(&truth, &recovered)
+            .expect("large-sample reference result");
+        let second = bias_standard_error(&truth, &recovered)
+            .expect("deterministic repeated result");
         assert_eq!(first.to_bits(), expected_bits);
         assert_eq!(second.to_bits(), expected_bits);
     }
