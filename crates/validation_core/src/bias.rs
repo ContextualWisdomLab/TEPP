@@ -37,13 +37,15 @@ fn subtraction_has_roundoff(recovered: f64, truth: f64, residual: f64) -> bool {
 }
 
 fn standard_error_from_deviations(deviations: &[f64]) -> Result<f64, ValidationError> {
+    // Both production call surfaces prove at least one nonzero represented deviation.
+    // Seed with the minimum positive binary64 quantum so an invariant violation fails
+    // closed at the existing zero-restoration guard instead of forming 0/0. Every
+    // admissible nonzero deviation is at least this magnitude, so the seed cannot
+    // change any production scale or scientific result.
     let scale = deviations
         .iter()
         .map(|deviation| deviation.abs())
-        .fold(0.0, f64::max);
-    if scale == 0.0 {
-        return Ok(0.0);
-    }
+        .fold(f64::from_bits(1), f64::max);
 
     let normalized_squares: Vec<_> = deviations
         .iter()
