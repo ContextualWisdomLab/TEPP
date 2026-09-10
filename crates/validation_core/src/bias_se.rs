@@ -30,7 +30,7 @@ fn positive_finite_dyadic(value: f64) -> (u64, i32) {
     };
     let trailing = significand.trailing_zeros();
     significand >>= trailing;
-    exponent += trailing as i32;
+    exponent += i32::try_from(trailing).expect("u64 trailing-zero count fits i32");
     (significand, exponent)
 }
 
@@ -213,8 +213,13 @@ fn adjacent_midpoint_dyadic(left: f64, right: f64) -> (u64, i32) {
     let mut midpoint_exponent = common_exponent - 1;
     let trailing = midpoint_significand.trailing_zeros();
     midpoint_significand >>= trailing;
-    midpoint_exponent += trailing as i32;
-    (midpoint_significand as u64, midpoint_exponent)
+    midpoint_exponent +=
+        i32::try_from(trailing).expect("u128 trailing-zero count fits i32");
+    (
+        u64::try_from(midpoint_significand)
+            .expect("adjacent binary64 midpoint significand fits u64"),
+        midpoint_exponent,
+    )
 }
 
 fn exact_power_of_two(exponent: i32) -> Option<f64> {
@@ -696,7 +701,7 @@ mod tests {
         assert_eq!(
             exact_pair_distance_standard_error(&truth, &scaled)
                 .expect("scaled admitted")
-                .expect("representable")
+                .expect("scaled representable")
                 .to_bits(),
             expected.to_bits()
         );
