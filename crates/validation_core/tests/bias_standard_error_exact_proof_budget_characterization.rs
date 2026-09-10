@@ -1,11 +1,11 @@
-//! Characterize exact bias-standard-error proof resource envelopes without widening production admission.
+//! Characterize exact bias-standard-error proof resource and rounding envelopes.
 //!
-//! The `n > 16` fixtures here quantify pair-record growth, checked-`u128` intermediate ceilings, and
-//! a two-limb `Wide256` recovery reference. They are characterization evidence only: this test contains
-//! reference arithmetic that mirrors production concepts, so it is not an independent scientific
-//! acceptance oracle and must not justify a production cutoff change by itself. Production remains
-//! bounded to `n=4..=16` until exact-head route telemetry, independent bit-level evidence, and measured
-//! release-mode resource data support a different budget.
+//! The `n > 16` fixtures quantify pair-record growth, checked-`u128` intermediate
+//! ceilings, a two-limb `Wide256` recovery reference, and exact binary64 midpoint
+//! bounds. They remain characterization evidence rather than an independent
+//! scientific oracle. Any wider Draft admission must still refuse when its checked
+//! arithmetic proof cannot establish the represented result and must not enable
+//! quadratic scratch above the bounded pairwise-reference ceiling.
 //!
 use validation_core::bias_standard_error;
 
@@ -227,11 +227,14 @@ fn scientific_denominator(sample_count: u128) -> Option<u128> {
 }
 
 #[test]
-fn seventeen_observation_fixture_proves_linear_identity_matches_pair_reference() {
+fn seventeen_observation_fixture_proves_exact_binary64_target() {
     const EXACT_PAIR_SQUARE_SUM: u128 = 92_549_865_125_191_410_206;
     const SCIENTIFIC_DENOMINATOR: u128 = 4_624;
     const REDUCED_NUMERATOR: u128 = 46_274_932_562_595_705_103;
     const REDUCED_DENOMINATOR: u128 = 2_312;
+    const MIDPOINT_DENOMINATOR: u128 = 1_u128 << 26;
+    const LOWER_MIDPOINT_SIGNIFICAND: u128 = 9_494_210_789_449_009;
+    const UPPER_MIDPOINT_SIGNIFICAND: u128 = 9_494_210_789_449_011;
 
     let pairwise = pair_square_sum_quadratic(&SEVENTEEN_OBSERVATION_FIXTURE)
         .expect("quadratic exact pair sum stays within u128");
@@ -245,14 +248,30 @@ fn seventeen_observation_fixture_proves_linear_identity_matches_pair_reference()
     assert_eq!(pairwise / divisor, REDUCED_NUMERATOR);
     assert_eq!(SCIENTIFIC_DENOMINATOR / divisor, REDUCED_DENOMINATOR);
 
+    // Prove the unique nearest binary64 without using the production midpoint
+    // helper. The lower and upper exact midpoints around 0x...8e99 are the two
+    // odd significands above divided by 2^26. Squaring is monotone here, and the
+    // cross-products fit u128, so this independently brackets sqrt(N/D).
+    let target_scaled = REDUCED_NUMERATOR
+        .checked_mul(MIDPOINT_DENOMINATOR * MIDPOINT_DENOMINATOR)
+        .expect("target midpoint comparison fits u128");
+    let lower_midpoint_scaled = REDUCED_DENOMINATOR
+        .checked_mul(LOWER_MIDPOINT_SIGNIFICAND * LOWER_MIDPOINT_SIGNIFICAND)
+        .expect("lower midpoint comparison fits u128");
+    let upper_midpoint_scaled = REDUCED_DENOMINATOR
+        .checked_mul(UPPER_MIDPOINT_SIGNIFICAND * UPPER_MIDPOINT_SIGNIFICAND)
+        .expect("upper midpoint comparison fits u128");
+    assert!(lower_midpoint_scaled < target_scaled);
+    assert!(target_scaled < upper_midpoint_scaled);
+
     let truth = [0.0; 17];
     let recovered = SEVENTEEN_OBSERVATION_FIXTURE
         .map(|value| f64::from(u32::try_from(value).expect("fixture value fits u32 exactly")));
     assert_eq!(
         bias_standard_error(&truth, &recovered)
-            .expect("current bounded fallback remains representable")
+            .expect("proof-driven result remains representable")
             .to_bits(),
-        0x41a0_dd77_9ac3_8e98
+        0x41a0_dd77_9ac3_8e99
     );
 }
 
