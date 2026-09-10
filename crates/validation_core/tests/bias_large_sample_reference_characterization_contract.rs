@@ -6,7 +6,7 @@
 //! themselves. Any future wider exact route must preserve these represented results
 //! and refusal semantics before it can replace the fallback for the same domain.
 
-use validation_core::{ValidationError, bias_standard_error};
+use validation_core::{bias_standard_error, ValidationError};
 
 const SAMPLE_COUNT: usize = 2_047;
 
