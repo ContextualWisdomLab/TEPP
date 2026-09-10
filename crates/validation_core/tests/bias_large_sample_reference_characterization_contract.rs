@@ -22,7 +22,7 @@ fn large_sample_two_level_reference_is_bitwise_permutation_invariant() {
     // 2^52 + 1 is exactly representable. With one zero and 2,046 identical
     // nonzero residuals, the exact two-level identity is SE(mean) = |gap| / n.
     // 0x4280_0200_4008_0101 is the nearest binary64 to (2^52 + 1) / 2047.
-    let gap = (1_u64 << 52) as f64 + 1.0;
+    let gap = f64::from_bits(0x4330_0000_0000_0001);
     let expected_bits = 0x4280_0200_4008_0101_u64;
 
     for anchor_index in [0, SAMPLE_COUNT / 2, SAMPLE_COUNT - 1] {
