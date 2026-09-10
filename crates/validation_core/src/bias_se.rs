@@ -543,11 +543,26 @@ mod tests {
         assert!(!one.bit(128));
 
         assert_eq!(compare_scaled_wide(zero, 0, zero, 0), Ordering::Equal);
-        assert_eq!(compare_scaled_wide(zero, -2_148, one, 2_047), Ordering::Less);
-        assert_eq!(compare_scaled_wide(one, 2_047, zero, -2_148), Ordering::Greater);
-        assert_eq!(compare_scaled_wide(one, -2_148, two, -2_149), Ordering::Equal);
-        assert_eq!(compare_scaled_wide(one, -2_148, three, -2_149), Ordering::Less);
-        assert_eq!(compare_scaled_wide(three, 2_046, one, 2_047), Ordering::Greater);
+        assert_eq!(
+            compare_scaled_wide(zero, -2_148, one, 2_047),
+            Ordering::Less
+        );
+        assert_eq!(
+            compare_scaled_wide(one, 2_047, zero, -2_148),
+            Ordering::Greater
+        );
+        assert_eq!(
+            compare_scaled_wide(one, -2_148, two, -2_149),
+            Ordering::Equal
+        );
+        assert_eq!(
+            compare_scaled_wide(one, -2_148, three, -2_149),
+            Ordering::Less
+        );
+        assert_eq!(
+            compare_scaled_wide(three, 2_046, one, 2_047),
+            Ordering::Greater
+        );
         assert_eq!(compare_scaled_wide(one, 1, one, 0), Ordering::Greater);
         assert_eq!(compare_scaled_wide(one, 0, one, 1), Ordering::Less);
     }
@@ -681,7 +696,7 @@ mod tests {
         assert_eq!(
             exact_pair_distance_standard_error(&truth, &scaled)
                 .expect("scaled admitted")
-                .expect("scaled representable")
+                .expect("representable")
                 .to_bits(),
             expected.to_bits()
         );
