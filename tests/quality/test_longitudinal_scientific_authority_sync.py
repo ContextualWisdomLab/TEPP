@@ -5,6 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CLAUDE = ROOT / "CLAUDE.md"
+PRD_AMENDMENT = ROOT / "docs/product/prd-v0.4-amendment-longitudinal-time-ownership.md"
+OWNERSHIP_ADR = ROOT / "docs/adr/longitudinal-modeling-ownership-addendum.md"
 
 
 def test_stationary_variance_overflow_guidance_matches_source_contract() -> None:
@@ -14,3 +16,25 @@ def test_stationary_variance_overflow_guidance_matches_source_contract() -> None
     assert "When `2 a` overflows, form `(q / a) * -0.5`." not in guidance
     assert "Do not form `0.5 q` first (`q = from_bits(1)` underflows)." not in guidance
     assert "When `2 a` overflows, form `(q * 0.5) / |a|`." in guidance
+
+
+def test_prd_names_irregular_rate_estimands_and_weighting_population() -> None:
+    """Keep the product target explicit when follow-up multiplicity changes pair weights."""
+    prd = PRD_AMENDMENT.read_text(encoding="utf-8")
+
+    assert "`tepp.irregular_rate.lag_pair_average.v1`" in prd
+    assert "`tepp.irregular_rate.unit_average.v1`" in prd
+    assert "candidate/contributing units" in prd
+    assert "candidate/admitted/refused pairs" in prd
+    assert "fail closed" in prd
+
+
+def test_ownership_adr_keeps_pair_and_unit_estimands_distinct() -> None:
+    """Prevent the implemented pair target from silently becoming an equal-unit target."""
+    adr = OWNERSHIP_ADR.read_text(encoding="utf-8")
+
+    assert "`tepp.irregular_rate.lag_pair_average.v1`" in adr
+    assert "`tepp.irregular_rate.unit_average.v1`" in adr
+    assert "occasion count" in adr
+    assert "membership weight" in adr
+    assert "fail closed" in adr
