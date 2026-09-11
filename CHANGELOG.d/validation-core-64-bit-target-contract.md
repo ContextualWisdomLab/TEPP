@@ -1,0 +1,1 @@
+`validation_core` now makes its production pointer-width contract explicit: numerical execution fails at compile time on non-64-bit targets. ADR 0001 records that this is a resource/numerical admission boundary rather than an x86-only claim, and the crate tests the `u128` square-root bound used by target-dependent exact-rational reasoning.
