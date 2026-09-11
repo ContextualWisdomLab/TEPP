@@ -12,6 +12,9 @@
 //! evidence; queued, predecessor, skipped, and LLM judgments fail closed.
 //! Metrics are pure `f64` CPU reference implementations.
 
+#[cfg(not(target_pointer_width = "64"))]
+compile_error!("validation_core production numerical execution requires a 64-bit target");
+
 mod bias;
 mod bias_se;
 mod claim;
@@ -86,6 +89,12 @@ pub use validation_evidence::ValidationEvidenceV1;
 #[cfg(test)]
 mod numeric_contract_tests {
     use super::numeric::deterministic_representable_sum_over_count;
+
+    #[test]
+    fn production_pointer_width_matches_numerical_contract() {
+        assert_eq!(usize::BITS, 64);
+        assert_eq!(u128::MAX.isqrt(), usize::MAX as u128);
+    }
 
     #[test]
     fn expanded_subnormal_sum_preserves_original_denominator() {
