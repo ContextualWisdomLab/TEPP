@@ -6,13 +6,11 @@
 //! This module is only the crate-public facade and must not carry a second
 //! floating-point implementation.
 
-/// Crate-public irregular residual log-rate entry points.
-///
-/// Re-exports the legacy pair-average scalar functions and the versioned,
-/// denominator-bearing estimand contract.
+/// Versioned, denominator-bearing irregular-rate estimand entry points.
 pub use crate::irregular_rate_estimand::{
     IrregularRateEstimand, IrregularRateSummary, recover_within_unit_irregular_rate_summary,
 };
+/// Legacy scalar irregular-rate entry points retained for compatibility.
 pub use crate::irregular_residual::{
     recover_centered_irregular_residual_log_rate, recover_within_unit_irregular_residual_log_rate,
 };
