@@ -18,6 +18,7 @@ mod diffusion;
 mod discrete_drift;
 mod error;
 mod event_time;
+mod irregular_rate_estimand;
 mod irregular_residual;
 mod level;
 mod occasion_mean;
@@ -55,6 +56,12 @@ pub use discrete_drift::refuse_unstandardised_discrete_drift_as_standardised_dis
 pub use error::LongitudinalError;
 /// A finite, strictly positive interval admitted on substantive event time.
 pub use event_time::EventTimeInterval;
+/// Versioned weighting target for irregular residual log-rate summaries.
+pub use irregular_rate_estimand::IrregularRateEstimand;
+/// Denominator-bearing evidence for an irregular residual log-rate summary.
+pub use irregular_rate_estimand::IrregularRateSummary;
+/// Recover an explicitly named irregular residual log-rate estimand with denominators.
+pub use irregular_rate_estimand::recover_within_unit_irregular_rate_summary;
 /// One unit's score at one event-time occasion.
 pub use irregular_residual::EventTimedObservation;
 /// One already-formed lagged within residual pair on event time.
