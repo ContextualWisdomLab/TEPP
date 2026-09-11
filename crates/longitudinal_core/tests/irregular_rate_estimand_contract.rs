@@ -48,9 +48,9 @@ fn lag_pair_average_reports_estimand_and_failure_denominators() {
     let legacy = recover_within_unit_irregular_residual_log_rate(&rows).expect("legacy pair mean");
     assert_eq!(pair_average.to_bits(), legacy.to_bits());
 
-    let unit_one = ((2.0_f64 / 3.0).ln() + (1.0_f64 / 2.0).ln()) / 2.0;
+    let unit_one = f64::midpoint((2.0_f64 / 3.0).ln(), (1.0_f64 / 2.0).ln());
     let unit_two = (1.0_f64 / 3.0).ln();
-    let equal_unit_comparison = (unit_one + unit_two) / 2.0;
+    let equal_unit_comparison = f64::midpoint(unit_one, unit_two);
     assert!(
         (pair_average - equal_unit_comparison).abs() > 1.0e-3,
         "unequal admitted-pair counts must make pair and equal-unit targets distinguishable"
