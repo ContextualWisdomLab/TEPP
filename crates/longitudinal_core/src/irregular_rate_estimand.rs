@@ -9,11 +9,11 @@
 
 use std::collections::BTreeMap;
 
+use crate::LongitudinalError;
 use crate::irregular_residual::{
     EventTimedObservation, center_within_unit_event_lags, driver_same_sign_log_rate,
     same_sign_nonzero, scaled_compensated_mean,
 };
-use crate::LongitudinalError;
 
 /// Versioned scientific weighting target for irregular residual log-rate summaries.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
