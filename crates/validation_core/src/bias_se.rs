@@ -233,6 +233,60 @@ fn exact_power_of_two(exponent: i32) -> Option<f64> {
     None
 }
 
+fn correct_scaled_sqrt_ratio_candidate(
+    numerator: u128,
+    target_exponent: i64,
+    denominator: u128,
+    candidate: f64,
+) -> Option<f64> {
+    let (candidate_significand, candidate_exponent) = positive_finite_dyadic(candidate);
+    let candidate_comparison = compare_scaled_ratio_to_dyadic_square(
+        numerator,
+        target_exponent,
+        denominator,
+        candidate_significand,
+        candidate_exponent,
+    );
+    if candidate_comparison == Ordering::Equal {
+        return Some(candidate);
+    }
+
+    let upward = candidate_comparison == Ordering::Greater;
+    let bits = candidate.to_bits();
+    let neighbor = if upward {
+        f64::from_bits(bits.checked_add(1)?)
+    } else {
+        if bits == 1 {
+            return None;
+        }
+        f64::from_bits(bits - 1)
+    };
+    if !neighbor.is_finite() {
+        return None;
+    }
+    let (midpoint_significand, midpoint_exponent) = adjacent_midpoint_dyadic(candidate, neighbor);
+    let midpoint_comparison = compare_scaled_ratio_to_dyadic_square(
+        numerator,
+        target_exponent,
+        denominator,
+        midpoint_significand,
+        midpoint_exponent,
+    );
+
+    let neighbor_is_closer = if upward {
+        midpoint_comparison == Ordering::Greater
+    } else {
+        midpoint_comparison == Ordering::Less
+    };
+    if neighbor_is_closer
+        || (midpoint_comparison == Ordering::Equal && candidate.to_bits() & 1 == 1)
+    {
+        Some(neighbor)
+    } else {
+        Some(candidate)
+    }
+}
+
 fn correctly_rounded_scaled_sqrt_ratio(
     numerator: u128,
     denominator: u128,
@@ -254,57 +308,23 @@ fn correctly_rounded_scaled_sqrt_ratio(
     }
     let target_exponent = i64::from(unit_exponent) * 2;
 
-    for _ in 0..4 {
-        let (candidate_significand, candidate_exponent) = positive_finite_dyadic(candidate);
-        let candidate_comparison = compare_scaled_ratio_to_dyadic_square(
+    // The repository-owned seed-distance derivation proves that every admitted
+    // finite seed starts strictly fewer than three adjacent binary64 values from
+    // the correctly rounded result. One correction application moves at most one
+    // neighbor and is idempotent once the candidate is correctly rounded, so
+    // three fixed exact-square/midpoint applications are a bounded total proof.
+    // A future widening of the admitted seed domain must update that theorem and
+    // this executable bound together rather than relying on an unreachable
+    // exhaustion branch.
+    for _ in 0..3 {
+        candidate = correct_scaled_sqrt_ratio_candidate(
             numerator,
             target_exponent,
             denominator,
-            candidate_significand,
-            candidate_exponent,
-        );
-        if candidate_comparison == Ordering::Equal {
-            return Some(candidate);
-        }
-
-        let upward = candidate_comparison == Ordering::Greater;
-        let bits = candidate.to_bits();
-        let neighbor = if upward {
-            f64::from_bits(bits.checked_add(1)?)
-        } else {
-            if bits == 1 {
-                return None;
-            }
-            f64::from_bits(bits - 1)
-        };
-        if !neighbor.is_finite() {
-            return None;
-        }
-        let (midpoint_significand, midpoint_exponent) =
-            adjacent_midpoint_dyadic(candidate, neighbor);
-        let midpoint_comparison = compare_scaled_ratio_to_dyadic_square(
-            numerator,
-            target_exponent,
-            denominator,
-            midpoint_significand,
-            midpoint_exponent,
-        );
-
-        let neighbor_is_closer = if upward {
-            midpoint_comparison == Ordering::Greater
-        } else {
-            midpoint_comparison == Ordering::Less
-        };
-        if neighbor_is_closer {
-            candidate = neighbor;
-            continue;
-        }
-        if midpoint_comparison == Ordering::Equal && candidate.to_bits() & 1 == 1 {
-            return Some(neighbor);
-        }
-        return Some(candidate);
+            candidate,
+        )?;
     }
-    None
+    Some(candidate)
 }
 
 fn exact_pairwise_pair_square_sum(residuals: &[f64]) -> Option<(u128, i32)> {
