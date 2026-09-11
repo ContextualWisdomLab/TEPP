@@ -107,6 +107,32 @@ fn zero_admissible_rates_still_return_explicit_pair_denominator() {
 }
 
 #[test]
+fn nonrepresentable_same_sign_rate_has_its_own_failure_denominator() {
+    let adjacent_one = f64::from_bits(1.0_f64.to_bits() + 1);
+    let rows = [
+        timed(1, 0.0, 1.0),
+        timed(1, f64::MAX / 2.0, adjacent_one),
+        timed(1, f64::MAX, -2.0),
+        timed(2, 0.0, 3.0),
+        timed(2, 1.0, 1.0),
+        timed(2, 2.0, -4.0),
+    ];
+
+    let summary =
+        recover_within_unit_irregular_rate_summary(&rows, IrregularRateEstimand::LagPairAverageV1)
+            .expect("pair-level transform refusal remains reportable evidence");
+
+    assert_eq!(summary.candidate_units(), 2);
+    assert_eq!(summary.candidate_pairs(), 4);
+    assert_eq!(summary.admitted_pairs(), 1);
+    assert_eq!(summary.sign_or_zero_refused_pairs(), 2);
+    assert_eq!(summary.nonrepresentable_rate_refused_pairs(), 1);
+    assert_eq!(summary.refused_pairs(), 3);
+    assert_eq!(summary.contributing_units(), 1);
+    assert!(summary.estimate().is_some());
+}
+
+#[test]
 fn unit_average_is_versioned_but_fails_closed_until_owner_mean_release() {
     let rows = unequal_pair_count_rows();
     assert_eq!(
