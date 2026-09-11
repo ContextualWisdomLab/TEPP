@@ -24,7 +24,7 @@ The immutable fast-mlsirm release remains `v0.9.1`; it predates this contract.
 
 ## Fresh owner evidence — 2026-09-11
 
-The live `fast-mlsirm#1816` head is `432765ccf633c9802e0f796ceeb4d6d572059acf` on protected `main@493326f2de49ea1704da0ded19868ed05d2fe00f`. The PR is open and non-Draft, but Ready status is admission only and is not merge or release authority.
+The live `fast-mlsirm#1816` head is `432765ccf633c9802e0f796ceeb4d6d572059acf` on protected `main@493326f2de49ea1704da0ded19868ed05d2fe00f`. The PR is open, **Draft**, mergeable, and unmerged. Its body is stale in two ways: it still names predecessor `f00c31c...` as current exact head and still describes the state as Ready for fresh admission. GitHub live metadata, not those predecessor body claims, is current authority.
 
 The numerical implementation entered at `b5fec1d33c02e8ea969405e59747f0505e690d20`. Subsequent ordinary-forward commits added the independent exact oracle and directed cancellation/non-finite fixtures (`087df1d...`), Proposed ADR-0029 (`9a8614f...`), doctoring/changelog currentization, touched-function rustdoc coverage (`f00c31c...`), and finally official ISO/IEEE record links (`432765c...`). The `f00c31c... -> 432765c...` delta changes only `docs/doctoring/correctly-rounded-binary64-mean.md`; the production arithmetic is unchanged.
 
@@ -35,7 +35,7 @@ Current exact-head hosted evidence on `432765c...` is mixed and therefore non-me
 - required delegated CodeQL PR `34606295286` is RED. Python job `103285476466` and Actions job `103285476530` both successfully read the current-head dispatch verdict and then failed at `Release runner or enforce current-head CodeQL verdict`; only afterward did dispatch job `103286411396` succeed. This remains the central producer/consumer settlement class and must be repaired at the canonical `.github` owner rather than copied into TEPP or fast-mlsirm;
 - current formal reviews are COMMENTED only. The CodeRabbit oracle/standards-link findings are resolved, but there is no qualifying submitted current-head `APPROVED` review.
 
-The current owner PR body still names predecessor `f00c31c...` as its exact head, so PR metadata itself is stale relative to GitHub's live head. That is an owner-path documentation finding, not permission for TEPP to rewrite fast-mlsirm source or consume the branch.
+The current owner PR body is therefore documentation debt inside the owner lane, not permission for TEPP to rewrite fast-mlsirm source or consume the branch.
 
 ## Canonical GPU/CI owner evidence
 
