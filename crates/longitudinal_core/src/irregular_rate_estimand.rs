@@ -48,7 +48,8 @@ pub struct IrregularRateSummary {
     contributing_units: usize,
     candidate_pairs: usize,
     admitted_pairs: usize,
-    refused_pairs: usize,
+    sign_or_zero_refused_pairs: usize,
+    nonrepresentable_rate_refused_pairs: usize,
 }
 
 impl IrregularRateSummary {
@@ -88,10 +89,22 @@ impl IrregularRateSummary {
         self.admitted_pairs
     }
 
-    /// Return the number of candidate pairs refused by log-rate admission.
+    /// Return pairs refused because a residual was zero or the pair changed sign.
+    #[must_use]
+    pub const fn sign_or_zero_refused_pairs(self) -> usize {
+        self.sign_or_zero_refused_pairs
+    }
+
+    /// Return same-sign nonzero pairs whose represented log-rate was not admissible.
+    #[must_use]
+    pub const fn nonrepresentable_rate_refused_pairs(self) -> usize {
+        self.nonrepresentable_rate_refused_pairs
+    }
+
+    /// Return the total number of candidate pairs refused by log-rate admission.
     #[must_use]
     pub const fn refused_pairs(self) -> usize {
-        self.refused_pairs
+        self.sign_or_zero_refused_pairs + self.nonrepresentable_rate_refused_pairs
     }
 }
 
@@ -100,8 +113,9 @@ impl IrregularRateSummary {
 /// `LagPairAverageV1` preserves the existing TEPP behavior: every admissible
 /// consecutive pair receives equal weight. The returned evidence makes the
 /// weighting population observable by carrying candidate/contributing units and
-/// candidate/admitted/refused pairs. Zero, opposite-sign, or non-representable
-/// pair rates are refusals rather than invisible denominator changes.
+/// candidate/admitted/refused pairs. Zero or opposite-sign pairs and represented
+/// same-sign pairs whose log-rate cannot be admitted have separate refusal
+/// denominators instead of silently changing the weighting population.
 ///
 /// `UnitAverageV1` is intentionally fail-closed. Equal-unit aggregation needs a
 /// second finite-mean operation over within-unit summaries. Reusable finite mean
@@ -129,7 +143,8 @@ pub fn recover_within_unit_irregular_rate_summary(
     let candidate_pairs = lagged.len();
     let mut admitted_rates = Vec::with_capacity(candidate_pairs);
     let mut admitted_pairs = 0_usize;
-    let mut refused_pairs = 0_usize;
+    let mut sign_or_zero_refused_pairs = 0_usize;
+    let mut nonrepresentable_rate_refused_pairs = 0_usize;
     let mut contributing_units = 0_usize;
     let mut offset = 0_usize;
 
@@ -139,7 +154,7 @@ pub fn recover_within_unit_irregular_rate_summary(
         let mut unit_contributed = false;
         for pair in unit_pairs {
             if !same_sign_nonzero(pair.earlier_residual(), pair.later_residual()) {
-                refused_pairs += 1;
+                sign_or_zero_refused_pairs += 1;
                 continue;
             }
             match driver_same_sign_log_rate(
@@ -153,7 +168,7 @@ pub fn recover_within_unit_irregular_rate_summary(
                     unit_contributed = true;
                 }
                 Err(LongitudinalError::InvalidTemporalTransformInput) => {
-                    refused_pairs += 1;
+                    nonrepresentable_rate_refused_pairs += 1;
                 }
                 Err(error) => return Err(error),
             }
@@ -164,6 +179,7 @@ pub fn recover_within_unit_irregular_rate_summary(
         offset = end;
     }
 
+    let refused_pairs = sign_or_zero_refused_pairs + nonrepresentable_rate_refused_pairs;
     debug_assert_eq!(offset, candidate_pairs);
     debug_assert_eq!(admitted_pairs + refused_pairs, candidate_pairs);
 
@@ -180,7 +196,8 @@ pub fn recover_within_unit_irregular_rate_summary(
         contributing_units,
         candidate_pairs,
         admitted_pairs,
-        refused_pairs,
+        sign_or_zero_refused_pairs,
+        nonrepresentable_rate_refused_pairs,
     })
 }
 
