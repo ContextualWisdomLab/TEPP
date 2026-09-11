@@ -110,6 +110,84 @@ fn extra_admitted_pair_changes_pair_weight_without_changing_unit_target() {
 }
 
 #[test]
+fn balanced_follow_up_recovers_declared_pair_weighted_truth() {
+    let rows = [
+        timed(1, 0.0, -8.0),
+        timed(1, 1.0, -4.0),
+        timed(1, 2.0, -2.0),
+        timed(1, 3.0, 14.0),
+        timed(2, 0.0, -27.0),
+        timed(2, 1.0, -9.0),
+        timed(2, 2.0, -3.0),
+        timed(2, 3.0, 39.0),
+    ];
+    let summary =
+        recover_within_unit_irregular_rate_summary(&rows, IrregularRateEstimand::LagPairAverageV1)
+            .expect("balanced known-truth evidence");
+
+    assert_eq!(summary.candidate_units(), 2);
+    assert_eq!(summary.contributing_units(), 2);
+    assert_eq!(summary.candidate_pairs(), 6);
+    assert_eq!(summary.admitted_pairs(), 4);
+    assert_eq!(summary.refused_pairs(), 2);
+
+    let half_rate = 0.5_f64.ln();
+    let third_rate = (1.0_f64 / 3.0).ln();
+    let expected = f64::midpoint(half_rate, third_rate);
+    let actual = summary.estimate().expect("balanced pair target");
+    assert!(
+        (actual - expected).abs() <= 8.0 * f64::EPSILON,
+        "balanced follow-up must recover the equal pair-weighted known truth"
+    );
+}
+
+#[test]
+fn rate_associated_highly_unbalanced_follow_up_recovers_pair_weighted_truth() {
+    let mut rows = Vec::with_capacity(21);
+    for (event_index, exponent) in (1..=16).rev().enumerate() {
+        rows.push(timed(
+            1,
+            event_index as f64,
+            -2.0_f64.powi(exponent),
+        ));
+    }
+    rows.push(timed(1, 16.0, 131_070.0));
+    rows.extend([
+        timed(2, 0.0, -27.0),
+        timed(2, 1.0, -9.0),
+        timed(2, 2.0, -3.0),
+        timed(2, 3.0, 39.0),
+    ]);
+
+    let summary = recover_within_unit_irregular_rate_summary(
+        &rows,
+        IrregularRateEstimand::LagPairAverageV1,
+    )
+    .expect("rate-associated follow-up evidence");
+
+    assert_eq!(summary.candidate_units(), 2);
+    assert_eq!(summary.contributing_units(), 2);
+    assert_eq!(summary.candidate_pairs(), 19);
+    assert_eq!(summary.admitted_pairs(), 17);
+    assert_eq!(summary.refused_pairs(), 2);
+
+    let half_rate = 0.5_f64.ln();
+    let third_rate = (1.0_f64 / 3.0).ln();
+    let expected_pair_target = (15.0 * half_rate + 2.0 * third_rate) / 17.0;
+    let equal_unit_target = f64::midpoint(half_rate, third_rate);
+    let actual = summary.estimate().expect("unbalanced pair target");
+
+    assert!(
+        (actual - expected_pair_target).abs() <= 16.0 * f64::EPSILON,
+        "declared pair weighting must recover the known 15:2 follow-up target"
+    );
+    assert!(
+        (actual - equal_unit_target).abs() > 0.1,
+        "rate-associated follow-up must not silently masquerade as equal-unit weighting"
+    );
+}
+
+#[test]
 fn lag_pair_average_is_invariant_to_input_row_permutation() {
     let canonical = unequal_pair_count_rows();
     let shuffled = [
