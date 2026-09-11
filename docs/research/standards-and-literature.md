@@ -47,9 +47,9 @@ Browne, W. J., Goldstein, H., & Rasbash, J. (2001). Multiple membership multiple
 
 Jones, K. (1991). Specifying and estimating multi-level models for geographical research. *Transactions of the Institute of British Geographers, 16*(2), 148–160. https://doi.org/10.2307/622612
 
-Huang, Y. (2011). Informative cluster sizes for subcluster-level covariates and weighted generalized estimating equations. *Biometrics, 67*(3), 843–851. https://doi.org/10.1111/j.1541-0420.2010.01542.x
+Huang, Y., & Leroux, B. (2011). Informative cluster sizes for subcluster-level covariates and weighted generalized estimating equations. *Biometrics, 67*(3), 843–851. https://doi.org/10.1111/j.1541-0420.2010.01542.x
 
-Kahan, B. C., Li, F., Blette, B., Jairath, V., Copas, A., & Harhay, M. O. (2023). Informative cluster size in cluster-randomised trials: A case study from the TRIGGER trial. *Clinical Trials*. https://doi.org/10.1177/17407745231186094
+Kahan, B. C., Li, F., Blette, B., Jairath, V., Copas, A., & Harhay, M. O. (2023). Informative cluster size in cluster-randomised trials: A case study from the TRIGGER trial. *Clinical Trials, 20*(6), 661–669. https://doi.org/10.1177/17407745231186094
 
 Wang, M., Kong, M., & Datta, S. (2011). Inference for marginal linear models for clustered longitudinal data with potentially informative cluster sizes. *Statistical Methods in Medical Research, 20*(4), 347–367. https://doi.org/10.1177/0962280209347043
 
@@ -118,7 +118,7 @@ Brown, T. B., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D., Dhariwal, P., Nee
 
 Reynolds, L., & McDonell, K. (2021). Prompt programming for large language models: Beyond the few-shot paradigm. In *Extended abstracts of the 2021 CHI conference on human factors in computing systems*. Association for Computing Machinery. https://doi.org/10.1145/3411763.3451760
 
-Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, G. (2023). Pre-train, prompt, and predict: A systematic survey of prompting methods in natural language processing. *ACM Computing Surveys, 55*(9), Article 195. https://doi.org/10.1145/3560815
+Liu, P., Yuan, W., Fu, J., Jiang, Z., Hayashi, H., & Neubig, E. (2023). Pre-train, prompt, and predict: A systematic survey of prompting methods in natural language processing. *ACM Computing Surveys, 55*(9), Article 195. https://doi.org/10.1145/3560815
 
 TEPP retains a logistic-normal CPU reference while allowing adapter backends that satisfy shared-latent, posterior, temporal, relational, and measurement-invariance contracts. Brown et al. (2020) and Reynolds and McDonell (2021) provide primary research context for prompts as task-conditioning and prompt-programming mechanisms; they do not define TEPP's latent-content labels. As a normative ADR 0004/0012 contract, instruction and prompt boilerplate is therefore modeled as explicit method structure, not unique latent content and not a stopword deletion. Liu et al. (2023) is secondary survey background only and is not evidence for that repository-specific classification. `topic_lineage` keeps one global topic identity when activity becomes dormant or reactivated.
 
