@@ -24,7 +24,7 @@ The immutable fast-mlsirm release remains `v0.9.1`; it predates this contract.
 
 ## Fresh owner evidence — 2026-09-11
 
-The live `fast-mlsirm#1816` head is `432765ccf633c9802e0f796ceeb4d6d572059acf` on protected `main@493326f2de49ea1704da0ded19868ed05d2fe00f`. The PR is open, **Draft**, mergeable, and unmerged. Its body is stale in two ways: it still names predecessor `f00c31c...` as current exact head and still describes the state as Ready for fresh admission. GitHub live metadata, not those predecessor body claims, is current authority.
+The live `fast-mlsirm#1816` head is `432765ccf633c9802e0f796ceeb4d6d572059acf` on protected `main@493326f2de49ea1704da0ded19868ed05d2fe00f`. The PR is open, **Draft**, mergeable, and unmerged. Its owner lane has now currentized the body to the same head and Draft-containment state; no predecessor review or hosted success is promoted across the head change.
 
 The numerical implementation entered at `b5fec1d33c02e8ea969405e59747f0505e690d20`. Subsequent ordinary-forward commits added the independent exact oracle and directed cancellation/non-finite fixtures (`087df1d...`), Proposed ADR-0029 (`9a8614f...`), doctoring/changelog currentization, touched-function rustdoc coverage (`f00c31c...`), and finally official ISO/IEEE record links (`432765c...`). The `f00c31c... -> 432765c...` delta changes only `docs/doctoring/correctly-rounded-binary64-mean.md`; the production arithmetic is unchanged.
 
@@ -33,9 +33,10 @@ Current exact-head hosted evidence on `432765c...` is mixed and therefore non-me
 - native CodeQL `34606295285`, Security Scan `34606295363`, SAST Semgrep `34606295323`, and ClusterFuzzLite `34606295428` are GREEN;
 - repository CI `34606295259` is RED because `gpu-smoke` job `103285576158` failed while installing the software Vulkan adapter, before Vulkan availability or GPU parity executed. Package and fuzz jobs are GREEN. That run is historical evidence of a failed acquisition path, not the current root-cause authority for GPU readiness;
 - required delegated CodeQL PR `34606295286` is RED. Python job `103285476466` and Actions job `103285476530` both successfully read the current-head dispatch verdict and then failed at `Release runner or enforce current-head CodeQL verdict`; only afterward did dispatch job `103286411396` succeed. This remains the central producer/consumer settlement class and must be repaired at the canonical `.github` owner rather than copied into TEPP or fast-mlsirm;
-- current formal reviews are COMMENTED only. The CodeRabbit oracle/standards-link findings are resolved, but there is no qualifying submitted current-head `APPROVED` review.
-
-The current owner PR body is therefore documentation debt inside the owner lane, not permission for TEPP to rewrite fast-mlsirm source or consume the branch.
+- current formal reviews are COMMENTED only. The CodeRabbit oracle/standards-link findings are resolved, but there is no qualifying submitted current-head `APPROVED` review;
+- current Noema evidence admitted `orchestrator/free` but the verdict request ended in HTTP 502; the exact consumer evidence belongs to the contextual-orchestrator owner path rather than a leaf provider/model retry;
+- current central coverage contexts still do not provide authoritative exact-head Rust owned line+branch evidence for this material Rust implementation; no denominator trick or Python line-touch substitute is acceptable;
+- current Strix evidence failed before an authoritative scan during sandbox/bootstrap control, so absence of a scan is not a clean security result.
 
 ## Canonical GPU/CI owner evidence
 
@@ -59,7 +60,7 @@ The final mean must be rounded from the exact rational `(S / n) * 2^-1074`, not 
 
 The current owner test surface includes the TEPP half-ULP counterexample and mirrored sign, `[1e16, -1, -1]`, `[f64::MAX, 1e-16, -f64::MAX]`, exact cancellation versus nonzero underflow, minimum-subnormal residue after MAX cancellation, subnormal/normal boundaries, normal and subnormal ties-to-even, binade carry, same-sign `f64::MAX`, permutation invariance, and empty/NaN/±infinity refusal. It also carries a deterministic 10,000-case subnormal-domain oracle using independent test-only exact integer/rational arithmetic rather than the production 34-limb accumulator.
 
-Those tests are necessary but not sufficient. One unchanged owner head still needs repository Rust/rustdoc/Clippy, actual owned statement and branch/edge coverage, package/fuzz/security/supply-chain evidence, zero valid unresolved findings, qualifying independent review, and terminal central controls. The canonical GPU capacity RED and delegated CodeQL failure keep that bar open.
+Those tests are necessary but not sufficient. One unchanged owner head still needs repository Rust/rustdoc/Clippy, actual owned statement and branch/edge coverage, package/fuzz/security/supply-chain evidence, zero valid unresolved findings, qualifying independent review, and terminal central controls. The canonical GPU capacity RED, delegated CodeQL failure, missing authoritative Rust coverage evidence, Noema owner failure, and pre-scan Strix failure keep that bar open.
 
 ## Rejected TEPP-local repairs
 
@@ -74,7 +75,7 @@ The following are not causal acceptance:
 - copying or modifying #1717's GPU/CI acquisition logic in TEPP or #1816;
 - weakening the 18-buffer GPU capability contract, accepting CPU fallback as GPU parity, or accepting a skipped GPU test;
 - describing faithful or approximate behavior as correctly rounded;
-- treating native CodeQL/security success as a substitute for failed repository/GPU evidence, delegated CodeQL receipt, independent review, or immutable release.
+- treating native CodeQL/security success as a substitute for failed repository/GPU evidence, delegated CodeQL receipt, authoritative Rust coverage, independent review, semantic-review evidence, or immutable release.
 
 ## Release and consumer acceptance
 
