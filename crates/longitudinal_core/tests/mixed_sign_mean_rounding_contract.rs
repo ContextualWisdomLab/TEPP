@@ -114,3 +114,25 @@ fn repeated_small_opposite_rates_change_the_correctly_rounded_mean() {
         "two +1 rates are jointly significant and must not be rounded away one at a time against the opposite extreme",
     );
 }
+
+#[test]
+fn half_ulp_tail_changes_the_final_mixed_sign_rounding() {
+    let log_two = -(-0.5_f64).ln_1p();
+    let dominant_rate = f64::from_bits(0x4698_0000_0000_0000);
+    let half_ulp_rate = f64::from_bits(0x4340_0000_0000_0000);
+    let expected = f64::from_bits(0x467f_ffff_ffff_ffff);
+
+    let pairs = [
+        lagged(1.0, 2.0, log_two / dominant_rate),
+        lagged(1.0, 0.5, log_two / half_ulp_rate),
+        lagged(1.0, 0.5, log_two),
+    ];
+    let recovered = recover_centered_irregular_residual_log_rate(&pairs)
+        .expect("finite mixed-sign mean remains identifiable");
+
+    assert_eq!(
+        recovered.to_bits(),
+        expected.to_bits(),
+        "the -1 tail sits below the -2^53 accumulator ULP but moves the final cancellation below the dominant half-ULP tie",
+    );
+}
