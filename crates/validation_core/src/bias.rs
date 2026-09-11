@@ -142,10 +142,12 @@ fn exact_two_level_rational_scale(
     let denominator = reduced_denominator.isqrt();
     // Positive source counts make both reduced terms and their integer roots
     // nonzero. Also, `reduced_numerator <= first_count * second_count`, so its
-    // root cannot exceed the larger `usize` input count.
+    // root cannot exceed the larger `usize` input count. `validation_core`
+    // admits only 64-bit production targets, where every exact `u128` square
+    // root is at most `floor(sqrt(u128::MAX)) = usize::MAX`; the denominator
+    // cast is therefore bounded by the supported target contract.
     if numerator.checked_mul(numerator)? != reduced_numerator
         || denominator.checked_mul(denominator)? != reduced_denominator
-        || denominator > usize::MAX as u128
     {
         return None;
     }
