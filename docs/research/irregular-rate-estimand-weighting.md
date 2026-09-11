@@ -2,13 +2,13 @@
 
 ## Status and scope
 
-This note records a Longitudinal Modeling estimand boundary exposed by TEPP PR #310. It does not change numerical arithmetic and does not promote an unmerged branch to protected-main authority.
+This note records a Longitudinal Modeling estimand boundary exposed by TEPP PR #310 and issue #495. The branch now contains a typed first-release candidate contract, but it remains Draft and is not protected-main or release authority.
 
-Exact source reviewed before this note: `df0b4d6d3e0622de3c988b840114fbdb41e5d1b0`.
+Scientific finding head: `df0b4d6d3e0622de3c988b840114fbdb41e5d1b0`. Typed-contract implementation lineage starts at `c7f55acb347ceac38675d9566eff767372739dba`; public contract tests start at `f45e83ba5223ad9d89022482e759ad9e705b229c` and refusal-class denominators are completed by `a3065f6d7589d5a310e54f85d6447b27414955ba`.
 
-`center_within_unit_event_lags` forms one consecutive event-time lag pair for each admitted adjacent occasion inside a unit. `LaggedWithinResidual` then carries the earlier residual, later residual, and typed event interval but not the originating unit identity. `pairwise_same_sign_log_rate` computes an admitted scalar log-rate for each pair and passes the resulting rate vector to the Longitudinal-local mean boundary.
+`center_within_unit_event_lags` forms one consecutive event-time lag pair for each admitted adjacent occasion inside a unit. `LaggedWithinResidual` carries the earlier residual, later residual, and typed event interval but not the originating unit identity. The existing scalar recovery therefore computes a lag-pair-average estimand: every admissible pair enters one common rate vector before averaging.
 
-Consequently, the existing aggregate is a lag-pair-average estimand. It must not be described as an equal-unit average unless the design makes those two estimands coincide.
+The Draft candidate now names that target explicitly as `tepp.irregular_rate.lag_pair_average.v1`. `tepp.irregular_rate.unit_average.v1` is also a typed name, but it fails closed until an immutable released reusable finite-mean contract can support the second aggregation step without adding another TEPP-local generic summation kernel.
 
 ## Two distinct estimands
 
@@ -34,19 +34,36 @@ A different, equal-unit target is
 
 Every contributing unit receives equal final weight after its admitted pair rates are summarized within unit. The targets are not algebraically interchangeable when `k_i` varies. They may also target different populations when follow-up duration, observation count, missingness, or pair admissibility is associated with the longitudinal process.
 
-The existing TEPP API has enough information to compute `theta_pair` after pairs are formed, but it does not retain unit identity in `LaggedWithinResidual`; it therefore cannot reconstruct `theta_unit` from that vector without changing the typed contract or preserving a unit-keyed aggregation boundary.
+The current pair-average summary attributes candidate/contributing-unit denominators using the same deterministic `BTreeMap<u32, ...>` unit order and consecutive-pair counts used by `center_within_unit_event_lags`. This is sufficient for denominator evidence for the existing pair-weighted target. It is deliberately not treated as the future equal-unit computation boundary: activating `unit_average.v1` must preserve unit identity through within-unit numerical aggregation instead of depending on flattened-pair reconstruction.
 
 ## Failure denominators are part of the estimand
 
-Zero, opposite-sign, non-finite, or otherwise inadmissible residual pairs are not ordinary numerical observations. A longitudinal summary must report at least:
+The Draft `IrregularRateSummary` reports:
 
-- candidate units;
-- units contributing one or more admitted lag pairs;
+- candidate units with at least two admitted event-time occasions;
+- units contributing at least one admitted scalar rate;
 - candidate consecutive pairs;
 - admitted pairs;
-- refused pairs by typed reason.
+- zero/opposite-sign refusals;
+- same-sign pairs whose represented scalar log-rate is not admissible.
 
-Dropping a refused pair changes `k_i` and can change both the pair-average weight and whether a unit contributes to a unit-average target. A unit with no admitted pairs must not disappear silently from a denominator whose interpretation says otherwise. The public contract therefore needs a declared estimand and failure-denominator policy before a result can be promoted as scientific evidence.
+`refused_pairs()` is the sum of the two pair-level refusal classes. Non-finite input rows remain a payload-level admission failure before a scientific summary is constructed; they are not silently converted into missing pair observations.
+
+If no pair is numerically admissible after otherwise valid CWC/event-time admission, the summary returns `estimate = None` while retaining the complete unit/pair denominators. The legacy scalar recovery remains fail-closed for that case. This separation lets evidence reporting preserve its failure population without changing legacy scalar semantics.
+
+Dropping a refused pair changes `k_i` and can change both the pair-average weight and whether a unit contributes to a unit-average target. A unit with no admitted pairs must therefore not disappear silently from a denominator whose interpretation says otherwise.
+
+## Public contract evidence
+
+`crates/longitudinal_core/tests/irregular_rate_estimand_contract.rs` fixes a deterministic unequal-pair-count fixture. One unit contributes three candidate pairs and another contributes two; three rates are admitted and two are refused by the sign/zero rule. The test establishes that:
+
+- `LagPairAverageV1` bit-matches the legacy pair-average scalar recovery;
+- the pair-average differs from the independently computed equal-unit comparison when admitted pair counts differ;
+- row permutation leaves the typed summary unchanged;
+- a two-unit fixture with no admissible rates retains `candidate_units = 2`, `candidate_pairs = 2`, `admitted_pairs = 0`, `refused_pairs = 2`, and `estimate = None`;
+- `UnitAverageV1` has a stable external name but fails closed while the owner mean release is unavailable.
+
+This evidence resolves the naming/denominator ambiguity for the pair-weighted first-release candidate. It does not claim equal-unit scientific acceptance and does not repair #310's independent mixed-sign binary64 mean RED.
 
 ## Relation to unequal and informative cluster size
 
@@ -54,11 +71,11 @@ This is not a cluster-randomized treatment-effect model. However, the statistica
 
 Wang, Kong, and Datta (2011) study clustered longitudinal data and show that informative cluster size can invalidate ordinary marginal inference when cluster size is related to the outcome distribution. Huang (2011) further shows that the appropriate weights depend on the population of interest and on within-cluster covariate structure. Kahan et al. (2023) give a clear modern estimand distinction between equal participant weighting and equal cluster weighting. TEPP does not import their treatment-effect estimands; it imports the narrower methodological requirement that aggregation weights are part of estimand identity.
 
-## Required product contract
+## Decision and documentation boundary
 
-Issue #495 owns the follow-up gap. Before any equal-unit result is implemented or any current pair-average result is described as an average unit/person effect:
+Issue #495 remains open because a branch-local typed API is not the complete scientific acceptance package. Before buyer-facing promotion:
 
-1. PRD/TRD/ADR/TRACEABILITY must name the target (`lag_pair_average`, `unit_average`, or a separately justified design-weighted target).
+1. The first released target must be named consistently in PRD/TRD/TRACEABILITY and a superseding scientific-estimand ADR. The current ADR directory already contains historical number collisions, so this Draft does not mint another potentially colliding ADR identifier; canonical documentation ownership must allocate and repair that identity before acceptance.
 2. A unit-average path must preserve unit identity until within-unit rates are summarized; occasion count cannot stand in for an externally defined design or membership weight.
 3. Known-truth acceptance must include balanced and highly unbalanced occasion counts, informative missing/follow-up patterns, irregular intervals, row permutation, worker-count determinism, and explicit failure denominators.
 4. Cross-classified and multiple-membership extensions must retain their declared membership structure and must not collapse to a primary group merely to obtain one scalar weight.
