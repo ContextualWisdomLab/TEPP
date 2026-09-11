@@ -2,7 +2,7 @@
 
 ## Decision scope
 
-This note narrows the remaining `validation_core::bias_standard_error` proof obligation in PR #488 / issue #491. It applies only to the general translated path in `crates/validation_core/src/bias.rs` after the exact two-level and exact three-level paths refuse, after canonical anchor translation, after power-of-two normalization, and after the nonzero-to-zero normalization preflight.
+This note narrows the remaining `validation_core::bias_standard_error` proof obligation in PR #488 / issue #491. It applies only to the general translated path in `crates/validation_core/src/bias.rs` after the exact two-level path refuses and, for three observations, after the exact three-level path also refuses, after canonical anchor translation, after power-of-two normalization, and after the nonzero-to-zero normalization preflight.
 
 It does **not** claim that the current floating implementation of `dispersion_numerator` is always positive. The production fail-closed `dispersion_numerator <= 0.0` guard remains required until an implementation-matched floating-point forward-error proof or a compact caller-valid counterexample closes that separate question.
 
@@ -11,7 +11,7 @@ It does **not** claim that the current floating implementation of `dispersion_nu
 Let the represented normalized binary64 values entering the moment sums be
 
 \[
-y_1,\ldots,y_n, \qquad n \ge 4,
+y_1,\ldots,y_n, \qquad n \ge 3,
 \]
 
 interpreted as exact real numbers for this section only. Canonical translation supplies at least one exact zero. Choose that value as `0`. Let `x` be a normalized value with maximum magnitude. `exact_power_of_two_scale` chooses the leading-binade power of the maximum translated magnitude, so
@@ -48,7 +48,7 @@ D \ge x^2 + (n-2)\frac{x^2}{2}
 \ge \frac{n}{2}.
 \]
 
-This is stronger than the earlier `D >= 1` narrowing. For the represented normalized values, exact real dispersion is separated from zero by a margin that grows linearly with sample count.
+The derivation also covers the `n=3` case that can reach the general path after `exact_three_level_standard_error` declines admission. This is stronger than the earlier `D >= 1` narrowing. For the represented normalized values, exact real dispersion is separated from zero by a margin that grows linearly with sample count.
 
 ## Why this does not remove the production guard
 
@@ -90,5 +90,5 @@ If the proof requires a bounded product/resource admission domain, that bound mu
 - production module: `crates/validation_core/src/bias.rs`
 - numerical primitive under analysis: `crates/validation_core/src/numeric.rs::deterministic_compensated_sum`
 - current fail-closed state: general translated `dispersion_numerator <= 0.0`
-- exact-real theorem in this note: `D >= n x² / 2 >= n / 2`
+- exact-real theorem in this note: `D >= n x² / 2 >= n / 2` for every admitted general-path `n >= 3`
 - theorem effect: narrows the floating proof obligation; does not authorize source removal or claim 100% branch coverage
