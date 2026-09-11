@@ -72,7 +72,7 @@ This evidence resolves the naming/denominator ambiguity for the pair-weighted fi
 
 This is not a cluster-randomized treatment-effect model. However, the statistical identification issue is analogous: unequal numbers of observations inside a higher-level unit can induce different weighting targets, and informative cluster or subcluster size can make those targets materially different. The estimator has to match the declared estimand rather than inheriting weights accidentally from record multiplicity.
 
-Wang, Kong, and Datta (2011) study clustered longitudinal data and show that informative cluster size can invalidate ordinary marginal inference when cluster size is related to the outcome distribution. Huang (2011) further shows that the appropriate weights depend on the population of interest and on within-cluster covariate structure. Kahan et al. (2023) give a clear modern estimand distinction between equal participant weighting and equal cluster weighting. TEPP does not import their treatment-effect estimands; it imports the narrower methodological requirement that aggregation weights are part of estimand identity.
+Wang, Kong, and Datta (2011) study clustered longitudinal data and show that informative cluster size can invalidate ordinary marginal inference when cluster size is related to the outcome distribution. Huang and Leroux (2011) further show that the appropriate weights depend on the population of interest and on within-cluster covariate structure. Kahan et al. (2023) give a clear modern estimand distinction between equal participant weighting and equal cluster weighting. TEPP does not import their treatment-effect estimands; it imports the narrower methodological requirement that aggregation weights are part of estimand identity.
 
 ## Decision and documentation boundary
 
@@ -89,8 +89,8 @@ The current mixed-sign binary64 mean RED in #310 remains independent. Clarifying
 
 ## References
 
-Huang, Y. (2011). Informative cluster sizes for subcluster-level covariates and weighted generalized estimating equations. *Biometrics, 67*(3), 843–851. https://doi.org/10.1111/j.1541-0420.2010.01542.x
+Huang, Y., & Leroux, B. (2011). Informative cluster sizes for subcluster-level covariates and weighted generalized estimating equations. *Biometrics, 67*(3), 843–851. https://doi.org/10.1111/j.1541-0420.2010.01542.x
 
-Kahan, B. C., Li, F., Blette, B., Jairath, V., Copas, A., & Harhay, M. O. (2023). Informative cluster size in cluster-randomised trials: A case study from the TRIGGER trial. *Clinical Trials*. https://doi.org/10.1177/17407745231186094
+Kahan, B. C., Li, F., Blette, B., Jairath, V., Copas, A., & Harhay, M. O. (2023). Informative cluster size in cluster-randomised trials: A case study from the TRIGGER trial. *Clinical Trials, 20*(6), 661–669. https://doi.org/10.1177/17407745231186094
 
 Wang, M., Kong, M., & Datta, S. (2011). Inference for marginal linear models for clustered longitudinal data with potentially informative cluster sizes. *Statistical Methods in Medical Research, 20*(4), 347–367. https://doi.org/10.1177/0962280209347043
