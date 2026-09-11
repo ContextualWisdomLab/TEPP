@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 CLAUDE = ROOT / "CLAUDE.md"
 PRD_AMENDMENT = ROOT / "docs/product/prd-v0.4-amendment-longitudinal-time-ownership.md"
+TRD = ROOT / "docs/TRD.md"
 OWNERSHIP_ADR = ROOT / "docs/adr/longitudinal-modeling-ownership-addendum.md"
 
 
@@ -27,6 +28,17 @@ def test_prd_names_irregular_rate_estimands_and_weighting_population() -> None:
     assert "candidate/contributing units" in prd
     assert "candidate/admitted/refused pairs" in prd
     assert "fail closed" in prd
+
+
+def test_trd_requires_versioned_irregular_rate_weighting_and_denominators() -> None:
+    """Keep the technical contract aligned with the public estimand API."""
+    trd = TRD.read_text(encoding="utf-8")
+
+    assert "`tepp.irregular_rate.lag_pair_average.v1`" in trd
+    assert "`tepp.irregular_rate.unit_average.v1`" in trd
+    assert "candidate/contributing units" in trd
+    assert "candidate/admitted/refused pairs" in trd
+    assert "attempted/recovered/failed" in trd
 
 
 def test_ownership_adr_keeps_pair_and_unit_estimands_distinct() -> None:
