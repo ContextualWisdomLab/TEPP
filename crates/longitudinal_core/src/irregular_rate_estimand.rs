@@ -125,16 +125,16 @@ impl IrregularRateSummary {
 /// # Errors
 ///
 /// Propagates event-time/CWC admission failures. `UnitAverageV1` returns
-/// [`LongitudinalError::InvalidTemporalTransformInput`] while the released
+/// [`LongitudinalError::IrregularRateEstimandUnavailable`] while the released
 /// reusable mean contract is unavailable. The pair-average numerical mean can
-/// return the same error if its currently shared compatibility arithmetic cannot
-/// represent the final admitted-pair mean.
+/// return [`LongitudinalError::InvalidTemporalTransformInput`] if its currently
+/// shared compatibility arithmetic cannot represent the final admitted-pair mean.
 pub fn recover_within_unit_irregular_rate_summary(
     rows: &[EventTimedObservation],
     estimand: IrregularRateEstimand,
 ) -> Result<IrregularRateSummary, LongitudinalError> {
     if estimand == IrregularRateEstimand::UnitAverageV1 {
-        return Err(LongitudinalError::InvalidTemporalTransformInput);
+        return Err(LongitudinalError::IrregularRateEstimandUnavailable);
     }
 
     let lagged = center_within_unit_event_lags(rows)?;
