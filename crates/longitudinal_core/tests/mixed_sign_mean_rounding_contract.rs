@@ -1,8 +1,9 @@
 //! Mixed-sign CWC and occasion means divide by the original sample count.
 
 use longitudinal_core::{
-    EventTimeInterval, EventTimedObservation, LaggedWithinResidual, center_occasion_mean_event_lags,
-    center_within_unit_event_lags, recover_centered_irregular_residual_log_rate,
+    EventTimeInterval, EventTimedObservation, LaggedWithinResidual,
+    center_occasion_mean_event_lags, center_within_unit_event_lags,
+    recover_centered_irregular_residual_log_rate,
 };
 
 fn timed(unit: u32, event_time: f64, score: f64) -> EventTimedObservation {
