@@ -2,85 +2,82 @@
 
 ## Decision status
 
-**Proposed consumer boundary.** This record does not activate a new numerical algorithm. It records why TEPP Longitudinal Modeling must not repair the current mixed-sign mean defect with another local summation heuristic and what evidence is required before replacing it with a released reusable numerical contract.
+**Proposed consumer boundary.** This record does not activate a new numerical algorithm. TEPP keeps the current Longitudinal Modeling RED until the reusable numerical owner has protected-integrated and immutably released a contract that satisfies the evidence below.
 
 ## Consumer finding
 
 TEPP PR #310 exposes a compact public RED through `crates/longitudinal_core/tests/mixed_sign_mean_rounding_contract.rs`.
 
-The represented rate values are:
+The represented rate values are `P = 0x1.8p+106` (`0x4698000000000000`), `-2^53`, and `-1`. The exact real sum is `P - 2^53 - 1`. The correctly rounded mean is `0x1.fffffffffffffp+104` (`0x467fffffffffffff`), while TEPP's current `scaled_compensated_mean` path returns `0x4680000000000000`, one ULP high because the same-side coalescing step can lose the final `-1` before the original-count division.
 
-- `P = 0x1.8p+106` (`0x4698000000000000`),
-- `-2^53`,
-- `-1`.
-
-The exact real sum is `P - 2^53 - 1`. The correctly rounded mean is `0x1.fffffffffffffp+104` (`0x467fffffffffffff`). The current `scaled_compensated_mean` path in `crates/longitudinal_core/src/irregular_residual.rs` returns `0x4680000000000000`, one ULP high, because the same-side coalescing step can lose the final `-1` before the original-count division.
-
-This is an ordinary finite three-value input constructed through the public already-centered residual path. It is not a resource-extreme synthetic witness.
+This is an ordinary finite three-value input through the public already-centered residual path. It is not a resource-extreme synthetic witness. The latest TEPP source-level RED authority remains Rust Foundation run `34595076660`: formatting and Clippy passed, 1,568/1,569 tests passed, and only `mixed_sign_mean_rounding_contract::half_ulp_tail_changes_the_final_mixed_sign_rounding` failed with the expected bit mismatch.
 
 ## Bounded-context ownership
 
-TEPP owns the temporal estimand: event-time admission, Driver et al. log-rate construction, CWC semantics, longitudinal evidence composition, and the decision to publish or refuse a result.
+TEPP owns the temporal estimand: event-time admission, Driver-style log-rate construction, CWC semantics, longitudinal evidence composition, and the decision to publish or refuse a result.
 
-Reusable finite binary64 sum/mean arithmetic is static numerical infrastructure and belongs to `ContextualWisdomLab/fast-mlsirm`. Canonical owner gap `fast-mlsirm#1814` therefore owns an exact or correctly rounded finite-sum/mean Published Language. TEPP may consume only an immutable released contract. Mutable owner PR heads, copied source, cross-repository SQL, or a second TEPP numerical implementation are not accepted dependencies.
+Reusable finite binary64 sum/mean arithmetic is domain-neutral numerical infrastructure and belongs to `ContextualWisdomLab/fast-mlsirm`. Canonical owner issue `fast-mlsirm#1814` and implementation PR `fast-mlsirm#1816` own this primitive. TEPP must not copy the owner source, pin a mutable PR head, introduce a second generic summation algorithm, or reinterpret an unreleased owner branch as dependency authority.
 
-Open fast-mlsirm PR #1536 contains relevant prior art at head `03d1e943b9f51d509977b63889a2052eae81717b`: private `add_fsum_partial` / `finish_fsum` helpers in `crates/mlsirm-core/src/multilevel_estimator.rs`, introduced by `5b856206e15ecc31236a4109571f1be58e77c54a`. Those helpers implement CPython-style partial accumulation and final half-even correction for membership-weight admission. They are design evidence only. The current caller is domain-private, uses non-negative totals expected near one, returns a rounded sum rather than a correctly rounded original-count mean, does not expose mathematical-zero versus nonzero-underflow identity, and does not establish an associative worker-reduction contract.
+The immutable fast-mlsirm release remains `v0.9.1`; it predates this contract.
 
-The current immutable fast-mlsirm release `v0.9.1` predates `fast-mlsirm#1814`; it is not authority for this repair.
+## Fresh owner evidence — 2026-09-11
 
-## Canonical owner implementation now in review
+The live `fast-mlsirm#1816` head is `432765ccf633c9802e0f796ceeb4d6d572059acf` on protected `main@493326f2de49ea1704da0ded19868ed05d2fe00f`. The PR is open and non-Draft, but Ready status is admission only and is not merge or release authority.
 
-`fast-mlsirm#1816` is the canonical implementation vehicle for #1814. The numerical implementation reviewed by this TEPP decision entered at owner commit `b5fec1d33c02e8ea969405e59747f0505e690d20` on protected base `493326f2de49ea1704da0ded19868ed05d2fe00f`. It publishes the proposed contract identity `fast_mlsirm.binary64_mean@1.0.0` and implements separate signed 34×`u64` exact magnitudes in `2^-1074` units, original-count integer quotient/remainder finalization, and a single round-to-nearest-ties-to-even projection.
+The numerical implementation entered at `b5fec1d33c02e8ea969405e59747f0505e690d20`. Subsequent ordinary-forward commits added the independent exact oracle and directed cancellation/non-finite fixtures (`087df1d...`), Proposed ADR-0029 (`9a8614f...`), doctoring/changelog currentization, touched-function rustdoc coverage (`f00c31c...`), and finally official ISO/IEEE record links (`432765c...`). The `f00c31c... -> 432765c...` delta changes only `docs/doctoring/correctly-rounded-binary64-mean.md`; the production arithmetic is unchanged.
 
-The owner PR later advanced without changing that production implementation: commit `087df1dae7bb7c177880d6758104e29edfe91cde` adds only contract-test evidence—an exact integer/rational oracle over 10,000 deterministic subnormal cases, `[f64::MAX, 1e-16, -f64::MAX]` tiny-cancellation coverage, and explicit negative-infinity refusal. Because the PR was Draft after this test-only push, its repository CI and ClusterFuzzLite workflows were skipped on `087df1d...`; native Semgrep, Security Scan and CodeQL completed GREEN while delegated CodeQL remained in progress at the observation point. Therefore predecessor Rust GREEN at `b5fec1d...` does not transfer to the new test head.
+Current exact-head hosted evidence on `432765c...` is mixed and therefore non-mergeable:
 
-This snapshot is traceability evidence, not a dependency pin. The owner PR's mutable exact head, Draft/Ready presentation and bot-review state may continue to change; TEPP does not treat any of them as consumer authority. The earlier `b5fec1d...` repository CI/package/native CodeQL/Semgrep/Security/ClusterFuzz evidence is useful predecessor evidence only. `.github#2099` separately owns the finding that central `coverage-evidence` can report GREEN without actually producing owned Rust line/branch measurement. No qualifying independent submitted review was present in the fresh owner sweep. A CodeRabbit retry moved from rate-limited to in-progress review on the owner stack, but in-progress or generated review prose cannot authorize merge or release.
+- native CodeQL `34606295285`, Security Scan `34606295363`, SAST Semgrep `34606295323`, and ClusterFuzzLite `34606295428` are GREEN;
+- repository CI `34606295259` is RED because `gpu-smoke` job `103285576158` failed while installing the software Vulkan adapter, before Vulkan availability or GPU parity executed. Package and fuzz jobs are GREEN. This is repository acceptance debt even though it is not evidence against the binary64 mean arithmetic;
+- required delegated CodeQL PR `34606295286` is RED. Python job `103285476466` and Actions job `103285476530` both successfully read the current-head dispatch verdict and then failed at `Release runner or enforce current-head CodeQL verdict`; only afterward did dispatch job `103286411396` succeed. This remains the central producer/consumer settlement class and must be repaired at the canonical `.github` owner rather than copied into TEPP or fast-mlsirm;
+- current formal reviews are COMMENTED only. The CodeRabbit oracle/standards-link findings are resolved, but there is no qualifying submitted current-head `APPROVED` review.
 
-TEPP therefore keeps the public longitudinal RED unchanged. Consumer migration begins only after #1816 lands through the normal protected path and a new immutable fast-mlsirm release exposes the contract with version/tag/package, SBOM/provenance, reproducibility, rollback and real owned source coverage evidence. A mutable PR SHA is not an allowed production dependency even if its source-level arithmetic appears correct.
+The current owner PR body still names predecessor `f00c31c...` as its exact head, so PR metadata itself is stale relative to GitHub's live head. That is an owner-path documentation finding, not permission for TEPP to rewrite fast-mlsirm source or consume the branch.
 
-## Candidate exact accumulator bound
+## Proposed numerical contract
 
-A fixed-width exact accumulator is feasible without introducing a psychometric sample ceiling when the numerical API accepts an ordinary Rust slice and supported production targets have `usize <= 64` bits.
+The owner candidate publishes the proposed identity `fast_mlsirm.binary64_mean@1.0.0`. Every finite binary64 value is represented exactly as an integer multiple of `q = 2^-1074`. Positive and negative totals are accumulated separately in fixed 34×`u64` magnitudes, the exact signed magnitude is divided by the original slice cardinality, and only the final rational result is projected to binary64 with round-to-nearest, ties-to-even. `exact_zero` distinguishes exact represented cancellation from a nonzero mean that rounds to signed zero.
 
-Every finite binary64 value is an integer multiple of `q = 2^-1074`. The largest finite value is
+For the largest finite binary64 value, the coefficient in `q` units is `(2^53 - 1) * 2^2045`, requiring 2,098 magnitude bits. On supported `usize::BITS <= 64` targets, any materializable same-sign slice total is `< 2^2162`; 34 `u64` limbs provide 2,176 magnitude bits. The fixed width is therefore a representation bound, not a psychometric sample ceiling.
 
-`MAX = (2^53 - 1) * 2^971`.
+The final mean must be rounded from the exact rational `(S / n) * 2^-1074`, not from a binary64-rounded sum. This also permits same-sign cases whose exact intermediate sum exceeds binary64 while their mean remains representable.
 
-In `q` units one addend therefore has magnitude
+## Owner acceptance already encoded in tests
 
-`I_max = (2^53 - 1) * 2^2045`,
+The current owner test surface includes the TEPP half-ULP counterexample and mirrored sign, `[1e16, -1, -1]`, `[f64::MAX, 1e-16, -f64::MAX]`, exact cancellation versus nonzero underflow, minimum-subnormal residue after MAX cancellation, subnormal/normal boundaries, normal and subnormal ties-to-even, binade carry, same-sign `f64::MAX`, permutation invariance, and empty/NaN/±infinity refusal. It also carries a deterministic 10,000-case subnormal-domain oracle using independent test-only exact integer/rational arithmetic rather than the production 34-limb accumulator.
 
-which requires 2,098 magnitude bits. For every 64-bit slice cardinality `n <= 2^64 - 1`,
+Those tests are necessary but not sufficient. One unchanged owner head still needs repository Rust/rustdoc/Clippy, actual owned statement and branch/edge coverage, package/fuzz/security/supply-chain evidence, zero valid unresolved findings, qualifying independent review, and terminal central controls. The present GPU provisioning failure and delegated CodeQL failure keep that bar open.
 
-`n * I_max < 2^2162`.
-
-A sign plus 2,162-bit magnitude is therefore sufficient for the exact mathematical sum over every slice representable by a 64-bit `usize`. A 34×`u64` magnitude provides 2,176 bits. This representation is implemented by the #1816 candidate but remains **Proposed** for TEPP until protected integration and immutable release acceptance complete.
-
-The mean must be rounded from the exact rational `(S / n) * 2^-1074`, not from a binary64-rounded sum. Integer quotient/remainder finalization can distinguish exact mathematical zero (`S == 0`) from a nonzero value that rounds below binary64 range and can apply round-to-nearest-ties-to-even at the final mean boundary. It also admits same-sign cases where the exact sum exceeds binary64 while the mean remains representable.
-
-## Rejected local repairs
+## Rejected TEPP-local repairs
 
 The following are not causal acceptance:
 
 - adding another swallowed-term or pair-order special case to `scaled_compensated_mean`;
-- replacing the current path with plain Kahan or Neumaier summation without a final-rounding proof;
-- pre-scaling all inputs by a large magnitude when cancellation can make a subnormal term scientifically material;
-- computing a rounded sum first and then dividing by the sample count;
-- adding a model-specific sample ceiling solely to simplify a numerical proof;
-- copying the private fast-mlsirm #1536 helpers or #1816 implementation into TEPP;
-- pinning a mutable fast-mlsirm PR/head as production authority;
-- accepting faithful or approximate behavior while documenting it as correctly rounded.
+- replacing it with plain Kahan, Neumaier, sorting/coalescing, or pre-scaling without a final-rounding proof;
+- computing a rounded floating sum first and dividing by the sample count afterward;
+- adding a product-specific sample ceiling to simplify the numerical proof;
+- copying fast-mlsirm #1536 private partials or #1816 source into TEPP;
+- pinning a mutable owner PR/head;
+- describing faithful or approximate behavior as correctly rounded;
+- treating native CodeQL/security success as a substitute for the failed repository CI, delegated CodeQL receipt, independent review, or immutable release.
 
 ## Release and consumer acceptance
 
-Before TEPP changes production arithmetic, the fast-mlsirm owner contract must be protected-merged and published in an immutable versioned release with SBOM, provenance, reproducibility, rollback evidence, rustdoc, test and edge-case coverage. Its RED/GREEN suite must include at least the TEPP half-ULP case, mirrored sign, `[1e16, -1, -1]`, `[MAX, tiny, -MAX]`, subnormal residue, exact cancellation, same-sign near-MAX finite means, exact midpoint/ties-to-even division, mathematical zero versus nonzero-underflow, input permutation, and worker-count determinism.
+Before TEPP changes production arithmetic, `fast-mlsirm#1816` must land through the normal protected path and the contract must be published in a new immutable versioned release with version/tag/package, SBOM/provenance, reproducibility and rollback evidence. ADR-0029 remains Proposed until that acceptance is complete.
 
-TEPP then pins the released version through the repository's approved dependency/ACL boundary, removes the local generic mean heuristic rather than retaining two numerical authorities, reruns the public longitudinal RED to GREEN, and reacquires exact-head Rust, 100% owned line/branch coverage, security, SBOM/provenance, review, and release evidence. LLM review is supplementary and cannot activate the numerical change.
+After release, TEPP must pin the released contract through the approved dependency/ACL boundary, remove the local generic mean heuristic rather than retaining two numerical authorities, rerun the public longitudinal RED to GREEN, and reacquire exact-head formatting, Clippy, no-retry tests, rustdoc, 100% owned line/branch/edge coverage, dependency/security policy, SBOM/provenance, live PostgreSQL, OpenCode/Noema, independent review, protected merge, and TEPP release evidence. LLM review cannot substitute for numerical or scientific acceptance.
 
-## Research basis
+## Research and standards trace
+
+International Organization for Standardization. (2020). *Information technology—Microprocessor systems—Floating-point arithmetic* (ISO/IEC 60559:2020). https://www.iso.org/standard/80985.html
+
+Institute of Electrical and Electronics Engineers. (2019). *IEEE standard for floating-point arithmetic* (IEEE Std 754-2019). https://standards.ieee.org/ieee/315/6210/
 
 Ogita, T., Rump, S. M., & Oishi, S. (2005). Accurate sum and dot product. *SIAM Journal on Scientific Computing, 26*(6), 1955–1988. https://doi.org/10.1137/030601818
 
-Rump, S. M., Ogita, T., & Oishi, S. (2008). Accurate floating-point summation part I: Faithful rounding. *SIAM Journal on Scientific Computing, 31*(1), 189–224. https://doi.org/10.1137/050645671
+Rump, S. M., Ogita, T., & Oishi, S. (2008a). Accurate floating-point summation part I: Faithful rounding. *SIAM Journal on Scientific Computing, 31*(1), 189–224. https://doi.org/10.1137/050645671
 
-These publications motivate error-free transformation and faithful summation analysis. They do not prove the fast-mlsirm implementation or authorize TEPP production activation by themselves.
+Rump, S. M., Ogita, T., & Oishi, S. (2008b). Accurate floating-point summation part II: Sign, K-fold faithful and rounding to nearest. *SIAM Journal on Scientific Computing, 31*(2), 1269–1302. https://doi.org/10.1137/07068816X
+
+These sources motivate the numerical design and final-rounding requirements. They do not prove the concrete fast-mlsirm implementation or authorize TEPP production activation by themselves.
