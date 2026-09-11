@@ -24,11 +24,9 @@ fn unequal_pair_count_rows() -> [EventTimedObservation; 7] {
 #[test]
 fn lag_pair_average_reports_estimand_and_failure_denominators() {
     let rows = unequal_pair_count_rows();
-    let summary = recover_within_unit_irregular_rate_summary(
-        &rows,
-        IrregularRateEstimand::LagPairAverageV1,
-    )
-    .expect("pair-average evidence");
+    let summary =
+        recover_within_unit_irregular_rate_summary(&rows, IrregularRateEstimand::LagPairAverageV1)
+            .expect("pair-average evidence");
 
     assert_eq!(
         summary.estimand().wire_name(),
@@ -94,11 +92,9 @@ fn zero_admissible_rates_still_return_explicit_pair_denominator() {
         timed(2, 0.0, 2.0),
         timed(2, 1.0, -2.0),
     ];
-    let summary = recover_within_unit_irregular_rate_summary(
-        &rows,
-        IrregularRateEstimand::LagPairAverageV1,
-    )
-    .expect("denominator evidence survives zero admissible rates");
+    let summary =
+        recover_within_unit_irregular_rate_summary(&rows, IrregularRateEstimand::LagPairAverageV1)
+            .expect("denominator evidence survives zero admissible rates");
 
     assert_eq!(summary.estimate(), None);
     assert_eq!(summary.candidate_units(), 2);
