@@ -18,6 +18,8 @@ TEPP owns the temporal estimand: event-time admission, Driver-style log-rate con
 
 Reusable finite binary64 sum/mean arithmetic is domain-neutral numerical infrastructure and belongs to `ContextualWisdomLab/fast-mlsirm`. Canonical owner issue `fast-mlsirm#1814` and implementation PR `fast-mlsirm#1816` own this primitive. TEPP must not copy the owner source, pin a mutable PR head, introduce a second generic summation algorithm, or reinterpret an unreleased owner branch as dependency authority.
 
+Repository-owned GPU/CI acquisition and parity evidence is separately owned by `fast-mlsirm#1717`. TEPP and the numerical PR must not duplicate that CI repair, lower its GPU capability invariant, substitute CPU fallback as GPU evidence, or treat a skipped parity test as acceptance.
+
 The immutable fast-mlsirm release remains `v0.9.1`; it predates this contract.
 
 ## Fresh owner evidence — 2026-09-11
@@ -29,11 +31,21 @@ The numerical implementation entered at `b5fec1d33c02e8ea969405e59747f0505e690d2
 Current exact-head hosted evidence on `432765c...` is mixed and therefore non-mergeable:
 
 - native CodeQL `34606295285`, Security Scan `34606295363`, SAST Semgrep `34606295323`, and ClusterFuzzLite `34606295428` are GREEN;
-- repository CI `34606295259` is RED because `gpu-smoke` job `103285576158` failed while installing the software Vulkan adapter, before Vulkan availability or GPU parity executed. Package and fuzz jobs are GREEN. This is repository acceptance debt even though it is not evidence against the binary64 mean arithmetic;
+- repository CI `34606295259` is RED because `gpu-smoke` job `103285576158` failed while installing the software Vulkan adapter, before Vulkan availability or GPU parity executed. Package and fuzz jobs are GREEN. That run is historical evidence of a failed acquisition path, not the current root-cause authority for GPU readiness;
 - required delegated CodeQL PR `34606295286` is RED. Python job `103285476466` and Actions job `103285476530` both successfully read the current-head dispatch verdict and then failed at `Release runner or enforce current-head CodeQL verdict`; only afterward did dispatch job `103286411396` succeed. This remains the central producer/consumer settlement class and must be repaired at the canonical `.github` owner rather than copied into TEPP or fast-mlsirm;
 - current formal reviews are COMMENTED only. The CodeRabbit oracle/standards-link findings are resolved, but there is no qualifying submitted current-head `APPROVED` review.
 
 The current owner PR body still names predecessor `f00c31c...` as its exact head, so PR metadata itself is stale relative to GitHub's live head. That is an owner-path documentation finding, not permission for TEPP to rewrite fast-mlsirm source or consume the branch.
+
+## Canonical GPU/CI owner evidence
+
+The stronger current GPU diagnosis is `fast-mlsirm#1717`, not another patch inside #1816. Its live exact head is `0b31640928e07f4362ce27dad3d310e630ab1b5d`, open/Draft/mergeable on the same protected fast-mlsirm base.
+
+#1717's controlled predecessor admission successfully acquired and initialized image-local SwiftShader, then measured the actual adapter contract. `SwiftShader Device (Subzero)` exposes `max_storage_buffers_per_shader_stage = 10`, while the current marginal GPU layout requires at least 18 storage buffers per shader stage. The adapter therefore cannot execute the governed kernel topology. Lowering the 18-buffer requirement without redesign evidence, accepting CPU fallback, or relabeling skipped GPU parity as success would weaken the product contract.
+
+The #1717 forward repair also moved the environment-specific capacity probe out of ordinary workspace tests into `crates/mlsirm-core/examples/gpu_adapter_capacity.rs`, so ordinary `cargo test --workspace` no longer performs hardware acquisition outside the dedicated GPU lane. Its exact-head CI `34607995391` reached `gpu-smoke` job `103291084354`, configured image-local SwiftShader, proved the Vulkan loader, ran the isolated capacity probe, reproduced the 10-versus-18 buffer mismatch, and failed closed at that invariant. The workflow was subsequently cancelled when the PR returned to Draft; the completed capacity RED remains diagnostic evidence, not a GREEN run or release gate.
+
+The next causal GPU repair therefore belongs to #1717 or its verified successor: either provide a reproducible adapter that satisfies the existing 18-buffer contract, or redesign the marginal resource topology and prove CPU-`f64` parity plus realistic performance/recovery without weakening scientific or GPU acceptance. #1816 must reacquire its own exact-head repository evidence only after that canonical CI path is protected-integrated; TEPP must wait for the resulting immutable numerical release.
 
 ## Proposed numerical contract
 
@@ -47,7 +59,7 @@ The final mean must be rounded from the exact rational `(S / n) * 2^-1074`, not 
 
 The current owner test surface includes the TEPP half-ULP counterexample and mirrored sign, `[1e16, -1, -1]`, `[f64::MAX, 1e-16, -f64::MAX]`, exact cancellation versus nonzero underflow, minimum-subnormal residue after MAX cancellation, subnormal/normal boundaries, normal and subnormal ties-to-even, binade carry, same-sign `f64::MAX`, permutation invariance, and empty/NaN/±infinity refusal. It also carries a deterministic 10,000-case subnormal-domain oracle using independent test-only exact integer/rational arithmetic rather than the production 34-limb accumulator.
 
-Those tests are necessary but not sufficient. One unchanged owner head still needs repository Rust/rustdoc/Clippy, actual owned statement and branch/edge coverage, package/fuzz/security/supply-chain evidence, zero valid unresolved findings, qualifying independent review, and terminal central controls. The present GPU provisioning failure and delegated CodeQL failure keep that bar open.
+Those tests are necessary but not sufficient. One unchanged owner head still needs repository Rust/rustdoc/Clippy, actual owned statement and branch/edge coverage, package/fuzz/security/supply-chain evidence, zero valid unresolved findings, qualifying independent review, and terminal central controls. The canonical GPU capacity RED and delegated CodeQL failure keep that bar open.
 
 ## Rejected TEPP-local repairs
 
@@ -59,12 +71,14 @@ The following are not causal acceptance:
 - adding a product-specific sample ceiling to simplify the numerical proof;
 - copying fast-mlsirm #1536 private partials or #1816 source into TEPP;
 - pinning a mutable owner PR/head;
+- copying or modifying #1717's GPU/CI acquisition logic in TEPP or #1816;
+- weakening the 18-buffer GPU capability contract, accepting CPU fallback as GPU parity, or accepting a skipped GPU test;
 - describing faithful or approximate behavior as correctly rounded;
-- treating native CodeQL/security success as a substitute for the failed repository CI, delegated CodeQL receipt, independent review, or immutable release.
+- treating native CodeQL/security success as a substitute for failed repository/GPU evidence, delegated CodeQL receipt, independent review, or immutable release.
 
 ## Release and consumer acceptance
 
-Before TEPP changes production arithmetic, `fast-mlsirm#1816` must land through the normal protected path and the contract must be published in a new immutable versioned release with version/tag/package, SBOM/provenance, reproducibility and rollback evidence. ADR-0029 remains Proposed until that acceptance is complete.
+Before TEPP changes production arithmetic, the fast-mlsirm owner chain must close in order: #1717 or a verified successor must establish normal GPU/CI acceptance; `fast-mlsirm#1816` must then reacquire its exact-current repository evidence, land through the normal protected path, and publish the numerical contract in a new immutable versioned release with version/tag/package, SBOM/provenance, reproducibility and rollback evidence. ADR-0029 remains Proposed until that acceptance is complete.
 
 After release, TEPP must pin the released contract through the approved dependency/ACL boundary, remove the local generic mean heuristic rather than retaining two numerical authorities, rerun the public longitudinal RED to GREEN, and reacquire exact-head formatting, Clippy, no-retry tests, rustdoc, 100% owned line/branch/edge coverage, dependency/security policy, SBOM/provenance, live PostgreSQL, OpenCode/Noema, independent review, protected merge, and TEPP release evidence. LLM review cannot substitute for numerical or scientific acceptance.
 
