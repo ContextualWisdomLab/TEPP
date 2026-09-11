@@ -16,6 +16,10 @@ fn timed(unit: u32, event_time: f64, score: f64) -> EventTimedObservation {
     EventTimedObservation::new(unit, event_time, score)
 }
 
+fn exact_test_count(value: usize) -> f64 {
+    f64::from(u32::try_from(value).expect("test count must fit in u32"))
+}
+
 #[derive(Clone, Copy)]
 struct SplitMix64 {
     state: u64,
@@ -36,7 +40,11 @@ impl SplitMix64 {
 
     fn signed_unit(&mut self) -> f64 {
         let mantissa = self.next_u64() >> 11;
-        let unit = mantissa as f64 / ((1_u64 << 53) as f64);
+        let high = u32::try_from(mantissa >> 32).expect("53-bit mantissa high part must fit u32");
+        let low = u32::try_from(mantissa & u64::from(u32::MAX))
+            .expect("53-bit mantissa low part must fit u32");
+        let unit = (f64::from(high) * 4_294_967_296.0 + f64::from(low))
+            / 9_007_199_254_740_992.0;
         2.0 * unit - 1.0
     }
 }
@@ -73,27 +81,31 @@ fn append_noisy_missingness_unit(
         } else {
             let draw = rng.next_u64();
             if retain_three_of_four {
-                draw & 3 != 0
+                draw.trailing_zeros() < 2
             } else {
-                draw & 3 == 0
+                draw.trailing_zeros() >= 2
             }
         };
 
         if retain {
             let score = -log_magnitude.exp();
-            rows.push(timed(unit, event_time as f64, score));
+            rows.push(timed(unit, exact_test_count(event_time), score));
             negative_sum += score;
             retained_times.push(event_time);
         }
     }
 
-    rows.push(timed(unit, (LAST_NEGATIVE_TIME + 1) as f64, -negative_sum));
+    rows.push(timed(
+        unit,
+        exact_test_count(LAST_NEGATIVE_TIME + 1),
+        -negative_sum,
+    ));
 
     let admitted_pairs = retained_times.len() - 1;
     let pair_rate_variance_sum = retained_times
         .windows(2)
         .map(|times| {
-            let gap = (times[1] - times[0]) as f64;
+            let gap = exact_test_count(times[1] - times[0]);
             innovation_variance / gap
         })
         .sum();
@@ -164,13 +176,15 @@ fn run_noisy_rate_associated_missingness(seed: u64) -> MonteCarloEvidence {
             summary.admitted_pairs() + summary.refused_pairs()
         );
 
-        let true_pair_target = (half.admitted_pairs as f64 * half_rate
-            + third.admitted_pairs as f64 * third_rate)
-            / admitted_pairs as f64;
+        let half_pairs = exact_test_count(half.admitted_pairs);
+        let third_pairs = exact_test_count(third.admitted_pairs);
+        let admitted_pair_count = exact_test_count(admitted_pairs);
+        let true_pair_target =
+            (half_pairs * half_rate + third_pairs * third_rate) / admitted_pair_count;
         let error = estimate - true_pair_target;
         let conditional_standard_error =
             (half.pair_rate_variance_sum + third.pair_rate_variance_sum).sqrt()
-                / admitted_pairs as f64;
+                / admitted_pair_count;
 
         recovered_replicates += 1;
         error_sum += error;
@@ -187,15 +201,15 @@ fn run_noisy_rate_associated_missingness(seed: u64) -> MonteCarloEvidence {
     assert!(recovered_replicates > 1);
     assert!(first_quarter_recovered > 0);
 
-    let recovered = recovered_replicates as f64;
+    let recovered = exact_test_count(recovered_replicates);
     let bias = error_sum / recovered;
     let rmse = (squared_error_sum / recovered).sqrt();
     let first_quarter_rmse =
-        (first_quarter_squared_error_sum / first_quarter_recovered as f64).sqrt();
+        (first_quarter_squared_error_sum / exact_test_count(first_quarter_recovered)).sqrt();
     let sample_error_variance =
         (squared_error_sum - recovered * bias * bias).max(0.0) / (recovered - 1.0);
     let bias_monte_carlo_se = (sample_error_variance / recovered).sqrt();
-    let coverage_95 = covered_replicates as f64 / recovered;
+    let coverage_95 = exact_test_count(covered_replicates) / recovered;
 
     let z_squared = Z_95 * Z_95;
     let wilson_denominator = 1.0 + z_squared / recovered;
