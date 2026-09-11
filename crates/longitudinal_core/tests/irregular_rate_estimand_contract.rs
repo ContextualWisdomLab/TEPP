@@ -115,6 +115,6 @@ fn unit_average_is_versioned_but_fails_closed_until_owner_mean_release() {
     );
     assert_eq!(
         recover_within_unit_irregular_rate_summary(&rows, IrregularRateEstimand::UnitAverageV1),
-        Err(LongitudinalError::InvalidTemporalTransformInput)
+        Err(LongitudinalError::IrregularRateEstimandUnavailable)
     );
 }
