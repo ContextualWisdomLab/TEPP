@@ -58,6 +58,60 @@ fn lag_pair_average_reports_estimand_and_failure_denominators() {
 }
 
 #[test]
+fn extra_admitted_pair_changes_pair_weight_without_changing_unit_target() {
+    let base = unequal_pair_count_rows();
+    let extended = [
+        base[0],
+        base[1],
+        base[2],
+        base[3],
+        base[4],
+        base[5],
+        base[6],
+        timed(2, 3.0, -4.0 / 3.0),
+        timed(2, 4.0, 4.0 / 3.0),
+    ];
+
+    let base_summary = recover_within_unit_irregular_rate_summary(
+        &base,
+        IrregularRateEstimand::LagPairAverageV1,
+    )
+    .expect("base pair-average evidence");
+    let extended_summary = recover_within_unit_irregular_rate_summary(
+        &extended,
+        IrregularRateEstimand::LagPairAverageV1,
+    )
+    .expect("extended pair-average evidence");
+
+    assert_eq!(base_summary.admitted_pairs(), 3);
+    assert_eq!(extended_summary.admitted_pairs(), 4);
+    assert_eq!(base_summary.candidate_pairs(), 5);
+    assert_eq!(extended_summary.candidate_pairs(), 7);
+    assert_eq!(base_summary.refused_pairs(), 2);
+    assert_eq!(extended_summary.refused_pairs(), 3);
+
+    let base_pair_average = base_summary.estimate().expect("base estimate");
+    let extended_pair_average = extended_summary.estimate().expect("extended estimate");
+    assert!(
+        extended_pair_average < base_pair_average,
+        "an extra admitted ln(1/3) rate must shift the pair-weighted target toward unit two"
+    );
+    assert!(
+        (extended_pair_average - base_pair_average).abs() > 0.05,
+        "the multiplicity perturbation must remain scientifically visible"
+    );
+
+    let unit_one = f64::midpoint((2.0_f64 / 3.0).ln(), (1.0_f64 / 2.0).ln());
+    let unit_two_base = (1.0_f64 / 3.0).ln();
+    let unit_two_extended = f64::midpoint(unit_two_base, unit_two_base);
+    assert_eq!(unit_two_extended.to_bits(), unit_two_base.to_bits());
+
+    let equal_unit_base = f64::midpoint(unit_one, unit_two_base);
+    let equal_unit_extended = f64::midpoint(unit_one, unit_two_extended);
+    assert_eq!(equal_unit_extended.to_bits(), equal_unit_base.to_bits());
+}
+
+#[test]
 fn lag_pair_average_is_invariant_to_input_row_permutation() {
     let canonical = unequal_pair_count_rows();
     let shuffled = [
