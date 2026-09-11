@@ -144,10 +144,12 @@ fn balanced_follow_up_recovers_declared_pair_weighted_truth() {
 #[test]
 fn rate_associated_highly_unbalanced_follow_up_recovers_pair_weighted_truth() {
     let mut rows = Vec::with_capacity(21);
-    for (event_index, exponent) in (1..=16).rev().enumerate() {
-        rows.push(timed(1, event_index as f64, -2.0_f64.powi(exponent)));
+    let mut event_time = 0.0;
+    for exponent in (1..=16).rev() {
+        rows.push(timed(1, event_time, -2.0_f64.powi(exponent)));
+        event_time += 1.0;
     }
-    rows.push(timed(1, 16.0, 131_070.0));
+    rows.push(timed(1, event_time, 131_070.0));
     rows.extend([
         timed(2, 0.0, -27.0),
         timed(2, 1.0, -9.0),
