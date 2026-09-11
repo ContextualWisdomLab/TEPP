@@ -43,8 +43,7 @@ impl SplitMix64 {
         let high = u32::try_from(mantissa >> 32).expect("53-bit mantissa high part must fit u32");
         let low = u32::try_from(mantissa & u64::from(u32::MAX))
             .expect("53-bit mantissa low part must fit u32");
-        let unit = (f64::from(high) * 4_294_967_296.0 + f64::from(low))
-            / 9_007_199_254_740_992.0;
+        let unit = (f64::from(high) * 4_294_967_296.0 + f64::from(low)) / 9_007_199_254_740_992.0;
         2.0 * unit - 1.0
     }
 }
