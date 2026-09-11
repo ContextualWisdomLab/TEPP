@@ -145,11 +145,7 @@ fn balanced_follow_up_recovers_declared_pair_weighted_truth() {
 fn rate_associated_highly_unbalanced_follow_up_recovers_pair_weighted_truth() {
     let mut rows = Vec::with_capacity(21);
     for (event_index, exponent) in (1..=16).rev().enumerate() {
-        rows.push(timed(
-            1,
-            event_index as f64,
-            -2.0_f64.powi(exponent),
-        ));
+        rows.push(timed(1, event_index as f64, -2.0_f64.powi(exponent)));
     }
     rows.push(timed(1, 16.0, 131_070.0));
     rows.extend([
@@ -159,11 +155,9 @@ fn rate_associated_highly_unbalanced_follow_up_recovers_pair_weighted_truth() {
         timed(2, 3.0, 39.0),
     ]);
 
-    let summary = recover_within_unit_irregular_rate_summary(
-        &rows,
-        IrregularRateEstimand::LagPairAverageV1,
-    )
-    .expect("rate-associated follow-up evidence");
+    let summary =
+        recover_within_unit_irregular_rate_summary(&rows, IrregularRateEstimand::LagPairAverageV1)
+            .expect("rate-associated follow-up evidence");
 
     assert_eq!(summary.candidate_units(), 2);
     assert_eq!(summary.contributing_units(), 2);
