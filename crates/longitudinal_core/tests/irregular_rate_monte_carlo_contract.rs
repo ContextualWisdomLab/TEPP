@@ -87,11 +87,7 @@ fn append_noisy_missingness_unit(
         }
     }
 
-    rows.push(timed(
-        unit,
-        (LAST_NEGATIVE_TIME + 1) as f64,
-        -negative_sum,
-    ));
+    rows.push(timed(unit, (LAST_NEGATIVE_TIME + 1) as f64, -negative_sum));
 
     let admitted_pairs = retained_times.len() - 1;
     let pair_rate_variance_sum = retained_times
@@ -203,8 +199,7 @@ fn run_noisy_rate_associated_missingness(seed: u64) -> MonteCarloEvidence {
 
     let z_squared = Z_95 * Z_95;
     let wilson_denominator = 1.0 + z_squared / recovered;
-    let wilson_center =
-        (coverage_95 + z_squared / (2.0 * recovered)) / wilson_denominator;
+    let wilson_center = (coverage_95 + z_squared / (2.0 * recovered)) / wilson_denominator;
     let wilson_margin = Z_95
         * ((coverage_95 * (1.0 - coverage_95) / recovered)
             + z_squared / (4.0 * recovered * recovered))
