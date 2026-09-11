@@ -72,11 +72,9 @@ fn extra_admitted_pair_changes_pair_weight_without_changing_unit_target() {
         timed(2, 4.0, 4.0 / 3.0),
     ];
 
-    let base_summary = recover_within_unit_irregular_rate_summary(
-        &base,
-        IrregularRateEstimand::LagPairAverageV1,
-    )
-    .expect("base pair-average evidence");
+    let base_summary =
+        recover_within_unit_irregular_rate_summary(&base, IrregularRateEstimand::LagPairAverageV1)
+            .expect("base pair-average evidence");
     let extended_summary = recover_within_unit_irregular_rate_summary(
         &extended,
         IrregularRateEstimand::LagPairAverageV1,
