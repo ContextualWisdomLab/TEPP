@@ -1,11 +1,20 @@
 //! Mixed-sign CWC and occasion means divide by the original sample count.
 
 use longitudinal_core::{
-    EventTimedObservation, center_occasion_mean_event_lags, center_within_unit_event_lags,
+    EventTimeInterval, EventTimedObservation, LaggedWithinResidual, center_occasion_mean_event_lags,
+    center_within_unit_event_lags, recover_centered_irregular_residual_log_rate,
 };
 
 fn timed(unit: u32, event_time: f64, score: f64) -> EventTimedObservation {
     EventTimedObservation::new(unit, event_time, score)
+}
+
+fn lagged(earlier: f64, later: f64, interval: f64) -> LaggedWithinResidual {
+    LaggedWithinResidual::new(
+        earlier,
+        later,
+        EventTimeInterval::new(interval).expect("positive event interval"),
+    )
 }
 
 #[test]
@@ -70,5 +79,25 @@ fn mixed_sign_subnormal_occasion_mean_uses_the_same_single_rounding_authority() 
     assert_eq!(
         pairs[2].earlier_residual().to_bits(),
         f64::from_bits(19).to_bits()
+    );
+}
+
+#[test]
+fn repeated_small_opposite_rates_change_the_correctly_rounded_mean() {
+    let log_two = -(-0.5_f64).ln_1p();
+    let pairs = [
+        lagged(1.0, 2.0, log_two / 1.0e16_f64),
+        lagged(1.0, 0.5, log_two),
+        lagged(1.0, 0.5, log_two),
+    ];
+
+    let recovered = recover_centered_irregular_residual_log_rate(&pairs)
+        .expect("finite mixed-sign mean remains identifiable");
+    let expected = 3_333_333_333_333_332.5_f64;
+
+    assert_eq!(
+        recovered.to_bits(),
+        expected.to_bits(),
+        "two -1 rates are jointly significant and must not be rounded away one at a time against 1e16",
     );
 }
