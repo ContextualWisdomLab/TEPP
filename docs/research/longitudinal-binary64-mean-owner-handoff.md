@@ -28,6 +28,14 @@ Open fast-mlsirm PR #1536 contains relevant prior art at head `03d1e943b9f51d509
 
 The current immutable fast-mlsirm release `v0.9.1` predates `fast-mlsirm#1814`; it is not authority for this repair.
 
+## Canonical owner implementation now in review
+
+`fast-mlsirm#1816` is now the canonical implementation vehicle for #1814. At the time of this record the exact owner head is `b5fec1d33c02e8ea969405e59747f0505e690d20` on protected base `493326f2de49ea1704da0ded19868ed05d2fe00f`. It publishes the proposed contract identity `fast_mlsirm.binary64_mean@1.0.0` and implements separate signed 34×`u64` exact magnitudes in `2^-1074` units, original-count integer quotient/remainder finalization, and a single round-to-nearest-ties-to-even projection.
+
+That is a material owner-path advance, not a TEPP dependency yet. The PR is open and Ready only for check/review admission. Its repository CI, package path, native CodeQL, Semgrep, Security Scan and ClusterFuzzLite evidence are GREEN on the cited head, while the organization delegated CodeQL receipt remains RED through the known producer/consumer settlement path. The owner also identified that central `coverage-evidence` can be GREEN without producing owned Rust line/branch measurement; `.github#2099` owns that missing immutable coverage evidence. No qualifying independent submitted review is currently present, and the latest CodeRabbit review attempts were rate-limited; review prose must not be promoted to merge authority unless retrievable exact-head evidence exists.
+
+TEPP therefore keeps the public longitudinal RED unchanged. Consumer migration begins only after #1816 lands through the normal protected path and a new immutable fast-mlsirm release exposes the contract with version/tag/package, SBOM/provenance, reproducibility, rollback and real owned source coverage evidence. A mutable PR SHA is not an allowed production dependency even if its source-level arithmetic appears correct.
+
 ## Candidate exact accumulator bound
 
 A fixed-width exact accumulator is feasible without introducing a psychometric sample ceiling when the numerical API accepts an ordinary Rust slice and supported production targets have `usize <= 64` bits.
@@ -44,11 +52,9 @@ which requires 2,098 magnitude bits. For every 64-bit slice cardinality `n <= 2^
 
 `n * I_max < 2^2162`.
 
-A sign plus 2,162-bit magnitude is therefore sufficient for the exact mathematical sum over every slice representable by a 64-bit `usize`. A 34×`u64` magnitude provides 2,176 bits. This is a candidate representation invariant, not accepted implementation evidence.
+A sign plus 2,162-bit magnitude is therefore sufficient for the exact mathematical sum over every slice representable by a 64-bit `usize`. A 34×`u64` magnitude provides 2,176 bits. This representation is implemented by the current #1816 candidate but remains **Proposed** for TEPP until protected integration and immutable release acceptance complete.
 
 The mean must be rounded from the exact rational `(S / n) * 2^-1074`, not from a binary64-rounded sum. Integer quotient/remainder finalization can distinguish exact mathematical zero (`S == 0`) from a nonzero value that rounds below binary64 range and can apply round-to-nearest-ties-to-even at the final mean boundary. It also admits same-sign cases where the exact sum exceeds binary64 while the mean remains representable.
-
-The owner must compare this representation against a generalized error-free-transform/partials construction and record the selected invariant, complexity, deterministic reduction strategy, and rejection reasons.
 
 ## Rejected local repairs
 
@@ -59,7 +65,8 @@ The following are not causal acceptance:
 - pre-scaling all inputs by a large magnitude when cancellation can make a subnormal term scientifically material;
 - computing a rounded sum first and then dividing by the sample count;
 - adding a model-specific sample ceiling solely to simplify a numerical proof;
-- copying the private fast-mlsirm #1536 helpers into TEPP;
+- copying the private fast-mlsirm #1536 helpers or #1816 implementation into TEPP;
+- pinning a mutable fast-mlsirm PR/head as production authority;
 - accepting faithful or approximate behavior while documenting it as correctly rounded.
 
 ## Release and consumer acceptance
@@ -74,4 +81,4 @@ Ogita, T., Rump, S. M., & Oishi, S. (2005). Accurate sum and dot product. *SIAM 
 
 Rump, S. M., Ogita, T., & Oishi, S. (2008). Accurate floating-point summation part I: Faithful rounding. *SIAM Journal on Scientific Computing, 31*(1), 189–224. https://doi.org/10.1137/050645671
 
-These publications motivate error-free transformation and faithful summation analysis. They do not prove a future fast-mlsirm implementation or authorize TEPP production activation by themselves.
+These publications motivate error-free transformation and faithful summation analysis. They do not prove the fast-mlsirm implementation or authorize TEPP production activation by themselves.
