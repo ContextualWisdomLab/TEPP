@@ -110,8 +110,8 @@ fn zero_admissible_rates_still_return_explicit_pair_denominator() {
 fn nonrepresentable_same_sign_rate_has_its_own_failure_denominator() {
     let adjacent_one = f64::from_bits(1.0_f64.to_bits() + 1);
     let rows = [
-        timed(1, 0.0, 1.0),
-        timed(1, f64::MAX / 2.0, adjacent_one),
+        timed(1, -f64::MAX, 1.0),
+        timed(1, 0.0, adjacent_one),
         timed(1, f64::MAX, -2.0),
         timed(2, 0.0, 3.0),
         timed(2, 1.0, 1.0),
