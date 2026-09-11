@@ -340,12 +340,12 @@ pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, Longitudina
 
     loop {
         let residual = positive + negative;
-        if residual == positive && negative_index + 1 < negatives.len() {
+        if residual.to_bits() == positive.to_bits() && negative_index + 1 < negatives.len() {
             negative += negatives[negative_index + 1];
             negative_index += 1;
             continue;
         }
-        if residual == negative && positive_index + 1 < positives.len() {
+        if residual.to_bits() == negative.to_bits() && positive_index + 1 < positives.len() {
             positive += positives[positive_index + 1];
             positive_index += 1;
             continue;
