@@ -18,6 +18,8 @@ pub enum LongitudinalError {
     InvalidTemporalAssociationInput,
     /// A temporal transform input or intermediate value was not representable.
     InvalidTemporalTransformInput,
+    /// The requested irregular-rate estimand is typed but not yet activated.
+    IrregularRateEstimandUnavailable,
     /// At least one marginal variance was not strictly positive.
     NonPositiveMarginalVariance,
     /// The event-time interval was not strictly positive.
@@ -55,6 +57,9 @@ impl fmt::Display for LongitudinalError {
             Self::InvalidObservationPayload => "invalid longitudinal observation payload",
             Self::InvalidTemporalAssociationInput => "invalid temporal association input",
             Self::InvalidTemporalTransformInput => "invalid temporal transform input",
+            Self::IrregularRateEstimandUnavailable => {
+                "requested irregular-rate estimand is not yet available"
+            }
             Self::NonPositiveMarginalVariance => {
                 "temporal correlation requires strictly positive marginal variances"
             }
@@ -131,6 +136,10 @@ mod tests {
             (
                 LongitudinalError::InvalidTemporalTransformInput,
                 "invalid temporal transform input",
+            ),
+            (
+                LongitudinalError::IrregularRateEstimandUnavailable,
+                "requested irregular-rate estimand is not yet available",
             ),
             (
                 LongitudinalError::NonPositiveMarginalVariance,
