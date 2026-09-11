@@ -86,19 +86,31 @@ fn mixed_sign_subnormal_occasion_mean_uses_the_same_single_rounding_authority() 
 #[test]
 fn repeated_small_opposite_rates_change_the_correctly_rounded_mean() {
     let log_two = -(-0.5_f64).ln_1p();
-    let pairs = [
+    let expected = 3_333_333_333_333_332.5_f64;
+
+    let positive_dominant = [
         lagged(1.0, 2.0, log_two / 1.0e16_f64),
         lagged(1.0, 0.5, log_two),
         lagged(1.0, 0.5, log_two),
     ];
-
-    let recovered = recover_centered_irregular_residual_log_rate(&pairs)
-        .expect("finite mixed-sign mean remains identifiable");
-    let expected = 3_333_333_333_333_332.5_f64;
-
+    let recovered = recover_centered_irregular_residual_log_rate(&positive_dominant)
+        .expect("finite positive-dominant mixed-sign mean remains identifiable");
     assert_eq!(
         recovered.to_bits(),
         expected.to_bits(),
         "two -1 rates are jointly significant and must not be rounded away one at a time against 1e16",
+    );
+
+    let mirrored_pairs = [
+        lagged(1.0, 0.5, log_two / 1.0e16_f64),
+        lagged(1.0, 2.0, log_two),
+        lagged(1.0, 2.0, log_two),
+    ];
+    let mirrored = recover_centered_irregular_residual_log_rate(&mirrored_pairs)
+        .expect("finite mirrored mixed-sign mean remains identifiable");
+    assert_eq!(
+        mirrored.to_bits(),
+        (-expected).to_bits(),
+        "two +1 rates are jointly significant and must not be rounded away one at a time against the opposite extreme",
     );
 }
