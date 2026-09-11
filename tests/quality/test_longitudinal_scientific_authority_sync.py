@@ -53,12 +53,24 @@ def test_ownership_adr_keeps_pair_and_unit_estimands_distinct() -> None:
     assert "fail closed" in adr
 
 
-def test_irregular_rate_weighting_sources_are_in_canonical_literature_register() -> None:
-    """Keep claim-specific informative-size sources in the canonical APA register."""
+def test_irregular_rate_weighting_sources_are_doctored_in_canonical_register() -> None:
+    """Keep claim-specific informative-size sources complete enough for APA traceability."""
     literature = LITERATURE_REGISTER.read_text(encoding="utf-8")
 
-    assert "Wang, M., Kong, M., & Datta, S. (2011)." in literature
-    assert "Huang, Y. (2011)." in literature
-    assert "Kahan, B. C., Li, F., Blette, B., Jairath, V., Copas, A., & Harhay, M. O. (2023)." in literature
+    assert (
+        "Huang, Y., & Leroux, B. (2011). Informative cluster sizes for subcluster-level "
+        "covariates and weighted generalized estimating equations. *Biometrics, 67*(3), "
+        "843–851." in literature
+    )
+    assert (
+        "Kahan, B. C., Li, F., Blette, B., Jairath, V., Copas, A., & Harhay, M. O. "
+        "(2023). Informative cluster size in cluster-randomised trials: A case study from "
+        "the TRIGGER trial. *Clinical Trials, 20*(6), 661–669." in literature
+    )
+    assert (
+        "Wang, M., Kong, M., & Datta, S. (2011). Inference for marginal linear models for "
+        "clustered longitudinal data with potentially informative cluster sizes. "
+        "*Statistical Methods in Medical Research, 20*(4), 347–367." in literature
+    )
     assert "irregular-rate estimand" in literature
     assert "record multiplicity" in literature
