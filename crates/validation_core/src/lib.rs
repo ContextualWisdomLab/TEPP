@@ -12,22 +12,29 @@
 //! evidence; queued, predecessor, skipped, and LLM judgments fail closed.
 //! Metrics are pure `f64` CPU reference implementations.
 
+#[cfg(not(target_pointer_width = "64"))]
+compile_error!("validation_core production numerical execution requires a 64-bit target");
+
 mod bias;
+mod bias_se;
 mod claim;
 mod coverage;
+mod coverage_evidence;
 mod error;
 mod graph_metrics;
 mod input;
 mod matching;
 mod monte_carlo;
+mod numeric;
 mod report;
 mod rmse;
 mod temporal_order;
+mod validation_evidence;
 
-/// Standard error of mean signed bias.
-pub use bias::bias_standard_error;
 /// Mean signed bias.
 pub use bias::mean_bias;
+/// Standard error of mean signed bias.
+pub use bias_se::bias_standard_error;
 /// Four ADR 0014 claim authorities.
 pub use claim::ClaimAuthority;
 /// One evidence item offered for promotion.
@@ -48,6 +55,8 @@ pub use claim::promote_scientific_recovery;
 pub use coverage::interval_coverage;
 /// Wilson bounds for coverage proportions.
 pub use coverage::wilson_coverage_interval;
+/// Versioned Wilson coverage evidence with denominator and critical-value provenance.
+pub use coverage_evidence::WilsonCoverageEvidenceV1;
 /// Fail-closed validation errors.
 pub use error::ValidationError;
 /// Undirected edge identity.
@@ -74,3 +83,110 @@ pub use rmse::rmse_standard_error;
 pub use rmse::root_mean_square_error;
 /// Pairwise temporal-order accuracy.
 pub use temporal_order::temporal_order_accuracy;
+/// Versioned durable validation envelope binding projections to scientific provenance.
+pub use validation_evidence::ValidationEvidenceV1;
+
+#[cfg(test)]
+mod numeric_contract_tests {
+    use super::numeric::deterministic_representable_sum_over_count;
+
+    #[test]
+    fn production_pointer_width_matches_numerical_contract() {
+        assert_eq!(usize::BITS, 64);
+        assert_eq!(u128::MAX.isqrt(), usize::MAX as u128);
+    }
+
+    #[test]
+    fn expanded_subnormal_sum_preserves_original_denominator() {
+        let minimum_subnormal = f64::from_bits(1);
+        let represented =
+            deterministic_representable_sum_over_count(&[minimum_subnormal, minimum_subnormal], 1)
+                .expect("expanded subnormal sum with original denominator");
+        assert_eq!(represented.to_bits(), f64::from_bits(2).to_bits());
+    }
+
+    #[test]
+    fn same_sign_nonzero_quotient_below_binary64_range_fails_closed() {
+        let result = deterministic_representable_sum_over_count(&[f64::MIN_POSITIVE], usize::MAX);
+        assert!(matches!(result, Err(crate::ValidationError::InvalidInput)));
+    }
+
+    #[test]
+    fn mixed_sign_nonzero_quotient_below_binary64_range_fails_closed() {
+        let minimum_subnormal = f64::from_bits(1);
+        let result = deterministic_representable_sum_over_count(
+            &[f64::MIN_POSITIVE * 4.0, -minimum_subnormal],
+            usize::MAX,
+        );
+        assert!(matches!(result, Err(crate::ValidationError::InvalidInput)));
+    }
+
+    #[test]
+    fn mixed_sign_nonzero_quotient_above_binary64_range_fails_closed() {
+        let result = deterministic_representable_sum_over_count(&[f64::MAX, f64::MAX, -1.0], 1);
+        assert!(matches!(result, Err(crate::ValidationError::InvalidInput)));
+    }
+
+    #[test]
+    fn mixed_sign_tail_rounds_below_the_adjacent_midpoint() {
+        let half_ulp_at_one = 2.0_f64.powi(-53);
+        let ulp_at_one = 2.0_f64.powi(-52);
+        let represented = deterministic_representable_sum_over_count(
+            &[half_ulp_at_one, -ulp_at_one, -(1.0 + ulp_at_one)],
+            3,
+        )
+        .expect("represented mixed-sign mean");
+        assert_eq!(represented.to_bits(), 0xbfd5_5555_5555_5557);
+    }
+
+    #[test]
+    fn mixed_sign_compensation_can_resolve_to_exact_zero() {
+        let one_down = f64::from_bits(1.0_f64.to_bits() - 1);
+        let ulp_at_one = 2.0_f64.powi(-52);
+        let represented =
+            deterministic_representable_sum_over_count(&[one_down, one_down, ulp_at_one, -2.0], 4)
+                .expect("exact compensated cancellation");
+        assert_eq!(represented.to_bits(), 0);
+    }
+}
+
+#[cfg(test)]
+mod bias_standard_error_route_contract_tests {
+    use super::{ValidationError, bias_standard_error};
+
+    #[test]
+    fn admitted_exact_route_refuses_unrepresentable_quarter_subnormal_standard_error() {
+        let minimum_subnormal = f64::from_bits(1);
+        let truth = [0.0; 4];
+        let recovered = [minimum_subnormal, 0.0, 0.0, 0.0];
+
+        assert_eq!(
+            bias_standard_error(&truth, &recovered),
+            Err(ValidationError::InvalidInput)
+        );
+    }
+
+    #[test]
+    fn generic_route_past_exact_budget_refuses_unrepresentable_subnormal_standard_error() {
+        const SAMPLE_COUNT: usize = 17;
+        let minimum_subnormal = f64::from_bits(1);
+        let truth = [0.0; SAMPLE_COUNT];
+        let mut recovered = [0.0; SAMPLE_COUNT];
+        recovered[0] = minimum_subnormal;
+
+        assert_eq!(
+            bias_standard_error(&truth, &recovered),
+            Err(ValidationError::InvalidInput)
+        );
+    }
+
+    #[test]
+    fn admitted_exact_route_preserves_zero_dispersion_for_minimum_subnormal_translation() {
+        const SAMPLE_COUNT: usize = 16;
+        let minimum_subnormal = f64::from_bits(1);
+        let truth = [0.0; SAMPLE_COUNT];
+        let recovered = [minimum_subnormal; SAMPLE_COUNT];
+
+        assert_eq!(bias_standard_error(&truth, &recovered), Ok(0.0));
+    }
+}

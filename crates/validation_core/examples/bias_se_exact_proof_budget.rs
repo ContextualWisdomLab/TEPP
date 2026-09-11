@@ -1,0 +1,480 @@
+//! Reproducible integer-kernel timing and layout harness for bias-SE exact-proof budgeting.
+//!
+//! This example compares checked-integer proof kernels on deterministic dyadic
+//! coefficients: a production-layout-shaped buffered O(n²) pair proof, an
+//! allocation-free two-pass O(n²) variant, an algebraically equivalent O(n)
+//! sufficient accumulator, a two-limb wider-product O(n) reference, the existing
+//! narrow-to-pair hybrid, and a candidate narrow-to-wide-to-pair hybrid. The O(n)
+//! paths first remove the shared power-of-two unit from anchor-relative
+//! coefficients so checked-intermediate refusal is evaluated on the canonical
+//! dyadic grid rather than on an arbitrary raw integer scale. This is
+//! characterization tooling, not production admission and not buyer-path latency
+//! evidence by itself.
+
+use std::hint::black_box;
+use std::mem::size_of;
+use std::time::{Duration, Instant};
+
+#[derive(Clone, Copy)]
+struct KernelObservation {
+    aligned_pair_square_sum: u128,
+    unit_exponent: i32,
+    scratch_records: usize,
+    scratch_payload_bytes: usize,
+    used_wide_product: bool,
+    used_pairwise_fallback: bool,
+}
+
+#[derive(Clone, Copy)]
+struct Wide256 {
+    high: u128,
+    low: u128,
+}
+
+impl Wide256 {
+    fn multiply_u128(left: u128, right: u128) -> Self {
+        let mask = u128::from(u64::MAX);
+        let left_limbs = [
+            u64::try_from(left & mask).expect("masked low limb fits u64"),
+            u64::try_from(left >> 64).expect("high limb fits u64"),
+        ];
+        let right_limbs = [
+            u64::try_from(right & mask).expect("masked low limb fits u64"),
+            u64::try_from(right >> 64).expect("high limb fits u64"),
+        ];
+        let mut limbs = [0_u64; 4];
+
+        for (left_index, left_limb) in left_limbs.iter().copied().enumerate() {
+            let mut carry = 0_u128;
+            for (right_index, right_limb) in right_limbs.iter().copied().enumerate() {
+                let limb_index = left_index + right_index;
+                let accumulator = u128::from(left_limb)
+                    .checked_mul(u128::from(right_limb))
+                    .expect("64-bit limb product fits u128")
+                    .checked_add(u128::from(limbs[limb_index]))
+                    .expect("schoolbook partial sum fits u128")
+                    .checked_add(carry)
+                    .expect("schoolbook carry sum fits u128");
+                limbs[limb_index] =
+                    u64::try_from(accumulator & mask).expect("masked schoolbook limb fits u64");
+                carry = accumulator >> 64;
+            }
+            limbs[left_index + 2] =
+                u64::try_from(carry).expect("schoolbook multiplication carry fits u64");
+        }
+
+        Self {
+            high: u128::from(limbs[2]) | (u128::from(limbs[3]) << 64),
+            low: u128::from(limbs[0]) | (u128::from(limbs[1]) << 64),
+        }
+    }
+
+    fn checked_sub(self, right: Self) -> Option<Self> {
+        let (low, borrow) = self.low.overflowing_sub(right.low);
+        let high = self
+            .high
+            .checked_sub(right.high)?
+            .checked_sub(u128::from(u8::from(borrow)))?;
+        Some(Self { high, low })
+    }
+
+    fn as_u128(self) -> Option<u128> {
+        (self.high == 0).then_some(self.low)
+    }
+}
+
+type Kernel = fn(&[u128]) -> Option<KernelObservation>;
+
+fn fixture(sample_count: usize) -> Vec<u128> {
+    (0..sample_count)
+        .map(|index| {
+            let value = u128::try_from(index).expect("fixture index fits u128");
+            (value * 1_000_003 + value * value * 97 + 17) % 4_000_000_001
+        })
+        .collect()
+}
+
+fn boundary_fixture(sample_count: usize, diameter: u128) -> Vec<u128> {
+    let mut values = Vec::with_capacity(sample_count);
+    values.push(0);
+    values.extend((1..sample_count).map(|_| diameter));
+    values
+}
+
+fn multiply_by_power_of_two(value: u128, shift: u32) -> Option<u128> {
+    let factor = 1_u128.checked_shl(shift)?;
+    value.checked_mul(factor)
+}
+
+fn compact_dyadic(value: u128) -> Option<(u128, i32)> {
+    if value == 0 {
+        return None;
+    }
+    let trailing = value.trailing_zeros();
+    Some((value >> trailing, i32::try_from(trailing).ok()?))
+}
+
+fn accumulate_aligned_pair_square_sum(
+    records: impl IntoIterator<Item = Option<(u128, i32)>>,
+    unit_exponent: i32,
+) -> Option<u128> {
+    let mut sum = 0_u128;
+    for (significand, exponent) in records.into_iter().flatten() {
+        let shift = exponent.checked_sub(unit_exponent)?.unsigned_abs();
+        let coefficient = multiply_by_power_of_two(significand, shift)?;
+        sum = sum.checked_add(coefficient.checked_mul(coefficient)?)?;
+    }
+    Some(sum)
+}
+
+fn pair_square_sum_quadratic_buffered(values: &[u128]) -> Option<KernelObservation> {
+    let pair_count = values
+        .len()
+        .checked_mul(values.len().checked_sub(1)?)?
+        .checked_div(2)?;
+    let mut records: Vec<Option<(u128, i32)>> = Vec::with_capacity(pair_count);
+    let mut unit_exponent = i32::MAX;
+    for left in 0..values.len() {
+        for right in left + 1..values.len() {
+            let record = compact_dyadic(values[left].abs_diff(values[right]));
+            if let Some((_, exponent)) = record {
+                unit_exponent = unit_exponent.min(exponent);
+            }
+            records.push(record);
+        }
+    }
+    let scratch_records = records.capacity();
+    let scratch_payload_bytes = scratch_records.checked_mul(size_of::<Option<(u128, i32)>>())?;
+    if unit_exponent == i32::MAX {
+        return Some(KernelObservation {
+            aligned_pair_square_sum: 0,
+            unit_exponent: 0,
+            scratch_records,
+            scratch_payload_bytes,
+            used_wide_product: false,
+            used_pairwise_fallback: false,
+        });
+    }
+    let aligned_pair_square_sum = accumulate_aligned_pair_square_sum(records, unit_exponent)?;
+    Some(KernelObservation {
+        aligned_pair_square_sum,
+        unit_exponent,
+        scratch_records,
+        scratch_payload_bytes,
+        used_wide_product: false,
+        used_pairwise_fallback: false,
+    })
+}
+
+fn pair_square_sum_quadratic_two_pass(values: &[u128]) -> Option<KernelObservation> {
+    let mut unit_exponent = i32::MAX;
+    for left in 0..values.len() {
+        for right in left + 1..values.len() {
+            if let Some((_, exponent)) = compact_dyadic(values[left].abs_diff(values[right])) {
+                unit_exponent = unit_exponent.min(exponent);
+            }
+        }
+    }
+    if unit_exponent == i32::MAX {
+        return Some(KernelObservation {
+            aligned_pair_square_sum: 0,
+            unit_exponent: 0,
+            scratch_records: 0,
+            scratch_payload_bytes: 0,
+            used_wide_product: false,
+            used_pairwise_fallback: false,
+        });
+    }
+
+    let records = (0..values.len()).flat_map(|left| {
+        (left + 1..values.len())
+            .map(move |right| compact_dyadic(values[left].abs_diff(values[right])))
+    });
+    let aligned_pair_square_sum = accumulate_aligned_pair_square_sum(records, unit_exponent)?;
+    Some(KernelObservation {
+        aligned_pair_square_sum,
+        unit_exponent,
+        scratch_records: 0,
+        scratch_payload_bytes: 0,
+        used_wide_product: false,
+        used_pairwise_fallback: false,
+    })
+}
+
+fn normalized_linear_terms(values: &[u128]) -> Option<(u128, u128, u32)> {
+    let minimum = *values.iter().min()?;
+    let common_shift = values
+        .iter()
+        .filter_map(|value| {
+            let coefficient = value.checked_sub(minimum)?;
+            (coefficient != 0).then_some(coefficient.trailing_zeros())
+        })
+        .min()
+        .unwrap_or(0);
+
+    let mut coefficient_sum = 0_u128;
+    let mut square_sum = 0_u128;
+    for value in values {
+        let coefficient = value.checked_sub(minimum)? >> common_shift;
+        coefficient_sum = coefficient_sum.checked_add(coefficient)?;
+        square_sum = square_sum.checked_add(coefficient.checked_mul(coefficient)?)?;
+    }
+    Some((coefficient_sum, square_sum, common_shift))
+}
+
+fn pair_square_sum_linear(values: &[u128]) -> Option<KernelObservation> {
+    let sample_count = u128::try_from(values.len()).ok()?;
+    let (coefficient_sum, square_sum, common_shift) = normalized_linear_terms(values)?;
+    let pair_square_sum = sample_count
+        .checked_mul(square_sum)?
+        .checked_sub(coefficient_sum.checked_mul(coefficient_sum)?)?;
+    Some(KernelObservation {
+        aligned_pair_square_sum: pair_square_sum,
+        unit_exponent: i32::try_from(common_shift).ok()?,
+        scratch_records: 0,
+        scratch_payload_bytes: 0,
+        used_wide_product: false,
+        used_pairwise_fallback: false,
+    })
+}
+
+fn pair_square_sum_linear_wide_product(values: &[u128]) -> Option<KernelObservation> {
+    let sample_count = u128::try_from(values.len()).ok()?;
+    let (coefficient_sum, square_sum, common_shift) = normalized_linear_terms(values)?;
+    let pair_square_sum = Wide256::multiply_u128(sample_count, square_sum)
+        .checked_sub(Wide256::multiply_u128(coefficient_sum, coefficient_sum))?
+        .as_u128()?;
+    Some(KernelObservation {
+        aligned_pair_square_sum: pair_square_sum,
+        unit_exponent: i32::try_from(common_shift).ok()?,
+        scratch_records: 0,
+        scratch_payload_bytes: 0,
+        used_wide_product: true,
+        used_pairwise_fallback: false,
+    })
+}
+
+fn pair_square_sum_hybrid(values: &[u128]) -> Option<KernelObservation> {
+    if let Some(observation) = pair_square_sum_linear(values) {
+        return Some(observation);
+    }
+    let mut observation = pair_square_sum_quadratic_buffered(values)?;
+    observation.used_pairwise_fallback = true;
+    Some(observation)
+}
+
+fn pair_square_sum_wide_hybrid(values: &[u128]) -> Option<KernelObservation> {
+    if let Some(observation) = pair_square_sum_linear(values) {
+        return Some(observation);
+    }
+    if let Some(observation) = pair_square_sum_linear_wide_product(values) {
+        return Some(observation);
+    }
+    let mut observation = pair_square_sum_quadratic_buffered(values)?;
+    observation.used_pairwise_fallback = true;
+    Some(observation)
+}
+
+fn restored_pair_square_sum(observation: KernelObservation) -> Option<u128> {
+    let shift = observation.unit_exponent.checked_mul(2)?.unsigned_abs();
+    multiply_by_power_of_two(observation.aligned_pair_square_sum, shift)
+}
+
+fn percentile_95(mut durations: Vec<Duration>) -> Duration {
+    durations.sort_unstable();
+    let rank = durations.len().saturating_mul(95).div_ceil(100);
+    durations[rank.saturating_sub(1)]
+}
+
+fn measure(values: &[u128], samples: usize, kernel: Kernel) -> (Duration, KernelObservation) {
+    for _ in 0..3 {
+        black_box(kernel(black_box(values)).expect("fixture must remain within u128"));
+    }
+    let mut durations = Vec::with_capacity(samples);
+    for _ in 0..samples {
+        let started = Instant::now();
+        black_box(kernel(black_box(values)).expect("fixture must remain within u128"));
+        durations.push(started.elapsed());
+    }
+    let observation = kernel(values).expect("fixture must remain within u128");
+    (percentile_95(durations), observation)
+}
+
+fn emit(
+    geometry: &str,
+    sample_count: usize,
+    kernel_name: &str,
+    p95: Duration,
+    samples: usize,
+    observation: KernelObservation,
+) {
+    println!(
+        "{geometry},{sample_count},{kernel_name},{},{samples},{},{},{},{},{},{}",
+        p95.as_nanos(),
+        observation.unit_exponent,
+        observation.scratch_records,
+        observation.scratch_payload_bytes,
+        size_of::<Option<(u128, i32)>>(),
+        observation.used_wide_product,
+        observation.used_pairwise_fallback
+    );
+}
+
+#[derive(Clone, Copy)]
+enum NarrowHybridRoute {
+    Linear,
+    PairwiseFallback,
+}
+
+#[derive(Clone, Copy)]
+enum WideHybridRoute {
+    Linear,
+    WideProduct,
+}
+
+fn assert_and_measure_geometry(
+    geometry: &str,
+    values: &[u128],
+    samples: usize,
+    expected_narrow_route: NarrowHybridRoute,
+    expected_wide_route: WideHybridRoute,
+) {
+    let expect_linear_admission = matches!(expected_narrow_route, NarrowHybridRoute::Linear);
+    assert_eq!(
+        matches!(expected_wide_route, WideHybridRoute::Linear),
+        expect_linear_admission,
+        "narrow and wide hybrids must agree on direct linear admission"
+    );
+    let buffered = pair_square_sum_quadratic_buffered(values)
+        .expect("buffered quadratic result stays within u128");
+    let two_pass = pair_square_sum_quadratic_two_pass(values)
+        .expect("two-pass quadratic result stays within u128");
+    let wide_product = pair_square_sum_linear_wide_product(values)
+        .expect("wider-product linear reference stays within its declared budget");
+    let hybrid = pair_square_sum_hybrid(values).expect("hybrid result stays within u128");
+    let wide_hybrid = pair_square_sum_wide_hybrid(values)
+        .expect("narrow-wide-pair hybrid result stays within u128");
+    let exact_pair_square_sum = restored_pair_square_sum(buffered)
+        .expect("buffered result restores to exact pair-square sum");
+    assert_eq!(
+        restored_pair_square_sum(two_pass),
+        Some(exact_pair_square_sum),
+        "quadratic kernels must agree"
+    );
+    assert_eq!(
+        restored_pair_square_sum(wide_product),
+        Some(exact_pair_square_sum),
+        "wider-product linear reference must preserve the exact pair numerator"
+    );
+    assert_eq!(
+        restored_pair_square_sum(hybrid),
+        Some(exact_pair_square_sum),
+        "narrow-pair hybrid must preserve the exact pair numerator"
+    );
+    assert_eq!(
+        restored_pair_square_sum(wide_hybrid),
+        Some(exact_pair_square_sum),
+        "narrow-wide-pair hybrid must preserve the exact pair numerator"
+    );
+    assert_eq!(
+        hybrid.used_pairwise_fallback,
+        matches!(expected_narrow_route, NarrowHybridRoute::PairwiseFallback),
+        "narrow-pair fallback observation must match the declared geometry"
+    );
+    assert_eq!(
+        wide_hybrid.used_wide_product,
+        matches!(expected_wide_route, WideHybridRoute::WideProduct),
+        "wide-route observation must match the declared geometry"
+    );
+    assert!(
+        !wide_hybrid.used_pairwise_fallback,
+        "wide-hybrid pair fallback is outside the measured proof-budget geometries"
+    );
+
+    match pair_square_sum_linear(values) {
+        Some(linear) => {
+            assert!(expect_linear_admission, "linear admission was not expected");
+            assert_eq!(
+                restored_pair_square_sum(linear),
+                Some(exact_pair_square_sum),
+                "linear identity must agree with pair reference"
+            );
+        }
+        None => assert!(!expect_linear_admission, "linear refusal was not expected"),
+    }
+
+    let mut kernels: Vec<(&str, Kernel)> = vec![
+        ("quadratic_buffered", pair_square_sum_quadratic_buffered),
+        ("quadratic_two_pass", pair_square_sum_quadratic_two_pass),
+        (
+            "linear_wide_product_reference",
+            pair_square_sum_linear_wide_product,
+        ),
+        ("hybrid_narrow_pair", pair_square_sum_hybrid),
+        ("hybrid_narrow_wide_pair", pair_square_sum_wide_hybrid),
+    ];
+    if expect_linear_admission {
+        kernels.push(("linear", pair_square_sum_linear));
+    }
+    for (kernel_name, kernel) in kernels {
+        let (p95, observation) = measure(values, samples, kernel);
+        emit(
+            geometry,
+            values.len(),
+            kernel_name,
+            p95,
+            samples,
+            observation,
+        );
+    }
+}
+
+fn main() {
+    let samples = std::env::args()
+        .nth(1)
+        .and_then(|value| value.parse::<usize>().ok())
+        .unwrap_or(25)
+        .max(1);
+
+    println!(
+        "geometry,sample_count,kernel,p95_ns,timing_samples,unit_exponent,scratch_records,scratch_payload_bytes,pair_record_size_bytes,used_wide_product,used_pairwise_fallback"
+    );
+    for sample_count in [16_usize, 64, 256, 1_024, 2_047] {
+        let values = fixture(sample_count);
+        assert_and_measure_geometry(
+            "compact_admit",
+            &values,
+            samples,
+            NarrowHybridRoute::Linear,
+            WideHybridRoute::Linear,
+        );
+    }
+
+    let power_of_two_values = boundary_fixture(65, 1_u128 << 58);
+    assert_and_measure_geometry(
+        "power_of_two_normalized_admit",
+        &power_of_two_values,
+        samples,
+        NarrowHybridRoute::Linear,
+        WideHybridRoute::Linear,
+    );
+
+    let odd_diameter = (1_u128 << 58) + 1;
+    let odd_64 = boundary_fixture(64, odd_diameter);
+    assert_and_measure_geometry(
+        "odd_boundary_admit",
+        &odd_64,
+        samples,
+        NarrowHybridRoute::Linear,
+        WideHybridRoute::Linear,
+    );
+
+    let odd_65 = boundary_fixture(65, odd_diameter);
+    assert_and_measure_geometry(
+        "odd_boundary_wide_recovery",
+        &odd_65,
+        samples,
+        NarrowHybridRoute::PairwiseFallback,
+        WideHybridRoute::WideProduct,
+    );
+}

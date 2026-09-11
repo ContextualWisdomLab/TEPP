@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import stat
-import sys
 import tempfile
 import unittest
 import unittest.mock
@@ -288,15 +287,8 @@ class PrepareAgentPrMessageHardeningTests(unittest.TestCase):
                 str(body),
             ],
         ):
-            loaded_module = sys.modules.pop("scripts.prepare_agent_pr_message", None)
-            try:
-                with self.assertRaises(SystemExit) as raised:
-                    runpy.run_module(
-                        "scripts.prepare_agent_pr_message", run_name="__main__"
-                    )
-            finally:
-                if loaded_module is not None:
-                    sys.modules["scripts.prepare_agent_pr_message"] = loaded_module
+            with self.assertRaises(SystemExit) as raised:
+                runpy.run_module("scripts.prepare_agent_pr_message", run_name="__main__")
             self.assertEqual(raised.exception.code, 0)
 
     def test_read_without_nofollow_flag_when_unavailable(self) -> None:

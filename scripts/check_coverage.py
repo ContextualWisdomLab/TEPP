@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from functools import cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -61,7 +62,6 @@ def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int
     ):
         raise ValueError("coverage JSON branch counts must be non-negative integers")
     return coordinates, true_count, false_count
-
 
 
 def is_live_sqlx_transport_source(filename: str) -> bool:
@@ -186,6 +186,34 @@ def resolve_repository_source_path(source_path: str, repository_root: Path) -> P
     return resolved
 
 
+@cache
+def _read_source_lines(path: Path) -> list[str]:
+    """Read one source snapshot for authored-line classification."""
+
+    return path.read_text(encoding="utf-8").splitlines()
+
+
+@cache
+def _cfg_test_module_line_numbers_for_path(path: Path) -> frozenset[int]:
+    """Return one cached cfg(test) classification snapshot for *path*."""
+
+    return frozenset(_cfg_test_module_line_numbers(_read_source_lines(path)))
+
+
+@cache
+def _cfg_not_feature_line_numbers_for_path(path: Path) -> frozenset[int]:
+    """Return one cached cfg(not(feature)) classification snapshot for *path*."""
+
+    return frozenset(_cfg_not_feature_line_numbers(_read_source_lines(path)))
+
+
+@cache
+def _multiline_data_line_numbers_for_path(path: Path) -> frozenset[int]:
+    """Return one cached multiline data/comment classification for *path*."""
+
+    return frozenset(_multiline_data_line_numbers(_read_source_lines(path)))
+
+
 def is_executable_source_line(
     source_path: str,
     line_number: int,
@@ -203,25 +231,28 @@ def is_executable_source_line(
     root (same fail-closed rule as LCOV ``SF:`` loading).
     """
 
+    if repository_root is None:
+        _read_source_lines.cache_clear()
+        _cfg_test_module_line_numbers_for_path.cache_clear()
+        _cfg_not_feature_line_numbers_for_path.cache_clear()
+        _multiline_data_line_numbers_for_path.cache_clear()
     try:
         path = (
             resolve_repository_source_path(source_path, repository_root)
             if repository_root is not None
             else Path(source_path)
         )
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = _read_source_lines(path)
     except OSError:
         return True
     # Stale LCOV rows past EOF are instrumentation noise, not production gaps.
     if line_number <= 0 or line_number > len(lines):
         return False
-    if line_number in _cfg_test_module_line_numbers(lines):
+    if line_number in _cfg_test_module_line_numbers_for_path(path):
         return False
-    if _line_in_cfg_not_feature_block(lines, line_number):
+    if line_number in _cfg_not_feature_line_numbers_for_path(path):
         return False
-    if _line_in_multiline_string_literal(lines, line_number):
-        return False
-    if _line_in_multiline_string(lines, line_number):
+    if line_number in _multiline_data_line_numbers_for_path(path):
         return False
     text = lines[line_number - 1].strip()
     if not text:
@@ -352,106 +383,10 @@ def _is_structural_comma_continuation(
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
-    """Return whether a source line is only a continuation of a string literal.
+    """Delegate legacy callers to the authoritative multiline-data classifier."""
 
-    LLVM assigns one line location to a multi-line SQL or JSON literal, while
-    LCOV can still emit zero-count records for its continuation lines. Those
-    bytes are data, not independently executable Rust statements. Rust comments,
-    character literals, and raw-string delimiters are ignored while finding the
-    literal so embedded quote characters cannot hide later production lines.
-    """
+    return _line_in_multiline_string_literal(lines, line_number)
 
-    in_string = False
-    block_comment_depth = 0
-    raw_hashes: int | None = None
-    for index, line in enumerate(lines, start=1):
-        if index == line_number and (in_string or block_comment_depth > 0):
-            return True
-        stripped = line.strip()
-        started_literal = False
-        escaped = False
-        position = 0
-        while position < len(line):
-            if raw_hashes is not None:
-                if line[position] == '"' and line[position + 1 :].startswith(
-                    "#" * raw_hashes
-                ):
-                    position += raw_hashes + 1
-                    raw_hashes = None
-                    in_string = False
-                else:
-                    position += 1
-                continue
-            if in_string:
-                character = line[position]
-                if character == '"' and not escaped:
-                    in_string = False
-                elif character == "\\" and not escaped:
-                    escaped = True
-                else:
-                    escaped = False
-                position += 1
-                continue
-            if block_comment_depth:
-                if line.startswith("/*", position):
-                    block_comment_depth += 1
-                    position += 2
-                elif line.startswith("*/", position):
-                    block_comment_depth -= 1
-                    position += 2
-                else:
-                    position += 1
-                continue
-            if line.startswith("/*", position):
-                block_comment_depth = 1
-                position += 2
-                continue
-            if line.startswith("//", position):
-                break
-            if line[position] == "'":
-                char_start = position
-                position += 1
-                char_escaped = False
-                closed_char = False
-                while position < len(line):
-                    character = line[position]
-                    position += 1
-                    if character == "'" and not char_escaped:
-                        closed_char = True
-                        break
-                    char_escaped = character == "\\" and not char_escaped
-                    if character != "\\":
-                        char_escaped = False
-                if not closed_char:
-                    position = char_start + 1
-                continue
-            raw_prefix = None
-            for prefix in ("br", "r"):
-                if line.startswith(prefix, position):
-                    cursor = position + len(prefix)
-                    while cursor < len(line) and line[cursor] == "#":
-                        cursor += 1
-                    if cursor < len(line) and line[cursor] == '"':
-                        raw_prefix = (len(prefix), cursor - position - len(prefix))
-                        break
-            if raw_prefix is not None:
-                prefix_length, hash_count = raw_prefix
-                raw_hashes = hash_count
-                in_string = True
-                started_literal = True
-                position += prefix_length + hash_count + 1
-                continue
-            if line[position] == '"':
-                in_string = True
-                started_literal = True
-            position += 1
-        if index == line_number:
-            if block_comment_depth > 0 or stripped.startswith("/*") and stripped.endswith("*/"):
-                return True
-            return in_string and started_literal and stripped.startswith(
-                ('"', "r\"", "r#", "br\"", "br#")
-            )
-    return False
 
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""
@@ -534,13 +469,10 @@ def _cfg_test_module_line_numbers(lines: list[str]) -> set[int]:
     return test_lines
 
 
-def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
-    """Return True when *line_number* is inside ``#[cfg(not(feature = ...))]`` code.
+def _cfg_not_feature_line_numbers(lines: list[str]) -> set[int]:
+    """Return lines inside ``#[cfg(not(feature = ...))]`` blocks."""
 
-    Workspace CI builds with ``--all-features``, so these inactive alternatives
-    must not fail the authored-line gate when LLVM still emits zero DA rows.
-    """
-
+    excluded_lines: set[int] = set()
     index = 0
     while index < len(lines):
         stripped = lines[index].strip()
@@ -553,30 +485,35 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
                 depth += raw.count("{") - raw.count("}")
                 if "{" in raw:
                     started = True
-                if cursor + 1 == line_number:
-                    return True
+                excluded_lines.add(cursor + 1)
                 if started and depth <= 0:
                     break
                 cursor += 1
             index = cursor + 1
             continue
         index += 1
-    return False
+    return excluded_lines
 
 
-def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
-    """Return whether a line is inside a Rust string continuation.
+def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
+    """Return True when *line_number* is inside ``#[cfg(not(feature = ...))]`` code.
 
-    The scanner tracks normal strings, raw strings, block comments, and character
-    literals so quotes in comments or literal contents cannot change the state of
-    a later source line.
+    Workspace CI builds with ``--all-features``, so these inactive alternatives
+    must not fail the authored-line gate when LLVM still emits zero DA rows.
     """
 
+    return line_number in _cfg_not_feature_line_numbers(lines)
+
+
+def _multiline_data_line_numbers(lines: list[str]) -> set[int]:
+    """Return lines that contain only multiline literal or block-comment data."""
+
+    data_lines: set[int] = set()
     in_string = False
     raw_hashes: int | None = None
     block_comment_depth = 0
     for index, raw in enumerate(lines, start=1):
-        target_continuation = (in_string or raw_hashes is not None) and index == line_number
+        target_data = in_string or raw_hashes is not None or block_comment_depth > 0
         target_closing_cursor: int | None = None
         target_has_executable_suffix = False
         cursor = 0
@@ -588,6 +525,12 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                 elif raw.startswith("*/", cursor):
                     block_comment_depth -= 1
                     cursor += 2
+                    if (
+                        target_data
+                        and block_comment_depth == 0
+                        and target_closing_cursor is None
+                    ):
+                        target_closing_cursor = cursor
                 else:
                     cursor += 1
                 continue
@@ -599,7 +542,7 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                 else:
                     raw_hashes = None
                     cursor = closing + len(delimiter)
-                    if target_continuation and target_closing_cursor is None:
+                    if target_data and target_closing_cursor is None:
                         target_closing_cursor = cursor
                 continue
             if in_string:
@@ -609,7 +552,7 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                 elif character == '"':
                     in_string = False
                     cursor += 1
-                    if target_continuation and target_closing_cursor is None:
+                    if target_data and target_closing_cursor is None:
                         target_closing_cursor = cursor
                 else:
                     cursor += 1
@@ -620,19 +563,25 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
             if raw.startswith("//", cursor):
                 break
             if raw.startswith("/*", cursor):
+                if not target_data and not raw[:cursor].strip():
+                    target_data = True
                 block_comment_depth += 1
                 cursor += 2
                 continue
-            if target_continuation and target_closing_cursor is not None:
+            if target_data and target_closing_cursor is not None:
                 if raw[cursor] in ",;)]}":
                     cursor += 1
                     continue
                 target_has_executable_suffix = True
             raw_start = _raw_string_start(raw, cursor)
             if raw_start is not None:
+                if not target_data and not raw[:cursor].strip():
+                    target_data = True
                 raw_hashes, cursor = raw_start
                 continue
             if raw[cursor] == '"':
+                if not target_data and not raw[:cursor].strip():
+                    target_data = True
                 in_string = True
                 cursor += 1
                 continue
@@ -642,11 +591,17 @@ def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> boo
                     cursor = character_end
                     continue
             cursor += 1
-        if target_continuation:
-            if target_closing_cursor is None:
-                return True
-            return not target_has_executable_suffix
-    return False
+        if target_data and (
+            target_closing_cursor is None or not target_has_executable_suffix
+        ):
+            data_lines.add(index)
+    return data_lines
+
+
+def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
+    """Return whether a line is only multiline string or block-comment data."""
+
+    return line_number in _multiline_data_line_numbers(lines)
 
 
 def _raw_string_start(line: str, cursor: int) -> tuple[int, int] | None:
@@ -702,6 +657,10 @@ def load_lcov_line_totals(
     """Load authored source-line totals from a fully framed LLVM LCOV report."""
 
     root = (repository_root or Path.cwd()).resolve()
+    _read_source_lines.cache_clear()
+    _cfg_test_module_line_numbers_for_path.cache_clear()
+    _cfg_not_feature_line_numbers_for_path.cache_clear()
+    _multiline_data_line_numbers_for_path.cache_clear()
     source_path: str | None = None
     line_counts: dict[tuple[str, int], int] = {}
     for raw_line in path.read_text(encoding="utf-8").splitlines():

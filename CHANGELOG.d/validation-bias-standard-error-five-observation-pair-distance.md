@@ -1,0 +1,2 @@
+- Validation Evidence now admits the exact pair-distance identity for bounded five-observation mean-bias standard errors when every represented residual and pairwise difference is proven exact and the reduced dyadic ratio fits the existing `u128` midpoint proof.
+- This prevents the translated floating moment/`sqrt` fallback from moving an exact represented-input five-observation standard error by one ULP while preserving fail-closed fallback outside the bounded proof.
