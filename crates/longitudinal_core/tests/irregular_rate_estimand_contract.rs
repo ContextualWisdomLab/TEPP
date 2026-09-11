@@ -176,8 +176,7 @@ fn run_rate_associated_missingness_recovery(seed: u64) -> MissingnessRecoveryEvi
         (first_quarter_squared_error_sum / FIRST_QUARTER_REPLICATES_F64).sqrt();
     let recovery_coverage = covered_mass / REPLICATES_F64;
     let variance_numerator = (squared_error_sum - REPLICATES_F64 * bias * bias).max(0.0);
-    let bias_standard_error =
-        (variance_numerator / (REPLICATES_F64 - 1.0) / REPLICATES_F64).sqrt();
+    let bias_standard_error = (variance_numerator / (REPLICATES_F64 - 1.0) / REPLICATES_F64).sqrt();
 
     let z = 1.96_f64;
     let z_squared = z * z;
