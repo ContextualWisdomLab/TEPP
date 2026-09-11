@@ -38,6 +38,8 @@ fn lag_pair_average_reports_estimand_and_failure_denominators() {
     assert_eq!(summary.contributing_units(), 2);
     assert_eq!(summary.candidate_pairs(), 5);
     assert_eq!(summary.admitted_pairs(), 3);
+    assert_eq!(summary.sign_or_zero_refused_pairs(), 2);
+    assert_eq!(summary.nonrepresentable_rate_refused_pairs(), 0);
     assert_eq!(summary.refused_pairs(), 2);
     assert_eq!(
         summary.admitted_pairs() + summary.refused_pairs(),
@@ -103,6 +105,8 @@ fn zero_admissible_rates_still_return_explicit_pair_denominator() {
     assert_eq!(summary.contributing_units(), 0);
     assert_eq!(summary.candidate_pairs(), 2);
     assert_eq!(summary.admitted_pairs(), 0);
+    assert_eq!(summary.sign_or_zero_refused_pairs(), 2);
+    assert_eq!(summary.nonrepresentable_rate_refused_pairs(), 0);
     assert_eq!(summary.refused_pairs(), 2);
 }
 
