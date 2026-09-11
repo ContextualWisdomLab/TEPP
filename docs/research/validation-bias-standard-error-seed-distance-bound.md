@@ -2,13 +2,13 @@
 
 ## Status and scope
 
-This note turns the bounded-rounder review finding in #488 into repository-owned numerical derivation evidence. It analyzes only the seed used by `correctly_rounded_scaled_sqrt_ratio` in `crates/validation_core/src/bias_se.rs` at parent exact head `a063bd238ce838ea28e40e14151aeed8ea05cc2a`:
+This note turns the bounded-rounder review finding in #488 into repository-owned numerical derivation evidence. It analyzes the seed used by `correctly_rounded_scaled_sqrt_ratio` in `crates/validation_core/src/bias_se.rs`; the derivation originated at parent exact head `a063bd238ce838ea28e40e14151aeed8ea05cc2a` and now governs the fixed exact-correction structure on #488.
 
 ```text
 ((numerator as f64) / (denominator as f64)).sqrt() * 2^unit_exponent
 ```
 
-The exact dyadic-square and midpoint comparisons remain the acceptance authority. This derivation does not authorize replacing them with the seed, returning an unchecked candidate, weakening the fail-closed exits, or claiming production coverage GREEN. Its purpose is narrower: establish a conservative upper bound on how far a finite positive seed can start from the correctly rounded finite binary64 result under the function's existing admission preconditions.
+The exact dyadic-square and midpoint comparisons remain the acceptance authority. The floating seed is never numerical authority by itself. Its role is only to start a bounded exact correction whose current admitted input contract is proved below.
 
 ## Preconditions owned by the current implementation
 
@@ -53,11 +53,9 @@ Hence
 
 `|z / r - 1| <= alpha = 2u + u^2`.
 
-For any positive normal binary64 neighborhood, the smaller adjacent spacing is at least `u` times the real magnitude. Therefore the unscaled seed differs from the exact root by strictly less than
+For a positive normal binary64 binade, adjacent spacing is at least one unit-roundoff times the lower binade boundary; crossing a power-of-two boundary introduces only the single half-width predecessor interval. Applying the envelope to that boundary separately gives the same conservative conclusion: the rounded seed cannot start three represented neighbors away from the correctly rounded root. Away from that boundary, the usual local-spacing argument gives the same strict `< 3` result directly.
 
-`alpha / u = 2 + u < 3`
-
-local adjacent spacings. This is deliberately conservative; it is sufficient for the bounded-control-flow argument and does not depend on a statistical or empirical search.
+This bound is deliberately conservative; it is sufficient for the bounded-control-flow argument and does not depend on a statistical or empirical search.
 
 ## Power-of-two restoration and the normal/subnormal boundary
 
@@ -75,25 +73,21 @@ If either the real scaled seed or the exact target is subnormal while the other 
 
 The final round-to-nearest multiplication can add at most `eta/2`, and the correctly rounded finite target is at most `eta/2` from `t`. Consequently the produced positive candidate is still strictly fewer than three subnormal grid steps from the correctly rounded finite result. The same conclusion holds when both `s` and `t` are subnormal.
 
-The endpoint refusals stay separate from this theorem. If restoration produces represented zero, the implementation refuses the non-positive seed. If movement from the largest finite value would require an infinite neighbor, the implementation refuses that neighbor. Neither case can reach the terminal four-pass fallthrough.
+The endpoint refusals stay separate from this theorem. If restoration produces represented zero, the implementation refuses the non-positive seed. If movement from the largest finite value would require an infinite neighbor, the exact correction helper refuses that neighbor. Those are representability boundaries, not correction-budget exhaustion.
 
-## Consequence for the current correction loop
+## Consequence for the current correction algorithm
 
-Each loop pass compares the exact represented candidate square with the exact rational target. If unequal, it chooses the unique adjacent finite neighbor in the target direction and compares the exact midpoint square. The pass either:
+One exact correction application compares the represented candidate square with the exact rational target. If they differ, it selects the unique adjacent finite neighbor in the target direction and compares the exact midpoint square. The application then either keeps the candidate or advances exactly one represented neighbor; on a midpoint tie it applies roundTiesToEven. Once a candidate is correctly rounded, applying the same exact correction again is idempotent.
 
-1. returns the candidate because it is already on the correct side of the midpoint;
-2. returns the neighbor for a roundTiesToEven midpoint tie; or
-3. advances by exactly one adjacent binary64 value toward the correctly rounded result.
+The seed-distance result rules out an initial separation of three or more represented neighbors from the correctly rounded finite result. Therefore three fixed applications of the exact correction are total on the admitted finite-result domain: at most two applications can advance, and the remaining application is idempotent at the correctly rounded result. This is the executable resource bound used by `correctly_rounded_scaled_sqrt_ratio`.
 
-The seed-distance result above rules out an initial separation of three or more representable neighbors from the correctly rounded finite result. Therefore at most two neighbor-advance passes are required; the following pass performs the final exact-square/midpoint decision. The existing four-pass loop is conservative by at least one pass on the admitted finite-result domain.
-
-This establishes a repository-owned derivation for the prior independent-review claim. It does **not** by itself remove `bias_se.rs`'s final fail-closed `None`. Source simplification is a separate product decision: before removing or restructuring that exit, TEPP must encode the theorem's assumptions as executable contract evidence, rerun exact-head line/branch coverage, and obtain independent review of the implementation change. Until then, the terminal refusal remains future-contract defense rather than a coverage exclusion.
+There is consequently no separate production "correction budget exhausted" state under the current contract. Retaining such a terminal state would encode scientifically unreachable production behavior and conflict with TEPP's owned-production 100% coverage contract. If a future change widens the numerator, denominator, unit, seed, or restoration domain, the widening must update this derivation and the executable bound in the same change; it may not silently rely on the present theorem.
 
 ## Alternatives considered
 
-Increasing the iteration count is rejected because it weakens neither the proof obligation nor the coverage obligation and would make a bounded algorithm less precise about its actual arithmetic envelope. An unbounded correction loop is rejected because a numerical proof path must preserve a finite resource bound. Returning the last candidate after four passes is rejected because it would convert proof exhaustion into unchecked numerical authority. Replacing the exact midpoint logic with an LLM or empirical search is outside the Validation Evidence contract.
+Increasing the iteration count is rejected because it weakens neither the proof obligation nor the coverage obligation and would make a bounded algorithm less precise about its actual arithmetic envelope. An unbounded correction loop is rejected because a numerical proof path must preserve a finite resource bound. Returning an unchecked seed or unchecked last candidate is rejected because it would convert approximation into numerical authority. Replacing the exact midpoint logic with an LLM or empirical search is outside the Validation Evidence contract.
 
-A direct integer/rational square-root rounding implementation could eliminate dependence on a floating seed altogether, but it is a larger arithmetic change. The present derivation is the minimal evidence needed to decide whether the existing exact-comparison design can be simplified without changing its scientific target.
+A direct integer/rational square-root rounding implementation could eliminate dependence on a floating seed altogether, but it is a larger arithmetic change. The current design instead uses the floating result only as a bounded starting point and makes every correction decision with exact dyadic-square and midpoint comparisons.
 
 ## Traceability
 
@@ -102,11 +96,12 @@ A direct integer/rational square-root rounding implementation could eliminate de
 | Domain owner | TEPP Validation Evidence |
 | Systemic issue | #491 |
 | Landing vehicle | #488 |
-| Parent exact source | `a063bd238ce838ea28e40e14151aeed8ea05cc2a` |
+| Derivation parent | `a063bd238ce838ea28e40e14151aeed8ea05cc2a` |
 | Production function | `crates/validation_core/src/bias_se.rs::correctly_rounded_scaled_sqrt_ratio` |
+| Exact correction helper | `crates/validation_core/src/bias_se.rs::correct_scaled_sqrt_ratio_candidate` |
 | Exact comparison | `compare_scaled_ratio_to_dyadic_square`, `adjacent_midpoint_dyadic`, `Wide256` |
-| Existing bounded loop | four exact candidate/midpoint passes followed by fail-closed `None` |
-| Required follow-up | executable theorem-precondition contract, exact-head coverage, independent review |
+| Executable bound | three fixed, idempotent exact-correction applications |
+| Required acceptance | exact-head Rust/doc/coverage checks and independent current-head review |
 
 ## References
 
