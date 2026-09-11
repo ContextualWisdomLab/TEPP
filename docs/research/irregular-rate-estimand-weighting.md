@@ -4,11 +4,11 @@
 
 This note records a Longitudinal Modeling estimand boundary exposed by TEPP PR #310 and issue #495. The branch now contains a typed first-release candidate contract, but it remains Draft and is not protected-main or release authority.
 
-Scientific finding head: `df0b4d6d3e0622de3c988b840114fbdb41e5d1b0`. Typed-contract implementation lineage starts at `c7f55acb347ceac38675d9566eff767372739dba`; public contract tests start at `f45e83ba5223ad9d89022482e759ad9e705b229c` and refusal-class denominators are completed by `a3065f6d7589d5a310e54f85d6447b27414955ba`.
+Scientific finding head: `df0b4d6d3e0622de3c988b840114fbdb41e5d1b0`. Typed-contract implementation lineage starts at `c7f55acb347ceac38675d9566eff767372739dba`; public contract tests start at `f45e83ba5223ad9d89022482e759ad9e705b229c`; refusal-class denominators are completed by `a3065f6d7589d5a310e54f85d6447b27414955ba`; the explicit unavailable-estimand error boundary lands through `432da36b44af921557f6cb92f4a71b0c8a56105d` and `8e579512c80e9544d594261186f279d9d896c5e2`; a represented same-sign rate-refusal denominator is exercised by `32729ac69562a148a4f55654f48ca6a6ce02d732`.
 
 `center_within_unit_event_lags` forms one consecutive event-time lag pair for each admitted adjacent occasion inside a unit. `LaggedWithinResidual` carries the earlier residual, later residual, and typed event interval but not the originating unit identity. The existing scalar recovery therefore computes a lag-pair-average estimand: every admissible pair enters one common rate vector before averaging.
 
-The Draft candidate now names that target explicitly as `tepp.irregular_rate.lag_pair_average.v1`. `tepp.irregular_rate.unit_average.v1` is also a typed name, but it fails closed until an immutable released reusable finite-mean contract can support the second aggregation step without adding another TEPP-local generic summation kernel.
+The Draft candidate now names that target explicitly as `tepp.irregular_rate.lag_pair_average.v1`. `tepp.irregular_rate.unit_average.v1` is also a typed name, but it fails closed with `LongitudinalError::IrregularRateEstimandUnavailable` until an immutable released reusable finite-mean contract can support the second aggregation step without adding another TEPP-local generic summation kernel. A scientifically valid but not-yet-activated estimand request is therefore not misclassified as malformed temporal input.
 
 ## Two distinct estimands
 
@@ -49,19 +49,22 @@ The Draft `IrregularRateSummary` reports:
 
 `refused_pairs()` is the sum of the two pair-level refusal classes. Non-finite input rows remain a payload-level admission failure before a scientific summary is constructed; they are not silently converted into missing pair observations.
 
+The second refusal class matters separately from sign/zero exclusion. A pair can contain two finite, nonzero, same-sign centered residuals and still fail represented-rate admission: for example, adjacent residual magnitudes over an extreme but finite event-time interval can imply a nonzero real log-rate whose binary64 quotient collapses to zero. That pair is counted in `nonrepresentable_rate_refused_pairs()`, not silently erased or conflated with an opposite-sign transition.
+
 If no pair is numerically admissible after otherwise valid CWC/event-time admission, the summary returns `estimate = None` while retaining the complete unit/pair denominators. The legacy scalar recovery remains fail-closed for that case. This separation lets evidence reporting preserve its failure population without changing legacy scalar semantics.
 
 Dropping a refused pair changes `k_i` and can change both the pair-average weight and whether a unit contributes to a unit-average target. A unit with no admitted pairs must therefore not disappear silently from a denominator whose interpretation says otherwise.
 
 ## Public contract evidence
 
-`crates/longitudinal_core/tests/irregular_rate_estimand_contract.rs` fixes a deterministic unequal-pair-count fixture. One unit contributes three candidate pairs and another contributes two; three rates are admitted and two are refused by the sign/zero rule. The test establishes that:
+`crates/longitudinal_core/tests/irregular_rate_estimand_contract.rs` fixes deterministic fixtures for unequal pair counts and pair-level refusal classes. The contract establishes that:
 
 - `LagPairAverageV1` bit-matches the legacy pair-average scalar recovery;
 - the pair-average differs from the independently computed equal-unit comparison when admitted pair counts differ;
 - row permutation leaves the typed summary unchanged;
 - a two-unit fixture with no admissible rates retains `candidate_units = 2`, `candidate_pairs = 2`, `admitted_pairs = 0`, `refused_pairs = 2`, and `estimate = None`;
-- `UnitAverageV1` has a stable external name but fails closed while the owner mean release is unavailable.
+- a finite same-sign adjacent-magnitude pair over an extreme finite interval increments `nonrepresentable_rate_refused_pairs()` while a second unit supplies an admitted rate, proving that this failure denominator is observable without turning the whole evidence summary into an error;
+- `UnitAverageV1` has a stable external name and fails closed with `IrregularRateEstimandUnavailable` while the owner mean release is unavailable.
 
 This evidence resolves the naming/denominator ambiguity for the pair-weighted first-release candidate. It does not claim equal-unit scientific acceptance and does not repair #310's independent mixed-sign binary64 mean RED.
 
