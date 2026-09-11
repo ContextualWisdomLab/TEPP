@@ -56,9 +56,9 @@ fn append_missingness_unit(
         event_time += 1.0;
         let draw = rng.next_u64();
         let retain = if retain_three_of_four {
-            draw & 3 != 0
+            draw.trailing_zeros() < 2
         } else {
-            draw & 3 == 0
+            draw.trailing_zeros() >= 2
         };
         if retain {
             let score = -(log_rate * event_time).exp();
