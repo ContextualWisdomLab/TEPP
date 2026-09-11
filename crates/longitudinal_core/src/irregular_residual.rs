@@ -292,14 +292,17 @@ fn pairwise_same_sign_log_rate(lagged: &[LaggedWithinResidual]) -> Result<f64, L
 /// subnormal mean into the wrong even-neighbour result. Mixed-sign inputs are
 /// partitioned by sign and sorted from largest magnitude downward. Opposite
 /// signs are cancelled before any scale reduction, so a subnormal addend is
-/// never divided into zero merely to protect an unrelated extreme term. Each
-/// cancellation is an opposite-sign addition and therefore cannot overflow.
-/// The remaining terms have one sign and are normalized and summed before the
-/// original sample-count denominator is applied. This avoids rounding a
-/// retained-only mean and then weighting that rounded intermediate, which can
-/// move a representable mixed-sign subnormal result by one ULP. A nonzero
-/// same-sign residual mass whose final real mean is below binary64's positive
-/// range fails closed instead of being reported as exact zero.
+/// never divided into zero merely to protect an unrelated extreme term. Before
+/// an opposite-side term can be rounded away unchanged, adjacent same-sign mass
+/// on that side is coalesced and retried so collectively representable low-order
+/// mass is not discarded one row at a time. Each cancellation is an
+/// opposite-sign addition and therefore cannot overflow. The remaining terms
+/// have one sign and are normalized and summed before the original sample-count
+/// denominator is applied. This avoids rounding a retained-only mean and then
+/// weighting that rounded intermediate, which can move a representable
+/// mixed-sign subnormal result by one ULP. A nonzero same-sign residual mass
+/// whose final real mean is below binary64's positive range fails closed instead
+/// of being reported as exact zero.
 pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, LongitudinalError> {
     if values.is_empty() {
         return Err(LongitudinalError::InvalidTemporalTransformInput);
@@ -337,6 +340,16 @@ pub(crate) fn scaled_compensated_mean(values: &[f64]) -> Result<f64, Longitudina
 
     loop {
         let residual = positive + negative;
+        if residual == positive && negative_index + 1 < negatives.len() {
+            negative += negatives[negative_index + 1];
+            negative_index += 1;
+            continue;
+        }
+        if residual == negative && positive_index + 1 < positives.len() {
+            positive += positives[positive_index + 1];
+            positive_index += 1;
+            continue;
+        }
         if residual > 0.0 {
             positive = residual;
             negative_index += 1;
