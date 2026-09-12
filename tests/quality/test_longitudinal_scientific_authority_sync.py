@@ -60,17 +60,17 @@ def test_irregular_rate_weighting_sources_are_doctored_in_canonical_register() -
     assert (
         "Huang, Y., & Leroux, B. (2011). Informative cluster sizes for subcluster-level "
         "covariates and weighted generalized estimating equations. *Biometrics, 67*(3), "
-        "843–851." in literature
+        "843\u2013851." in literature
     )
     assert (
         "Kahan, B. C., Li, F., Blette, B., Jairath, V., Copas, A., & Harhay, M. O. "
         "(2023). Informative cluster size in cluster-randomised trials: A case study from "
-        "the TRIGGER trial. *Clinical Trials, 20*(6), 661–669." in literature
+        "the TRIGGER trial. *Clinical Trials, 20*(6), 661\u2013669." in literature
     )
     assert (
         "Wang, M., Kong, M., & Datta, S. (2011). Inference for marginal linear models for "
         "clustered longitudinal data with potentially informative cluster sizes. "
-        "*Statistical Methods in Medical Research, 20*(4), 347–367." in literature
+        "*Statistical Methods in Medical Research, 20*(4), 347\u2013367." in literature
     )
     assert "irregular-rate estimand" in literature
     assert "record multiplicity" in literature
