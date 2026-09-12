@@ -43,8 +43,9 @@ That sign bit does not represent positive versus negative within-person change:
 the deviation is exactly zero. The public decomposition boundary therefore
 canonicalizes only validated exact-zero residuals to `+0.0`; private numerical
 intermediates remain free to retain signed zero where it is diagnostically
-meaningful. IEEE Std 754-2019 remains the active published floating-point
-standard while IEEE P754 is the active revision project as of 2026-09-03.
+meaningful. IEEE Std 754-2019 is the cited floating-point standard for this
+signed-zero contract; no time-dependent IEEE P754 project-status claim is used
+as scientific evidence.
 
 Signed-zero traceability:
 
