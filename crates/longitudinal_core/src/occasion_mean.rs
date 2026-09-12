@@ -9,9 +9,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::irregular_residual::{
-    EventTimedObservation, LaggedWithinResidual, scaled_compensated_mean,
+    EventTimedObservation, LaggedWithinResidual, recover_centered_irregular_residual_log_rate,
+    scaled_compensated_mean,
 };
-use crate::stable_irregular_rate::recover_centered_irregular_residual_log_rate;
 use crate::{EventTimeInterval, LongitudinalError};
 
 /// Form consecutive event-time lags after subtracting each occasion's group mean.
