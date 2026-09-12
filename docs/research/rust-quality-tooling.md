@@ -7,15 +7,26 @@ required by later estimators.
 
 ## Rust compiler
 
-TEPP pins Rust 1.98.0 for the stable build reference. The Rust Release Team
-published 1.98.0 on August 20, 2026, with the release's compiler, Cargo, and
-Clippy changes recorded in the authoritative release announcement. A future
-compiler update requires exact-head formatting, Clippy, rustdoc, test,
-coverage, and numerical-parity evidence before adoption.
+TEPP pins Rust 1.98.1 for the stable build reference. The Rust Release Team
+published 1.98.1 on September 3, 2026, to repair a vtable-generation
+miscompilation in 1.98.0 that could emit a null pointer where a trait-object
+function pointer was required. Because that defect can produce undefined
+behavior, the patch release is treated as a compiler-correctness repair rather
+than a feature migration. Adoption still requires exact-head formatting,
+Clippy, rustdoc, test, coverage, numerical-parity, database, and supply-chain
+evidence.
+
+The workspace `rust-version = "1.98.0"` remains the declared minimum supported
+Rust version. That MSRV contract is distinct from the exact compiler used for
+TEPP's current build and validation evidence; a patch-level build-reference
+update does not raise the MSRV without a separate compatibility decision.
 
 The root `rust-toolchain.toml` is monitored through GitHub Dependabot's
 `rust-toolchain` ecosystem. Updates therefore arrive as reviewable pull requests
-rather than silently changing a floating compiler channel.
+rather than silently changing a floating compiler channel. Repository-quality
+regressions require every stable Rust Foundation CI lane to install the exact
+channel declared by `rust-toolchain.toml`, so a manifest-only Dependabot update
+fails closed instead of silently testing a different compiler.
 
 ## Cargo workspace
 
@@ -74,3 +85,6 @@ The Cargo Team. (n.d.). *Workspaces*. In *The Cargo Book*. Retrieved August 5,
 
 The Rust Release Team. (2026, August 20). *Announcing Rust 1.98.0*. Rust Blog.
 https://blog.rust-lang.org/2026/08/20/Rust-1.98.0/
+
+The Rust Release Team. (2026, September 3). *Announcing Rust 1.98.1*. Rust Blog.
+https://blog.rust-lang.org/2026/09/03/Rust-1.98.1/
