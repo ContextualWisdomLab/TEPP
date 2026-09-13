@@ -28,7 +28,7 @@ class HourlyOrchestratorProductDevelopmentContractTests(unittest.TestCase):
 
         text = _text(WORKFLOW)
         for token in (
-            'cron: "47 * * * *"',
+            "# cwl-org-commercial-entrypoint: v1",
             "workflow_dispatch:",
             "dry_run:",
             "hourly-nim-product-development-${{ github.repository }}",
