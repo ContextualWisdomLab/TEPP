@@ -9,6 +9,8 @@ use corpus_background::CorpusBackgroundKind;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
+const SNAPSHOT_ID: &str = "snapshot-corpus-background";
+
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
 }
@@ -18,7 +20,7 @@ fn available() -> AvailableTime {
 }
 
 fn document(document_id: &str, kind: CorpusBackgroundKind) -> CorpusBackgroundDocument {
-    CorpusBackgroundDocument::new(document_id, kind, available()).expect("document")
+    CorpusBackgroundDocument::new(document_id, kind, SNAPSHOT_ID, available()).expect("document")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -26,7 +28,7 @@ fn request() -> AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: "corpus-background-idem".into(),
         tenant_workspace_id: "tenant-workspace".into(),
-        snapshot_id: "snapshot-corpus-background".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
         model_contract_version: CORPUS_BACKGROUND_MODEL_CONTRACT_VERSION.into(),
         output_profile: CORPUS_BACKGROUND_OUTPUT_PROFILE.into(),
@@ -57,7 +59,7 @@ fn execute(
     execute_corpus_background_run(
         request,
         &accepted(request),
-        "snapshot-corpus-background",
+        SNAPSHOT_ID,
         cutoff(),
         documents,
         "2026-08-02T00:00:00Z",
@@ -139,7 +141,21 @@ fn empty_unique_only_background_only_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        CorpusBackgroundDocument::new("", CorpusBackgroundKind::UniqueContent, available()),
+        CorpusBackgroundDocument::new(
+            "",
+            CorpusBackgroundKind::UniqueContent,
+            SNAPSHOT_ID,
+            available(),
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        CorpusBackgroundDocument::new(
+            "unique-a",
+            CorpusBackgroundKind::UniqueContent,
+            "",
+            available(),
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 }
@@ -165,7 +181,7 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
         execute_corpus_background_run(
             &mismatched,
             &accepted(&mismatched),
-            "snapshot-corpus-background",
+            SNAPSHOT_ID,
             cutoff(),
             &documents,
             "2026-08-02T00:00:00Z",
@@ -192,7 +208,7 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             execute_corpus_background_run(
                 &reused,
                 &accepted(&reused),
-                "snapshot-corpus-background",
+                SNAPSHOT_ID,
                 cutoff(),
                 &documents,
                 "2026-08-02T00:00:00Z",
