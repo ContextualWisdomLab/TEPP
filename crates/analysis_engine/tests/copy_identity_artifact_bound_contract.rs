@@ -1,9 +1,10 @@
 //! Execution and serialization bounds for the copy-identity profile.
 
 use analysis_engine::{
-    AnalysisEngineError, COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION,
-    COPY_IDENTITY_MODEL_CONTRACT_VERSION, COPY_IDENTITY_OUTPUT_PROFILE, CopyIdentityArtifact,
-    CopyIdentityDocument, MAX_EVIDENCE_UNITS, execute_copy_identity_run,
+    AnalysisEngineError, COPY_IDENTITY_ARTIFACT_BYTE_LIMIT,
+    COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION, COPY_IDENTITY_MODEL_CONTRACT_VERSION,
+    COPY_IDENTITY_OUTPUT_PROFILE, CopyIdentityArtifact, CopyIdentityDocument, MAX_EVIDENCE_UNITS,
+    execute_copy_identity_run,
 };
 use copy_identity::CopyKind;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -32,6 +33,26 @@ fn request() -> AnalysisRunRequest {
         model_contract_version: COPY_IDENTITY_MODEL_CONTRACT_VERSION.into(),
         output_profile: COPY_IDENTITY_OUTPUT_PROFILE.into(),
     }
+}
+
+#[test]
+fn maximal_valid_copy_artifact_fits_wire_limit() {
+    let template_copy_count = MAX_EVIDENCE_UNITS as u64 - 1;
+    let artifact = CopyIdentityArtifact {
+        schema_version: COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION.into(),
+        run_id: "r".repeat(256),
+        snapshot_id: "s".repeat(256),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        document_count: MAX_EVIDENCE_UNITS as u64,
+        source_document_count: 1,
+        template_copy_count,
+        refused_as_source_count: template_copy_count,
+        refused_as_transition_count: template_copy_count,
+        inference_status: "template_copy_is_not_source_identity_not_transition".into(),
+    };
+
+    let payload = artifact.to_json().expect("maximal valid artifact");
+    assert!(payload.len() < COPY_IDENTITY_ARTIFACT_BYTE_LIMIT);
 }
 
 #[test]
