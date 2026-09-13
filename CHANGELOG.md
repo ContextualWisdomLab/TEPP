@@ -39,6 +39,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ## [Unreleased]
 
 - **Prediction-contradiction analysis-run profile**: `analysis_engine` binds existing `prediction_contradiction::refuse_promotion` to cutoff-safe `prediction_contradiction_v1` (`tepp.prediction_contradiction.v1`) with inference status `unmatched_prediction_is_not_observed`. `contradiction_agreement_rate` stays library-side. Not support-edge, not summarizes-edge, not retrospective-edge, not role-contradiction, not subevent-containment, not inferred-status, not episode-membership, not relation-absence, not outcome-order, not membership-target, not location-membership, not membership-posterior ICC, not copied-text, not copy-identity, not citation-edge, not GPU, not MCMC, and not topic birth/split/merge.
+- Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 
