@@ -28,6 +28,20 @@ a visible identity cannot change the artifact or terminal result. The branch
 also verifies that two legal RFC 3339 spellings of one instant bind
 identically, while a different instant remains a mismatch.
 
+The protected-main provider currently returns
+`CitationEdgeError::ProvenanceIsNotTransition` for every closed
+`ProvenanceKind`, while its error enum is non-exhaustive. The adapter therefore
+accepts only that exact refusal and routes unexpected success or any other
+present/future provider error through a directly exercised fail-closed guard.
+It does not silently assume the provider can never evolve.
+
+The untrusted `from_json` boundary retains its 256 KiB cap. Canonical output no
+longer carries a second, unreachable post-validation size branch: a focused
+proof uses the maximum 256-byte run/snapshot identifiers, the maximum strict
+RFC 3339 spelling permitted by `temporal_core` (four-digit date, up to nine
+fractional digits and explicit offset), and `MAX_EVIDENCE_UNITS` census counts
+to demonstrate the largest valid artifact remains below that input cap.
+
 The artifact inference status is `provenance_is_not_a_state_transition`.
 Terminal provider validation is separately `validated`.
 `edge_kind_recovery_rate` stays library-side. This is not a
@@ -47,7 +61,15 @@ Current repair lineage:
 - `742b65bc0dc4d8c745cf3bc1f7b924abd1de7b80` — canonical
   `corpus_split::cutoff_eligible` promoted to the production dependency set;
 - `74f48935674a1ab4d7f4c563bf9887a3ba627ae5` — ADR 0064 returned from
-  premature `Accepted` branch authority to `Proposed`.
+  premature `Accepted` branch authority to `Proposed`;
+- `b780479fa9bcb9624e53dc79521899708163a05c` — provider-result drift moved
+  behind a directly testable guard; maximal-valid output proof added before
+  removing only the redundant egress limit branch;
+- `f9e5a17f52e97efd0d2b564d31e8af4bdf8d93db` — wire-bound proof strengthened
+  to maximum identifier lengths and the longest strict RFC 3339 timestamp
+  form;
+- `ccf8c4ed05ee975f6256c495fca9a9a88dcc1b15` — ADR currentized with those
+  bounded/fail-closed decisions.
 
 No predecessor workflow receipt is evidence for a later head. The eventual
 surviving Analysis Run vehicle must reacquire exact-head line/branch coverage,
