@@ -18,59 +18,67 @@ Modality-source refusals (#421 / ADR 0061) bind `ModalityKind` and do not
 replace `corpus_background`.
 
 The original branch implementation called this profile cutoff-safe while
-`CorpusBackgroundDocument` carried no `AvailableTime`. It also compared the
-request cutoff to a canonical RFC 3339 rendering as text. That made equivalent
-representations of the same instant fail and left the executor unable to
-exclude evidence that did not exist at the historical cutoff. A future row
-could therefore enter duplicate/domain admission and change an earlier replay.
+`CorpusBackgroundDocument` carried neither immutable snapshot identity nor
+`AvailableTime`. It also compared the request cutoff to a canonical RFC 3339
+rendering as text. That made equivalent representations of the same instant
+fail, allowed unrelated-snapshot evidence to be attributed to the requested
+snapshot, and left the executor unable to exclude evidence that did not exist at
+the historical cutoff. A future row could therefore enter duplicate/domain
+admission and change an earlier replay.
 
 `identity_recovery_rate` stays library-side. This slice does not put a
 `scientific_acceptance` metric on inspect payloads. The terminal
 `AnalysisResultSummary.validation_status` is provider-authored lifecycle
 validation state and must not be reused for the domain inference claim.
 
-GPU kernels, MCMC, and topic birth/split/merge remain later GAP-004 work
-and are not this slice.
+GPU kernels, MCMC, and topic birth/split/merge remain later GAP-004 work and are
+not this slice.
 
 ## Decision
 
 Add the `corpus_background_v1` analysis-run output profile to
 `analysis_engine`. The executor:
 
-- requires every `CorpusBackgroundDocument` to carry explicit `AvailableTime`;
+- requires every `CorpusBackgroundDocument` to carry an immutable source
+  `snapshot_id` and explicit `AvailableTime`;
+- rejects any input document whose snapshot identity differs from the admitted
+  run snapshot before aggregation;
 - parses request and execution cutoffs as `KnowledgeCutoff` values and compares
   their instants rather than RFC 3339 spelling;
-- excludes rows with `AvailableTime > knowledge_cutoff` before duplicate
-  identity and domain admission, so future evidence cannot perturb a historical
-  census;
+- excludes same-snapshot rows with `AvailableTime > knowledge_cutoff` before
+  duplicate identity and domain admission, so future evidence cannot perturb a
+  historical census;
 - preserves duplicate refusal among evidence actually available at the cutoff;
 - preserves the raw `MAX_EVIDENCE_UNITS` operational admission bound and
   derives `document_count` from cutoff-admitted identities;
 - invokes `refuse_corpus_background_as_unique_content` and
-  `refuse_corpus_background_as_stopword_deletion` without reimplementing
-  the background/content vocabulary;
-- emits a canonical SHA-256-digested `tepp.corpus_background.v1` artifact
-  with unique-content/corpus-background counts, matching refusal counts,
-  and inference status
+  `refuse_corpus_background_as_stopword_deletion` without reimplementing the
+  background/content vocabulary;
+- emits a canonical SHA-256-digested `tepp.corpus_background.v1` artifact with
+  unique-content/corpus-background counts, matching refusal counts, and
+  inference status
   `corpus_background_is_not_unique_content_not_stopword_deletion`;
 - emits terminal `validation_status = "validated"` separately from that domain
   inference status;
-- does not emit `identity_recovery_rate`, invent MCMC, select GPU
-  backends, or emit topic birth/split/merge events.
+- does not emit `identity_recovery_rate`, invent MCMC, select GPU backends, or
+  emit topic birth/split/merge events.
 
 ## Alternatives considered
 
-1. Keep the branch-local constructor without availability provenance — rejected
-   because a historical cutoff cannot be enforced from document identity and
-   kind alone.
+1. Keep the branch-local constructor without snapshot/availability provenance —
+   rejected because the executor could not substantiate either the requested
+   snapshot or historical cutoff from document identity and kind alone.
 2. Compare RFC 3339 strings — rejected because equal instants can have distinct
    valid textual representations.
-3. Reject every future-unavailable row — rejected because mere future evidence
-   existence must not change an earlier scientific replay; it is excluded from
-   the historical census instead.
-4. Duplicate modality-source refusals (#421) — rejected because that profile
+3. Reject every future-unavailable same-snapshot row — rejected because mere
+   future evidence existence must not change an earlier scientific replay; it
+   is excluded from the historical census instead.
+4. Silently exclude cross-snapshot evidence — rejected because snapshot
+   membership is an admission invariant, not temporal censoring; mixed snapshot
+   input is invalid evidence and fails closed.
+5. Duplicate modality-source refusals (#421) — rejected because that profile
    binds `ModalityKind` and does not bind `corpus_background`.
-5. Put `identity_recovery_rate` on the operator artifact — rejected because
+6. Put `identity_recovery_rate` on the operator artifact — rejected because
    inspect payloads stay metric-free and `tepp.scientific_acceptance.v1` never
    appears.
 
@@ -92,6 +100,18 @@ Add the `corpus_background_v1` analysis-run output profile to
 - `b30da70030b85b335465c2cccd558436607109fd` promotes `corpus_split` from a
   test-only dependency to the runtime dependency required by the production
   cutoff predicate.
+- RED `348f063bcb7add29a5c77fd16bc6e9ca9c86aab7` requires document-level snapshot
+  provenance and proves that cross-snapshot evidence cannot enter a successful
+  artifact.
+- Repair `66221cdefc71a761cbf9e048082cb0f8ca06622f` adds immutable document
+  `snapshot_id` and rejects cross-snapshot input before aggregation.
+- `8db10e638ef0a42fc94d26556c00d2b7debaf8c8` migrates the existing execution
+  fixtures to explicit snapshot provenance and tests invalid snapshot IDs.
+- `9efef36d1599f800723b9e96e34ac5b2d1980d46` removes the redundant
+  `corpus_background` development dependency after it became a production
+  dependency.
+- `102768cbcbc6d94748b061bffb342f29a82a0553` adds explicit tests for independent
+  stopword-refusal-count tampering and overflowing kind-count sums.
 
 These commits are branch evidence only. `Proposed` remains appropriate until
 this profile is consolidated into the surviving Analysis Run landing vehicle,
@@ -100,23 +120,27 @@ contains the implementation.
 
 ## Consequences
 
-Operators can eventually request leakage-safe corpus-background refusals as a
-digest-bound terminal result. The artifact does not claim MCMC, GPU parity,
-modality-source, prompt-source, style-source, copy-identity, method-effect
-estimation, or topic birth/split/merge. Snapshot/profile/cutoff mismatch, empty
-or single-kind admitted corpora, duplicate admitted document identities, and
-raw population overflow fail closed.
+Operators can eventually request leakage-safe, snapshot-bound
+corpus-background refusals as a digest-bound terminal result. The artifact does
+not claim MCMC, GPU parity, modality-source, prompt-source, style-source,
+copy-identity, method-effect estimation, or topic birth/split/merge.
+Snapshot/profile/cutoff mismatch, cross-snapshot evidence, empty or single-kind
+admitted corpora, duplicate admitted document identities, and raw population
+overflow fail closed.
 
-The constructor change intentionally has no compatibility path that invents an
-availability timestamp. Callers must provide provenance explicitly.
+The constructor change intentionally has no compatibility path that invents a
+snapshot identity or availability timestamp. Callers must provide provenance
+explicitly.
 
 ## Verification
 
 The PR includes Rust unit and integration tests for mixed unique/background
 corpora, historical replay under future-unavailable duplicate identities,
-equivalent RFC 3339 cutoff spellings, terminal validation-status separation,
+cross-snapshot admission refusal, equivalent RFC 3339 cutoff spellings,
+terminal validation-status separation,
 empty/unique-only/background-only/duplicate refusal, snapshot/profile/cutoff
-mismatch, population bounds, and artifact tampering. Run:
+mismatch, population bounds, independent refusal-count tampering, overflowing
+kind sums, and artifact tampering. Run:
 
 ```text
 cargo fmt --all -- --check
@@ -129,6 +153,6 @@ python3 scripts/validate_documentation.py
 
 Rollback removes the `corpus_background_v1` profile. No persisted schema
 migration is introduced. Supersede only with an ADR that keeps explicit
-availability provenance, instant-based cutoff semantics, historical replay
-invariance, corpus-background wording distinct from modality-source refusals,
-and `identity_recovery_rate` outside inspect payloads.
+snapshot and availability provenance, instant-based cutoff semantics,
+historical replay invariance, corpus-background wording distinct from
+modality-source refusals, and `identity_recovery_rate` outside inspect payloads.
