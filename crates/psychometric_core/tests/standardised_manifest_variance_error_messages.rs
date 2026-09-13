@@ -1,3 +1,5 @@
+//! Contract tests for standardised manifest-variance boundary error messages.
+
 use psychometric_core::PsychometricError;
 
 #[test]
