@@ -7,7 +7,7 @@ use analysis_engine::{
 };
 use membership_target::MembershipTargetKind;
 use temporal_core::KnowledgeCutoff;
-use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
+use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
@@ -288,5 +288,21 @@ fn execution_refuses_snapshot_profile_cutoff_mismatch_and_oversize() {
     assert_eq!(
         execute(&request, &oversized),
         Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
+fn invalid_completed_at_fails_terminal_result_construction() {
+    let request = request();
+    assert_eq!(
+        execute_membership_target_run(
+            &request,
+            &accepted(&request),
+            "snapshot-membership-target",
+            cutoff(),
+            &mixed_documents(),
+            "not-a-timestamp",
+        ),
+        Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
     );
 }
