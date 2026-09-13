@@ -11,6 +11,7 @@
 //! contracts and preserves their artifact meaning.
 
 mod case_deletion_refit;
+mod citation_edge_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -41,6 +42,12 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Citation-edge artifact and execution contracts from this engine.
+pub use citation_edge_artifact::{
+    CITATION_EDGE_ARTIFACT_BYTE_LIMIT, CITATION_EDGE_ARTIFACT_SCHEMA_VERSION,
+    CITATION_EDGE_MODEL_CONTRACT_VERSION, CITATION_EDGE_OUTPUT_PROFILE, CitationEdgeArtifact,
+    CitationEdgeDocument, CitationEdgeExecution, execute_citation_edge_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +255,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A citation-edge artifact violated its bounded schema or count invariants.
+    InvalidCitationEdgeArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +271,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidCitationEdgeArtifact => "invalid citation-edge artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +690,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidCitationEdgeArtifact,
+                "invalid citation-edge artifact",
             ),
         ];
         for (error, message) in messages {
