@@ -224,7 +224,7 @@ pub fn execute_location_membership_run(
     let mut refused_as_language_channel_count = 0_u64;
     for document in documents {
         if document.available_time().instant() > knowledge_cutoff.instant() {
-            return Err(AnalysisEngineError::InvalidEvidence);
+            continue;
         }
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
@@ -251,7 +251,8 @@ pub fn execute_location_membership_run(
             }
         }
     }
-    let document_count = documents.len() as u64;
+    let document_count =
+        u64::try_from(seen.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     if document_count < 2
         || location_count == 0
         || entity_identity_count
