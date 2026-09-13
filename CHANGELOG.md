@@ -38,6 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- Hourly contextual-orchestrator bootstrap now admits only discovery rows whose provider-reported prompt and completion token prices are both present and exactly `0.0` before cheapest ranking. Paid, partial, missing, and fully unpriced rows stay out of the general-chat pool; an empty explicitly-free pool fails closed with no paid fallback. Secret-free discovery evidence records admitted free candidates and excluded non-free candidates. ADR 0017 and the hourly runbook document the same boundary. The checksum-pinned contextual-orchestrator revision is unchanged; unknown price is not treated as free.
 - Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.

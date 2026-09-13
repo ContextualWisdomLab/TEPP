@@ -45,10 +45,11 @@ Use primary papers, international standards, official specifications, and offici
 
 - Treat all model output as untrusted structured input.
 - Preserve exact source spans and evidence identifiers.
-- Use `NVIDIA_NIM_API_KEY` for approved live tests.
-- Never use or introduce `COPILOT_GITHUB_TOKEN`.
-- Record provider, model, prompt hash, reasoning effort, workflow depth, tools/access list, seed where supported, latency, token usage, and cost.
-- Include direct-routing versus orchestrated and reasoning-effort ablations.
+- Route every semantic LLM operation and model-backed GitHub Actions workflow through a released, versioned `contextual-orchestrator` contract. GitHub Actions use only `orchestrator/free` through the contextual-orchestrator gateway credential.
+- Do not select or hard-code a provider, model, provider group, or paid fallback in TEPP, and do not expose provider API keys to TEPP workflows. If a released orchestrator contract cannot provide the required capability, fail closed and repair the canonical owner before adopting the change here.
+- Never use or introduce `COPILOT_GITHUB_TOKEN`, and never repurpose independent review-agent credentials as execution credentials.
+- Record the contextual-orchestrator release/contract identity, route, prompt hash, reasoning effort, workflow depth, tools/access list, seed where supported, latency, token usage, and cost. Record provider/model identity only when the released orchestrator returns it as execution provenance; it is evidence, not TEPP routing authority.
+- Include direct-routing versus orchestrated and reasoning-effort ablations where scientifically relevant. LLM output never replaces numerical estimation or scientific acceptance.
 
 ## Database naming
 

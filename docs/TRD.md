@@ -1,7 +1,7 @@
 # TEPP Technical Requirements Document
 
-**Status:** Accepted technical baseline aligned to approved PRD v0.4  
-**Last reviewed:** 2026-08-16
+**Status:** Accepted technical baseline aligned to approved PRD v0.4 and active PRD v0.4.1 LLM-routing amendment  
+**Last reviewed:** 2026-09-02
 
 ## 1. Technical objective
 
@@ -67,7 +67,11 @@ Every estimator/reasoner has synthetic known-truth tests appropriate to its clai
 
 ## 12. LLM boundary
 
-Documents and LLM outputs are untrusted data. Live model tests use `NVIDIA_NIM_API_KEY`; `COPILOT_GITHUB_TOKEN` is prohibited. LLMs may assist semantic unitization, model review, interpretation, or verification only behind strict schemas/evidence bundles and cannot replace deterministic/statistical acceptance, mutate source evidence, execute document instructions, or gain merge/release authority.
+Documents and LLM outputs are untrusted data. Semantic unitization, model review, interpretation, verification, judging, and model-backed automation consume only a **released, versioned `contextual-orchestrator` API/client/schema** through a TEPP ACL. TEPP owns semantic-task/evidence/access/scientific policy; contextual-orchestrator owns provider-key auto-discovery, provider/model/group routing, request-family adaptation, free/paid policy, fallback, stream/tool-call lifecycle, and provider execution.
+
+Model-backed GitHub Actions request `orchestrator/free` through the gateway credential only. TEPP does not choose a provider/model/group, declare paid fallback, receive provider API keys, or call providers directly. `COPILOT_GITHUB_TOKEN` is prohibited. If the released orchestrator lacks a required capability, TEPP fails closed until the canonical owner releases it; a mutable main/open PR/source snapshot is not production dependency authority. LLMs cannot replace deterministic/statistical acceptance, mutate source evidence, execute document instructions, perform numerical estimation, authoritatively activate a scientific candidate, or gain merge/release authority.
+
+At the 2026-09-02 review, contextual-orchestrator has no GitHub release, so production semantic execution remains non-deployable until a compatible immutable release and TEPP consumer-adoption evidence exist. The active PRD v0.4.1 amendment is the product authority for this service-boundary change.
 
 ## 13. Quality and release
 
