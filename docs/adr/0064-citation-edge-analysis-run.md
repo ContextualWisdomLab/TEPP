@@ -53,12 +53,19 @@ Add the `citation_edge_v1` analysis-run output profile to
 - rejects raw input larger than `MAX_EVIDENCE_UNITS` before identity-set
   allocation and derives `document_count` from admitted identities;
 - invokes `refuse_provenance_as_transition` without reimplementing the
-  provenance vocabulary;
+  provenance vocabulary and accepts only the canonical
+  `ProvenanceIsNotTransition` refusal; unexpected provider success or another
+  present/future provider error fails closed through a directly tested guard;
 - requires at least two admitted documents and at least two distinct
   provenance kinds so the census is not a single-kind dump;
-- emits a canonical SHA-256-digested `tepp.citation_edge.v1` artifact with
-  per-kind counts, matching refusal counts, and inference status
+- emits a SHA-256-digested `tepp.citation_edge.v1` artifact with per-kind
+  counts, matching refusal counts, and inference status
   `provenance_is_not_a_state_transition`;
+- keeps the 256 KiB cap on untrusted `from_json` input, while a maximal-valid
+  output proof over the 256-byte identifier bounds, strict at-most-nine-digit
+  RFC 3339 fraction/offset syntax, and bounded census demonstrates canonical
+  output cannot reach that cap; the redundant post-validation egress branch is
+  therefore absent;
 - keeps terminal provider validation state separate as `validated`;
 - does not emit `edge_kind_recovery_rate`, invent MCMC, select GPU
   backends, or emit topic birth/split/merge events.
@@ -84,10 +91,13 @@ as historical data; it is a provenance violation and fails closed.
 5. Reject all post-cutoff rows — rejected for same-snapshot historical
    evidence because the Analysis Run contract censors unavailable future rows;
    cross-snapshot rows still fail closed as provenance violations.
-6. Put `edge_kind_recovery_rate` on the operator artifact — rejected
+6. Keep an output-side 256 KiB branch after validating bounded fields —
+   rejected after the maximal-valid wire proof showed the branch cannot be
+   reached; the independent untrusted-input cap remains.
+7. Put `edge_kind_recovery_rate` on the operator artifact — rejected
    because inspect payloads stay metric-free and
    `tepp.scientific_acceptance.v1` never appears.
-7. Bind the existing citation-edge refusals to ADR 0022's analysis-run
+8. Bind the existing citation-edge refusals to ADR 0022's analysis-run
    profile — selected, subject to this Proposed implementation reaching
    protected-main acceptance.
 
@@ -96,7 +106,9 @@ as historical data; it is a provenance violation and fails closed.
 Operators can eventually request provenance-is-not-transition refusals whose
 historical census is explicitly bound to immutable snapshot and availability
 provenance. Future-unavailable rows cannot affect an earlier run; visible
-duplicates still fail closed. The artifact does not claim MCMC, GPU parity,
+duplicates still fail closed. The adapter also fails closed if the non-exhaustive
+`CitationEdgeError` provider contract drifts away from the exact refusal this
+profile claims. The artifact does not claim MCMC, GPU parity,
 lineage-criterion fitting, corpus-background, modality-source, prompt-source,
 style-source, copy-identity, method-effect estimation, or topic
 birth/split/merge. Snapshot/profile/cutoff mismatch, cross-snapshot evidence,
@@ -123,7 +135,14 @@ The branch preserves explicit RED → repair evidence:
   population bound;
 - `742b65bc0dc4d8c745cf3bc1f7b924abd1de7b80` promotes canonical
   `corpus_split::cutoff_eligible` to a production dependency and removes
-  duplicate development-only dependency declarations.
+  duplicate development-only dependency declarations;
+- `b780479fa9bcb9624e53dc79521899708163a05c` moves the non-exhaustive
+  provider-result fallback behind a directly testable fail-closed guard and
+  adds the bounded-output proof before removing only the unreachable egress
+  limit branch;
+- `f9e5a17f52e97efd0d2b564d31e8af4bdf8d93db` strengthens that proof with the
+  maximum permitted identifier lengths and maximum strict RFC 3339 timestamp
+  spelling.
 
 Run on the exact surviving head:
 
@@ -142,5 +161,6 @@ independent review remain required; predecessor receipts do not transfer.
 Rollback removes the `citation_edge_v1` profile. No persisted schema
 migration is introduced. Supersede only with an ADR that preserves explicit
 snapshot/availability provenance, instant-based cutoff semantics, historical
-replay invariance, provenance-is-not-transition distinctness from
-unique-content/stopword refusals, and the metric-free inspect boundary.
+replay invariance, fail-closed provider-drift handling,
+provenance-is-not-transition distinctness from unique-content/stopword
+refusals, and the metric-free inspect boundary.
