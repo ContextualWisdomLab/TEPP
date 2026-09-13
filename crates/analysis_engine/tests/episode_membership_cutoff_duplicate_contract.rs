@@ -54,12 +54,7 @@ fn future_duplicate_identity_cannot_change_historical_cutoff_result() {
             episode,
             "2026-07-01T00:00:00Z",
         ),
-        assignment(
-            "escaped-b",
-            window(9, 15),
-            episode,
-            "2026-07-02T00:00:00Z",
-        ),
+        assignment("escaped-b", window(9, 15), episode, "2026-07-02T00:00:00Z"),
     ];
     let baseline = execute_episode_membership_run(
         &request,
