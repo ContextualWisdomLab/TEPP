@@ -21,12 +21,8 @@ fn document(
     document_id: impl Into<String>,
     kind: MembershipTargetKind,
 ) -> MembershipTargetDocument {
-    MembershipTargetDocument::new(
-        document_id,
-        kind,
-        available("2026-07-01T00:00:00Z"),
-    )
-    .expect("document")
+    MembershipTargetDocument::new(document_id, kind, available("2026-07-01T00:00:00Z"))
+        .expect("document")
 }
 
 fn request() -> AnalysisRunRequest {
