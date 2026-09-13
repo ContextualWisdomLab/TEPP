@@ -22,7 +22,7 @@ pub const COPY_IDENTITY_ARTIFACT_SCHEMA_VERSION: &str = "tepp.copy_identity.v1";
 pub const COPY_IDENTITY_MODEL_CONTRACT_VERSION: &str = "copy_identity_v1";
 /// Analysis-run output profile required for a copy-identity artifact.
 pub const COPY_IDENTITY_OUTPUT_PROFILE: &str = "copy_identity_v1";
-/// Maximum canonical artifact JSON size.
+/// Maximum accepted copy-identity artifact JSON size.
 pub const COPY_IDENTITY_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const COPY_IDENTITY_INFERENCE_STATUS: &str = "template_copy_is_not_source_identity_not_transition";
 
@@ -123,15 +123,10 @@ impl CopyIdentityArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > COPY_IDENTITY_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
