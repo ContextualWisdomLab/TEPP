@@ -115,10 +115,7 @@ fn equivalent_rfc3339_cutoff_offsets_are_the_same_instant() {
     let mut offset_request = request();
     offset_request.knowledge_cutoff = "2026-08-01T09:00:00+09:00".into();
     let execution = execute(&offset_request, &mixed_documents()).expect("equivalent cutoff");
-    assert_eq!(
-        execution.artifact.knowledge_cutoff,
-        "2026-08-01T00:00:00Z"
-    );
+    assert_eq!(execution.artifact.knowledge_cutoff, "2026-08-01T00:00:00Z");
 }
 
 #[test]

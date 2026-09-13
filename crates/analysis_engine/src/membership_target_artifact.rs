@@ -1,6 +1,6 @@
 //! Digest-bound membership-target refusals as an analysis-run profile.
 
-use membership_target::{refuse_collapsed_target, MembershipTargetError, MembershipTargetKind};
+use membership_target::{MembershipTargetError, MembershipTargetKind, refuse_collapsed_target};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use temporal_core::KnowledgeCutoff;
@@ -9,8 +9,8 @@ use tepp_api::{
 };
 
 use crate::{
-    format_digest, require_receipt_identity, valid_identifier, AnalysisEngineError,
-    MAX_EVIDENCE_UNITS,
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, format_digest, require_receipt_identity,
+    valid_identifier,
 };
 
 /// Versioned schema for a completed membership-target artifact.
@@ -354,8 +354,8 @@ fn map_membership_target_error(error: MembershipTargetError) -> AnalysisEngineEr
 #[cfg(test)]
 mod tests {
     use super::{
-        MembershipTargetArtifact, MEMBERSHIP_TARGET_ARTIFACT_BYTE_LIMIT,
-        MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION, MEMBERSHIP_TARGET_INFERENCE_STATUS,
+        MEMBERSHIP_TARGET_ARTIFACT_BYTE_LIMIT, MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION,
+        MEMBERSHIP_TARGET_INFERENCE_STATUS, MembershipTargetArtifact,
     };
     use crate::AnalysisEngineError;
 

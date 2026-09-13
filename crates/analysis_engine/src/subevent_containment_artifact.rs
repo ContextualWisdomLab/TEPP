@@ -243,12 +243,8 @@ pub fn execute_subevent_containment_run(
         inference_status: SUBEVENT_CONTAINMENT_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "subevent_containment",
-        assignment_count,
-        4,
-        "validated",
-    )?;
+    let summary =
+        AnalysisResultSummary::new("subevent_containment", assignment_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
