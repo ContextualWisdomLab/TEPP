@@ -19,7 +19,7 @@ pub const EPISODE_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION: &str = "tepp.episode_membe
 pub const EPISODE_MEMBERSHIP_MODEL_CONTRACT_VERSION: &str = "episode_membership_v1";
 /// Analysis-run output profile required for an episode-membership artifact.
 pub const EPISODE_MEMBERSHIP_OUTPUT_PROFILE: &str = "episode_membership_v1";
-/// Maximum canonical artifact JSON size.
+/// Maximum accepted episode-membership artifact JSON size.
 pub const EPISODE_MEMBERSHIP_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const EPISODE_MEMBERSHIP_INFERENCE_STATUS: &str =
     "membership_window_cannot_escape_episode_interval";
@@ -128,15 +128,10 @@ impl EpisodeMembershipArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > EPISODE_MEMBERSHIP_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
