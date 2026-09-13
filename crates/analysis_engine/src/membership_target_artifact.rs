@@ -185,6 +185,15 @@ pub struct MembershipTargetExecution {
     pub terminal_result: AnalysisRunTerminalResult,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum TypedMembershipTargetKind {
+    Language,
+    Episode,
+    Template,
+    Department,
+    OpportunityPool,
+}
+
 /// Execute cutoff-safe membership-target refusals as one analysis-run profile.
 ///
 /// The executor invokes [`refuse_collapsed_target`] already on protected main.
@@ -250,51 +259,46 @@ pub fn execute_membership_target_run(
             | MembershipTargetKind::Template
             | MembershipTargetKind::Department
             | MembershipTargetKind::OpportunityPool => {
-                match refuse_collapsed_target(document.kind(), MembershipTargetKind::Entity) {
-                    Err(MembershipTargetError::TargetKindCollapsed) => {
-                        refused_as_entity_count = refused_as_entity_count
-                            .checked_add(1)
-                            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
-                match refuse_collapsed_target(document.kind(), MembershipTargetKind::Project) {
-                    Err(MembershipTargetError::TargetKindCollapsed) => {
-                        refused_as_project_count = refused_as_project_count
-                            .checked_add(1)
-                            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
-                match document.kind() {
-                    MembershipTargetKind::Language => {
+                require_target_refusal(refuse_collapsed_target(
+                    document.kind(),
+                    MembershipTargetKind::Entity,
+                ))?;
+                refused_as_entity_count = increment(refused_as_entity_count)?;
+                require_target_refusal(refuse_collapsed_target(
+                    document.kind(),
+                    MembershipTargetKind::Project,
+                ))?;
+                refused_as_project_count = increment(refused_as_project_count)?;
+                match typed_membership_target_kind(document.kind())? {
+                    TypedMembershipTargetKind::Language => {
                         language_count = increment(language_count)?;
                     }
-                    MembershipTargetKind::Episode => {
+                    TypedMembershipTargetKind::Episode => {
                         episode_count = increment(episode_count)?;
                     }
-                    MembershipTargetKind::Template => {
+                    TypedMembershipTargetKind::Template => {
                         template_count = increment(template_count)?;
                     }
-                    MembershipTargetKind::Department => {
+                    TypedMembershipTargetKind::Department => {
                         department_count = increment(department_count)?;
                     }
-                    MembershipTargetKind::OpportunityPool => {
+                    TypedMembershipTargetKind::OpportunityPool => {
                         opportunity_pool_count = increment(opportunity_pool_count)?;
-                    }
-                    MembershipTargetKind::Entity | MembershipTargetKind::Project => {
-                        return Err(AnalysisEngineError::InvalidEvidence);
                     }
                 }
             }
             MembershipTargetKind::Entity => {
-                refuse_collapsed_target(document.kind(), MembershipTargetKind::Entity)
-                    .map_err(map_membership_target_error)?;
+                require_target_identity(refuse_collapsed_target(
+                    document.kind(),
+                    MembershipTargetKind::Entity,
+                ))?;
                 entity_count = increment(entity_count)?;
             }
             MembershipTargetKind::Project => {
-                refuse_collapsed_target(document.kind(), MembershipTargetKind::Project)
-                    .map_err(map_membership_target_error)?;
+                require_target_identity(refuse_collapsed_target(
+                    document.kind(),
+                    MembershipTargetKind::Project,
+                ))?;
                 project_count = increment(project_count)?;
             }
         }
@@ -347,27 +351,51 @@ pub fn execute_membership_target_run(
     })
 }
 
+fn typed_membership_target_kind(
+    kind: MembershipTargetKind,
+) -> Result<TypedMembershipTargetKind, AnalysisEngineError> {
+    match kind {
+        MembershipTargetKind::Language => Ok(TypedMembershipTargetKind::Language),
+        MembershipTargetKind::Episode => Ok(TypedMembershipTargetKind::Episode),
+        MembershipTargetKind::Template => Ok(TypedMembershipTargetKind::Template),
+        MembershipTargetKind::Department => Ok(TypedMembershipTargetKind::Department),
+        MembershipTargetKind::OpportunityPool => Ok(TypedMembershipTargetKind::OpportunityPool),
+        MembershipTargetKind::Entity | MembershipTargetKind::Project => {
+            Err(AnalysisEngineError::InvalidEvidence)
+        }
+    }
+}
+
+fn require_target_refusal(
+    result: Result<(), MembershipTargetError>,
+) -> Result<(), AnalysisEngineError> {
+    match result {
+        Err(MembershipTargetError::TargetKindCollapsed) => Ok(()),
+        Ok(()) | Err(_) => Err(AnalysisEngineError::InvalidEvidence),
+    }
+}
+
+fn require_target_identity(
+    result: Result<(), MembershipTargetError>,
+) -> Result<(), AnalysisEngineError> {
+    result.map_err(|_| AnalysisEngineError::InvalidEvidence)
+}
+
 fn increment(count: u64) -> Result<u64, AnalysisEngineError> {
     count
         .checked_add(1)
         .ok_or(AnalysisEngineError::ArithmeticOverflow)
 }
 
-fn map_membership_target_error(error: MembershipTargetError) -> AnalysisEngineError {
-    match error {
-        MembershipTargetError::TargetKindCollapsed
-        | MembershipTargetError::InvalidTargetPayload
-        | _ => AnalysisEngineError::InvalidEvidence,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
         MEMBERSHIP_TARGET_ARTIFACT_BYTE_LIMIT, MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION,
-        MEMBERSHIP_TARGET_INFERENCE_STATUS, MembershipTargetArtifact,
+        MEMBERSHIP_TARGET_INFERENCE_STATUS, MembershipTargetArtifact, TypedMembershipTargetKind,
+        require_target_identity, require_target_refusal, typed_membership_target_kind,
     };
     use crate::AnalysisEngineError;
+    use membership_target::{MembershipTargetError, MembershipTargetKind};
 
     fn artifact() -> MembershipTargetArtifact {
         MembershipTargetArtifact {
@@ -479,5 +507,62 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn membership_target_provider_contract_guards_fail_closed() {
+        assert_eq!(
+            require_target_refusal(Err(MembershipTargetError::TargetKindCollapsed)),
+            Ok(())
+        );
+        assert_eq!(
+            require_target_refusal(Ok(())),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_target_refusal(Err(MembershipTargetError::InvalidTargetPayload)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(require_target_identity(Ok(())), Ok(()));
+        assert_eq!(
+            require_target_identity(Err(MembershipTargetError::TargetKindCollapsed)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_target_identity(Err(MembershipTargetError::InvalidTargetPayload)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+    }
+
+    #[test]
+    fn typed_membership_target_classifier_refuses_persistence_kinds() {
+        assert_eq!(
+            typed_membership_target_kind(MembershipTargetKind::Language),
+            Ok(TypedMembershipTargetKind::Language)
+        );
+        assert_eq!(
+            typed_membership_target_kind(MembershipTargetKind::Episode),
+            Ok(TypedMembershipTargetKind::Episode)
+        );
+        assert_eq!(
+            typed_membership_target_kind(MembershipTargetKind::Template),
+            Ok(TypedMembershipTargetKind::Template)
+        );
+        assert_eq!(
+            typed_membership_target_kind(MembershipTargetKind::Department),
+            Ok(TypedMembershipTargetKind::Department)
+        );
+        assert_eq!(
+            typed_membership_target_kind(MembershipTargetKind::OpportunityPool),
+            Ok(TypedMembershipTargetKind::OpportunityPool)
+        );
+        assert_eq!(
+            typed_membership_target_kind(MembershipTargetKind::Entity),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            typed_membership_target_kind(MembershipTargetKind::Project),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }
