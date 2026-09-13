@@ -122,15 +122,10 @@ impl InferredStatusArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > INFERRED_STATUS_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
@@ -280,18 +275,16 @@ fn census_evidence(
                 observed_count = increment(observed_count)?;
             }
             EvidenceStatus::Inferred => {
-                match refuse_inferred_as_observed(row.status()) {
-                    Err(InferredStatusError::InferredIsNotObserved) => {
-                        refused_as_observed_count = increment(refused_as_observed_count)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
-                match refuse_inferred_as_transition(row.status()) {
-                    Err(InferredStatusError::InferredIsNotTransition) => {
-                        refused_as_transition_count = increment(refused_as_transition_count)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
+                require_refusal(
+                    refuse_inferred_as_observed(row.status()),
+                    InferredStatusError::InferredIsNotObserved,
+                )?;
+                refused_as_observed_count = increment(refused_as_observed_count)?;
+                require_refusal(
+                    refuse_inferred_as_transition(row.status()),
+                    InferredStatusError::InferredIsNotTransition,
+                )?;
+                refused_as_transition_count = increment(refused_as_transition_count)?;
                 inferred_count = increment(inferred_count)?;
             }
         }
@@ -310,22 +303,30 @@ fn increment(count: u64) -> Result<u64, AnalysisEngineError> {
         .ok_or(AnalysisEngineError::ArithmeticOverflow)
 }
 
-fn map_inferred_status_error(error: InferredStatusError) -> AnalysisEngineError {
-    match error {
-        InferredStatusError::InferredIsNotObserved
-        | InferredStatusError::InferredIsNotTransition
-        | InferredStatusError::InvalidStatusPayload
-        | _ => AnalysisEngineError::InvalidEvidence,
+fn require_refusal(
+    result: Result<(), InferredStatusError>,
+    expected: InferredStatusError,
+) -> Result<(), AnalysisEngineError> {
+    match result {
+        Err(error) if error == expected => Ok(()),
+        Ok(()) | Err(_) => Err(AnalysisEngineError::InvalidEvidence),
     }
+}
+
+fn map_inferred_status_error(_: InferredStatusError) -> AnalysisEngineError {
+    AnalysisEngineError::InvalidEvidence
 }
 
 #[cfg(test)]
 mod tests {
+    use inferred_status::InferredStatusError;
+
     use super::{
         INFERRED_STATUS_ARTIFACT_BYTE_LIMIT, INFERRED_STATUS_ARTIFACT_SCHEMA_VERSION,
-        INFERRED_STATUS_INFERENCE_STATUS, InferredStatusArtifact,
+        INFERRED_STATUS_INFERENCE_STATUS, InferredStatusArtifact, map_inferred_status_error,
+        require_refusal,
     };
-    use crate::{AnalysisEngineError, MAX_EVIDENCE_UNITS};
+    use crate::{AnalysisEngineError, MAX_ANALYSIS_IDENTIFIER_BYTES, MAX_EVIDENCE_UNITS};
 
     fn artifact() -> InferredStatusArtifact {
         InferredStatusArtifact {
@@ -366,6 +367,54 @@ mod tests {
             InferredStatusArtifact::from_json(&"x".repeat(INFERRED_STATUS_ARTIFACT_BYTE_LIMIT + 1)),
             Err(AnalysisEngineError::LimitExceeded)
         );
+    }
+
+    #[test]
+    fn maximal_valid_artifact_serialization_stays_within_wire_limit() {
+        let mut maximal = artifact();
+        maximal.run_id = "r".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES);
+        maximal.snapshot_id = "s".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES);
+        maximal.evidence_count = MAX_EVIDENCE_UNITS as u64;
+        maximal.observed_count = 1;
+        maximal.inferred_count = MAX_EVIDENCE_UNITS as u64 - 1;
+        maximal.refused_as_observed_count = maximal.inferred_count;
+        maximal.refused_as_transition_count = maximal.inferred_count;
+
+        let unchecked_payload = serde_json::to_string(&maximal).expect("unchecked fixture json");
+        assert!(unchecked_payload.len() < INFERRED_STATUS_ARTIFACT_BYTE_LIMIT);
+        assert_eq!(maximal.to_json(), Ok(unchecked_payload));
+    }
+
+    #[test]
+    fn refusal_contract_guard_fails_closed_on_domain_result_drift() {
+        assert_eq!(
+            require_refusal(
+                Err(InferredStatusError::InferredIsNotObserved),
+                InferredStatusError::InferredIsNotObserved,
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            require_refusal(Ok(()), InferredStatusError::InferredIsNotObserved),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_refusal(
+                Err(InferredStatusError::InvalidStatusPayload),
+                InferredStatusError::InferredIsNotObserved,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        for error in [
+            InferredStatusError::InferredIsNotObserved,
+            InferredStatusError::InferredIsNotTransition,
+            InferredStatusError::InvalidStatusPayload,
+        ] {
+            assert_eq!(
+                map_inferred_status_error(error),
+                AnalysisEngineError::InvalidEvidence
+            );
+        }
     }
 
     #[test]
