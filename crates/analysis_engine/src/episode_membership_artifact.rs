@@ -303,8 +303,7 @@ fn increment(count: u64) -> Result<u64, AnalysisEngineError> {
 mod tests {
     use super::{
         EPISODE_MEMBERSHIP_ARTIFACT_BYTE_LIMIT, EPISODE_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
-        EPISODE_MEMBERSHIP_INFERENCE_STATUS, EpisodeMembershipArtifact,
-        classify_membership_result,
+        EPISODE_MEMBERSHIP_INFERENCE_STATUS, EpisodeMembershipArtifact, classify_membership_result,
     };
     use crate::AnalysisEngineError;
     use episode_membership::EpisodeMembershipError;

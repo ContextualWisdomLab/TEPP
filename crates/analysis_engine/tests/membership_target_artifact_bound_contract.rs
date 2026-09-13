@@ -23,7 +23,8 @@ fn maximal_valid_membership_target_artifact_fits_wire_limit() {
         project_count: 0,
         refused_as_entity_count: language_count,
         refused_as_project_count: language_count,
-        inference_status: "language_episode_template_department_opportunity_pool_are_not_entities".into(),
+        inference_status: "language_episode_template_department_opportunity_pool_are_not_entities"
+            .into(),
     };
 
     let payload = artifact.to_json().expect("maximal valid artifact");
