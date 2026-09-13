@@ -1,17 +1,21 @@
 //! Digest-bound non-lexical modality refusals as an analysis-run profile.
 
+use corpus_split::cutoff_eligible;
 use modality_source::{
     ModalityKind, ModalitySourceError, refuse_modality_as_stopword_deletion,
     refuse_modality_as_unique_content,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 
-use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
+use crate::{
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, format_digest, require_receipt_identity,
+    valid_identifier,
+};
 
 /// Versioned schema for a completed modality-source artifact.
 pub const MODALITY_SOURCE_ARTIFACT_SCHEMA_VERSION: &str = "tepp.modality_source.v1";
@@ -24,29 +28,39 @@ pub const MODALITY_SOURCE_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const MODALITY_SOURCE_INFERENCE_STATUS: &str =
     "non_lexical_modality_is_not_unique_content_not_stopword_deletion";
 
-/// One cutoff-admitted token treatment with a closed modality-source kind.
+/// One token treatment with immutable snapshot and availability provenance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ModalitySourceDocument {
     document_id: String,
     kind: ModalityKind,
+    snapshot_id: String,
+    available_time: AvailableTime,
 }
 
 impl ModalitySourceDocument {
-    /// Construct a bounded modality-source document.
+    /// Construct a bounded modality-source document with explicit provenance.
     ///
     /// # Errors
     ///
-    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document
-    /// identity is empty or oversized.
+    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document or
+    /// snapshot identity is empty or oversized.
     pub fn new(
         document_id: impl Into<String>,
         kind: ModalityKind,
+        snapshot_id: impl Into<String>,
+        available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
         let document_id = document_id.into();
-        if !valid_identifier(&document_id) {
+        let snapshot_id = snapshot_id.into();
+        if !valid_identifier(&document_id) || !valid_identifier(&snapshot_id) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        Ok(Self { document_id, kind })
+        Ok(Self {
+            document_id,
+            kind,
+            snapshot_id,
+            available_time,
+        })
     }
 
     /// Return the opaque document identity.
@@ -59,6 +73,18 @@ impl ModalitySourceDocument {
     #[must_use]
     pub const fn kind(&self) -> ModalityKind {
         self.kind
+    }
+
+    /// Return the immutable source snapshot identity.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
+    /// Return when the document became available for historical analysis.
+    #[must_use]
+    pub const fn available_time(&self) -> &AvailableTime {
+        &self.available_time
     }
 }
 
@@ -139,6 +165,7 @@ impl ModalitySourceArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.document_count < 2
+            || self.document_count > MAX_EVIDENCE_UNITS as u64
             || self.unique_content_count == 0
             || self.non_lexical_modality_count == 0
             || kind_sum != Some(self.document_count)
@@ -171,7 +198,8 @@ pub struct ModalitySourceExecution {
 /// # Errors
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, empty or
-/// single-kind corpus, duplicate document identity, or invalid artifact error.
+/// single-kind admitted corpus, duplicate admitted document identity,
+/// oversized raw corpus, or invalid artifact error.
 pub fn execute_modality_source_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -194,6 +222,9 @@ pub fn execute_modality_source_run(
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
+    if documents.len() > MAX_EVIDENCE_UNITS {
+        return Err(AnalysisEngineError::LimitExceeded);
+    }
 
     let mut seen = std::collections::BTreeSet::new();
     let mut unique_content_count = 0_u64;
@@ -201,6 +232,12 @@ pub fn execute_modality_source_run(
     let mut refused_as_unique_content_count = 0_u64;
     let mut refused_as_stopword_deletion_count = 0_u64;
     for document in documents {
+        if document.snapshot_id() != snapshot_id {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        if !cutoff_eligible(document.available_time(), &knowledge_cutoff) {
+            continue;
+        }
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
@@ -237,7 +274,7 @@ pub fn execute_modality_source_run(
         }
     }
     let document_count =
-        u64::try_from(documents.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+        u64::try_from(seen.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     if document_count < 2 || unique_content_count == 0 || non_lexical_modality_count == 0 {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
@@ -286,7 +323,7 @@ mod tests {
         MODALITY_SOURCE_ARTIFACT_BYTE_LIMIT, MODALITY_SOURCE_ARTIFACT_SCHEMA_VERSION,
         MODALITY_SOURCE_INFERENCE_STATUS, ModalitySourceArtifact,
     };
-    use crate::AnalysisEngineError;
+    use crate::{AnalysisEngineError, MAX_EVIDENCE_UNITS};
 
     fn artifact() -> ModalitySourceArtifact {
         ModalitySourceArtifact {
@@ -360,6 +397,15 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.document_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("bound") + 1;
+                value.unique_content_count = value.document_count - 1;
+                value.non_lexical_modality_count = 1;
+                value.refused_as_unique_content_count = 1;
+                value.refused_as_stopword_deletion_count = 1;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.unique_content_count = 0;
                 value
             },
@@ -370,7 +416,19 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.unique_content_count = u64::MAX;
+                value.non_lexical_modality_count = 1;
+                value.document_count = u64::MAX;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.refused_as_unique_content_count = 1;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.refused_as_stopword_deletion_count = 1;
                 value
             },
             {
