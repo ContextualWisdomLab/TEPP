@@ -3,14 +3,18 @@
 use analysis_engine::{
     AnalysisEngineError, CITATION_EDGE_ARTIFACT_SCHEMA_VERSION,
     CITATION_EDGE_MODEL_CONTRACT_VERSION, CITATION_EDGE_OUTPUT_PROFILE, CitationEdgeDocument,
-    execute_citation_edge_run,
+    MAX_EVIDENCE_UNITS, execute_citation_edge_run,
 };
 use citation_edge::ProvenanceKind;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+}
+
+fn available(stamp: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(stamp).expect("available")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -30,12 +34,33 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
         .expect("accepted")
 }
 
+fn document(document_id: &str, kind: ProvenanceKind, available_time: &str) -> CitationEdgeDocument {
+    CitationEdgeDocument::new(
+        document_id,
+        kind,
+        "snapshot-citation-edge",
+        available(available_time),
+    )
+    .expect("document")
+}
+
 fn mixed_documents() -> Vec<CitationEdgeDocument> {
     vec![
-        CitationEdgeDocument::new("cite-a", ProvenanceKind::Citation).expect("citation"),
-        CitationEdgeDocument::new("rev-b", ProvenanceKind::Revision).expect("revision"),
-        CitationEdgeDocument::new("retro-c", ProvenanceKind::RetrospectiveReport)
-            .expect("retrospective"),
+        document(
+            "cite-a",
+            ProvenanceKind::Citation,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "rev-b",
+            ProvenanceKind::Revision,
+            "2026-07-31T23:00:00Z",
+        ),
+        document(
+            "retro-c",
+            ProvenanceKind::RetrospectiveReport,
+            "2026-08-01T00:00:00Z",
+        ),
     ]
 }
 
@@ -120,6 +145,55 @@ fn terminal_summary_keeps_validation_status_separate_from_domain_inference() {
 }
 
 #[test]
+fn future_unavailable_duplicate_cannot_change_historical_replay() {
+    let request = request();
+    let baseline = execute(&request, &mixed_documents()).expect("baseline");
+    let mut with_future = vec![document(
+        "cite-a",
+        ProvenanceKind::Citation,
+        "2026-08-01T00:00:01Z",
+    )];
+    with_future.extend(mixed_documents());
+    let replay = execute(&request, &with_future).expect("historical replay");
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
+}
+
+#[test]
+fn cross_snapshot_document_fails_before_aggregation() {
+    let request = request();
+    let mut documents = mixed_documents();
+    documents.push(
+        CitationEdgeDocument::new(
+            "other-snapshot-edge",
+            ProvenanceKind::Citation,
+            "other-snapshot",
+            available("2026-07-31T23:30:00Z"),
+        )
+        .expect("cross-snapshot document"),
+    );
+    assert_eq!(
+        execute(&request, &documents),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn raw_census_bound_precedes_identity_allocation_and_duplicate_checks() {
+    let request = request();
+    let repeated = document(
+        "repeated",
+        ProvenanceKind::Citation,
+        "2026-07-31T22:00:00Z",
+    );
+    let documents = vec![repeated; MAX_EVIDENCE_UNITS + 1];
+    assert_eq!(
+        execute(&request, &documents),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
 fn empty_single_kind_and_duplicate_identities_fail_closed() {
     let request = request();
     assert_eq!(
@@ -127,23 +201,53 @@ fn empty_single_kind_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let citation_only = vec![
-        CitationEdgeDocument::new("cite-a", ProvenanceKind::Citation).expect("citation"),
-        CitationEdgeDocument::new("cite-b", ProvenanceKind::Citation).expect("citation"),
+        document(
+            "cite-a",
+            ProvenanceKind::Citation,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "cite-b",
+            ProvenanceKind::Citation,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &citation_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
-        CitationEdgeDocument::new("same", ProvenanceKind::Citation).expect("citation"),
-        CitationEdgeDocument::new("same", ProvenanceKind::Revision).expect("revision"),
+        document(
+            "same",
+            ProvenanceKind::Citation,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "same",
+            ProvenanceKind::Revision,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &duplicates),
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        CitationEdgeDocument::new("", ProvenanceKind::Citation),
+        CitationEdgeDocument::new(
+            "",
+            ProvenanceKind::Citation,
+            "snapshot-citation-edge",
+            available("2026-07-31T22:00:00Z"),
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        CitationEdgeDocument::new(
+            "cite-a",
+            ProvenanceKind::Citation,
+            "",
+            available("2026-07-31T22:00:00Z"),
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 }
