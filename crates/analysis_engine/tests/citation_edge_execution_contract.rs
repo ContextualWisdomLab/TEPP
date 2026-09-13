@@ -91,6 +91,35 @@ fn mixed_provenance_kinds_emit_digest_bound_refusals_without_recovery_metric() {
 }
 
 #[test]
+fn equivalent_rfc3339_cutoff_spellings_bind_the_same_instant() {
+    let mut equivalent = request();
+    equivalent.knowledge_cutoff = "2026-08-01T01:00:00+01:00".into();
+    let execution = execute_citation_edge_run(
+        &equivalent,
+        &accepted(&equivalent),
+        "snapshot-citation-edge",
+        cutoff(),
+        &mixed_documents(),
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("equivalent cutoff instant");
+    assert_eq!(execution.artifact.knowledge_cutoff, cutoff().to_rfc3339());
+}
+
+#[test]
+fn terminal_summary_keeps_validation_status_separate_from_domain_inference() {
+    let request = request();
+    let execution = execute(&request, &mixed_documents()).expect("execution");
+    let summary = execution
+        .terminal_result
+        .summary
+        .as_ref()
+        .expect("succeeded summary");
+    assert_eq!(summary.validation_status, "validated");
+    assert_ne!(summary.validation_status, execution.artifact.inference_status);
+}
+
+#[test]
 fn empty_single_kind_and_duplicate_identities_fail_closed() {
     let request = request();
     assert_eq!(
