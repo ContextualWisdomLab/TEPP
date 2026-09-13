@@ -11,6 +11,7 @@
 //! contracts and preserves their artifact meaning.
 
 mod case_deletion_refit;
+mod corpus_background_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -41,6 +42,13 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Corpus-background artifact and execution contracts from this engine.
+pub use corpus_background_artifact::{
+    CORPUS_BACKGROUND_ARTIFACT_BYTE_LIMIT, CORPUS_BACKGROUND_ARTIFACT_SCHEMA_VERSION,
+    CORPUS_BACKGROUND_MODEL_CONTRACT_VERSION, CORPUS_BACKGROUND_OUTPUT_PROFILE,
+    CorpusBackgroundArtifact, CorpusBackgroundDocument, CorpusBackgroundExecution,
+    execute_corpus_background_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +256,8 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A corpus-background artifact violated its bounded schema or count invariants.
+    InvalidCorpusBackgroundArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +272,7 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidCorpusBackgroundArtifact => "invalid corpus-background artifact",
         };
         formatter.write_str(message)
     }
@@ -680,6 +691,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidCorpusBackgroundArtifact,
+                "invalid corpus-background artifact",
             ),
         ];
         for (error, message) in messages {

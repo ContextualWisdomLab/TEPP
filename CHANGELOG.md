@@ -38,6 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- **Corpus-background analysis-run profile**: `analysis_engine` binds existing `corpus_background::refuse_corpus_background_as_unique_content` and `refuse_corpus_background_as_stopword_deletion` to cutoff-safe `corpus_background_v1` (`tepp.corpus_background.v1`) with inference status `corpus_background_is_not_unique_content_not_stopword_deletion`. `identity_recovery_rate` stays library-side. Not modality-source, not prompt-source, not style-source, not copy-identity, not a simulation method-effect census, not GPU, not MCMC, and not topic birth/split/merge.
 - Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
