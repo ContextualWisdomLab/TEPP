@@ -3,7 +3,7 @@
 use membership_target::{MembershipTargetError, MembershipTargetKind, refuse_collapsed_target};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
@@ -29,6 +29,7 @@ const MEMBERSHIP_TARGET_INFERENCE_STATUS: &str =
 pub struct MembershipTargetDocument {
     document_id: String,
     kind: MembershipTargetKind,
+    available_time: AvailableTime,
 }
 
 impl MembershipTargetDocument {
@@ -41,12 +42,17 @@ impl MembershipTargetDocument {
     pub fn new(
         document_id: impl Into<String>,
         kind: MembershipTargetKind,
+        available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
         let document_id = document_id.into();
         if !valid_identifier(&document_id) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        Ok(Self { document_id, kind })
+        Ok(Self {
+            document_id,
+            kind,
+            available_time,
+        })
     }
 
     /// Return the opaque document identity.
@@ -59,6 +65,12 @@ impl MembershipTargetDocument {
     #[must_use]
     pub const fn kind(&self) -> MembershipTargetKind {
         self.kind
+    }
+
+    /// Return when this document became available for historical analysis.
+    #[must_use]
+    pub const fn available_time(&self) -> AvailableTime {
+        self.available_time
     }
 }
 
@@ -219,6 +231,7 @@ pub fn execute_membership_target_run(
     }
 
     let mut seen = std::collections::BTreeSet::new();
+    let mut document_count = 0_u64;
     let mut language_count = 0_u64;
     let mut episode_count = 0_u64;
     let mut template_count = 0_u64;
@@ -229,9 +242,13 @@ pub fn execute_membership_target_run(
     let mut refused_as_entity_count = 0_u64;
     let mut refused_as_project_count = 0_u64;
     for document in documents {
+        if document.available_time().instant() > knowledge_cutoff.instant() {
+            continue;
+        }
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
+        document_count = increment(document_count)?;
         match document.kind() {
             MembershipTargetKind::Language
             | MembershipTargetKind::Episode
@@ -288,8 +305,6 @@ pub fn execute_membership_target_run(
         }
     }
 
-    let document_count =
-        u64::try_from(documents.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let typed_sum = language_count
         .checked_add(episode_count)
         .and_then(|value| value.checked_add(template_count))
