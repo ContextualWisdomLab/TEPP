@@ -6,11 +6,27 @@ use analysis_engine::{
     MembershipTargetArtifact, MembershipTargetDocument, execute_membership_target_run,
 };
 use membership_target::MembershipTargetKind;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+}
+
+fn available(stamp: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(stamp).expect("available")
+}
+
+fn document(
+    document_id: impl Into<String>,
+    kind: MembershipTargetKind,
+) -> MembershipTargetDocument {
+    MembershipTargetDocument::new(
+        document_id,
+        kind,
+        available("2026-07-01T00:00:00Z"),
+    )
+    .expect("document")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -36,15 +52,13 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
 
 fn mixed_documents() -> Vec<MembershipTargetDocument> {
     vec![
-        MembershipTargetDocument::new("lang-a", MembershipTargetKind::Language).expect("language"),
-        MembershipTargetDocument::new("ep-b", MembershipTargetKind::Episode).expect("episode"),
-        MembershipTargetDocument::new("tmpl-c", MembershipTargetKind::Template).expect("template"),
-        MembershipTargetDocument::new("dept-d", MembershipTargetKind::Department)
-            .expect("department"),
-        MembershipTargetDocument::new("pool-e", MembershipTargetKind::OpportunityPool)
-            .expect("opportunity"),
-        MembershipTargetDocument::new("ent-f", MembershipTargetKind::Entity).expect("entity"),
-        MembershipTargetDocument::new("proj-g", MembershipTargetKind::Project).expect("project"),
+        document("lang-a", MembershipTargetKind::Language),
+        document("ep-b", MembershipTargetKind::Episode),
+        document("tmpl-c", MembershipTargetKind::Template),
+        document("dept-d", MembershipTargetKind::Department),
+        document("pool-e", MembershipTargetKind::OpportunityPool),
+        document("ent-f", MembershipTargetKind::Entity),
+        document("proj-g", MembershipTargetKind::Project),
     ]
 }
 
@@ -159,55 +173,59 @@ fn empty_single_class_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let language_only = vec![
-        MembershipTargetDocument::new("lang-a", MembershipTargetKind::Language).expect("language"),
-        MembershipTargetDocument::new("lang-b", MembershipTargetKind::Language).expect("language"),
+        document("lang-a", MembershipTargetKind::Language),
+        document("lang-b", MembershipTargetKind::Language),
     ];
     assert_eq!(
         execute(&request, &language_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let entity_only = vec![
-        MembershipTargetDocument::new("ent-a", MembershipTargetKind::Entity).expect("entity"),
-        MembershipTargetDocument::new("ent-b", MembershipTargetKind::Entity).expect("entity"),
+        document("ent-a", MembershipTargetKind::Entity),
+        document("ent-b", MembershipTargetKind::Entity),
     ];
     assert_eq!(
         execute(&request, &entity_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let project_only = vec![
-        MembershipTargetDocument::new("proj-a", MembershipTargetKind::Project).expect("project"),
-        MembershipTargetDocument::new("proj-b", MembershipTargetKind::Project).expect("project"),
+        document("proj-a", MembershipTargetKind::Project),
+        document("proj-b", MembershipTargetKind::Project),
     ];
     assert_eq!(
         execute(&request, &project_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let typed_only = vec![
-        MembershipTargetDocument::new("lang-a", MembershipTargetKind::Language).expect("language"),
-        MembershipTargetDocument::new("ep-b", MembershipTargetKind::Episode).expect("episode"),
+        document("lang-a", MembershipTargetKind::Language),
+        document("ep-b", MembershipTargetKind::Episode),
     ];
     assert_eq!(
         execute(&request, &typed_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let persistence_only = vec![
-        MembershipTargetDocument::new("ent-a", MembershipTargetKind::Entity).expect("entity"),
-        MembershipTargetDocument::new("proj-b", MembershipTargetKind::Project).expect("project"),
+        document("ent-a", MembershipTargetKind::Entity),
+        document("proj-b", MembershipTargetKind::Project),
     ];
     assert_eq!(
         execute(&request, &persistence_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
-        MembershipTargetDocument::new("same", MembershipTargetKind::Language).expect("language"),
-        MembershipTargetDocument::new("same", MembershipTargetKind::Entity).expect("entity"),
+        document("same", MembershipTargetKind::Language),
+        document("same", MembershipTargetKind::Entity),
     ];
     assert_eq!(
         execute(&request, &duplicates),
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        MembershipTargetDocument::new("", MembershipTargetKind::Language),
+        MembershipTargetDocument::new(
+            "",
+            MembershipTargetKind::Language,
+            available("2026-07-01T00:00:00Z"),
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 }
@@ -282,7 +300,7 @@ fn execution_refuses_snapshot_profile_cutoff_mismatch_and_oversize() {
             } else {
                 MembershipTargetKind::Language
             };
-            MembershipTargetDocument::new(format!("document-{index}"), kind).expect("document")
+            document(format!("document-{index}"), kind)
         })
         .collect();
     assert_eq!(
