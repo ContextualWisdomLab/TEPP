@@ -19,7 +19,7 @@ pub const SUBEVENT_CONTAINMENT_ARTIFACT_SCHEMA_VERSION: &str = "tepp.subevent_co
 pub const SUBEVENT_CONTAINMENT_MODEL_CONTRACT_VERSION: &str = "subevent_containment_v1";
 /// Analysis-run output profile required for a subevent-containment artifact.
 pub const SUBEVENT_CONTAINMENT_OUTPUT_PROFILE: &str = "subevent_containment_v1";
-/// Maximum canonical artifact JSON size.
+/// Maximum accepted subevent-containment artifact JSON size.
 pub const SUBEVENT_CONTAINMENT_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const SUBEVENT_CONTAINMENT_INFERENCE_STATUS: &str =
     "subevent_interval_cannot_escape_parent_interval";
@@ -128,15 +128,10 @@ impl SubeventContainmentArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > SUBEVENT_CONTAINMENT_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
