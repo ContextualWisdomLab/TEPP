@@ -1,16 +1,20 @@
 //! End-to-end contract for cutoff-safe prompt-boilerplate refusals.
 
 use analysis_engine::{
-    AnalysisEngineError, PROMPT_SOURCE_ARTIFACT_SCHEMA_VERSION,
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, PROMPT_SOURCE_ARTIFACT_SCHEMA_VERSION,
     PROMPT_SOURCE_MODEL_CONTRACT_VERSION, PROMPT_SOURCE_OUTPUT_PROFILE, PromptSourceDocument,
     execute_prompt_source_run,
 };
 use prompt_source::PromptKind;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+}
+
+fn available(stamp: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(stamp).expect("available")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -30,11 +34,33 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
         .expect("accepted")
 }
 
+fn document(document_id: &str, kind: PromptKind, available_time: &str) -> PromptSourceDocument {
+    PromptSourceDocument::new(
+        document_id,
+        kind,
+        "snapshot-prompt-source",
+        available(available_time),
+    )
+    .expect("document")
+}
+
 fn mixed_documents() -> Vec<PromptSourceDocument> {
     vec![
-        PromptSourceDocument::new("unique-a", PromptKind::UniqueContent).expect("unique"),
-        PromptSourceDocument::new("prompt-b", PromptKind::PromptBoilerplate).expect("prompt"),
-        PromptSourceDocument::new("prompt-c", PromptKind::PromptBoilerplate).expect("prompt"),
+        document(
+            "unique-a",
+            PromptKind::UniqueContent,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "prompt-b",
+            PromptKind::PromptBoilerplate,
+            "2026-07-31T23:00:00Z",
+        ),
+        document(
+            "prompt-c",
+            PromptKind::PromptBoilerplate,
+            "2026-08-01T00:00:00Z",
+        ),
     ]
 }
 
@@ -87,6 +113,84 @@ fn mixed_prompt_kinds_emit_digest_bound_refusals_without_recovery_metric() {
 }
 
 #[test]
+fn equivalent_rfc3339_cutoff_spellings_bind_the_same_instant() {
+    let mut equivalent = request();
+    equivalent.knowledge_cutoff = "2026-08-01T01:00:00+01:00".into();
+    let execution = execute_prompt_source_run(
+        &equivalent,
+        &accepted(&equivalent),
+        "snapshot-prompt-source",
+        cutoff(),
+        &mixed_documents(),
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("equivalent cutoff instant");
+    assert_eq!(execution.artifact.knowledge_cutoff, cutoff().to_rfc3339());
+}
+
+#[test]
+fn terminal_summary_keeps_validation_status_separate_from_domain_inference() {
+    let request = request();
+    let execution = execute(&request, &mixed_documents()).expect("execution");
+    let summary = execution
+        .terminal_result
+        .summary
+        .as_ref()
+        .expect("succeeded summary");
+    assert_eq!(summary.validation_status, "validated");
+    assert_ne!(summary.validation_status, execution.artifact.inference_status);
+}
+
+#[test]
+fn future_unavailable_duplicate_cannot_change_historical_replay() {
+    let request = request();
+    let baseline = execute(&request, &mixed_documents()).expect("baseline");
+    let mut with_future = vec![document(
+        "unique-a",
+        PromptKind::UniqueContent,
+        "2026-08-01T00:00:01Z",
+    )];
+    with_future.extend(mixed_documents());
+    let replay = execute(&request, &with_future).expect("historical replay");
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
+}
+
+#[test]
+fn cross_snapshot_document_fails_before_aggregation() {
+    let request = request();
+    let mut documents = mixed_documents();
+    documents.push(
+        PromptSourceDocument::new(
+            "prompt-other-snapshot",
+            PromptKind::PromptBoilerplate,
+            "other-snapshot",
+            available("2026-07-31T23:30:00Z"),
+        )
+        .expect("cross-snapshot document"),
+    );
+    assert_eq!(
+        execute(&request, &documents),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn raw_census_bound_precedes_identity_allocation_and_duplicate_checks() {
+    let request = request();
+    let repeated = document(
+        "repeated",
+        PromptKind::UniqueContent,
+        "2026-07-31T22:00:00Z",
+    );
+    let documents = vec![repeated; MAX_EVIDENCE_UNITS + 1];
+    assert_eq!(
+        execute(&request, &documents),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
 fn empty_unique_only_prompt_only_and_duplicate_identities_fail_closed() {
     let request = request();
     assert_eq!(
@@ -94,31 +198,65 @@ fn empty_unique_only_prompt_only_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let unique_only = vec![
-        PromptSourceDocument::new("unique-a", PromptKind::UniqueContent).expect("unique"),
-        PromptSourceDocument::new("unique-b", PromptKind::UniqueContent).expect("unique"),
+        document(
+            "unique-a",
+            PromptKind::UniqueContent,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "unique-b",
+            PromptKind::UniqueContent,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &unique_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let prompt_only = vec![
-        PromptSourceDocument::new("prompt-a", PromptKind::PromptBoilerplate).expect("prompt"),
-        PromptSourceDocument::new("prompt-b", PromptKind::PromptBoilerplate).expect("prompt"),
+        document(
+            "prompt-a",
+            PromptKind::PromptBoilerplate,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "prompt-b",
+            PromptKind::PromptBoilerplate,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &prompt_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
-        PromptSourceDocument::new("same", PromptKind::UniqueContent).expect("unique"),
-        PromptSourceDocument::new("same", PromptKind::PromptBoilerplate).expect("prompt"),
+        document("same", PromptKind::UniqueContent, "2026-07-31T22:00:00Z"),
+        document(
+            "same",
+            PromptKind::PromptBoilerplate,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &duplicates),
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        PromptSourceDocument::new("", PromptKind::UniqueContent),
+        PromptSourceDocument::new(
+            "",
+            PromptKind::UniqueContent,
+            "snapshot-prompt-source",
+            available("2026-07-31T22:00:00Z"),
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        PromptSourceDocument::new(
+            "unique-a",
+            PromptKind::UniqueContent,
+            "",
+            available("2026-07-31T22:00:00Z"),
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 }
