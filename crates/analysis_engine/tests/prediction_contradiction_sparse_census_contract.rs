@@ -84,8 +84,8 @@ fn covered_only_census_reports_zero_refusals_instead_of_rejecting_the_run() {
         assignment("covered-b", closed(2, 8), closed(0, 10)),
     ];
 
-    let execution = execute(&assignments)
-        .expect("absence of contradiction classes is valid observed evidence");
+    let execution =
+        execute(&assignments).expect("absence of contradiction classes is valid observed evidence");
     assert_eq!(execution.artifact.assignment_count, 2);
     assert_eq!(execution.artifact.covered_count, 2);
     assert_eq!(execution.artifact.partial_overlap_count, 0);
@@ -101,8 +101,8 @@ fn contradiction_only_census_reports_zero_coverage_instead_of_rejecting_the_run(
         assignment("contradictory-b", closed(20, 30), closed(0, 10)),
     ];
 
-    let execution = execute(&assignments)
-        .expect("absence of covered pairs is valid observed evidence");
+    let execution =
+        execute(&assignments).expect("absence of covered pairs is valid observed evidence");
     assert_eq!(execution.artifact.assignment_count, 2);
     assert_eq!(execution.artifact.covered_count, 0);
     assert_eq!(execution.artifact.partial_overlap_count, 0);
