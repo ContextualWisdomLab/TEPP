@@ -270,22 +270,27 @@ fn census_assignments(
         if !seen.insert(assignment.assignment_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
-        match refuse_membership_outside_episode(assignment.membership(), assignment.episode()) {
-            Ok(()) => {
-                contained_count = increment(contained_count)?;
-            }
-            Err(EpisodeMembershipError::MembershipEscapesEpisode) => {
-                refused_as_escape_count = increment(refused_as_escape_count)?;
-                escaped_count = increment(escaped_count)?;
-            }
-            Err(
-                EpisodeMembershipError::InvertedEventWindow
-                | EpisodeMembershipError::InvalidEpisodePayload
-                | _,
-            ) => return Err(AnalysisEngineError::InvalidEvidence),
+        if classify_membership_result(refuse_membership_outside_episode(
+            assignment.membership(),
+            assignment.episode(),
+        ))? {
+            contained_count = increment(contained_count)?;
+        } else {
+            refused_as_escape_count = increment(refused_as_escape_count)?;
+            escaped_count = increment(escaped_count)?;
         }
     }
     Ok((contained_count, escaped_count, refused_as_escape_count))
+}
+
+fn classify_membership_result(
+    result: Result<(), EpisodeMembershipError>,
+) -> Result<bool, AnalysisEngineError> {
+    match result {
+        Ok(()) => Ok(true),
+        Err(EpisodeMembershipError::MembershipEscapesEpisode) => Ok(false),
+        Err(_) => Err(AnalysisEngineError::InvalidEvidence),
+    }
 }
 
 fn increment(count: u64) -> Result<u64, AnalysisEngineError> {
@@ -299,8 +304,10 @@ mod tests {
     use super::{
         EPISODE_MEMBERSHIP_ARTIFACT_BYTE_LIMIT, EPISODE_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
         EPISODE_MEMBERSHIP_INFERENCE_STATUS, EpisodeMembershipArtifact,
+        classify_membership_result,
     };
     use crate::AnalysisEngineError;
+    use episode_membership::EpisodeMembershipError;
 
     fn artifact() -> EpisodeMembershipArtifact {
         EpisodeMembershipArtifact {
@@ -400,5 +407,18 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn membership_result_classifier_fails_closed_on_provider_drift() {
+        assert_eq!(classify_membership_result(Ok(())), Ok(true));
+        assert_eq!(
+            classify_membership_result(Err(EpisodeMembershipError::MembershipEscapesEpisode)),
+            Ok(false)
+        );
+        assert_eq!(
+            classify_membership_result(Err(EpisodeMembershipError::InvalidEpisodePayload)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }
