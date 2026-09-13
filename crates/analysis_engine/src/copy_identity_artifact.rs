@@ -221,7 +221,7 @@ pub fn execute_copy_identity_run(
     let mut refused_as_transition_count = 0_u64;
     for document in documents {
         if !cutoff_eligible(document.available_time(), &knowledge_cutoff) {
-            return Err(AnalysisEngineError::InvalidEvidence);
+            continue;
         }
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
@@ -252,7 +252,7 @@ pub fn execute_copy_identity_run(
         }
     }
     let document_count =
-        u64::try_from(documents.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+        u64::try_from(seen.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     if document_count < 2 || source_document_count == 0 || template_copy_count == 0 {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
