@@ -8,12 +8,17 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Fitted candidate-`K`
+//! composed with topic lineage is invoked through [`model_selection`] and
+//! [`execute_topic_lineage_run`] and is not a Bayesian sampler.
 
 mod case_deletion_refit;
+mod composed_fitted_lineage_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
+
+use model_selection::ModelSelectionError;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -41,6 +46,13 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Composed fitted-`K` plus topic-lineage artifact and execution contracts.
+pub use composed_fitted_lineage_artifact::{
+    COMPOSED_FITTED_LINEAGE_ARTIFACT_BYTE_LIMIT, COMPOSED_FITTED_LINEAGE_ARTIFACT_SCHEMA_VERSION,
+    COMPOSED_FITTED_LINEAGE_MODEL_CONTRACT_VERSION, COMPOSED_FITTED_LINEAGE_OUTPUT_PROFILE,
+    ComposedFittedLineageArtifact, ComposedFittedLineageExecution, ComposedFittedLineageInput,
+    execute_composed_fitted_lineage_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +260,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A model-selection gate rejected the offered candidates or method.
+    ModelSelection(ModelSelectionError),
+    /// A composed fitted-lineage artifact violated its bounded schema or counts.
+    InvalidComposedFittedLineageArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +278,10 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::ModelSelection(error) => return error.fmt(formatter),
+            Self::InvalidComposedFittedLineageArtifact => {
+                "invalid composed fitted-lineage artifact"
+            }
         };
         formatter.write_str(message)
     }
@@ -278,6 +298,12 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<ModelSelectionError> for AnalysisEngineError {
+    fn from(error: ModelSelectionError) -> Self {
+        Self::ModelSelection(error)
     }
 }
 
@@ -413,7 +439,8 @@ mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
+        MAX_EVIDENCE_UNITS, ModelSelectionError, TopicMeasurementError, add_membership_count,
+        execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -681,6 +708,14 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::InvalidComposedFittedLineageArtifact,
+                "invalid composed fitted-lineage artifact",
+            ),
+            (
+                AnalysisEngineError::ModelSelection(ModelSelectionError::EmptyCandidateSet),
+                "empty model-selection candidate set",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -689,6 +724,12 @@ mod tests {
         assert_eq!(converted.to_string(), "invalid API wire payload");
         let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
         assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        let from_selection: AnalysisEngineError =
+            ModelSelectionError::LlmVoteIsNotStatisticalAuthority.into();
+        assert_eq!(
+            from_selection.to_string(),
+            "llm vote is not statistical authority"
+        );
         assert_eq!(
             add_membership_count(u64::MAX, 1),
             Err(AnalysisEngineError::ArithmeticOverflow)

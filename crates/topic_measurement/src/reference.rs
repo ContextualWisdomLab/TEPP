@@ -2,10 +2,10 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use corpus_split::CorpusSnapshot;
+use corpus_split::{CorpusSnapshot, cutoff_eligible};
 use membership_core::{GroupId, MemberId, MembershipNetwork, MembershipRole};
 use relation_graph::RelationGraph;
-use temporal_core::EventTime;
+use temporal_core::{AvailableTime, EventTime, KnowledgeCutoff};
 use uuid::Uuid;
 
 use crate::{SparseMatrix, TopicMeasurementError, from_additive_log_ratio};
@@ -41,6 +41,7 @@ pub enum PrevalenceFeature {
 #[derive(Clone, Debug)]
 pub struct ReferenceTopicInput {
     document_ids: Vec<Uuid>,
+    available_times: Vec<AvailableTime>,
     event_times: Vec<EventTime>,
     term_rows: Vec<Vec<(usize, f64)>>,
     vocabulary_size: usize,
@@ -104,8 +105,14 @@ impl ReferenceTopicInput {
         let (design, features) = build_design(&document_ids, event_times, covariates, memberships)?;
         let transition_pairs = collect_transition_pairs(&index_by_id, relations)?;
 
+        let available_times = document_ids
+            .iter()
+            .map(|id| snapshot.available_time(*id))
+            .collect::<Option<Vec<_>>>()
+            .ok_or(TopicMeasurementError::InvalidModelInput)?;
         Ok(Self {
             document_ids,
+            available_times,
             event_times: event_times.to_vec(),
             term_rows,
             vocabulary_size: document_term.columns(),
@@ -119,6 +126,14 @@ impl ReferenceTopicInput {
     #[must_use]
     pub fn document_count(&self) -> usize {
         self.document_ids.len()
+    }
+
+    /// Return whether every modeled document was available by `knowledge_cutoff`.
+    #[must_use]
+    pub fn is_eligible_at(&self, knowledge_cutoff: &KnowledgeCutoff) -> bool {
+        self.available_times
+            .iter()
+            .all(|available| cutoff_eligible(available, knowledge_cutoff))
     }
 
     /// Return the vocabulary size.
@@ -1091,11 +1106,15 @@ mod tests {
         validate_positive_definite,
     };
     use crate::TopicMeasurementError;
-    use temporal_core::EventTime;
+    use temporal_core::{AvailableTime, EventTime};
     use uuid::Uuid;
 
     fn event_time(day: u8) -> EventTime {
         EventTime::parse_rfc3339(&format!("2026-01-{day:02}T00:00:00Z")).expect("event time")
+    }
+
+    fn available_time() -> AvailableTime {
+        AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("available time")
     }
 
     #[test]
@@ -1130,6 +1149,7 @@ mod tests {
     fn impossible_numeric_states_and_mixed_topic_edges_fail_closed() {
         let input = ReferenceTopicInput {
             document_ids: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            available_times: vec![available_time(); 2],
             event_times: vec![event_time(1), event_time(2)],
             term_rows: vec![vec![(0, f64::MAX)], vec![(0, f64::MAX)]],
             vocabulary_size: 2,
@@ -1220,6 +1240,7 @@ mod tests {
     ) -> ReferenceTopicInput {
         ReferenceTopicInput {
             document_ids: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            available_times: vec![available_time(); 2],
             event_times: vec![event_time(1), event_time(2)],
             term_rows,
             vocabulary_size,
@@ -1335,6 +1356,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)]
     fn joint_precision_binds_basis_and_rejects_invalid_geometry() {
         let input = scoring_input(vec![vec![(0, 2.0)], vec![(1, 3.0)]], 3);
         let config = ReferenceTopicModelConfig::new(3, vec![1], 10, 1e-6).expect("config");
@@ -1387,6 +1409,7 @@ mod tests {
 
         let empty = ReferenceTopicInput {
             document_ids: Vec::new(),
+            available_times: Vec::new(),
             event_times: Vec::new(),
             term_rows: Vec::new(),
             vocabulary_size: 2,
@@ -1408,6 +1431,7 @@ mod tests {
         );
         let oversized = ReferenceTopicInput {
             document_ids: vec![Uuid::from_u128(1); 4_097],
+            available_times: vec![available_time(); 4_097],
             event_times: vec![event_time(1); 4_097],
             term_rows: vec![vec![(0, 1.0)]; 4_097],
             vocabulary_size: 2,

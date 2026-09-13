@@ -158,13 +158,14 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
     let (snapshot, ids, times, memberships, relations) = fixture();
     let counts = SparseMatrix::from_csr(4, 2, vec![0, 1, 2, 3, 4], vec![0, 0, 1, 1], vec![1.0; 4])
         .expect("counts");
     let input = ReferenceTopicInput::new(
         &snapshot,
-        ids,
+        ids.clone(),
         &counts,
         &times,
         None,
@@ -221,6 +222,38 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+    let late_available =
+        AvailableTime::parse_rfc3339("2026-08-02T00:00:00Z").expect("late available");
+    let later_cutoff =
+        KnowledgeCutoff::parse_rfc3339("2026-08-03T00:00:00Z").expect("later cutoff");
+    let mut late_snapshot = CorpusSnapshot::new();
+    for id in &ids {
+        late_snapshot
+            .insert_if_eligible(CorpusDocument::new(*id, late_available), &later_cutoff)
+            .expect("later snapshot");
+    }
+    let late_input = ReferenceTopicInput::new(
+        &late_snapshot,
+        ids,
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("late input");
+    assert_eq!(
+        execute_topic_lineage_run(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            cutoff,
+            &late_input,
+            &config,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
     assert_eq!(
         execute_topic_lineage_run(
             &request,

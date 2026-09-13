@@ -9,7 +9,7 @@ use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 use topic_measurement::{
-    ReferenceTopicInput, ReferenceTopicModelConfig, fit_reference_topic_model,
+    ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, fit_reference_topic_model,
 };
 use uuid::Uuid;
 
@@ -197,11 +197,32 @@ pub fn execute_topic_lineage_run(
     if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
         || request.model_contract_version != TOPIC_LINEAGE_MODEL_CONTRACT_VERSION
         || request.output_profile != TOPIC_LINEAGE_OUTPUT_PROFILE
+        || !input.is_eligible_at(&knowledge_cutoff)
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
 
     let model = fit_reference_topic_model(input, config)?;
+    topic_lineage_execution_from_model(
+        request,
+        accepted,
+        snapshot_id,
+        knowledge_cutoff,
+        input,
+        &model,
+        completed_at,
+    )
+}
+
+pub(crate) fn topic_lineage_execution_from_model(
+    request: &AnalysisRunRequest,
+    accepted: &AnalysisRunAccepted,
+    snapshot_id: &str,
+    knowledge_cutoff: KnowledgeCutoff,
+    input: &ReferenceTopicInput,
+    model: &ReferenceTopicModel,
+    completed_at: impl Into<String>,
+) -> Result<TopicLineageExecution, AnalysisEngineError> {
     let topic_count = u64::try_from(model.topic_term_probabilities.len())
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let evidence_count = u64::try_from(input.document_count())

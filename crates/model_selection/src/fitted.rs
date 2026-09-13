@@ -113,6 +113,40 @@ impl FittedCandidateKConfig {
         self.tolerance
     }
 
+    /// Build the exact reference-estimator configuration for one candidate.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ModelSelectionError::NonPositiveCandidateK`] when `candidate_k`
+    /// is not in this validated candidate set, or
+    /// [`ModelSelectionError::InvalidDiagnostic`] when conversion fails.
+    pub fn reference_config(
+        &self,
+        candidate_k: u32,
+    ) -> Result<ReferenceTopicModelConfig, ModelSelectionError> {
+        if !self.candidate_topic_counts.contains(&candidate_k) {
+            return Err(ModelSelectionError::NonPositiveCandidateK);
+        }
+        let topic_count =
+            usize::try_from(candidate_k).map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+        ReferenceTopicModelConfig::new(
+            topic_count,
+            self.seeds.clone(),
+            self.maximum_iterations,
+            self.tolerance,
+        )
+        .and_then(|value| {
+            value.with_hyperparameters(
+                self.prior_variance,
+                self.relation_strength,
+                self.ridge,
+                self.topic_smoothing,
+                self.step_size,
+            )
+        })
+        .map_err(|_| ModelSelectionError::InvalidDiagnostic)
+    }
+
     fn validate(&self) -> Result<(), ModelSelectionError> {
         if self.candidate_topic_counts.is_empty() {
             return Err(ModelSelectionError::EmptyCandidateSet);
@@ -202,29 +236,29 @@ pub fn select_fitted_candidate_k(
     method_name: &str,
     llm_votes: &[u32],
 ) -> Result<u32, ModelSelectionError> {
+    select_fitted_candidate_model(input, config, method_name, llm_votes)
+        .map(|(candidate_k, _)| candidate_k)
+}
+
+/// Fit each candidate and return the selected `K` with its exact fitted model.
+///
+/// # Errors
+///
+/// Returns the same typed failures as [`select_fitted_candidate_k`].
+pub fn select_fitted_candidate_model(
+    input: &ReferenceTopicInput,
+    config: &FittedCandidateKConfig,
+    method_name: &str,
+    llm_votes: &[u32],
+) -> Result<(u32, ReferenceTopicModel), ModelSelectionError> {
     refuse_nonstatistical_method(method_name)?;
     let mut candidates = Vec::new();
+    let mut fitted = Vec::new();
     for &candidate_k in config.candidate_topic_counts() {
-        #[allow(clippy::cast_possible_truncation)]
-        let topic_count = candidate_k as usize;
-        let fit_config = ReferenceTopicModelConfig::new(
-            topic_count,
-            config.seeds().to_vec(),
-            config.maximum_iterations(),
-            config.tolerance(),
-        )
-        .and_then(|value| {
-            value.with_hyperparameters(
-                config.prior_variance,
-                config.relation_strength,
-                config.ridge,
-                config.topic_smoothing,
-                config.step_size,
-            )
-        })
-        .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+        let fit_config = config.reference_config(candidate_k)?;
         if let Ok(model) = fit_reference_topic_model(input, &fit_config) {
             candidates.push(statistical_candidate_from_fit(input, candidate_k, &model)?);
+            fitted.push((candidate_k, model));
         }
     }
     for &vote in llm_votes {
@@ -233,7 +267,11 @@ pub fn select_fitted_candidate_k(
     if candidates.is_empty() {
         return Err(ModelSelectionError::NoSuccessfulFit);
     }
-    select_candidate_k(&candidates)
+    let selected_k = select_candidate_k(&candidates)?;
+    fitted
+        .into_iter()
+        .find(|(candidate_k, _)| *candidate_k == selected_k)
+        .ok_or(ModelSelectionError::NoSuccessfulFit)
 }
 
 fn refuse_nonstatistical_method(method: &str) -> Result<(), ModelSelectionError> {
@@ -322,6 +360,11 @@ mod tests {
         assert_eq!(config.seeds(), &[7, 11]);
         assert_eq!(config.maximum_iterations(), 20);
         assert!((config.tolerance() - 1e-5).abs() < f64::EPSILON);
+        assert!(config.reference_config(2).is_ok());
+        assert_eq!(
+            config.reference_config(4),
+            Err(ModelSelectionError::NonPositiveCandidateK)
+        );
         refuse_nonstatistical_method("trsl_tm_reference").expect("allowed");
         refuse_nonstatistical_method("logistic_normal").expect("allowed");
         for method in [
