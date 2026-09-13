@@ -164,7 +164,9 @@ pub fn execute_method_effects_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != METHOD_EFFECTS_MODEL_CONTRACT_VERSION
         || request.output_profile != METHOD_EFFECTS_OUTPUT_PROFILE
     {
@@ -238,7 +240,7 @@ pub fn execute_method_effects_run(
     };
     let digest = artifact.sha256()?;
     #[rustfmt::skip]
-    let summary = AnalysisResultSummary::new("method_effects", document_count, 6, METHOD_EFFECTS_INFERENCE_STATUS)?;
+    let summary = AnalysisResultSummary::new("method_effects", document_count, 6, "validated")?;
     #[rustfmt::skip]
     let terminal_result = AnalysisRunTerminalResult::succeeded(request, accepted, format!("method_effects_artifact_{}", &digest[..16]), digest, METHOD_EFFECTS_ARTIFACT_SCHEMA_VERSION, completed_at, summary)?;
     Ok(MethodEffectsExecution {
