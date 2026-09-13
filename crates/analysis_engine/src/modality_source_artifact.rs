@@ -186,7 +186,9 @@ pub fn execute_modality_source_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != MODALITY_SOURCE_MODEL_CONTRACT_VERSION
         || request.output_profile != MODALITY_SOURCE_OUTPUT_PROFILE
     {
@@ -253,12 +255,7 @@ pub fn execute_modality_source_run(
         inference_status: MODALITY_SOURCE_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "modality_source",
-        document_count,
-        4,
-        MODALITY_SOURCE_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("modality_source", document_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
