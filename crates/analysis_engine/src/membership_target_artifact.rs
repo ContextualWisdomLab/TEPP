@@ -19,7 +19,7 @@ pub const MEMBERSHIP_TARGET_ARTIFACT_SCHEMA_VERSION: &str = "tepp.membership_tar
 pub const MEMBERSHIP_TARGET_MODEL_CONTRACT_VERSION: &str = "membership_target_v1";
 /// Analysis-run output profile required for a membership-target artifact.
 pub const MEMBERSHIP_TARGET_OUTPUT_PROFILE: &str = "membership_target_v1";
-/// Maximum canonical artifact JSON size.
+/// Maximum accepted membership-target artifact JSON size.
 pub const MEMBERSHIP_TARGET_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const MEMBERSHIP_TARGET_INFERENCE_STATUS: &str =
     "language_episode_template_department_opportunity_pool_are_not_entities";
@@ -131,15 +131,10 @@ impl MembershipTargetArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > MEMBERSHIP_TARGET_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
