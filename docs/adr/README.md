@@ -28,8 +28,13 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0020](0020-span-grounded-semantic-units.md) | Span-grounded semantic units; language tags are not identity | Accepted | active-PR | First ADR 0004 production slice; concept alignment, invariance, and topic estimation are not claimed. |
 | [0021](0021-lineageweave-project-history-boundary.md) | LineageWeave project-history service boundary | Accepted | active-PR | Credential-free bounded project-history API preserves LineageWeave authorization ownership. |
 | [0022](0022-deterministic-analysis-run-execution.md) | Deterministic cutoff-safe analysis-run execution | Accepted | active-PR | Closes the first executable product path from accepted run to digest-bound terminal result without claiming estimator authority. |
+| [0074](0074-subevent-containment-analysis-run.md) | Subevent-containment refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `EventInterval` + `refuse_escaped_subevent`, not episode-membership, not inferred-status. |
 | [0024](0024-lineage-pair-criterion-and-project-journey-posterior.md) | Independent Event Lineage pair criterion and posterior Project Journey | Proposed | active-PR | Strict artifacts preserve criterion/event-time draws, branches, ties, and CPU/GPU receipts without claiming the scientific estimator is complete. |
 | [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
+| [0058](0058-copy-identity-analysis-run.md) | Template-copy identity refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `refuse_copy_as_source_identity` + `refuse_copy_as_transition`, not a simulation method-effect census. |
+| [0066](0066-location-membership-analysis-run.md) | Location-membership refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `refuse_location_as_entity_identity` + `refuse_location_as_language_channel`, not membership-posterior ICC. |
+| [0069](0069-membership-target-analysis-run.md) | Membership-target refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `MembershipTargetKind` + `refuse_collapsed_target`, not location-membership, not membership-posterior ICC. |
+| [0072](0072-episode-membership-analysis-run.md) | Episode-membership refusals as an analysis-run profile | Accepted | active-PR | Complements ADR 0003/0022; `EventWindow` + `refuse_membership_outside_episode`, not relation-absence, not outcome-order, not membership-target. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -138,6 +143,11 @@ Use the narrowest owning ADR when decisions overlap:
 - **project-history wire-size symmetry:** ADR 0019.
 - **LineageWeave project-history service boundary:** ADR 0021.
 - **accepted-run execution and terminal artifact production:** ADR 0022.
+- **copy-identity analysis-run profile:** ADR 0058.
+- **location-membership analysis-run profile:** ADR 0066.
+- **membership-target analysis-run profile:** ADR 0069.
+- **episode-membership analysis-run profile:** ADR 0072.
+- **subevent-containment analysis-run profile:** ADR 0074.
 - **independent lineage criterion and posterior Project Journey:** ADR 0023.
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
 
