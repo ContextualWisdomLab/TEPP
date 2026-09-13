@@ -53,7 +53,7 @@ pub use rng::SeededRng;
 /// Digest-bound known-truth corpus.
 pub use truth_manifest::TruthManifest;
 /// Digest helper for configuration fingerprints.
-pub use truth_manifest::digest_bytes;
+pub use truth_manifest::{digest_bytes, digest_documents};
 
 use uuid::Uuid;
 

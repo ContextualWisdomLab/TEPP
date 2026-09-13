@@ -183,24 +183,7 @@ impl TruthManifest {
             hasher.update(event.state().wire_name().as_bytes());
         }
         for document in &self.documents {
-            hasher.update(document.document_id().as_bytes());
-            hasher.update(document.event_id().as_bytes());
-            hasher.update(document.document_time().to_rfc3339().as_bytes());
-            hasher.update(document.available_time().to_rfc3339().as_bytes());
-            hasher.update(document.method_effect().wire_name().as_bytes());
-            if let Some(parent) = document.parent_document_id() {
-                hasher.update(parent.as_bytes());
-            }
-            if let Some(observed) = document.observed_event_time() {
-                hasher.update(observed.to_rfc3339().as_bytes());
-            } else {
-                hasher.update(b"missing");
-            }
-            for membership in document.memberships() {
-                hasher.update(membership.group_id().as_bytes());
-                hasher.update(membership.role_label().as_bytes());
-                hasher.update(membership.weight_bps().to_le_bytes());
-            }
+            hash_document(&mut hasher, document);
         }
         for relation in &self.true_relations {
             hasher.update(relation.relation_id().as_bytes());
@@ -217,6 +200,41 @@ impl TruthManifest {
         }
         hex_encode(&hasher.finalize())
     }
+}
+
+fn hash_document(hasher: &mut Sha256, document: &SimulatedDocument) {
+    hasher.update(document.document_id().as_bytes());
+    hasher.update(document.event_id().as_bytes());
+    hasher.update(document.document_time().to_rfc3339().as_bytes());
+    hasher.update(document.available_time().to_rfc3339().as_bytes());
+    hasher.update(document.method_effect().wire_name().as_bytes());
+    if let Some(parent) = document.parent_document_id() {
+        hasher.update(parent.as_bytes());
+    }
+    if let Some(observed) = document.observed_event_time() {
+        hasher.update(observed.to_rfc3339().as_bytes());
+    } else {
+        hasher.update(b"missing");
+    }
+    for membership in document.memberships() {
+        hasher.update(membership.group_id().as_bytes());
+        hasher.update(membership.role_label().as_bytes());
+        hasher.update(membership.weight_bps().to_le_bytes());
+    }
+}
+
+/// Digest an ordered admitted-document population using canonical truth fields.
+///
+#[must_use]
+pub fn digest_documents(documents: &[&SimulatedDocument]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"tepp.simulated_documents.v1");
+    hasher.update(documents.len().to_string().as_bytes());
+    hasher.update([0]);
+    for document in documents {
+        hash_document(&mut hasher, document);
+    }
+    hex_encode(&hasher.finalize())
 }
 
 fn hex_encode(bytes: &[u8]) -> String {

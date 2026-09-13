@@ -38,6 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- **Method-effects analysis-run profile**: `analysis_engine` binds existing `tepp_simulation::generate` and `refuse_unavailable_document` to cutoff-safe `method_effects_v1` (`tepp.method_effects.v1`) with inference status `simulation_method_effect_labels_not_estimator_model`. Not an estimator-side method model, not GPU, not MCMC, and not topic birth/split/merge.
 - Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
