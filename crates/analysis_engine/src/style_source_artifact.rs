@@ -1,16 +1,20 @@
 //! Digest-bound house-voice style refusals as an analysis-run profile.
 
+use corpus_split::cutoff_eligible;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use style_source::{
     StyleKind, StyleSourceError, refuse_style_as_stopword_deletion, refuse_style_as_unique_content,
 };
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 
-use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
+use crate::{
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, format_digest, require_receipt_identity,
+    valid_identifier,
+};
 
 /// Versioned schema for a completed style-source artifact.
 pub const STYLE_SOURCE_ARTIFACT_SCHEMA_VERSION: &str = "tepp.style_source.v1";
@@ -23,29 +27,39 @@ pub const STYLE_SOURCE_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const STYLE_SOURCE_INFERENCE_STATUS: &str =
     "style_residue_is_not_unique_content_not_stopword_deletion";
 
-/// One cutoff-admitted token treatment with a closed style-source kind.
+/// One token treatment with immutable snapshot and availability provenance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StyleSourceDocument {
     document_id: String,
     kind: StyleKind,
+    snapshot_id: String,
+    available_time: AvailableTime,
 }
 
 impl StyleSourceDocument {
-    /// Construct a bounded style-source document.
+    /// Construct a bounded style-source document with explicit provenance.
     ///
     /// # Errors
     ///
-    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document
-    /// identity is empty or oversized.
+    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document or
+    /// snapshot identity is empty or oversized.
     pub fn new(
         document_id: impl Into<String>,
         kind: StyleKind,
+        snapshot_id: impl Into<String>,
+        available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
         let document_id = document_id.into();
-        if !valid_identifier(&document_id) {
+        let snapshot_id = snapshot_id.into();
+        if !valid_identifier(&document_id) || !valid_identifier(&snapshot_id) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        Ok(Self { document_id, kind })
+        Ok(Self {
+            document_id,
+            kind,
+            snapshot_id,
+            available_time,
+        })
     }
 
     /// Return the opaque document identity.
@@ -58,6 +72,18 @@ impl StyleSourceDocument {
     #[must_use]
     pub const fn kind(&self) -> StyleKind {
         self.kind
+    }
+
+    /// Return the immutable source snapshot identity.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
+    /// Return when the document became available for historical analysis.
+    #[must_use]
+    pub const fn available_time(&self) -> &AvailableTime {
+        &self.available_time
     }
 }
 
@@ -138,6 +164,7 @@ impl StyleSourceArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.document_count < 2
+            || self.document_count > MAX_EVIDENCE_UNITS as u64
             || self.unique_content_count == 0
             || self.style_residue_count == 0
             || kind_sum != Some(self.document_count)
@@ -170,7 +197,8 @@ pub struct StyleSourceExecution {
 /// # Errors
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, empty or
-/// single-kind corpus, duplicate document identity, or invalid artifact error.
+/// single-kind admitted corpus, duplicate admitted document identity,
+/// oversized raw corpus, or invalid artifact error.
 pub fn execute_style_source_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -185,11 +213,16 @@ pub fn execute_style_source_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != STYLE_SOURCE_MODEL_CONTRACT_VERSION
         || request.output_profile != STYLE_SOURCE_OUTPUT_PROFILE
     {
         return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    if documents.len() > MAX_EVIDENCE_UNITS {
+        return Err(AnalysisEngineError::LimitExceeded);
     }
 
     let mut seen = std::collections::BTreeSet::new();
@@ -198,6 +231,12 @@ pub fn execute_style_source_run(
     let mut refused_as_unique_content_count = 0_u64;
     let mut refused_as_stopword_deletion_count = 0_u64;
     for document in documents {
+        if document.snapshot_id() != snapshot_id {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        if !cutoff_eligible(document.available_time(), &knowledge_cutoff) {
+            continue;
+        }
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
@@ -233,7 +272,7 @@ pub fn execute_style_source_run(
         }
     }
     let document_count =
-        u64::try_from(documents.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+        u64::try_from(seen.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     if document_count < 2 || unique_content_count == 0 || style_residue_count == 0 {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
@@ -251,12 +290,7 @@ pub fn execute_style_source_run(
         inference_status: STYLE_SOURCE_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "style_source",
-        document_count,
-        4,
-        STYLE_SOURCE_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("style_source", document_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
@@ -287,7 +321,7 @@ mod tests {
         STYLE_SOURCE_ARTIFACT_BYTE_LIMIT, STYLE_SOURCE_ARTIFACT_SCHEMA_VERSION,
         STYLE_SOURCE_INFERENCE_STATUS, StyleSourceArtifact,
     };
-    use crate::AnalysisEngineError;
+    use crate::{AnalysisEngineError, MAX_EVIDENCE_UNITS};
 
     fn artifact() -> StyleSourceArtifact {
         StyleSourceArtifact {
@@ -361,6 +395,15 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.document_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("bound") + 1;
+                value.unique_content_count = value.document_count - 1;
+                value.style_residue_count = 1;
+                value.refused_as_unique_content_count = 1;
+                value.refused_as_stopword_deletion_count = 1;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.unique_content_count = 0;
                 value
             },
@@ -371,7 +414,19 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.unique_content_count = u64::MAX;
+                value.style_residue_count = 1;
+                value.document_count = u64::MAX;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.refused_as_unique_content_count = 1;
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.refused_as_stopword_deletion_count = 1;
                 value
             },
             {
