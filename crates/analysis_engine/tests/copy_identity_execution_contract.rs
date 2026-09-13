@@ -153,21 +153,25 @@ fn empty_source_only_copy_only_and_duplicate_identities_fail_closed() {
 }
 
 #[test]
-fn future_available_documents_fail_closed() {
+fn future_duplicate_identity_cannot_change_historical_cutoff_result() {
     let request = request();
-    let mut documents = mixed_documents();
-    documents.push(
+    let visible = mixed_documents();
+    let baseline = execute(&request, &visible).expect("historical baseline");
+
+    let mut with_future_duplicate = vec![
         CopyIdentityDocument::new(
-            "future-copy",
+            "copy-b",
             CopyKind::TemplateCopy,
             AvailableTime::parse_rfc3339("2026-08-02T00:00:00Z").expect("available"),
         )
         .expect("document"),
-    );
-    assert_eq!(
-        execute(&request, &documents),
-        Err(AnalysisEngineError::InvalidEvidence)
-    );
+    ];
+    with_future_duplicate.extend(visible);
+    let replay = execute(&request, &with_future_duplicate)
+        .expect("future-unavailable duplicate must not enter cutoff admission");
+
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
 }
 
 #[test]
