@@ -262,11 +262,11 @@ fn census_evidence(
     let mut refused_as_observed_count = 0_u64;
     let mut refused_as_transition_count = 0_u64;
     for row in evidence {
-        if !seen.insert(row.evidence_id()) {
-            return Err(AnalysisEngineError::DuplicateEvidence);
-        }
         if row.available_time().instant() > knowledge_cutoff.instant() {
             continue;
+        }
+        if !seen.insert(row.evidence_id()) {
+            return Err(AnalysisEngineError::DuplicateEvidence);
         }
         match row.status() {
             EvidenceStatus::Observed => {
