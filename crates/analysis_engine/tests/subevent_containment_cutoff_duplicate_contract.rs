@@ -54,12 +54,7 @@ fn future_duplicate_identity_cannot_change_historical_cutoff_result() {
             interval(15, 30),
             "2026-07-01T00:00:00Z",
         ),
-        assignment(
-            "escaped-b",
-            parent,
-            interval(0, 20),
-            "2026-07-02T00:00:00Z",
-        ),
+        assignment("escaped-b", parent, interval(0, 20), "2026-07-02T00:00:00Z"),
     ];
     let baseline = execute_subevent_containment_run(
         &request,
