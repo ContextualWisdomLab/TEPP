@@ -6,11 +6,19 @@ use analysis_engine::{
     CorpusBackgroundDocument, execute_corpus_background_run,
 };
 use corpus_background::CorpusBackgroundKind;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+}
+
+fn available() -> AvailableTime {
+    AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available")
+}
+
+fn document(document_id: &str, kind: CorpusBackgroundKind) -> CorpusBackgroundDocument {
+    CorpusBackgroundDocument::new(document_id, kind, available()).expect("document")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -36,12 +44,9 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
 
 fn mixed_documents() -> Vec<CorpusBackgroundDocument> {
     vec![
-        CorpusBackgroundDocument::new("unique-a", CorpusBackgroundKind::UniqueContent)
-            .expect("unique"),
-        CorpusBackgroundDocument::new("bg-b", CorpusBackgroundKind::CorpusBackground)
-            .expect("background"),
-        CorpusBackgroundDocument::new("bg-c", CorpusBackgroundKind::CorpusBackground)
-            .expect("background"),
+        document("unique-a", CorpusBackgroundKind::UniqueContent),
+        document("bg-b", CorpusBackgroundKind::CorpusBackground),
+        document("bg-c", CorpusBackgroundKind::CorpusBackground),
     ]
 }
 
@@ -76,6 +81,15 @@ fn mixed_background_kinds_emit_digest_bound_refusals_without_recovery_metric() {
         execution.artifact.inference_status,
         "corpus_background_is_not_unique_content_not_stopword_deletion"
     );
+    assert_eq!(
+        execution
+            .terminal_result
+            .summary
+            .as_ref()
+            .expect("summary")
+            .validation_status,
+        "validated"
+    );
     let payload = execution.artifact.to_json().expect("json");
     assert!(!payload.contains("identity_recovery_rate"));
     assert!(!payload.contains("scientific_acceptance"));
@@ -101,36 +115,31 @@ fn empty_unique_only_background_only_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let unique_only = vec![
-        CorpusBackgroundDocument::new("unique-a", CorpusBackgroundKind::UniqueContent)
-            .expect("unique"),
-        CorpusBackgroundDocument::new("unique-b", CorpusBackgroundKind::UniqueContent)
-            .expect("unique"),
+        document("unique-a", CorpusBackgroundKind::UniqueContent),
+        document("unique-b", CorpusBackgroundKind::UniqueContent),
     ];
     assert_eq!(
         execute(&request, &unique_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let background_only = vec![
-        CorpusBackgroundDocument::new("bg-a", CorpusBackgroundKind::CorpusBackground)
-            .expect("background"),
-        CorpusBackgroundDocument::new("bg-b", CorpusBackgroundKind::CorpusBackground)
-            .expect("background"),
+        document("bg-a", CorpusBackgroundKind::CorpusBackground),
+        document("bg-b", CorpusBackgroundKind::CorpusBackground),
     ];
     assert_eq!(
         execute(&request, &background_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
-        CorpusBackgroundDocument::new("same", CorpusBackgroundKind::UniqueContent).expect("unique"),
-        CorpusBackgroundDocument::new("same", CorpusBackgroundKind::CorpusBackground)
-            .expect("background"),
+        document("same", CorpusBackgroundKind::UniqueContent),
+        document("same", CorpusBackgroundKind::CorpusBackground),
     ];
     assert_eq!(
         execute(&request, &duplicates),
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        CorpusBackgroundDocument::new("", CorpusBackgroundKind::UniqueContent),
+        CorpusBackgroundDocument::new("", CorpusBackgroundKind::UniqueContent, available()),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 }
