@@ -270,20 +270,27 @@ fn census_assignments(
         if !seen.insert(assignment.assignment_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
-        match refuse_escaped_subevent(assignment.parent(), assignment.child()) {
-            Ok(()) => {
-                contained_count = increment(contained_count)?;
-            }
-            Err(SubeventContainmentError::SubeventEscapesParent) => {
-                refused_as_escape_count = increment(refused_as_escape_count)?;
-                escaped_count = increment(escaped_count)?;
-            }
-            Err(SubeventContainmentError::InvalidIntervalPayload | _) => {
-                return Err(AnalysisEngineError::InvalidEvidence);
-            }
+        if classify_subevent_result(refuse_escaped_subevent(
+            assignment.parent(),
+            assignment.child(),
+        ))? {
+            contained_count = increment(contained_count)?;
+        } else {
+            refused_as_escape_count = increment(refused_as_escape_count)?;
+            escaped_count = increment(escaped_count)?;
         }
     }
     Ok((contained_count, escaped_count, refused_as_escape_count))
+}
+
+fn classify_subevent_result(
+    result: Result<(), SubeventContainmentError>,
+) -> Result<bool, AnalysisEngineError> {
+    match result {
+        Ok(()) => Ok(true),
+        Err(SubeventContainmentError::SubeventEscapesParent) => Ok(false),
+        Err(_) => Err(AnalysisEngineError::InvalidEvidence),
+    }
 }
 
 fn increment(count: u64) -> Result<u64, AnalysisEngineError> {
@@ -297,8 +304,10 @@ mod tests {
     use super::{
         SUBEVENT_CONTAINMENT_ARTIFACT_BYTE_LIMIT, SUBEVENT_CONTAINMENT_ARTIFACT_SCHEMA_VERSION,
         SUBEVENT_CONTAINMENT_INFERENCE_STATUS, SubeventContainmentArtifact,
+        classify_subevent_result,
     };
     use crate::AnalysisEngineError;
+    use subevent_containment::SubeventContainmentError;
 
     fn artifact() -> SubeventContainmentArtifact {
         SubeventContainmentArtifact {
@@ -398,5 +407,18 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn subevent_result_classifier_fails_closed_on_provider_drift() {
+        assert_eq!(classify_subevent_result(Ok(())), Ok(true));
+        assert_eq!(
+            classify_subevent_result(Err(SubeventContainmentError::SubeventEscapesParent)),
+            Ok(false)
+        );
+        assert_eq!(
+            classify_subevent_result(Err(SubeventContainmentError::InvalidIntervalPayload)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }
