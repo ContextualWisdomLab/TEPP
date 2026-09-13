@@ -28,33 +28,37 @@ pub const CORPUS_BACKGROUND_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const CORPUS_BACKGROUND_INFERENCE_STATUS: &str =
     "corpus_background_is_not_unique_content_not_stopword_deletion";
 
-/// One token treatment with availability provenance and a closed corpus-background kind.
+/// One token treatment with immutable snapshot and availability provenance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CorpusBackgroundDocument {
     document_id: String,
     kind: CorpusBackgroundKind,
+    snapshot_id: String,
     available_time: AvailableTime,
 }
 
 impl CorpusBackgroundDocument {
-    /// Construct a bounded corpus-background document with explicit availability provenance.
+    /// Construct a bounded corpus-background document with explicit provenance.
     ///
     /// # Errors
     ///
-    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document
-    /// identity is empty or oversized.
+    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document or
+    /// snapshot identity is empty or oversized.
     pub fn new(
         document_id: impl Into<String>,
         kind: CorpusBackgroundKind,
+        snapshot_id: impl Into<String>,
         available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
         let document_id = document_id.into();
-        if !valid_identifier(&document_id) {
+        let snapshot_id = snapshot_id.into();
+        if !valid_identifier(&document_id) || !valid_identifier(&snapshot_id) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         Ok(Self {
             document_id,
             kind,
+            snapshot_id,
             available_time,
         })
     }
@@ -69,6 +73,12 @@ impl CorpusBackgroundDocument {
     #[must_use]
     pub const fn kind(&self) -> CorpusBackgroundKind {
         self.kind
+    }
+
+    /// Return the immutable source snapshot identity.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
     }
 
     /// Return when the document became available for historical analysis.
@@ -223,6 +233,9 @@ pub fn execute_corpus_background_run(
     let mut refused_as_unique_content_count = 0_u64;
     let mut refused_as_stopword_deletion_count = 0_u64;
     for document in documents {
+        if document.snapshot_id() != snapshot_id {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
         if !cutoff_eligible(document.available_time(), &knowledge_cutoff) {
             continue;
         }
