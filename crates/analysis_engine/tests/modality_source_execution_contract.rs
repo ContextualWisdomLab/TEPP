@@ -1,16 +1,20 @@
 //! End-to-end contract for cutoff-safe non-lexical modality refusals.
 
 use analysis_engine::{
-    AnalysisEngineError, MODALITY_SOURCE_ARTIFACT_SCHEMA_VERSION,
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, MODALITY_SOURCE_ARTIFACT_SCHEMA_VERSION,
     MODALITY_SOURCE_MODEL_CONTRACT_VERSION, MODALITY_SOURCE_OUTPUT_PROFILE, ModalitySourceDocument,
     execute_modality_source_run,
 };
 use modality_source::ModalityKind;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+}
+
+fn available(stamp: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(stamp).expect("available")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -30,13 +34,37 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
         .expect("accepted")
 }
 
+fn document(
+    document_id: &str,
+    kind: ModalityKind,
+    available_time: &str,
+) -> ModalitySourceDocument {
+    ModalitySourceDocument::new(
+        document_id,
+        kind,
+        "snapshot-modality-source",
+        available(available_time),
+    )
+    .expect("document")
+}
+
 fn mixed_documents() -> Vec<ModalitySourceDocument> {
     vec![
-        ModalitySourceDocument::new("unique-a", ModalityKind::UniqueContent).expect("unique"),
-        ModalitySourceDocument::new("modality-b", ModalityKind::NonLexicalModality)
-            .expect("modality"),
-        ModalitySourceDocument::new("modality-c", ModalityKind::NonLexicalModality)
-            .expect("modality"),
+        document(
+            "unique-a",
+            ModalityKind::UniqueContent,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "modality-b",
+            ModalityKind::NonLexicalModality,
+            "2026-07-31T23:00:00Z",
+        ),
+        document(
+            "modality-c",
+            ModalityKind::NonLexicalModality,
+            "2026-08-01T00:00:00Z",
+        ),
     ]
 }
 
@@ -118,6 +146,55 @@ fn terminal_summary_keeps_validation_status_separate_from_domain_inference() {
 }
 
 #[test]
+fn future_unavailable_duplicate_cannot_change_historical_replay() {
+    let request = request();
+    let baseline = execute(&request, &mixed_documents()).expect("baseline");
+    let mut with_future = vec![document(
+        "unique-a",
+        ModalityKind::UniqueContent,
+        "2026-08-01T00:00:01Z",
+    )];
+    with_future.extend(mixed_documents());
+    let replay = execute(&request, &with_future).expect("historical replay");
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
+}
+
+#[test]
+fn cross_snapshot_document_fails_before_aggregation() {
+    let request = request();
+    let mut documents = mixed_documents();
+    documents.push(
+        ModalitySourceDocument::new(
+            "modality-other-snapshot",
+            ModalityKind::NonLexicalModality,
+            "other-snapshot",
+            available("2026-07-31T23:30:00Z"),
+        )
+        .expect("cross-snapshot document"),
+    );
+    assert_eq!(
+        execute(&request, &documents),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn raw_census_bound_precedes_identity_allocation_and_duplicate_checks() {
+    let request = request();
+    let repeated = document(
+        "repeated",
+        ModalityKind::UniqueContent,
+        "2026-07-31T22:00:00Z",
+    );
+    let documents = vec![repeated; MAX_EVIDENCE_UNITS + 1];
+    assert_eq!(
+        execute(&request, &documents),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
 fn empty_unique_only_modality_only_and_duplicate_identities_fail_closed() {
     let request = request();
     assert_eq!(
@@ -125,33 +202,69 @@ fn empty_unique_only_modality_only_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let unique_only = vec![
-        ModalitySourceDocument::new("unique-a", ModalityKind::UniqueContent).expect("unique"),
-        ModalitySourceDocument::new("unique-b", ModalityKind::UniqueContent).expect("unique"),
+        document(
+            "unique-a",
+            ModalityKind::UniqueContent,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "unique-b",
+            ModalityKind::UniqueContent,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &unique_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let modality_only = vec![
-        ModalitySourceDocument::new("modality-a", ModalityKind::NonLexicalModality)
-            .expect("modality"),
-        ModalitySourceDocument::new("modality-b", ModalityKind::NonLexicalModality)
-            .expect("modality"),
+        document(
+            "modality-a",
+            ModalityKind::NonLexicalModality,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "modality-b",
+            ModalityKind::NonLexicalModality,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &modality_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
-        ModalitySourceDocument::new("same", ModalityKind::UniqueContent).expect("unique"),
-        ModalitySourceDocument::new("same", ModalityKind::NonLexicalModality).expect("modality"),
+        document(
+            "same",
+            ModalityKind::UniqueContent,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "same",
+            ModalityKind::NonLexicalModality,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &duplicates),
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        ModalitySourceDocument::new("", ModalityKind::UniqueContent),
+        ModalitySourceDocument::new(
+            "",
+            ModalityKind::UniqueContent,
+            "snapshot-modality-source",
+            available("2026-07-31T22:00:00Z"),
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        ModalitySourceDocument::new(
+            "unique-a",
+            ModalityKind::UniqueContent,
+            "",
+            available("2026-07-31T22:00:00Z"),
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 }
