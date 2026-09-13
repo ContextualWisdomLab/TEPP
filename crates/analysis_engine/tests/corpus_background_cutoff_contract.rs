@@ -1,19 +1,21 @@
 //! Historical-cutoff contracts for the corpus-background analysis profile.
 
 use analysis_engine::{
-    CORPUS_BACKGROUND_MODEL_CONTRACT_VERSION, CORPUS_BACKGROUND_OUTPUT_PROFILE,
-    CorpusBackgroundDocument, execute_corpus_background_run,
+    AnalysisEngineError, CORPUS_BACKGROUND_MODEL_CONTRACT_VERSION,
+    CORPUS_BACKGROUND_OUTPUT_PROFILE, CorpusBackgroundDocument, execute_corpus_background_run,
 };
 use corpus_background::CorpusBackgroundKind;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest};
+
+const SNAPSHOT_ID: &str = "snapshot-corpus-background";
 
 fn request(cutoff: &str) -> AnalysisRunRequest {
     AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: "corpus-background-cutoff".into(),
         tenant_workspace_id: "tenant-workspace".into(),
-        snapshot_id: "snapshot-corpus-background".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: cutoff.into(),
         model_contract_version: CORPUS_BACKGROUND_MODEL_CONTRACT_VERSION.into(),
         output_profile: CORPUS_BACKGROUND_OUTPUT_PROFILE.into(),
@@ -28,11 +30,13 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
 fn document(
     document_id: &str,
     kind: CorpusBackgroundKind,
+    snapshot_id: &str,
     available_time: &str,
 ) -> CorpusBackgroundDocument {
     CorpusBackgroundDocument::new(
         document_id,
         kind,
+        snapshot_id,
         AvailableTime::parse_rfc3339(available_time).expect("available time"),
     )
     .expect("document")
@@ -43,27 +47,34 @@ fn documents() -> Vec<CorpusBackgroundDocument> {
         document(
             "unique-a",
             CorpusBackgroundKind::UniqueContent,
+            SNAPSHOT_ID,
             "2026-07-01T00:00:00Z",
         ),
         document(
             "background-b",
             CorpusBackgroundKind::CorpusBackground,
+            SNAPSHOT_ID,
             "2026-07-02T00:00:00Z",
         ),
     ]
 }
 
-fn execute(documents: &[CorpusBackgroundDocument]) -> analysis_engine::CorpusBackgroundExecution {
+fn try_execute(
+    documents: &[CorpusBackgroundDocument],
+) -> Result<analysis_engine::CorpusBackgroundExecution, AnalysisEngineError> {
     let request = request("2026-08-01T00:00:00Z");
     execute_corpus_background_run(
         &request,
         &accepted(&request),
-        "snapshot-corpus-background",
+        SNAPSHOT_ID,
         KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
         documents,
         "2026-08-02T00:00:00Z",
     )
-    .expect("execution")
+}
+
+fn execute(documents: &[CorpusBackgroundDocument]) -> analysis_engine::CorpusBackgroundExecution {
+    try_execute(documents).expect("execution")
 }
 
 #[test]
@@ -72,7 +83,7 @@ fn equivalent_rfc3339_cutoff_spellings_bind_to_the_same_instant() {
     let execution = execute_corpus_background_run(
         &request,
         &accepted(&request),
-        "snapshot-corpus-background",
+        SNAPSHOT_ID,
         KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
         &documents(),
         "2026-08-02T00:00:00Z",
@@ -110,6 +121,7 @@ fn future_unavailable_duplicate_identity_cannot_change_historical_replay() {
         document(
             "background-b",
             CorpusBackgroundKind::UniqueContent,
+            SNAPSHOT_ID,
             "2026-09-01T00:00:00Z",
         ),
         baseline_documents[0].clone(),
@@ -119,4 +131,17 @@ fn future_unavailable_duplicate_identity_cannot_change_historical_replay() {
 
     assert_eq!(replay.artifact, baseline.artifact);
     assert_eq!(replay.terminal_result, baseline.terminal_result);
+}
+
+#[test]
+fn cross_snapshot_document_is_rejected_before_aggregation() {
+    let mut mixed = documents();
+    mixed.push(document(
+        "background-other-snapshot",
+        CorpusBackgroundKind::CorpusBackground,
+        "snapshot-other",
+        "2026-07-03T00:00:00Z",
+    ));
+
+    assert_eq!(try_execute(&mixed), Err(AnalysisEngineError::InvalidEvidence));
 }
