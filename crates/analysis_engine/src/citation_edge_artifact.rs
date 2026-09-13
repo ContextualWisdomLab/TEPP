@@ -133,9 +133,10 @@ impl CitationEdgeArtifact {
 
     /// Serialize canonical validated artifact JSON.
     ///
-    /// The validated identifier and census bounds make canonical output
-    /// strictly smaller than [`CITATION_EDGE_ARTIFACT_BYTE_LIMIT`]. The input
-    /// cap remains enforced by [`Self::from_json`].
+    /// The validated identifier, strict timestamp syntax, and census bounds
+    /// make canonical output strictly smaller than
+    /// [`CITATION_EDGE_ARTIFACT_BYTE_LIMIT`]. The input cap remains enforced
+    /// by [`Self::from_json`].
     ///
     /// # Errors
     ///
@@ -384,7 +385,7 @@ mod tests {
             schema_version: CITATION_EDGE_ARTIFACT_SCHEMA_VERSION.into(),
             run_id: "r".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES),
             snapshot_id: "s".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES),
-            knowledge_cutoff: "9999-12-31T23:59:59Z".into(),
+            knowledge_cutoff: "2026-08-01T00:00:00.123456789+14:00".into(),
             document_count: maximum_count,
             citation_count: maximum_count - 1,
             translation_count: 0,
