@@ -187,7 +187,9 @@ pub fn execute_corpus_background_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != CORPUS_BACKGROUND_MODEL_CONTRACT_VERSION
         || request.output_profile != CORPUS_BACKGROUND_OUTPUT_PROFILE
     {
@@ -255,12 +257,7 @@ pub fn execute_corpus_background_run(
         inference_status: CORPUS_BACKGROUND_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "corpus_background",
-        document_count,
-        4,
-        CORPUS_BACKGROUND_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("corpus_background", document_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
