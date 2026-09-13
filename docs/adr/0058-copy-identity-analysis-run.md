@@ -1,6 +1,6 @@
 # ADR 0058 — Template-copy identity refusals as an analysis-run output profile
 
-**Decision status:** Accepted
+**Decision status:** Proposed
 **Implementation maturity:** active-PR — composed on this branch; not implemented-main
 **Date:** 2026-08-31
 **Supersedes:** None; complements ADR 0003 (copy-versus-source identity) and ADR 0022 (cutoff-safe analysis-run execution). Does not reuse ADR 0057 (simulation method-effect census), ADR 0056 (case-deletion), ADR 0055 (composed fitted-K+lineage), ADR 0054 (export GET), ADR 0053 (Pareto candidate-`K`), or ADR 0052 (joint posterior Laplace draws).
@@ -32,8 +32,9 @@ Add the `copy_identity_v1` analysis-run output profile to
   `CopyKind` values and retained availability times;
 - requires the request snapshot and knowledge cutoff to match the offered
   input construction;
-- rejects every document whose availability time exceeds the knowledge
-  cutoff instead of trusting only caller-supplied labels;
+- excludes documents whose availability time exceeds the knowledge cutoff
+  before duplicate-identity or domain admission, so future-unavailable rows
+  cannot change a historical replay;
 - invokes `refuse_copy_as_source_identity` and `refuse_copy_as_transition`
   without reimplementing the copy/source vocabulary;
 - emits a canonical SHA-256-digested `tepp.copy_identity.v1` artifact with
@@ -51,22 +52,25 @@ Add the `copy_identity_v1` analysis-run output profile to
    because inspect payloads stay metric-free and
    `tepp.scientific_acceptance.v1` never appears.
 3. Bind the existing copy-identity refusals to ADR 0022's analysis-run
-   profile — accepted.
+   profile — selected because it preserves the canonical domain vocabulary
+   while adding the temporal admission boundary.
 
 ## Consequences
 
 Operators can request cutoff-safe template-copy identity refusals as a
 digest-bound terminal result. The artifact does not claim MCMC, GPU
 parity, method-effect estimation, or topic birth/split/merge.
-Snapshot/profile/cutoff mismatch, empty or single-kind corpora, and
-duplicate document identities fail closed.
-Future-available documents also fail closed.
+Snapshot/profile/cutoff mismatch, empty or single-kind admitted corpora,
+and duplicate document identities visible at the cutoff fail closed.
+Future-unavailable documents are excluded from the historical scientific
+census before identity admission.
 
 ## Verification
 
 The PR includes Rust unit and integration tests for mixed source/copy
-corpora, empty/source-only/copy-only/duplicate refusal, snapshot /
-profile / cutoff mismatch, future availability, and artifact tampering. Run:
+corpora, empty/source-only/copy-only/visible-duplicate refusal, snapshot /
+profile / cutoff mismatch, historical replay invariance in the presence of
+a future-unavailable duplicate identity, and artifact tampering. Run:
 
 ```text
 cargo fmt --all -- --check
