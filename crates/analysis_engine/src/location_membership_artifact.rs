@@ -1,7 +1,8 @@
 //! Digest-bound location-membership refusals as an analysis-run profile.
 
 use location_membership::{
-    LocationKind, refuse_location_as_entity_identity, refuse_location_as_language_channel,
+    LocationKind, LocationMembershipError, refuse_location_as_entity_identity,
+    refuse_location_as_language_channel,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -21,7 +22,7 @@ pub const LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION: &str = "tepp.location_mem
 pub const LOCATION_MEMBERSHIP_MODEL_CONTRACT_VERSION: &str = "location_membership_v1";
 /// Analysis-run output profile required for a location-membership artifact.
 pub const LOCATION_MEMBERSHIP_OUTPUT_PROFILE: &str = "location_membership_v1";
-/// Maximum canonical artifact JSON size.
+/// Maximum accepted artifact JSON input size.
 pub const LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const LOCATION_MEMBERSHIP_INFERENCE_STATUS: &str =
     "location_is_not_entity_identity_not_language_channel";
@@ -126,15 +127,10 @@ impl LocationMembershipArtifact {
     ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
@@ -235,8 +231,14 @@ pub fn execute_location_membership_run(
         }
         match document.kind() {
             LocationKind::Location => {
-                let _ = refuse_location_as_entity_identity(document.kind());
-                let _ = refuse_location_as_language_channel(document.kind());
+                require_refusal(
+                    refuse_location_as_entity_identity(document.kind()),
+                    LocationMembershipError::LocationIsNotEntityIdentity,
+                )?;
+                require_refusal(
+                    refuse_location_as_language_channel(document.kind()),
+                    LocationMembershipError::LocationIsNotLanguageChannel,
+                )?;
                 refused_as_entity_identity_count += 1;
                 refused_as_language_channel_count += 1;
                 location_count += 1;
@@ -295,13 +297,25 @@ pub fn execute_location_membership_run(
     })
 }
 
+fn require_refusal(
+    result: Result<(), LocationMembershipError>,
+    expected: LocationMembershipError,
+) -> Result<(), AnalysisEngineError> {
+    match result {
+        Err(error) if error == expected => Ok(()),
+        Ok(()) | Err(_) => Err(AnalysisEngineError::InvalidEvidence),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use location_membership::LocationMembershipError;
+
     use super::{
         LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT, LOCATION_MEMBERSHIP_ARTIFACT_SCHEMA_VERSION,
-        LOCATION_MEMBERSHIP_INFERENCE_STATUS, LocationMembershipArtifact,
+        LOCATION_MEMBERSHIP_INFERENCE_STATUS, LocationMembershipArtifact, require_refusal,
     };
-    use crate::AnalysisEngineError;
+    use crate::{AnalysisEngineError, MAX_ANALYSIS_IDENTIFIER_BYTES, MAX_EVIDENCE_UNITS};
 
     fn artifact() -> LocationMembershipArtifact {
         LocationMembershipArtifact {
@@ -344,6 +358,45 @@ mod tests {
                 &"x".repeat(LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT + 1)
             ),
             Err(AnalysisEngineError::LimitExceeded)
+        );
+    }
+
+    #[test]
+    fn maximal_valid_artifact_serialization_stays_within_wire_limit() {
+        let mut maximal = artifact();
+        maximal.run_id = "r".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES);
+        maximal.snapshot_id = "s".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES);
+        maximal.document_count = MAX_EVIDENCE_UNITS as u64;
+        maximal.location_count = MAX_EVIDENCE_UNITS as u64 - 1;
+        maximal.entity_identity_count = 1;
+        maximal.language_channel_count = 0;
+        maximal.refused_as_entity_identity_count = maximal.location_count;
+        maximal.refused_as_language_channel_count = maximal.location_count;
+
+        let unchecked_payload = serde_json::to_string(&maximal).expect("unchecked fixture json");
+        assert!(unchecked_payload.len() < LOCATION_MEMBERSHIP_ARTIFACT_BYTE_LIMIT);
+        assert_eq!(maximal.to_json(), Ok(unchecked_payload));
+    }
+
+    #[test]
+    fn refusal_contract_guard_fails_closed_on_domain_result_drift() {
+        assert_eq!(
+            require_refusal(
+                Err(LocationMembershipError::LocationIsNotEntityIdentity),
+                LocationMembershipError::LocationIsNotEntityIdentity,
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            require_refusal(Ok(()), LocationMembershipError::LocationIsNotEntityIdentity),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_refusal(
+                Err(LocationMembershipError::LocationIsNotLanguageChannel),
+                LocationMembershipError::LocationIsNotEntityIdentity,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
         );
     }
 
