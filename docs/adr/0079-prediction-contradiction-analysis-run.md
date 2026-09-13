@@ -2,7 +2,7 @@
 
 **Decision status:** Proposed
 
-**Implementation maturity:** fold-child — source/tests/doctoring live on Draft #487 and are not implemented-main; canonical landing authority remains #416 pending repository-wide ADR normalization under #437.
+**Implementation maturity:** active-PR — source/tests/doctoring live on Draft #487 and are not implemented-main; canonical landing authority remains #416 pending repository-wide ADR normalization under #437.
 
 **Date:** 2026-09-03
 
