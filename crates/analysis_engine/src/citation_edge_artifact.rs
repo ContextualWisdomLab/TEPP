@@ -20,7 +20,7 @@ pub const CITATION_EDGE_ARTIFACT_SCHEMA_VERSION: &str = "tepp.citation_edge.v1";
 pub const CITATION_EDGE_MODEL_CONTRACT_VERSION: &str = "citation_edge_v1";
 /// Analysis-run output profile required for a citation-edge artifact.
 pub const CITATION_EDGE_OUTPUT_PROFILE: &str = "citation_edge_v1";
-/// Maximum canonical artifact JSON size.
+/// Maximum accepted citation-edge artifact JSON size.
 pub const CITATION_EDGE_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const CITATION_EDGE_INFERENCE_STATUS: &str = "provenance_is_not_a_state_transition";
 
@@ -133,17 +133,16 @@ impl CitationEdgeArtifact {
 
     /// Serialize canonical validated artifact JSON.
     ///
+    /// The validated identifier and census bounds make canonical output
+    /// strictly smaller than [`CITATION_EDGE_ARTIFACT_BYTE_LIMIT`]. The input
+    /// cap remains enforced by [`Self::from_json`].
+    ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > CITATION_EDGE_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
@@ -247,14 +246,10 @@ pub fn execute_citation_edge_run(
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
-        match refuse_provenance_as_transition(document.kind()) {
-            Err(CitationEdgeError::ProvenanceIsNotTransition) => {
-                refused_as_transition_count = refused_as_transition_count
-                    .checked_add(1)
-                    .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-            }
-            Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-        }
+        require_provenance_refusal(refuse_provenance_as_transition(document.kind()))?;
+        refused_as_transition_count = refused_as_transition_count
+            .checked_add(1)
+            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
         match document.kind() {
             ProvenanceKind::Citation => {
                 citation_count = citation_count
@@ -319,13 +314,25 @@ pub fn execute_citation_edge_run(
     })
 }
 
+fn require_provenance_refusal(
+    result: Result<(), CitationEdgeError>,
+) -> Result<(), AnalysisEngineError> {
+    match result {
+        Err(CitationEdgeError::ProvenanceIsNotTransition) => Ok(()),
+        Ok(()) | Err(_) => Err(AnalysisEngineError::InvalidEvidence),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         CITATION_EDGE_ARTIFACT_BYTE_LIMIT, CITATION_EDGE_ARTIFACT_SCHEMA_VERSION,
-        CITATION_EDGE_INFERENCE_STATUS, CitationEdgeArtifact,
+        CITATION_EDGE_INFERENCE_STATUS, CitationEdgeArtifact, require_provenance_refusal,
     };
-    use crate::{AnalysisEngineError, MAX_EVIDENCE_UNITS};
+    use crate::{
+        AnalysisEngineError, MAX_ANALYSIS_IDENTIFIER_BYTES, MAX_EVIDENCE_UNITS,
+    };
+    use citation_edge::CitationEdgeError;
 
     fn artifact() -> CitationEdgeArtifact {
         CitationEdgeArtifact {
@@ -352,7 +359,7 @@ mod tests {
     }
 
     #[test]
-    fn artifact_round_trip_and_size_bounds_fail_closed() {
+    fn artifact_round_trip_and_input_size_bounds_fail_closed() {
         let artifact = artifact();
         let payload = artifact.to_json().expect("json");
         assert_eq!(
@@ -368,6 +375,28 @@ mod tests {
             CitationEdgeArtifact::from_json(&"x".repeat(CITATION_EDGE_ARTIFACT_BYTE_LIMIT + 1)),
             Err(AnalysisEngineError::LimitExceeded)
         );
+    }
+
+    #[test]
+    fn maximal_valid_artifact_stays_below_input_wire_limit() {
+        let maximum_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("bounded census");
+        let maximal = CitationEdgeArtifact {
+            schema_version: CITATION_EDGE_ARTIFACT_SCHEMA_VERSION.into(),
+            run_id: "r".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES),
+            snapshot_id: "s".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES),
+            knowledge_cutoff: "9999-12-31T23:59:59Z".into(),
+            document_count: maximum_count,
+            citation_count: maximum_count - 1,
+            translation_count: 0,
+            revision_count: 1,
+            retrospective_report_count: 0,
+            refused_as_transition_count: maximum_count,
+            distinct_kind_count: 2,
+            inference_status: CITATION_EDGE_INFERENCE_STATUS.into(),
+        };
+        let payload = maximal.to_json().expect("maximal valid artifact");
+        assert!(payload.len() < CITATION_EDGE_ARTIFACT_BYTE_LIMIT);
+        assert_eq!(CitationEdgeArtifact::from_json(&payload), Ok(maximal));
     }
 
     #[test]
@@ -412,6 +441,17 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.citation_count = u64::MAX;
+                value.translation_count = 1;
+                value.revision_count = 0;
+                value.retrospective_report_count = 0;
+                value.document_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("bound");
+                value.refused_as_transition_count = value.document_count;
+                value.distinct_kind_count = 2;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.distinct_kind_count = 1;
                 value
             },
@@ -429,5 +469,21 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn provider_refusal_guard_fails_closed_on_contract_drift() {
+        assert_eq!(
+            require_provenance_refusal(Err(CitationEdgeError::ProvenanceIsNotTransition)),
+            Ok(())
+        );
+        assert_eq!(
+            require_provenance_refusal(Ok(())),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_provenance_refusal(Err(CitationEdgeError::InvalidEdgePayload)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }
