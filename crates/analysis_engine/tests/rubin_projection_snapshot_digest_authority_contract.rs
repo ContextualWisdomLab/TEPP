@@ -15,6 +15,8 @@ const OTHER_SNAPSHOT_DIGEST: &str =
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const OBSERVATION_COUNT: u64 = 48;
+const DRAW_COUNT: u64 = 8;
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
@@ -86,6 +88,8 @@ fn runtime_snapshot_digest_is_an_independent_activation_input() {
             SNAPSHOT_ID,
             OTHER_SNAPSHOT_DIGEST,
             cutoff(),
+            OBSERVATION_COUNT,
+            DRAW_COUNT,
             IndicatorKind::AdditiveLogRatio,
         ),
         RubinProjectionActivationDecision::DescriptiveOnly
@@ -96,6 +100,8 @@ fn runtime_snapshot_digest_is_an_independent_activation_input() {
             SNAPSHOT_ID,
             OTHER_SNAPSHOT_DIGEST,
             cutoff(),
+            OBSERVATION_COUNT,
+            DRAW_COUNT,
             IndicatorKind::AdditiveLogRatio,
         ),
         RubinProjectionActivationDecision::Rejected
