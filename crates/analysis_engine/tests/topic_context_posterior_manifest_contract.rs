@@ -16,6 +16,10 @@ fn manifest() -> TopicContextPosteriorSnapshotManifest {
             "018f3f7a-7b7c-7d00-8000-000000000001".into(),
             "2026-07-20T00:00:00Z".into(),
         )]),
+        support_evidence_available_at: BTreeMap::from([(
+            "evidence-relation-1".into(),
+            "2026-07-20T00:00:00Z".into(),
+        )]),
     }
 }
 
@@ -34,14 +38,15 @@ fn manifest_round_trips_through_the_bounded_validated_wire_contract() {
 fn manifest_requires_an_explicit_support_evidence_availability_ledger() {
     let json = manifest().to_json().expect("manifest json");
     let mut value: serde_json::Value = serde_json::from_str(&json).expect("manifest value");
-    value["support_evidence_available_at"] = serde_json::json!({
-        "evidence-relation-1": "2026-07-20T00:00:00Z"
-    });
+    value
+        .as_object_mut()
+        .expect("manifest object")
+        .remove("support_evidence_available_at");
     let payload = serde_json::to_string(&value).expect("manifest payload");
 
-    assert!(
-        TopicContextPosteriorSnapshotManifest::from_json(&payload).is_ok(),
-        "the authoritative manifest must carry independent availability for supporting evidence resources"
+    assert_eq!(
+        TopicContextPosteriorSnapshotManifest::from_json(&payload),
+        Err(AnalysisEngineError::InvalidEvidence)
     );
 }
 
@@ -58,5 +63,19 @@ fn manifest_parser_rejects_unknown_fields_and_oversized_payloads() {
     assert_eq!(
         TopicContextPosteriorSnapshotManifest::from_json(&oversized),
         Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
+fn manifest_rejects_malformed_support_availability() {
+    let mut malformed = manifest();
+    *malformed
+        .support_evidence_available_at
+        .first_entry()
+        .expect("support evidence")
+        .get_mut() = "not-a-time".into();
+    assert_eq!(
+        malformed.to_json(),
+        Err(AnalysisEngineError::InvalidEvidence)
     );
 }
