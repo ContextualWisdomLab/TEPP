@@ -710,6 +710,27 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Driver 2017-era `T0TRAITVARstd` was requested with a
+    /// non-positive first-occasion trait extra. Unstandardised
+    /// `T0TRAITVAR` is defined for a zero extra; standardised
+    /// `T0TRAITVAR` is not.
+    StandardisedInitialTraitVarianceRequiresPositiveInitialTraitVariance,
+    /// Driver 2017-era unstandardised `T0TRAITVAR` `t0_trait² · trait`
+    /// was treated as `T0TRAITVARstd`. Equal numbers when the extra
+    /// is 1 are still distinct named quantities.
+    UnstandardisedInitialTraitVarianceIsNotStandardisedInitialTraitVariance,
+    /// Driver p. 16 `TRAITVARstd` was treated as 2017-era
+    /// `T0TRAITVARstd`. Equal numbers when both correlations equal
+    /// 1 are still distinct named quantities.
+    StandardisedTraitVarianceIsNotStandardisedInitialTraitVariance,
+    /// Driver p. 16 `T0VARstd` was treated as 2017-era
+    /// `T0TRAITVARstd`. Equal numbers when both correlations equal
+    /// 1 are still distinct named quantities.
+    StandardisedInitialLatentVarianceIsNotStandardisedInitialTraitVariance,
+    /// Driver 2017-era `addedT0TIPREDVAR` `t0_b² v` was treated as
+    /// 2017-era `T0TRAITVARstd`. Extra first-occasion TI variance
+    /// is not the correlation form of first-occasion trait extra.
+    InitialTimeIndependentVarianceIsNotStandardisedInitialTraitVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1255,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedInitialTraitVarianceRequiresPositiveInitialTraitVariance => {
+                "standardised initial trait variance requires strictly positive initial trait variance"
+            }
+            Self::UnstandardisedInitialTraitVarianceIsNotStandardisedInitialTraitVariance => {
+                "unstandardised initial trait variance is not standardised initial trait variance"
+            }
+            Self::StandardisedTraitVarianceIsNotStandardisedInitialTraitVariance => {
+                "standardised trait variance is not standardised initial trait variance"
+            }
+            Self::StandardisedInitialLatentVarianceIsNotStandardisedInitialTraitVariance => {
+                "standardised initial latent variance is not standardised initial trait variance"
+            }
+            Self::InitialTimeIndependentVarianceIsNotStandardisedInitialTraitVariance => {
+                "initial time-independent predictor variance is not standardised initial trait variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2107,35 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_initial_trait_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedInitialTraitVarianceRequiresPositiveInitialTraitVariance
+                .to_string(),
+            "standardised initial trait variance requires strictly positive initial trait variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedInitialTraitVarianceIsNotStandardisedInitialTraitVariance
+                .to_string(),
+            "unstandardised initial trait variance is not standardised initial trait variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTraitVarianceIsNotStandardisedInitialTraitVariance
+                .to_string(),
+            "standardised trait variance is not standardised initial trait variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialLatentVarianceIsNotStandardisedInitialTraitVariance
+                .to_string(),
+            "standardised initial latent variance is not standardised initial trait variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedInitialTraitVariance
+                .to_string(),
+            "initial time-independent predictor variance is not standardised initial trait variance"
         );
     }
 }
