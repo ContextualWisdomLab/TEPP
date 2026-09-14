@@ -19,6 +19,7 @@ default = []
 live-sqlx = ["dep:sqlx", "dep:tokio"]
 
 [dependencies]
+event_core = { path = "../event_core", version = "0.2.0" }
 operational_log = { path = "../operational_log", version = "0.2.0" }
 temporal_core = { path = "../temporal_core", version = "0.2.0" }
 uuid.workspace = true

@@ -28,6 +28,14 @@ pub struct ConstraintId {
     constraint_index: usize,
 }
 
+impl ConstraintId {
+    /// Return the zero-based accepted-assertion ordinal within this reasoner.
+    #[must_use]
+    pub const fn assertion_ordinal(self) -> usize {
+        self.constraint_index
+    }
+}
+
 /// The bounded resource whose configured maximum was exceeded.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ReasonerLimitKind {

@@ -1,7 +1,7 @@
 # ADR 0016 — TDT, CHRONOS, and Event Ontology intelligence boundary
 
 **Decision status:** Accepted  
-**Implementation maturity:** active-PR — versioned TDT/CHRONOS composition is executable in existing `event_core` on this PR (segmentation → span-grounded mentions → links → first-story → tracks → schema slots → forecasts), building on the isolated gates already on main; interval consistency, persistence, and JSON/JSON-LD/GraphML exports remain accepted-target  
+**Implementation maturity:** active-PR — versioned TDT/CHRONOS composition and bounded Allen/CHRONOS interval consistency are executable in `event_core`; the successor artifact contract exports the actual reasoner result as canonical typed JSON and provenance-bearing GraphML and binds its digest/type to ADR 0013's immutable `model_artifact` chain; JSON-LD remains accepted-target
 **Date:** 2026-08-12  
 **Supersedes:** None; complements ADR 0002 temporal semantics and ADR 0003 event ontology/membership.
 
@@ -21,6 +21,17 @@ TEPP separates three event-intelligence layers:
 
 Transition edges admitted to the state/input-process-outcome graph remain governed by ADR 0002/0003 and cannot be created merely because TDT/CHRONOS predicts or links two events. Retrospective evidence and schema predictions remain provenance/hypothesis edges until independently promoted.
 
+One completed bounded consistency run is durably published as the canonical
+`tepp.tdt_chronos_interval_consistency.v1` JSON payload. It binds an opaque run,
+snapshot, exact admitted-input SHA-256, stable Allen relation order,
+observed/derived status, and conservative accepted-assertion ordinals. Its
+canonical JSON digest and artifact type
+`tdt_chronos_interval_consistency_v1` enter ADR 0013's append-only
+`model_artifact` row; the protected object reference locates the immutable JSON
+bytes. GraphML is a deterministic projection of that same typed payload, not a
+second source of truth and not a causal-transition claim. Loaders must verify
+the object bytes against the stored digest before decoding.
+
 The bounded `prediction_contradiction` crate is the promotion-authority gate for a pairwise predicted-versus-observed closed proper interval. `refuse_promotion` and `require_observed_coverage` succeed only when later-available evidence covers every predicted instant (`during`, `starts`, `finishes`, or `equals`). `refuse_contradiction_or_adjacency` answers only whether the pair is Allen `before`/`after` or `meets`/`met_by`; its `Ok(())` is not authority to promote unmatched predicted mass.
 
 ## Alternatives considered
@@ -36,6 +47,8 @@ The bounded `prediction_contradiction` crate is the promotion-authority gate for
 - temporal-consistency failures can reject a proposed schema/transition without rewriting source evidence;
 - TDT/CHRONOS outputs can feed psychometric and longitudinal models only through versioned, uncertainty-bearing contracts;
 - event prediction is never silently converted to historical fact.
+- a consumer can replay the exact observed/derived temporal result and its
+  conservative support without inspecting reasoner-private identifiers.
 
 ## Failure and recovery
 
