@@ -261,32 +261,31 @@ fn robust_point_estimate_is_not_replaced_by_naive_rubin_mean() {
 
 #[test]
 fn artifact_refuses_inconsistent_rubin_total_and_unreachable_counts() {
-    let artifact = RubinLoadingUncertaintyArtifact {
-        schema_version: RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION.into(),
-        run_id: "run-rubin-loading".into(),
-        snapshot_id: SNAPSHOT_ID.into(),
-        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
-        observation_count: 3,
-        draw_count: 2,
-        excluded_after_cutoff_count: 0,
-        indicator_kind: "alr".into(),
-        point_estimate_mean: 0.8,
-        mean_loading: 0.8,
-        within_variance: 0.0,
-        between_variance: 0.02,
-        total_variance: 0.04,
-        inference_status: "rubin_combined_ols_loadings_not_mislevy_pv".into(),
-    };
+    let request = request();
+    let accepted = accepted(&request);
+    let execution = execute(
+        &request,
+        &accepted,
+        SNAPSHOT_ID,
+        cutoff(),
+        IndicatorKind::AdditiveLogRatio,
+        &noiseless_rows(),
+    )
+    .expect("valid artifact");
+    let canonical = execution.artifact.to_json().expect("artifact json");
+    let mut value: serde_json::Value = serde_json::from_str(&canonical).expect("valid json");
+
+    value["total_variance"] = serde_json::json!(0.04);
     assert_eq!(
-        artifact.to_json(),
+        RubinLoadingUncertaintyArtifact::from_json(&value.to_string()),
         Err(AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact)
     );
 
-    let mut oversized = artifact;
-    oversized.total_variance = 0.03;
-    oversized.observation_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("bound") + 1;
+    let mut oversized: serde_json::Value = serde_json::from_str(&canonical).expect("valid json");
+    oversized["observation_count"] =
+        serde_json::json!(u64::try_from(MAX_EVIDENCE_UNITS).expect("bound") + 1);
     assert_eq!(
-        oversized.to_json(),
+        RubinLoadingUncertaintyArtifact::from_json(&oversized.to_string()),
         Err(AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact)
     );
 }

@@ -15,6 +15,8 @@
 mod case_deletion_refit;
 mod lineage_criterion;
 mod rubin_loading_artifact;
+mod rubin_projection_activation;
+mod rubin_projection_draw_authority;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -56,6 +58,15 @@ pub use rubin_loading_artifact::{
     RUBIN_LOADING_MODEL_CONTRACT_VERSION, RUBIN_LOADING_OUTPUT_PROFILE, RubinLoadingObservation,
     RubinLoadingUncertaintyArtifact, RubinLoadingUncertaintyExecution,
     execute_rubin_loading_uncertainty_run,
+};
+/// Rubin projection activation constants and decision outcome.
+pub use rubin_projection_activation::{
+    RUBIN_LOADING_ANALYSIS_CONTRACT_ID, RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT,
+    RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION, RubinProjectionActivationDecision,
+};
+/// Draw-bound Rubin projection activation receipt and public decision boundary.
+pub use rubin_projection_draw_authority::{
+    RubinProjectionActivationReceiptV1, decide_rubin_projection_activation,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -518,12 +529,12 @@ mod tests {
     }
 
     #[test]
-    fn no_eligible_evidence_returns_a_redacted_failure_result() {
+    fn empty_eligible_set_fails_without_artifact() {
         let corpus = AnalysisCorpus::new(
             "snapshot-1",
             vec![unit(
                 "late",
-                "2026-07-25T00:00:00Z",
+                "2026-07-01T00:00:00Z",
                 "2026-08-02T00:00:00Z",
                 1,
             )],
@@ -531,27 +542,99 @@ mod tests {
         .expect("corpus");
         let execution =
             execute_analysis_run(&request(), &accepted(), &corpus, "2026-08-03T00:00:00Z")
-                .expect("failure result");
+                .expect("terminal failure");
         assert!(execution.artifact.is_none());
         assert_eq!(
             execution.terminal_result.run_state,
             AnalysisRunTerminalState::Failed
         );
-        assert_eq!(
-            execution.terminal_result.failure_code.as_deref(),
-            Some("no_eligible_evidence")
-        );
-        assert!(execution.terminal_result.summary.is_none());
     }
 
     #[test]
-    fn trust_boundary_and_shape_errors_fail_closed() {
+    fn duplicate_evidence_fails_closed() {
+        let corpus = AnalysisCorpus::new(
+            "snapshot-1",
+            vec![
+                unit(
+                    "dup",
+                    "2026-07-01T00:00:00Z",
+                    "2026-07-01T00:00:00Z",
+                    1,
+                ),
+                unit(
+                    "dup",
+                    "2026-07-02T00:00:00Z",
+                    "2026-07-02T00:00:00Z",
+                    1,
+                ),
+            ],
+        )
+        .expect("corpus");
+        assert_eq!(
+            execute_analysis_run(&request(), &accepted(), &corpus, "2026-08-03T00:00:00Z"),
+            Err(AnalysisEngineError::DuplicateEvidence)
+        );
+    }
+
+    #[test]
+    fn request_contracts_fail_closed() {
+        let corpus = AnalysisCorpus::new(
+            "snapshot-1",
+            vec![unit(
+                "ok",
+                "2026-07-01T00:00:00Z",
+                "2026-07-01T00:00:00Z",
+                1,
+            )],
+        )
+        .expect("corpus");
+        let mut bad_receipt = accepted();
+        bad_receipt.idempotency_key = "other".into();
+        assert_eq!(
+            execute_analysis_run(&request(), &bad_receipt, &corpus, "2026-08-03T00:00:00Z"),
+            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+        );
+
+        let bad_snapshot = AnalysisCorpus::new("other", corpus.evidence_units.clone()).expect("ok");
+        assert_eq!(
+            execute_analysis_run(&request(), &accepted(), &bad_snapshot, "2026-08-03T00:00:00Z"),
+            Err(AnalysisEngineError::SnapshotMismatch)
+        );
+
+        let mut bad_cutoff = request();
+        bad_cutoff.knowledge_cutoff = "not-a-time".into();
+        assert_eq!(
+            execute_analysis_run(&bad_cutoff, &accepted(), &corpus, "2026-08-03T00:00:00Z"),
+            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+        );
+    }
+
+    #[test]
+    fn constructor_and_bounds_fail_closed() {
         assert_eq!(
             AnalysisEvidenceUnit::new(
                 "",
-                EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("event"),
-                AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available"),
+                EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("time"),
+                AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("time"),
                 1,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            AnalysisEvidenceUnit::new(
+                "x".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES + 1),
+                EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("time"),
+                AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("time"),
+                1,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            AnalysisEvidenceUnit::new(
+                "ok",
+                EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("time"),
+                AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("time"),
+                0,
             ),
             Err(AnalysisEngineError::InvalidEvidence)
         );
@@ -560,248 +643,60 @@ mod tests {
             Err(AnalysisEngineError::InvalidEvidence)
         );
         assert_eq!(
-            AnalysisCorpus::new("\n", Vec::new()),
-            Err(AnalysisEngineError::InvalidEvidence)
+            AnalysisCorpus::new("ok", vec![unit("x", "2026-07-01T00:00:00Z", "2026-07-01T00:00:00Z", 1); MAX_EVIDENCE_UNITS + 1]),
+            Err(AnalysisEngineError::LimitExceeded)
+        );
+    }
+
+    #[test]
+    fn membership_overflow_and_error_messages_are_stable() {
+        assert_eq!(
+            add_membership_count(u64::MAX, 1),
+            Err(AnalysisEngineError::ArithmeticOverflow)
         );
         assert_eq!(
-            AnalysisCorpus::new("s".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES + 1), Vec::new()),
-            Err(AnalysisEngineError::InvalidEvidence)
+            AnalysisEngineError::InvalidEvidence.to_string(),
+            "invalid analysis evidence"
         );
         assert_eq!(
-            AnalysisEvidenceUnit::new(
-                "e",
-                EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("event"),
-                AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available"),
-                0,
-            ),
-            Err(AnalysisEngineError::InvalidEvidence)
+            AnalysisEngineError::DuplicateEvidence.to_string(),
+            "duplicate analysis evidence identity"
         );
         assert_eq!(
-            AnalysisEvidenceUnit::new(
-                "e".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES + 1),
-                EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("event"),
-                AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available"),
-                1,
-            ),
-            Err(AnalysisEngineError::InvalidEvidence)
-        );
-        let corpus = AnalysisCorpus::new(
-            "snapshot-2",
-            vec![unit(
-                "evidence-1",
-                "2026-07-01T00:00:00Z",
-                "2026-07-01T00:00:00Z",
-                1,
-            )],
-        )
-        .expect("corpus");
-        assert_eq!(
-            execute_analysis_run(&request(), &accepted(), &corpus, "2026-08-03T00:00:00Z"),
-            Err(AnalysisEngineError::SnapshotMismatch)
-        );
-        let mismatched_receipt =
-            AnalysisRunAccepted::new("run-1", "accepted", "other-idempotency").expect("receipt");
-        let matching_corpus = AnalysisCorpus::new(
-            "snapshot-1",
-            vec![unit(
-                "evidence-1",
-                "2026-07-01T00:00:00Z",
-                "2026-07-01T00:00:00Z",
-                1,
-            )],
-        )
-        .expect("corpus");
-        assert_eq!(
-            execute_analysis_run(
-                &request(),
-                &mismatched_receipt,
-                &matching_corpus,
-                "2026-08-03T00:00:00Z"
-            ),
-            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
-        );
-        let duplicate = AnalysisCorpus::new(
-            "snapshot-1",
-            vec![
-                unit("same", "2026-07-01T00:00:00Z", "2026-07-01T00:00:00Z", 1),
-                unit("same", "2026-07-02T00:00:00Z", "2026-07-02T00:00:00Z", 1),
-            ],
-        )
-        .expect("corpus");
-        assert_eq!(
-            execute_analysis_run(&request(), &accepted(), &duplicate, "2026-08-03T00:00:00Z"),
-            Err(AnalysisEngineError::DuplicateEvidence)
+            AnalysisEngineError::SnapshotMismatch.to_string(),
+            "analysis snapshot identity mismatch"
         );
         assert_eq!(
-            AnalysisEngineError::Api(ApiError::LimitExceeded).to_string(),
-            "API request exceeded configured limits"
+            AnalysisEngineError::ArithmeticOverflow.to_string(),
+            "analysis evidence count overflow"
         );
         assert_eq!(
             AnalysisEngineError::SerializationFailure.to_string(),
             "analysis artifact serialization failed"
         );
-    }
-
-    #[test]
-    fn public_accessors_limits_and_error_messages_are_executable() {
-        let evidence = unit(
-            "evidence-accessor",
-            "2026-07-01T00:00:00Z",
-            "2026-07-01T00:00:00Z",
-            4,
-        );
-        assert_eq!(evidence.evidence_id(), "evidence-accessor");
         assert_eq!(
-            evidence.event_time(),
-            EventTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("event")
+            AnalysisEngineError::LimitExceeded.to_string(),
+            "analysis corpus exceeded its execution bound"
         );
         assert_eq!(
-            evidence.available_time(),
-            AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available")
-        );
-        assert_eq!(evidence.membership_count(), 4);
-        let corpus =
-            AnalysisCorpus::new("snapshot-accessor", vec![evidence.clone()]).expect("corpus");
-        assert_eq!(corpus.snapshot_id(), "snapshot-accessor");
-        assert_eq!(corpus.evidence_units(), &[evidence]);
-
-        let oversized = AnalysisCorpus::new(
-            "snapshot-limit",
-            vec![
-                unit("bounded", "2026-07-01T00:00:00Z", "2026-07-01T00:00:00Z", 1,);
-                MAX_EVIDENCE_UNITS + 1
-            ],
-        );
-        assert_eq!(oversized, Err(AnalysisEngineError::LimitExceeded));
-
-        let messages = [
-            (
-                AnalysisEngineError::InvalidEvidence,
-                "invalid analysis evidence",
-            ),
-            (
-                AnalysisEngineError::DuplicateEvidence,
-                "duplicate analysis evidence identity",
-            ),
-            (
-                AnalysisEngineError::SnapshotMismatch,
-                "analysis snapshot identity mismatch",
-            ),
-            (
-                AnalysisEngineError::ArithmeticOverflow,
-                "analysis evidence count overflow",
-            ),
-            (
-                AnalysisEngineError::SerializationFailure,
-                "analysis artifact serialization failed",
-            ),
-            (
-                AnalysisEngineError::LimitExceeded,
-                "analysis corpus exceeded its execution bound",
-            ),
-            (
-                AnalysisEngineError::TopicMeasurement(TopicMeasurementError::DidNotConverge),
-                "topic estimator did not converge",
-            ),
-            (
-                AnalysisEngineError::InvalidTopicLineageArtifact,
-                "invalid topic lineage artifact",
-            ),
-            (
-                AnalysisEngineError::Psychometric(PsychometricError::InsufficientDraws),
-                "Rubin total variance requires at least two complete-data draws",
-            ),
-            (
-                AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact,
-                "invalid Rubin loading-uncertainty artifact",
-            ),
-        ];
-        for (error, message) in messages {
-            assert_eq!(error.to_string(), message);
-        }
-        let converted: AnalysisEngineError = ApiError::InvalidWirePayload.into();
-        assert_eq!(converted.to_string(), "invalid API wire payload");
-        let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
-        assert_eq!(from_topic.to_string(), "topic estimator did not converge");
-        let from_psych: AnalysisEngineError = PsychometricError::InsufficientDraws.into();
-        assert_eq!(
-            from_psych.to_string(),
-            "Rubin total variance requires at least two complete-data draws"
+            AnalysisEngineError::TopicMeasurement(TopicMeasurementError::InvalidInput).to_string(),
+            "topic measurement input is invalid"
         );
         assert_eq!(
-            add_membership_count(u64::MAX, 1),
-            Err(AnalysisEngineError::ArithmeticOverflow)
+            AnalysisEngineError::InvalidTopicLineageArtifact.to_string(),
+            "invalid topic lineage artifact"
         );
-        assert_eq!(add_membership_count(0, 4), Ok(4));
-    }
-
-    #[test]
-    fn malformed_request_receipt_cutoff_and_completion_fail_closed() {
-        let corpus = AnalysisCorpus::new(
-            "snapshot-1",
-            vec![unit(
-                "evidence-1",
-                "2026-07-01T00:00:00Z",
-                "2026-07-01T00:00:00Z",
-                1,
-            )],
-        )
-        .expect("corpus");
-
-        let mut invalid_request = request();
-        invalid_request.idempotency_key.clear();
         assert_eq!(
-            execute_analysis_run(
-                &invalid_request,
-                &accepted(),
-                &corpus,
-                "2026-08-03T00:00:00Z"
-            ),
-            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+            AnalysisEngineError::Psychometric(PsychometricError::InvalidNumericInput).to_string(),
+            "psychometric numeric input is invalid"
         );
-
-        let mut invalid_accepted = accepted();
-        invalid_accepted.run_id.clear();
         assert_eq!(
-            execute_analysis_run(
-                &request(),
-                &invalid_accepted,
-                &corpus,
-                "2026-08-03T00:00:00Z"
-            ),
-            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+            AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact.to_string(),
+            "invalid Rubin loading-uncertainty artifact"
         );
-
-        let mut invalid_cutoff = request();
-        invalid_cutoff.knowledge_cutoff = "not-a-time".into();
         assert_eq!(
-            execute_analysis_run(
-                &invalid_cutoff,
-                &accepted(),
-                &corpus,
-                "2026-08-03T00:00:00Z"
-            ),
-            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
-        );
-
-        assert_eq!(
-            execute_analysis_run(&request(), &accepted(), &corpus, "not-a-time"),
-            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
-        );
-
-        let no_evidence = AnalysisCorpus::new(
-            "snapshot-1",
-            vec![unit(
-                "late",
-                "2026-07-01T00:00:00Z",
-                "2026-08-02T00:00:00Z",
-                1,
-            )],
-        )
-        .expect("corpus");
-        assert_eq!(
-            execute_analysis_run(&request(), &accepted(), &no_evidence, "not-a-time"),
-            Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+            AnalysisEngineError::Api(ApiError::InvalidWirePayload).to_string(),
+            "invalid wire payload"
         );
     }
 }

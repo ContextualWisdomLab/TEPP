@@ -27,7 +27,11 @@ pub const RUBIN_LOADING_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const RUBIN_LOADING_MAX_DRAWS: usize = 256;
 const RUBIN_LOADING_MAX_MATRIX_CELLS: usize = 1_000_000;
 const RUBIN_LOADING_INFERENCE_STATUS: &str = "rubin_combined_ols_loadings_not_mislevy_pv";
+const RUBIN_LOADING_PROJECTION_STATUS: &str =
+    "descriptive_only_unbound_draw_generation_provenance";
 const RUBIN_LOADING_STATISTIC_COUNT: u64 = 5;
+const RUBIN_ESTIMATOR_PAYLOAD_DIGEST_DOMAIN: &[u8] =
+    b"tepp.rubin_loading.analysis_payload.v1\0";
 
 /// One already-mapped factor score with complete-data indicator draws.
 #[derive(Clone, Debug, PartialEq)]
@@ -117,6 +121,8 @@ pub struct RubinLoadingUncertaintyArtifact {
     pub excluded_after_cutoff_count: u64,
     /// Admitted indicator-kind wire name.
     pub indicator_kind: String,
+    /// Canonical SHA-256 of the admitted factor-score/design and draw payload.
+    estimator_payload_sha256: String,
     /// Robust arithmetic mean of per-draw OLS loadings. Not Rubin `T`.
     pub point_estimate_mean: f64,
     /// Rubin mean complete-data loading `Q̄`.
@@ -129,6 +135,8 @@ pub struct RubinLoadingUncertaintyArtifact {
     pub total_variance: f64,
     /// Fixed claim boundary for consumer copy.
     pub inference_status: String,
+    /// Fail-closed projection policy for unbound draw-generation provenance.
+    projection_status: String,
 }
 
 fn require_artifact_byte_limit(payload_len: usize) -> Result<(), AnalysisEngineError> {
@@ -139,6 +147,18 @@ fn require_artifact_byte_limit(payload_len: usize) -> Result<(), AnalysisEngineE
 }
 
 impl RubinLoadingUncertaintyArtifact {
+    /// Return the canonical SHA-256 of the exact admitted numeric estimator payload.
+    #[must_use]
+    pub fn estimator_payload_sha256(&self) -> &str {
+        &self.estimator_payload_sha256
+    }
+
+    /// Return the read-only projection status bound into this artifact's digest.
+    #[must_use]
+    pub fn projection_status(&self) -> &str {
+        &self.projection_status
+    }
+
     /// Parse and fully validate a bounded artifact JSON payload.
     ///
     /// # Errors
@@ -201,6 +221,7 @@ impl RubinLoadingUncertaintyArtifact {
             || !(2..=RUBIN_LOADING_MAX_DRAWS).contains(&draw_count)
             || matrix_cells > RUBIN_LOADING_MAX_MATRIX_CELLS
             || !admitted_indicator_kind(&self.indicator_kind)
+            || !valid_sha256(&self.estimator_payload_sha256)
             || !self.point_estimate_mean.is_finite()
             || !self.mean_loading.is_finite()
             || !self.within_variance.is_finite()
@@ -210,6 +231,7 @@ impl RubinLoadingUncertaintyArtifact {
             || !self.total_variance.is_finite()
             || self.total_variance < 0.0
             || self.inference_status != RUBIN_LOADING_INFERENCE_STATUS
+            || self.projection_status != RUBIN_LOADING_PROJECTION_STATUS
         {
             return Err(AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact);
         }
@@ -240,8 +262,43 @@ struct EligibleRubinRows {
     excluded_after_cutoff_count: u64,
 }
 
+impl EligibleRubinRows {
+    fn estimator_payload_sha256(&self) -> Result<String, AnalysisEngineError> {
+        let observation_count = u64::try_from(self.factor_scores.len())
+            .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+        let draw_count = u64::try_from(self.indicator_draws.len())
+            .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+        let mut hasher = Sha256::new();
+        hasher.update(RUBIN_ESTIMATOR_PAYLOAD_DIGEST_DOMAIN);
+        hasher.update(observation_count.to_be_bytes());
+        hasher.update(draw_count.to_be_bytes());
+        for factor_score in &self.factor_scores {
+            if !factor_score.is_finite() {
+                return Err(AnalysisEngineError::InvalidEvidence);
+            }
+            hasher.update(factor_score.to_bits().to_be_bytes());
+        }
+        for draw in &self.indicator_draws {
+            if draw.len() != self.factor_scores.len() || draw.iter().any(|value| !value.is_finite()) {
+                return Err(AnalysisEngineError::InvalidEvidence);
+            }
+            for value in draw {
+                hasher.update(value.to_bits().to_be_bytes());
+            }
+        }
+        Ok(format_digest(hasher.finalize()))
+    }
+}
+
 fn admitted_indicator_kind(label: &str) -> bool {
     matches!(label, "alr" | "ilr" | "logistic_normal")
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn admit_observations_at_cutoff(
@@ -308,7 +365,9 @@ fn admit_observations_at_cutoff(
 /// separate protected scientific contracts because their accumulation policies
 /// are intentionally not interchangeable. This executor does not treat the
 /// draws as Mislevy person-level plausible values, persist rows, or invent an
-/// ESEM/DSEM sampler.
+/// ESEM/DSEM sampler. Until a versioned draw-generation contract is bound to
+/// claim-specific Validation Evidence, the artifact is projection-limited to
+/// descriptive combination arithmetic.
 ///
 /// # Errors
 ///
@@ -335,6 +394,7 @@ pub fn execute_rubin_loading_uncertainty_run(request: &AnalysisRunRequest, accep
     }
 
     let eligible = admit_observations_at_cutoff(observations, snapshot_id, knowledge_cutoff)?;
+    let estimator_payload_sha256 = eligible.estimator_payload_sha256()?;
     let point_estimate_mean = recover_loading_point_estimate_mean(
         &eligible.factor_scores,
         &eligible.indicator_draws,
@@ -347,7 +407,7 @@ pub fn execute_rubin_loading_uncertainty_run(request: &AnalysisRunRequest, accep
     let draw_count = u64::try_from(combined.draw_count)
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     #[rustfmt::skip]
-    let artifact = RubinLoadingUncertaintyArtifact { schema_version: RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION.into(), run_id: accepted.run_id.clone(), snapshot_id: snapshot_id.to_owned(), knowledge_cutoff: knowledge_cutoff.to_rfc3339(), observation_count, draw_count, excluded_after_cutoff_count: eligible.excluded_after_cutoff_count, indicator_kind: kind.as_str().to_owned(), point_estimate_mean, mean_loading: combined.mean_loading, within_variance: combined.within_variance, between_variance: combined.between_variance, total_variance: combined.total_variance, inference_status: RUBIN_LOADING_INFERENCE_STATUS.into() };
+    let artifact = RubinLoadingUncertaintyArtifact { schema_version: RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION.into(), run_id: accepted.run_id.clone(), snapshot_id: snapshot_id.to_owned(), knowledge_cutoff: knowledge_cutoff.to_rfc3339(), observation_count, draw_count, excluded_after_cutoff_count: eligible.excluded_after_cutoff_count, indicator_kind: kind.as_str().to_owned(), estimator_payload_sha256, point_estimate_mean, mean_loading: combined.mean_loading, within_variance: combined.within_variance, between_variance: combined.between_variance, total_variance: combined.total_variance, inference_status: RUBIN_LOADING_INFERENCE_STATUS.into(), projection_status: RUBIN_LOADING_PROJECTION_STATUS.into() };
     let digest = artifact.sha256()?;
     let summary = AnalysisResultSummary::new(
         "rubin_loading_uncertainty",
@@ -376,7 +436,8 @@ mod tests {
     use super::{
         RUBIN_LOADING_ARTIFACT_BYTE_LIMIT, RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION,
         RUBIN_LOADING_INFERENCE_STATUS, RUBIN_LOADING_MAX_DRAWS, RUBIN_LOADING_MAX_MATRIX_CELLS,
-        RubinLoadingUncertaintyArtifact, require_artifact_byte_limit,
+        RUBIN_LOADING_PROJECTION_STATUS, RubinLoadingUncertaintyArtifact,
+        require_artifact_byte_limit,
     };
     use crate::{AnalysisEngineError, MAX_EVIDENCE_UNITS};
 
@@ -390,12 +451,15 @@ mod tests {
             draw_count: 2,
             excluded_after_cutoff_count: 0,
             indicator_kind: "alr".into(),
+            estimator_payload_sha256:
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".into(),
             point_estimate_mean: 0.8,
             mean_loading: 0.8,
             within_variance: 0.0,
             between_variance: 0.02,
             total_variance: 0.03,
             inference_status: RUBIN_LOADING_INFERENCE_STATUS.into(),
+            projection_status: RUBIN_LOADING_PROJECTION_STATUS.into(),
         }
     }
 
@@ -414,6 +478,7 @@ mod tests {
             RubinLoadingUncertaintyArtifact::from_json(&payload),
             Ok(artifact.clone())
         );
+        assert_eq!(artifact.estimator_payload_sha256().len(), 64);
         assert_eq!(artifact.sha256().expect("digest").len(), 64);
         assert_eq!(
             RubinLoadingUncertaintyArtifact::from_json("{}"),
@@ -529,6 +594,11 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.estimator_payload_sha256 = "not-a-digest".into();
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.point_estimate_mean = f64::NAN;
                 value
             },
@@ -575,6 +645,11 @@ mod tests {
             {
                 let mut value = artifact.clone();
                 value.inference_status.clear();
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.projection_status.clear();
                 value
             },
         ];
