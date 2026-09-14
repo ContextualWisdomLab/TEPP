@@ -98,7 +98,9 @@ the receipt's payload commitment unchanged. The executor-owned commitment must
 cover the cutoff-admitted factor-score vector and draw matrix together. Source
 snapshot hashing does not substitute for this invariant because the executor
 accepts the mapped factor score as a numeric application input and does not
-prove the source-to-score mapping.
+prove the source-to-score mapping. Because these schemas remain unreleased,
+`estimator_payload_sha256` is the eventual v1 wire/accessor name rather than
+preserving the narrower branch-local draw-only label.
 
 ## Decision
 
@@ -119,11 +121,9 @@ projection boundary:
   These are resource envelopes, not psychometric validity recommendations;
 - bound total raw observation population with `MAX_EVIDENCE_UNITS` and make
   imported artifact counts obey the same reachable envelope;
-- after cutoff/snapshot admission and draw-major transposition, compute the
-  current Draft `complete_data_draws_sha256` wire value over **both** the
-  admitted factor-score vector and the exact draw matrix sent to
-  `psychometric_core`. The name predates issue #522 and must be renamed before
-  protected-main/release so the public contract describes the full payload;
+- after cutoff/snapshot admission and draw-major transposition, compute
+  `estimator_payload_sha256` over **both** the admitted factor-score vector and
+  the exact draw matrix sent to `psychometric_core`;
 - start that commitment with the domain separator
   `tepp.rubin_loading.analysis_payload.v1\0`, then admitted observation and draw
   counts as big-endian `u64`, then each finite factor score's exact IEEE-754 bits
@@ -153,12 +153,13 @@ projection boundary:
 - define a bounded public `RubinProjectionActivationReceiptV1` that binds
   generator contract ID/version, exact Rubin analysis contract ID/version,
   Validation Evidence ID/SHA-256/availability, source snapshot identity/SHA-256,
-  **executor-owned numeric estimator-payload SHA-256**, knowledge cutoff, and
-  design envelope;
+  **executor-owned `estimator_payload_sha256`**, knowledge cutoff, and design
+  envelope;
 - keep the receipt schema at `tepp.rubin_projection_activation_receipt.v1`
   because this contract is Draft, has never shipped from protected `main`, and
-  has no immutable TEPP release. The payload commitment is part of the eventual
-  v1 definition rather than a post-release incompatible change;
+  has no immutable TEPP release. The estimator-payload commitment and precise
+  name are part of the eventual v1 definition rather than a post-release
+  incompatible change;
 - validate the receipt's analysis ID/version against the canonical
   `RUBIN_LOADING_ANALYSIS_CONTRACT_ID` and
   `RUBIN_LOADING_MODEL_CONTRACT_VERSION` before registry matching. Production
@@ -170,11 +171,12 @@ projection boundary:
   same mutable alias on both sides is not sufficient provenance;
 - validate the receipt and runtime `source_snapshot_sha256` as canonical
   lowercase 64-hex digests and require exact equality before registry matching;
-- validate the receipt and executor-produced runtime payload SHA-256 as
-  canonical lowercase 64-hex digests and require exact equality before
-  class-level registry matching. A factor-score or draw-value substitution fails
-  closed even when snapshot, cutoff, dimensions, design envelope, indicator,
-  generator, analysis, and evidence identities all remain unchanged;
+- validate the receipt and executor-produced runtime
+  `estimator_payload_sha256` as canonical lowercase 64-hex digests and require
+  exact equality before class-level registry matching. A factor-score or
+  draw-value substitution fails closed even when snapshot, cutoff, dimensions,
+  design envelope, indicator, generator, analysis, and evidence identities all
+  remain unchanged;
 - receive actual runtime observation and draw counts independently and require
   exact membership in the owner-approved design points; a design-envelope label
   never authorizes interpolation or extrapolation;
@@ -205,9 +207,9 @@ multiple-imputation inference. Issue #505 owns claim-specific positive
 activation. Draft #506 owns both the negative projection rule and the bounded
 activation authority contract, #515 closes concrete payload substitution, #516
 makes the executor the canonical payload-hash owner, and #522 repairs the
-factor-score omission from that payload identity. No positive artifact
-projection is emitted because no production pairing has crossed ADR 0014's
-scientific, review, and release gates. Until an approved pairing exists,
+factor-score omission plus the unreleased public payload name. No positive
+artifact projection is emitted because no production pairing has crossed ADR
+0014's scientific, review, and release gates. Until an approved pairing exists,
 `Q̄/Ū/B/T` may be computed descriptively but cannot be projected as validated
 interval/variance inference.
 
@@ -215,10 +217,11 @@ interval/variance inference.
 
 For a fixed requested snapshot and knowledge cutoff, adding evidence that only
 becomes available after that cutoff must not change the earlier admitted
-factor-score/draw matrix, its canonical payload digest, or its scientific
-result. Such rows may change only the excluded-after-cutoff count. A row from
-another immutable snapshot is not historical censoring; it is a provenance
-violation and fails closed even when its availability is later than the cutoff.
+factor-score/draw matrix, its canonical `estimator_payload_sha256`, or its
+scientific result. Such rows may change only the excluded-after-cutoff count. A
+row from another immutable snapshot is not historical censoring; it is a
+provenance violation and fails closed even when its availability is later than
+the cutoff.
 
 Activation authority follows the same temporal rule. Validation Evidence that
 was unavailable at the historical cutoff cannot retroactively authorize an
@@ -239,12 +242,12 @@ Evidence pairing.
 Concrete numeric estimator content is a separate invariant. Observation/draw
 counts describe shape, not values. The executor, not an arbitrary caller, owns
 the canonical hash representation of the admitted factor-score vector and
-draw-major matrix. The public receipt binds that payload digest and activation
-receives the executor-produced runtime value independently. Receipt/runtime
-mismatch is rejected before class-level approval. This prevents reusing a
-receipt for different factor scores or draw values with an identical shape; it
-does not certify that a matching payload actually came from the approved
-generator or factor-mapping implementation.
+draw-major matrix. The public receipt binds `estimator_payload_sha256` and
+activation receives the executor-produced runtime value independently.
+Receipt/runtime mismatch is rejected before class-level approval. This prevents
+reusing a receipt for different factor scores or draw values with an identical
+shape; it does not certify that a matching payload actually came from the
+approved generator or factor-mapping implementation.
 
 ## Alternatives considered
 
@@ -317,6 +320,9 @@ generator or factor-mapping implementation.
     estimators also consume `factor_scores`; keeping factor scores outside the
     commitment permits a result-changing substitution under an unchanged
     receipt digest.
+21. Preserve the unreleased draw-only wire member as a compatibility alias —
+    rejected because there is no immutable release to preserve and retaining a
+    misleading public name would make the eventual v1 contract less precise.
 
 ## Scientific acceptance boundary
 
@@ -393,13 +399,14 @@ mutable receipt/run snapshot refs; #510 fixes the canonical Rubin analysis
 identity; #511 binds owner-approved Validation Evidence to its source snapshot
 identity; #512 adds the source-content commitment; #515 adds concrete per-run
 payload binding; #516 makes the executor/artifact the canonical digest owner;
-#522 repairs the missing factor-score design-vector commitment.
+#522 repairs the missing factor-score design-vector commitment and gives the
+unreleased v1 payload its precise public name.
 
 That does not make #504 or #506 scientific authority: the production approved-
 pairing registry is empty, the artifact remains descriptive-only, and exact-head
 scientific/review/release gates still control promotion. The profile remains
-Draft/Proposed and not implemented-main while #503, #505, #522, and the normal
-exact-head merge gates remain unresolved.
+Draft/Proposed and not implemented-main while #503, #505, and the normal exact-
+head merge gates remain unresolved.
 
 ## Verification
 
@@ -424,10 +431,10 @@ evidence/design/indicator authority, caller backdating versus owner-controlled
 evidence availability, noncanonical registry availability, owner-approved
 snapshot mismatch/mutable-snapshot refusal, same-ID different-source-digest
 refusal, malformed receipt/owner/runtime source snapshot digest refusal, exact
-runtime design-point admission, malformed payload digest refusal,
-receipt/runtime payload-digest mismatch refusal, cutoff-safe executor payload
+runtime design-point admission, malformed estimator-payload digest refusal,
+receipt/runtime estimator-payload mismatch refusal, cutoff-safe executor payload
 digest stability, admitted draw-value sensitivity, admitted factor-score
-sensitivity, and malformed artifact payload-digest refusal.
+sensitivity, and malformed artifact estimator-payload digest refusal.
 
 A future positive artifact state still requires an independently promoted
 production pairing and must digest-bind the activation receipt. Predecessor
