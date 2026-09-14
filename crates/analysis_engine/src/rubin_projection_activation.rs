@@ -139,12 +139,12 @@ impl RubinProjectionActivationReceiptV1 {
             self.analysis_contract_version.as_str(),
             self.validation_evidence_id.as_str(),
             self.design_envelope_id.as_str(),
+            self.source_snapshot_id.as_str(),
         ];
         if self.schema_version != RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION
             || immutable_authority_fields
                 .iter()
                 .any(|value| !valid_identifier(value) || is_mutable_authority_locator(value))
-            || !valid_identifier(&self.source_snapshot_id)
             || !valid_sha256(&self.validation_evidence_sha256)
         {
             return Err(AnalysisEngineError::InvalidEvidence);
@@ -227,7 +227,10 @@ fn decide_with_registry(
     let Some(receipt) = receipt else {
         return RubinProjectionActivationDecision::DescriptiveOnly;
     };
-    if receipt.validate_authority_fields().is_err() || !valid_identifier(expected_snapshot_id) {
+    if receipt.validate_authority_fields().is_err()
+        || !valid_identifier(expected_snapshot_id)
+        || is_mutable_authority_locator(expected_snapshot_id)
+    {
         return RubinProjectionActivationDecision::Rejected;
     }
     let Ok((evidence_available_at, receipt_cutoff)) = receipt.validated_clocks() else {
