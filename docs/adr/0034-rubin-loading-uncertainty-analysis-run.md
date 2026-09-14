@@ -34,6 +34,13 @@ with this analysis has accepted recovery/coverage evidence. Broader inferential
 activation must therefore remain scoped to an immutable, validated
 generator/analysis/evidence pairing.
 
+A third temporal authority constraint applies to that pairing. Validation
+Evidence `AvailableTime` cannot be trusted only because a caller placed it in an
+otherwise valid activation receipt. Positive authority must bind the exact
+owner-controlled availability instant for the approved Validation Evidence
+identity/digest; otherwise a later evidence package could be backdated into an
+older `KnowledgeCutoff`.
+
 ## Decision
 
 Add `rubin_loading_uncertainty_v1` to `analysis_engine` as an application
@@ -73,9 +80,14 @@ composition over the protected-main scientific owners. The executor:
   Evidence ID/SHA-256/availability, source snapshot, knowledge cutoff, and
   design envelope;
 - evaluates that receipt through a pure fail-closed activation decision.
-  Snapshot and cutoff binding precede registry matching, Validation Evidence
-  availability must not exceed the run cutoff, and generator/analysis/evidence/
-  design/indicator matching is exact rather than heuristic;
+  Snapshot and cutoff binding precede registry matching, generator/analysis/
+  evidence/design/indicator matching is exact rather than heuristic, and the
+  approved pairing itself carries the canonical Validation Evidence
+  `AvailableTime`;
+- rejects positive activation unless the receipt availability equals that
+  owner-controlled availability by typed instant and the authoritative
+  availability is at or before the run cutoff. Noncanonical registry clocks
+  fail closed;
 - keeps the production approved-pairing registry empty on this Draft branch.
   A test-private fake pairing exercises the `Eligible` branch without creating
   production claim authority.
@@ -103,8 +115,11 @@ its availability is later than the cutoff.
 
 Activation authority follows the same temporal rule. Validation Evidence that
 was unavailable at the historical cutoff cannot retroactively authorize an
-older run. Equivalent RFC 3339 spellings of the same instant compare equal only
-after typed parsing; persisted receipt timestamps remain canonical.
+older run. The availability clock is owner-controlled approval metadata, not a
+caller assertion: matching the approved evidence ID/digest while supplying an
+earlier receipt timestamp fails closed. Equivalent RFC 3339 spellings of the
+same instant compare equal only after typed parsing; persisted receipt and
+registry timestamps remain canonical.
 
 ## Alternatives considered
 
@@ -137,6 +152,10 @@ after typed parsing; persisted receipt timestamps remain canonical.
     could self-authorize arbitrary draw generators. Production approval data
     remain an owner-controlled immutable registry, while tests use a private
     fake registry only to exercise the pure decision algorithm.
+11. Trust caller-supplied Validation Evidence availability once ID/digest match —
+    rejected because immutable content identity does not establish when that
+    evidence became available. The owner-controlled pairing binds the
+    authoritative availability clock and historical eligibility uses that clock.
 
 ## Scientific acceptance boundary
 
@@ -162,11 +181,11 @@ Issue #505 separately owns inferential activation. The Analysis Run must not
 project #504's design-specific coverage as universal authorization for an
 unknown or arbitrary draw generator. Promotion requires a versioned approved
 generator/analysis pairing and the exact Validation Evidence identity/digest,
-snapshot, cutoff, availability, and design envelope that support that pairing,
-consistent with ADR 0014's separation of implementation authority from
-scientific/product claim authority. Draft #506 can represent and reject this
-authority boundary but cannot populate the production registry from its own
-candidate evidence.
+owner-controlled availability, snapshot, cutoff, and design envelope that
+support that pairing, consistent with ADR 0014's separation of implementation
+authority from scientific/product claim authority. Draft #506 can represent
+and reject this authority boundary but cannot populate the production registry
+from its own candidate evidence.
 
 Primary authorities for the current combining-rule and activation boundary are:
 
@@ -201,11 +220,14 @@ distinguish descriptive combination arithmetic from projection authority.
 
 The activation receipt now has an executable bounded representation and pure
 decision algorithm, including the positive algorithmic branch under a private
-test pairing. That does not make #504 or #506 scientific authority: the
-production approved-pairing registry is empty, the artifact remains
-descriptive-only, and exact-head scientific/review/release gates still control
-promotion. The profile remains Draft/Proposed and not implemented-main while
-#503, #505, and the normal exact-head merge gates remain unresolved.
+test pairing. Positive eligibility also requires the receipt's evidence
+availability to match the owner-controlled approved availability, so immutable
+evidence content cannot be backdated into an older cutoff. That does not make
+#504 or #506 scientific authority: the production approved-pairing registry is
+empty, the artifact remains descriptive-only, and exact-head scientific/review/
+release gates still control promotion. The profile remains Draft/Proposed and
+not implemented-main while #503, #505, and the normal exact-head merge gates
+remain unresolved.
 
 ## Verification
 
@@ -225,7 +247,9 @@ bounds, terminal provider/domain-status separation, Monte Carlo snapshot/run-
 identity non-aliasing, digest-bound descriptive-only projection, bounded receipt
 round-trip/digest validation, missing receipt, late Validation Evidence,
 snapshot/cutoff mismatch, unknown or mismatched generator/analysis/evidence/
-design/indicator authority, and a private exact approved-pairing positive branch.
+design/indicator authority, caller backdating versus owner-controlled evidence
+availability, noncanonical registry availability, and a private exact approved-
+pairing positive branch.
 
 A future positive artifact state still requires an independently promoted
 production pairing and must digest-bind the activation receipt. Predecessor
