@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 
-use crate::{AnalysisEngineError, format_digest, valid_identifier};
+use crate::{
+    AnalysisEngineError, RUBIN_LOADING_MODEL_CONTRACT_VERSION, format_digest, valid_identifier,
+};
 
 /// Versioned wire schema for a Rubin projection activation receipt.
 pub const RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION: &str =
@@ -142,6 +144,8 @@ impl RubinProjectionActivationReceiptV1 {
             self.source_snapshot_id.as_str(),
         ];
         if self.schema_version != RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION
+            || self.analysis_contract_id != RUBIN_LOADING_ANALYSIS_CONTRACT_ID
+            || self.analysis_contract_version != RUBIN_LOADING_MODEL_CONTRACT_VERSION
             || immutable_authority_fields
                 .iter()
                 .any(|value| !valid_identifier(value) || is_mutable_authority_locator(value))
