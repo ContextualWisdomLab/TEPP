@@ -16,7 +16,7 @@ use temporal_core::{AvailableTime, KnowledgeCutoff};
 const SNAPSHOT_ID: &str = "snapshot-rubin-activation";
 const SNAPSHOT_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const DRAW_PAYLOAD_DIGEST: &str =
+const ESTIMATOR_PAYLOAD_DIGEST: &str =
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const CUTOFF: &str = "2026-08-01T00:00:00Z";
 const EVIDENCE_DIGEST: &str =
@@ -42,7 +42,7 @@ fn receipt() -> RubinProjectionActivationReceiptV1 {
         ),
         SNAPSHOT_ID,
         SNAPSHOT_DIGEST,
-        DRAW_PAYLOAD_DIGEST,
+        ESTIMATOR_PAYLOAD_DIGEST,
         cutoff(),
         "rubin-gaussian-single-level-candidate-v1",
     )
@@ -64,7 +64,7 @@ fn noncanonical_analysis_identity_is_not_admitted_by_rubin_receipt() {
             evidence.clone(),
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
-            DRAW_PAYLOAD_DIGEST,
+            ESTIMATOR_PAYLOAD_DIGEST,
             cutoff(),
             "rubin-gaussian-single-level-candidate-v1",
         )
@@ -77,7 +77,7 @@ fn noncanonical_analysis_identity_is_not_admitted_by_rubin_receipt() {
             evidence,
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
-            DRAW_PAYLOAD_DIGEST,
+            ESTIMATOR_PAYLOAD_DIGEST,
             cutoff(),
             "rubin-gaussian-single-level-candidate-v1",
         )
@@ -92,7 +92,7 @@ fn no_receipt_remains_descriptive_only() {
             None,
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
-            DRAW_PAYLOAD_DIGEST,
+            ESTIMATOR_PAYLOAD_DIGEST,
             cutoff(),
             OBSERVATION_COUNT,
             DRAW_COUNT,
@@ -109,7 +109,7 @@ fn production_registry_does_not_preapprove_candidate_evidence() {
             Some(&receipt()),
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
-            DRAW_PAYLOAD_DIGEST,
+            ESTIMATOR_PAYLOAD_DIGEST,
             cutoff(),
             OBSERVATION_COUNT,
             DRAW_COUNT,
@@ -129,7 +129,10 @@ fn receipt_wire_is_bounded_digest_bound_and_canonical() {
     assert_eq!(reparsed.knowledge_cutoff(), CUTOFF);
     assert_eq!(reparsed.source_snapshot_id(), SNAPSHOT_ID);
     assert_eq!(reparsed.source_snapshot_sha256(), SNAPSHOT_DIGEST);
-    assert_eq!(reparsed.complete_data_draws_sha256(), DRAW_PAYLOAD_DIGEST);
+    assert_eq!(
+        reparsed.estimator_payload_sha256(),
+        ESTIMATOR_PAYLOAD_DIGEST
+    );
     assert_eq!(reparsed.sha256().expect("digest").len(), 64);
 }
 
@@ -144,9 +147,9 @@ fn receipt_wire_refuses_forged_digest_and_late_evidence() {
     forged_snapshot["source_snapshot_sha256"] = serde_json::json!("not-a-digest");
     assert!(RubinProjectionActivationReceiptV1::from_json(&forged_snapshot.to_string()).is_err());
 
-    let mut forged_draws: serde_json::Value = serde_json::from_str(&canonical).expect("json");
-    forged_draws["complete_data_draws_sha256"] = serde_json::json!("not-a-digest");
-    assert!(RubinProjectionActivationReceiptV1::from_json(&forged_draws.to_string()).is_err());
+    let mut forged_payload: serde_json::Value = serde_json::from_str(&canonical).expect("json");
+    forged_payload["estimator_payload_sha256"] = serde_json::json!("not-a-digest");
+    assert!(RubinProjectionActivationReceiptV1::from_json(&forged_payload.to_string()).is_err());
 
     let late = RubinProjectionActivationReceiptV1::new(
         ("gaussian_complete_data_draws", "candidate-v1"),
@@ -161,7 +164,7 @@ fn receipt_wire_refuses_forged_digest_and_late_evidence() {
         ),
         SNAPSHOT_ID,
         SNAPSHOT_DIGEST,
-        DRAW_PAYLOAD_DIGEST,
+        ESTIMATOR_PAYLOAD_DIGEST,
         cutoff(),
         "rubin-gaussian-single-level-candidate-v1",
     )
@@ -171,7 +174,7 @@ fn receipt_wire_refuses_forged_digest_and_late_evidence() {
             Some(&late),
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
-            DRAW_PAYLOAD_DIGEST,
+            ESTIMATOR_PAYLOAD_DIGEST,
             cutoff(),
             OBSERVATION_COUNT,
             DRAW_COUNT,
