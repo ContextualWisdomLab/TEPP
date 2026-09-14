@@ -17,6 +17,16 @@ pub enum MembershipDesign {
 }
 
 impl MembershipDesign {
+    /// Return the stable wire name for this membership design.
+    #[must_use]
+    pub const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Nested => "nested",
+            Self::CrossClassified => "cross_classified",
+            Self::MultipleMembership => "multiple_membership",
+        }
+    }
+
     /// Return whether a one-way nested ICC is identified for this design.
     #[must_use]
     pub const fn allows_nested_icc(self) -> bool {
@@ -228,6 +238,15 @@ mod tests {
         assert!(MembershipDesign::Nested.allows_nested_icc());
         assert!(!MembershipDesign::CrossClassified.allows_nested_icc());
         assert!(!MembershipDesign::MultipleMembership.allows_nested_icc());
+        assert_eq!(MembershipDesign::Nested.wire_name(), "nested");
+        assert_eq!(
+            MembershipDesign::CrossClassified.wire_name(),
+            "cross_classified"
+        );
+        assert_eq!(
+            MembershipDesign::MultipleMembership.wire_name(),
+            "multiple_membership"
+        );
         let member = MemberId::new();
         let outcome = NestedOutcome::new(member, 1.5).expect("finite");
         assert_eq!(outcome.member_id(), member);

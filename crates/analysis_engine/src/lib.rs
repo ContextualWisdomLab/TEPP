@@ -6,15 +6,20 @@
 //! was unavailable at the requested knowledge cutoff, counts multiple-membership
 //! assignments without collapsing them, and emits a digest-bound terminal result
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
-//! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Longitudinal ESEM/DSEM
+//! engine composition is invoked through [`psychometric_core`],
+//! [`longitudinal_core`], and [`membership_core`] and is not an estimator.
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod longitudinal_esem_dsem_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use longitudinal_core::LongitudinalError;
+use membership_core::MembershipError;
+use psychometric_core::PsychometricError;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -45,6 +50,13 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Longitudinal ESEM/DSEM engine composition artifact and execution contracts.
+pub use longitudinal_esem_dsem_artifact::{
+    LONGITUDINAL_ESEM_DSEM_ARTIFACT_BYTE_LIMIT, LONGITUDINAL_ESEM_DSEM_ARTIFACT_SCHEMA_VERSION,
+    LONGITUDINAL_ESEM_DSEM_MODEL_CONTRACT_VERSION, LONGITUDINAL_ESEM_DSEM_OUTPUT_PROFILE,
+    LongitudinalEsemDsemArtifact, LongitudinalEsemDsemDesign, LongitudinalEsemDsemExecution,
+    LongitudinalEsemDsemObservation, execute_longitudinal_esem_dsem_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +260,14 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A psychometric recovery rejected the offered coordinates.
+    Psychometric(PsychometricError),
+    /// A membership design rejected nested collapse.
+    Membership(MembershipError),
+    /// A longitudinal component identity rejected the offered level.
+    Longitudinal(LongitudinalError),
+    /// A longitudinal ESEM/DSEM artifact violated its bounded schema or counts.
+    InvalidLongitudinalEsemDsemArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +282,12 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::Psychometric(error) => return error.fmt(formatter),
+            Self::Membership(error) => return error.fmt(formatter),
+            Self::Longitudinal(error) => return error.fmt(formatter),
+            Self::InvalidLongitudinalEsemDsemArtifact => {
+                "invalid longitudinal ESEM/DSEM composition artifact"
+            }
         };
         formatter.write_str(message)
     }
@@ -278,6 +304,24 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<PsychometricError> for AnalysisEngineError {
+    fn from(error: PsychometricError) -> Self {
+        Self::Psychometric(error)
+    }
+}
+
+impl From<MembershipError> for AnalysisEngineError {
+    fn from(error: MembershipError) -> Self {
+        Self::Membership(error)
+    }
+}
+
+impl From<LongitudinalError> for AnalysisEngineError {
+    fn from(error: LongitudinalError) -> Self {
+        Self::Longitudinal(error)
     }
 }
 
@@ -412,8 +456,9 @@ fn valid_identifier(value: &str) -> bool {
 mod tests {
     use super::{
         ANALYSIS_ARTIFACT_SCHEMA_VERSION, ANALYSIS_STATISTIC_COUNT, AnalysisCorpus,
-        AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
-        MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
+        AnalysisEngineError, AnalysisEvidenceUnit, LongitudinalError,
+        MAX_ANALYSIS_IDENTIFIER_BYTES, MAX_EVIDENCE_UNITS, MembershipError, PsychometricError,
+        TopicMeasurementError, add_membership_count, execute_analysis_run,
     };
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -617,7 +662,7 @@ mod tests {
     }
 
     #[test]
-    fn public_accessors_limits_and_error_messages_are_executable() {
+    fn public_accessors_and_limits_are_executable() {
         let evidence = unit(
             "evidence-accessor",
             "2026-07-01T00:00:00Z",
@@ -647,7 +692,15 @@ mod tests {
             ],
         );
         assert_eq!(oversized, Err(AnalysisEngineError::LimitExceeded));
+        assert_eq!(
+            add_membership_count(u64::MAX, 1),
+            Err(AnalysisEngineError::ArithmeticOverflow)
+        );
+        assert_eq!(add_membership_count(0, 4), Ok(4));
+    }
 
+    #[test]
+    fn error_messages_and_from_impls_are_executable() {
         let messages = [
             (
                 AnalysisEngineError::InvalidEvidence,
@@ -681,6 +734,22 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::Psychometric(PsychometricError::CausalUnderidentified),
+                "temporal precedence is not causal identification",
+            ),
+            (
+                AnalysisEngineError::Membership(MembershipError::NestedIccInapplicable),
+                "nested ICC is inapplicable to this membership design",
+            ),
+            (
+                AnalysisEngineError::Longitudinal(LongitudinalError::BetweenIsNotWithinChange),
+                "between component is not within-unit change",
+            ),
+            (
+                AnalysisEngineError::InvalidLongitudinalEsemDsemArtifact,
+                "invalid longitudinal ESEM/DSEM composition artifact",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -689,11 +758,22 @@ mod tests {
         assert_eq!(converted.to_string(), "invalid API wire payload");
         let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
         assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        let from_psych: AnalysisEngineError = PsychometricError::CausalUnderidentified.into();
         assert_eq!(
-            add_membership_count(u64::MAX, 1),
-            Err(AnalysisEngineError::ArithmeticOverflow)
+            from_psych.to_string(),
+            "temporal precedence is not causal identification"
         );
-        assert_eq!(add_membership_count(0, 4), Ok(4));
+        let from_membership: AnalysisEngineError = MembershipError::NestedIccInapplicable.into();
+        assert_eq!(
+            from_membership.to_string(),
+            "nested ICC is inapplicable to this membership design"
+        );
+        let from_longitudinal: AnalysisEngineError =
+            LongitudinalError::BetweenIsNotWithinChange.into();
+        assert_eq!(
+            from_longitudinal.to_string(),
+            "between component is not within-unit change"
+        );
     }
 
     #[test]
