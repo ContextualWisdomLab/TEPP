@@ -1648,6 +1648,139 @@ pub fn refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean(
     Err(PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean)
 }
 
+/// Exact scalar p. 16 `TDPREDMEANSstd` after strictly positive
+/// `TDPREDVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; p. 16; footnote
+/// 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF re-opened
+/// 2026-08-31T03:00Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `TDPREDMEANS` the `n.TDpred × Tpoints × 1` matrix of free
+/// means of time-dependent predictors and name `TDPREDVAR` the
+/// Cholesky of time-dependent predictor variance. Page 16 prints
+/// standardised matrices with the suffix `std` when appropriate.
+/// The printed example on p. 16 is `discreteDRIFTstd`, not
+/// `TDPREDMEANSstd`. Footnote 4: standardisations use only the
+/// relevant variance, not the total. The relevant variance for that
+/// named predictor mean is `TDPREDVAR` `v`, not within-subject
+/// `asymDIFFUSION` `-q / (2 a)`, because Table 2 is the predictor,
+/// not the process dynamics. The 2017-era `summary.ctsemFit.R`
+/// comments out `TDPREDVAR` / `TDPREDVARstd` and does not form a
+/// `TDPREDMEANSstd` matrix; the scalar map here is the footnote 4
+/// standardisation of that named mean: `μ_x / √v`. Form strictly
+/// positive `v` first, then divide `μ_x` by `√v`. A zero mean is
+/// exactly zero. Unstandardised `TDPREDMEANS` is defined for a zero
+/// predictor variance; standardised `TDPREDMEANS` is not. Zero `v`
+/// has no positive SD and fails closed. Time-dependent predictor
+/// means are an event-time structural quantity, so a non-event
+/// clock fails closed. `TDPREDMEANS` does not require stable
+/// `a < 0`. `TDPREDVARstd` `v / v = 1` recovers the same number
+/// when `μ_x = √v` and remains a distinct named quantity. This
+/// crate does not currently export `TDPREDVARstd`; the refuse still
+/// names that quantity. `μ_x / √asymDIFFUSION` uses
+/// process-dynamics variance and is not this predictor map. Page 22
+/// does not report standardised `TDPRED` when there is no modeled
+/// `v`. This is not a Kalman filter, not a matrix `expm`, not DSEM,
+/// and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedTimeDependentPredictorMeanRequiresPositiveTimeDependentPredictorVariance`]
+/// when `TDPREDVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the mean is
+/// non-finite, the variance is non-finite or negative, or the
+/// mapped ratio overflows. Negative means remain valid signed
+/// locations.
+pub fn recover_standardised_time_dependent_predictor_mean(
+    predictor_mean: f64,
+    predictor_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !predictor_variance.is_finite() || predictor_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if predictor_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedTimeDependentPredictorMeanRequiresPositiveTimeDependentPredictorVariance,
+        );
+    }
+    let mean = require_finite(predictor_mean)?;
+    if mean == 0.0 {
+        return Ok(0.0);
+    }
+    let predictor_sd = predictor_variance.sqrt();
+    require_finite(mean / predictor_sd)
+}
+
+/// Refuse treating unstandardised `TDPREDMEANS` as p. 16
+/// `TDPREDMEANSstd`.
+///
+/// Free `TDPREDMEANS` `μ_x` is defined for a zero predictor
+/// variance. Footnote 4 `TDPREDMEANSstd` requires strictly positive
+/// `v`. Equal numbers when `v = 1` are still distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean`].
+pub fn refuse_unstandardised_time_dependent_predictor_mean_as_standardised_time_dependent_predictor_mean(
+    unstandardised_predictor_mean: f64,
+    standardised_predictor_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_predictor_mean, standardised_predictor_mean);
+    Err(
+        PsychometricError::UnstandardisedTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean,
+    )
+}
+
+/// Refuse treating p. 16 `TDPREDVARstd` as p. 16 `TDPREDMEANSstd`.
+///
+/// Both scalar maps equal 1 when `μ_x = √v`. `TDPREDVARstd` is the
+/// correlation form of `TDPREDVAR`. `TDPREDMEANSstd` is the
+/// predictor mean. Equal numbers remain distinct named quantities.
+/// This crate does not currently export `TDPREDVARstd`; the refuse
+/// still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedTimeDependentPredictorVarianceIsNotStandardisedTimeDependentPredictorMean`].
+pub fn refuse_standardised_time_dependent_predictor_variance_as_standardised_time_dependent_predictor_mean(
+    standardised_predictor_variance: f64,
+    standardised_predictor_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_predictor_variance, standardised_predictor_mean);
+    Err(
+        PsychometricError::StandardisedTimeDependentPredictorVarianceIsNotStandardisedTimeDependentPredictorMean,
+    )
+}
+
+/// Refuse treating `μ_x / √asymDIFFUSION` as p. 16
+/// `TDPREDMEANSstd`.
+///
+/// Footnote 4 predictor-mean standardisation uses `TDPREDVAR`, not
+/// process-dynamics `asymDIFFUSION`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::WithinSubjectScaledTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean`].
+pub fn refuse_within_subject_scaled_time_dependent_predictor_mean_as_standardised_time_dependent_predictor_mean(
+    within_subject_scaled_mean: f64,
+    standardised_predictor_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (within_subject_scaled_mean, standardised_predictor_mean);
+    Err(
+        PsychometricError::WithinSubjectScaledTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean,
+    )
+}
+
 /// Exact scalar p. 16 `T0MEANSstd` after strictly positive free
 /// `T0VAR`.
 ///
@@ -6891,14 +7024,14 @@ mod tests {
         recover_standardised_discrete_continuous_intercept,
         recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
         recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
-        recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-        recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-        recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-        recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-        recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate,
+        recover_standardised_time_dependent_predictor_mean, recover_standardised_trait_variance,
+        recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+        recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+        recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+        recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+        recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -6988,6 +7121,7 @@ mod tests {
         refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
         refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
+        refuse_standardised_time_dependent_predictor_variance_as_standardised_time_dependent_predictor_mean,
         refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
         refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
@@ -7038,8 +7172,10 @@ mod tests {
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
+        refuse_unstandardised_time_dependent_predictor_mean_as_standardised_time_dependent_predictor_mean,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+        refuse_within_subject_scaled_time_dependent_predictor_mean_as_standardised_time_dependent_predictor_mean,
     };
     use crate::error::PsychometricError;
 
@@ -15696,6 +15832,139 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_manifest_mean(f64::MAX, 1e-4, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput),
+        );
+    }
+
+    #[test]
+    fn standardised_time_dependent_predictor_mean_recovers_driver_page_sixteen_after_positive_v() {
+        // Driver et al. (2017, p. 16 TDPREDMEANSstd; Table 2; footnote 4;
+        // 2017-era summary.ctsemFit.R comments out TDPREDVAR): form
+        // strictly positive TDPREDVAR v, then μ_x / √v. Relevant
+        // variance is v, not asymDIFFUSION.
+        let mean = 0.8_f64;
+        let predictor_variance = 1.6_f64;
+        let recovered = recover_standardised_time_dependent_predictor_mean(
+            mean,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("TDPREDMEANSstd");
+        let expected = mean / predictor_variance.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let larger_v =
+            recover_standardised_time_dependent_predictor_mean(mean, 6.4, LagClock::EventTime)
+                .expect("TDPREDMEANSstd v=6.4");
+        assert!((larger_v - recovered).abs() > 1e-3);
+        assert!(larger_v.abs() < recovered.abs());
+        let unit = recover_standardised_time_dependent_predictor_mean(
+            predictor_variance.sqrt(),
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("TDPREDMEANSstd μ_x=√v");
+        // TDPREDVARstd is v/v = 1 after strictly positive v. Equal
+        // numbers when μ_x = √v remain distinct named quantities.
+        let variance_std = 1.0_f64;
+        assert!((unit - variance_std).abs() < 1e-15);
+        let within = recover_stationary_latent_variance(0.4, -0.25, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        let within_scaled = mean / within.sqrt();
+        assert!((within_scaled - recovered).abs() > 1e-3);
+        let matching_manifest =
+            recover_standardised_manifest_mean(mean, predictor_variance, LagClock::EventTime)
+                .expect("MANIFESTMEANSstd matching numbers");
+        assert!((matching_manifest - recovered).abs() < 1e-15);
+        let zero = recover_standardised_time_dependent_predictor_mean(
+            0.0,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("zero TDPREDMEANS");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative = recover_standardised_time_dependent_predictor_mean(
+            -mean,
+            predictor_variance,
+            LagClock::EventTime,
+        )
+        .expect("negative signed TDPREDMEANSstd");
+        assert!((negative + expected).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_time_dependent_predictor_mean_as_standardised_time_dependent_predictor_mean(
+                mean, recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean
+            )
+        );
+        assert_eq!(
+            refuse_standardised_time_dependent_predictor_variance_as_standardised_time_dependent_predictor_mean(
+                variance_std, unit
+            ),
+            Err(
+                PsychometricError::StandardisedTimeDependentPredictorVarianceIsNotStandardisedTimeDependentPredictorMean
+            )
+        );
+        assert_eq!(
+            refuse_within_subject_scaled_time_dependent_predictor_mean_as_standardised_time_dependent_predictor_mean(
+                within_scaled, recovered
+            ),
+            Err(
+                PsychometricError::WithinSubjectScaledTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean
+            )
+        );
+    }
+
+    #[test]
+    fn standardised_time_dependent_predictor_mean_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(0.8, 0.0, LagClock::EventTime),
+            Err(
+                PsychometricError::StandardisedTimeDependentPredictorMeanRequiresPositiveTimeDependentPredictorVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(0.8, 1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(0.8, 1.6, LagClock::AssertionTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(0.8, 1.6, LagClock::DocumentTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(
+                0.8,
+                1.6,
+                LagClock::AvailabilityTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(0.8, 1.6, LagClock::KnowledgeCutoff),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(0.8, -1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(f64::NAN, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(
+                0.8,
+                f64::INFINITY,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_time_dependent_predictor_mean(f64::MAX, 1e-4, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput),
         );
     }

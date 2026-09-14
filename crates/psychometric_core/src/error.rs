@@ -710,6 +710,27 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Driver p. 16 `TDPREDMEANSstd` was requested with a
+    /// non-positive time-dependent predictor variance. Footnote 4
+    /// standardisation of the 2017-era `TDPREDMEANS` vector
+    /// requires strictly positive `TDPREDVAR`.
+    StandardisedTimeDependentPredictorMeanRequiresPositiveTimeDependentPredictorVariance,
+    /// Driver Table 2 unstandardised `TDPREDMEANS` `μ_x` was treated
+    /// as `TDPREDMEANSstd`. Unstandardised predictor mean is defined
+    /// for a zero predictor variance; standardised `TDPREDMEANS` is
+    /// not.
+    UnstandardisedTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean,
+    /// Driver p. 16 `TDPREDVARstd` was treated as p. 16
+    /// `TDPREDMEANSstd`. Equal numbers when `μ_x = √v` are still
+    /// distinct named quantities. `TDPREDVARstd` is the correlation
+    /// form of `TDPREDVAR`; `TDPREDMEANSstd` is the predictor mean.
+    /// This crate does not currently export `TDPREDVARstd`; the
+    /// refuse still names that quantity.
+    StandardisedTimeDependentPredictorVarianceIsNotStandardisedTimeDependentPredictorMean,
+    /// Driver p. 16 `TDPREDMEANS` `/ √asymDIFFUSION` was treated as
+    /// `TDPREDMEANSstd`. Footnote 4 standardises the named predictor
+    /// mean using `TDPREDVAR`, not process-dynamics `asymDIFFUSION`.
+    WithinSubjectScaledTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1255,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedTimeDependentPredictorMeanRequiresPositiveTimeDependentPredictorVariance => {
+                "standardised time-dependent predictor mean requires strictly positive time-dependent predictor variance"
+            }
+            Self::UnstandardisedTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean => {
+                "unstandardised time-dependent predictor mean is not standardised time-dependent predictor mean"
+            }
+            Self::StandardisedTimeDependentPredictorVarianceIsNotStandardisedTimeDependentPredictorMean => {
+                "standardised time-dependent predictor variance is not standardised time-dependent predictor mean"
+            }
+            Self::WithinSubjectScaledTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean => {
+                "within-subject scaled time-dependent predictor mean is not standardised time-dependent predictor mean"
             }
         };
         formatter.write_str(message)
@@ -1899,6 +1932,30 @@ mod tests {
         assert_eq!(
             PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean.to_string(),
             "observed scaled manifest mean is not standardised manifest mean"
+        );
+    }
+
+    #[test]
+    fn standardised_time_dependent_predictor_mean_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedTimeDependentPredictorMeanRequiresPositiveTimeDependentPredictorVariance
+                .to_string(),
+            "standardised time-dependent predictor mean requires strictly positive time-dependent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean
+                .to_string(),
+            "unstandardised time-dependent predictor mean is not standardised time-dependent predictor mean"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTimeDependentPredictorVarianceIsNotStandardisedTimeDependentPredictorMean
+                .to_string(),
+            "standardised time-dependent predictor variance is not standardised time-dependent predictor mean"
+        );
+        assert_eq!(
+            PsychometricError::WithinSubjectScaledTimeDependentPredictorMeanIsNotStandardisedTimeDependentPredictorMean
+                .to_string(),
+            "within-subject scaled time-dependent predictor mean is not standardised time-dependent predictor mean"
         );
     }
 
