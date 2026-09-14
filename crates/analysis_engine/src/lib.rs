@@ -8,13 +8,17 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Rubin loading uncertainty
+//! is invoked through [`psychometric_core`] and is not Mislevy person-level
+//! plausible-value pooling.
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod rubin_loading_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use psychometric_core::PsychometricError;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -45,6 +49,13 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Rubin loading-uncertainty artifact and execution contracts.
+pub use rubin_loading_artifact::{
+    RUBIN_LOADING_ARTIFACT_BYTE_LIMIT, RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION,
+    RUBIN_LOADING_MODEL_CONTRACT_VERSION, RUBIN_LOADING_OUTPUT_PROFILE, RubinLoadingObservation,
+    RubinLoadingUncertaintyArtifact, RubinLoadingUncertaintyExecution,
+    execute_rubin_loading_uncertainty_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +259,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A psychometric recovery rejected the offered coordinates.
+    Psychometric(PsychometricError),
+    /// A Rubin loading-uncertainty artifact violated its bounded schema.
+    InvalidRubinLoadingUncertaintyArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +277,10 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::Psychometric(error) => return error.fmt(formatter),
+            Self::InvalidRubinLoadingUncertaintyArtifact => {
+                "invalid Rubin loading-uncertainty artifact"
+            }
         };
         formatter.write_str(message)
     }
@@ -278,6 +297,12 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<PsychometricError> for AnalysisEngineError {
+    fn from(error: PsychometricError) -> Self {
+        Self::Psychometric(error)
     }
 }
 
@@ -415,6 +440,7 @@ mod tests {
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
         MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
     };
+    use psychometric_core::PsychometricError;
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 
@@ -681,6 +707,14 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::Psychometric(PsychometricError::InsufficientDraws),
+                "Rubin total variance requires at least two complete-data draws",
+            ),
+            (
+                AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact,
+                "invalid Rubin loading-uncertainty artifact",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -689,6 +723,11 @@ mod tests {
         assert_eq!(converted.to_string(), "invalid API wire payload");
         let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
         assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        let from_psych: AnalysisEngineError = PsychometricError::InsufficientDraws.into();
+        assert_eq!(
+            from_psych.to_string(),
+            "Rubin total variance requires at least two complete-data draws"
+        );
         assert_eq!(
             add_membership_count(u64::MAX, 1),
             Err(AnalysisEngineError::ArithmeticOverflow)
