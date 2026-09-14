@@ -1,9 +1,10 @@
-//! Concrete draw-payload provenance contract for Rubin projection activation.
+//! Concrete estimator-payload provenance contract for Rubin projection activation.
 //!
 //! Snapshot identity, design dimensions, and an approved generator class do not
-//! identify the actual complete-data draw matrix consumed by one run. Activation
-//! therefore binds the receipt to the canonical SHA-256 of that concrete payload
-//! and receives the independently computed runtime digest.
+//! identify the actual factor-score/design vector and complete-data draw matrix
+//! consumed by one run. Activation therefore binds the receipt to the canonical
+//! SHA-256 of that concrete numeric payload and receives the independently
+//! computed runtime digest.
 
 use analysis_engine::{
     RUBIN_LOADING_MODEL_CONTRACT_VERSION, RubinProjectionActivationDecision,
@@ -15,9 +16,9 @@ use temporal_core::{AvailableTime, KnowledgeCutoff};
 const SNAPSHOT_ID: &str = "snapshot-rubin-activation";
 const SNAPSHOT_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const DRAW_PAYLOAD_DIGEST: &str =
+const ESTIMATOR_PAYLOAD_DIGEST: &str =
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const OTHER_DRAW_PAYLOAD_DIGEST: &str =
+const OTHER_ESTIMATOR_PAYLOAD_DIGEST: &str =
     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -40,7 +41,7 @@ fn receipt() -> RubinProjectionActivationReceiptV1 {
         ),
         SNAPSHOT_ID,
         SNAPSHOT_DIGEST,
-        DRAW_PAYLOAD_DIGEST,
+        ESTIMATOR_PAYLOAD_DIGEST,
         cutoff(),
         "rubin-gaussian-single-level-candidate-v1",
     )
@@ -48,21 +49,24 @@ fn receipt() -> RubinProjectionActivationReceiptV1 {
 }
 
 #[test]
-fn receipt_wire_binds_the_concrete_complete_data_draw_payload() {
+fn receipt_wire_binds_the_concrete_estimator_payload() {
     let receipt = receipt();
-    assert_eq!(receipt.complete_data_draws_sha256(), DRAW_PAYLOAD_DIGEST);
+    assert_eq!(receipt.estimator_payload_sha256(), ESTIMATOR_PAYLOAD_DIGEST);
 
     let json = receipt.to_json().expect("receipt json");
     let reparsed = RubinProjectionActivationReceiptV1::from_json(&json).expect("receipt parse");
-    assert_eq!(reparsed.complete_data_draws_sha256(), DRAW_PAYLOAD_DIGEST);
+    assert_eq!(
+        reparsed.estimator_payload_sha256(),
+        ESTIMATOR_PAYLOAD_DIGEST
+    );
 
     let mut forged: serde_json::Value = serde_json::from_str(&json).expect("json");
-    forged["complete_data_draws_sha256"] = serde_json::json!("not-a-digest");
+    forged["estimator_payload_sha256"] = serde_json::json!("not-a-digest");
     assert!(RubinProjectionActivationReceiptV1::from_json(&forged.to_string()).is_err());
 }
 
 #[test]
-fn production_decision_receives_runtime_draw_payload_digest_independently() {
+fn production_decision_receives_runtime_estimator_payload_digest_independently() {
     let receipt = receipt();
 
     // Production remains rejected because the approved-pairing registry is
@@ -73,7 +77,7 @@ fn production_decision_receives_runtime_draw_payload_digest_independently() {
             Some(&receipt),
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
-            DRAW_PAYLOAD_DIGEST,
+            ESTIMATOR_PAYLOAD_DIGEST,
             cutoff(),
             48,
             8,
@@ -86,7 +90,7 @@ fn production_decision_receives_runtime_draw_payload_digest_independently() {
             Some(&receipt),
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
-            OTHER_DRAW_PAYLOAD_DIGEST,
+            OTHER_ESTIMATOR_PAYLOAD_DIGEST,
             cutoff(),
             48,
             8,
