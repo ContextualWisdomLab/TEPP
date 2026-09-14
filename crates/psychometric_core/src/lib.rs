@@ -379,6 +379,8 @@ pub use event_time::recover_initial_time_dependent_predictor_effect;
 pub use event_time::recover_initial_time_independent_predictor_carry;
 /// Exact scalar first-occasion `T0TIPREDEFFECT` shift `t0_b z`.
 pub use event_time::recover_initial_time_independent_predictor_effect;
+/// Exact scalar 2017-era `T0TOTALVAR` `t0_trait² · trait + p_0`.
+pub use event_time::recover_initial_total_variance;
 /// Mean exact log-rate on already-centered irregular residuals.
 pub use event_time::recover_irregular_centered_residual_log_rate;
 /// Exact scalar §7.2 level-change `CINT` `κ = −a m x`.
@@ -572,6 +574,14 @@ pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_imp
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
+/// Refuse treating 2017-era `T0TOTALVAR` as free first-occasion `T0VAR`.
+pub use event_time::refuse_initial_total_variance_as_initial_latent_variance;
+/// Refuse treating 2017-era `T0TOTALVAR` as 2017-era `addedT0TIPREDVAR`.
+pub use event_time::refuse_initial_total_variance_as_initial_time_independent_variance;
+/// Refuse treating 2017-era `T0TOTALVAR` as 2017-era `T0TRAITVAR`.
+pub use event_time::refuse_initial_total_variance_as_initial_trait_variance;
+/// Refuse treating 2017-era `T0TOTALVAR` as Table 2 `TRAITVAR`.
+pub use event_time::refuse_initial_total_variance_as_trait_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.
