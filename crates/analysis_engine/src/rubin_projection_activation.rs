@@ -187,9 +187,9 @@ impl RubinProjectionActivationReceiptV1 {
 pub enum RubinProjectionActivationDecision {
     /// No activation receipt was offered; the artifact remains descriptive.
     DescriptiveOnly,
-    /// An offered receipt failed authority, provenance, or registry matching.
+    /// An offered receipt failed authority, provenance, design, or registry matching.
     Rejected,
-    /// The exact immutable pairing is approved for the declared design envelope.
+    /// The exact immutable pairing is approved for the observed design point.
     Eligible,
 }
 
@@ -205,6 +205,8 @@ struct ApprovedRubinProjectionPairing {
     source_snapshot_id: &'static str,
     source_snapshot_sha256: &'static str,
     design_envelope_id: &'static str,
+    supported_observation_counts: &'static [u64],
+    supported_draw_counts: &'static [u64],
     indicator_kind: &'static str,
 }
 
@@ -219,13 +221,18 @@ const PRODUCTION_APPROVED_PAIRINGS: &[ApprovedRubinProjectionPairing] = &[];
 /// remains empty until an independently accepted Validation Evidence package is
 /// promoted through the owner path, so a syntactically valid candidate receipt
 /// cannot self-authorize. Snapshot identity and content digest are independent
-/// runtime inputs and both must match the receipt and owner authority.
+/// runtime inputs and both must match the receipt and owner authority. Runtime
+/// observation and draw counts are checked against exact owner-approved design
+/// points; a design-envelope label alone never expands discrete validation
+/// evidence into an untested range.
 #[must_use]
 pub fn decide_rubin_projection_activation(
     receipt: Option<&RubinProjectionActivationReceiptV1>,
     expected_snapshot_id: &str,
     expected_snapshot_sha256: &str,
     expected_knowledge_cutoff: KnowledgeCutoff,
+    observation_count: u64,
+    draw_count: u64,
     indicator_kind: IndicatorKind,
 ) -> RubinProjectionActivationDecision {
     decide_with_registry(
@@ -233,6 +240,8 @@ pub fn decide_rubin_projection_activation(
         expected_snapshot_id,
         expected_snapshot_sha256,
         expected_knowledge_cutoff,
+        observation_count,
+        draw_count,
         indicator_kind,
         PRODUCTION_APPROVED_PAIRINGS,
     )
@@ -243,6 +252,8 @@ fn decide_with_registry(
     expected_snapshot_id: &str,
     expected_snapshot_sha256: &str,
     expected_knowledge_cutoff: KnowledgeCutoff,
+    observation_count: u64,
+    draw_count: u64,
     indicator_kind: IndicatorKind,
     approved_pairings: &[ApprovedRubinProjectionPairing],
 ) -> RubinProjectionActivationDecision {
@@ -253,6 +264,8 @@ fn decide_with_registry(
         || !valid_identifier(expected_snapshot_id)
         || is_mutable_authority_locator(expected_snapshot_id)
         || !valid_sha256(expected_snapshot_sha256)
+        || observation_count < 2
+        || draw_count < 2
     {
         return RubinProjectionActivationDecision::Rejected;
     }
@@ -276,6 +289,8 @@ fn decide_with_registry(
         if !valid_identifier(pairing.source_snapshot_id)
             || is_mutable_authority_locator(pairing.source_snapshot_id)
             || !valid_sha256(pairing.source_snapshot_sha256)
+            || !valid_design_points(pairing.supported_observation_counts)
+            || !valid_design_points(pairing.supported_draw_counts)
             || authoritative_available_at.to_rfc3339() != pairing.validation_evidence_available_at
             || authoritative_available_at.instant() != evidence_available_at.instant()
             || authoritative_available_at.instant() > expected_knowledge_cutoff.instant()
@@ -291,6 +306,8 @@ fn decide_with_registry(
             && receipt.source_snapshot_id == pairing.source_snapshot_id
             && receipt.source_snapshot_sha256 == pairing.source_snapshot_sha256
             && receipt.design_envelope_id == pairing.design_envelope_id
+            && pairing.supported_observation_counts.contains(&observation_count)
+            && pairing.supported_draw_counts.contains(&draw_count)
             && indicator_kind.as_str() == pairing.indicator_kind
     });
     if approved {
@@ -312,6 +329,12 @@ fn valid_sha256(value: &str) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn valid_design_points(values: &[u64]) -> bool {
+    !values.is_empty()
+        && values.iter().all(|value| *value >= 2)
+        && values.windows(2).all(|pair| pair[0] < pair[1])
 }
 
 fn is_mutable_authority_locator(value: &str) -> bool {
@@ -360,6 +383,8 @@ mod tests {
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     const EVIDENCE_AVAILABLE_AT: &str = "2026-07-31T23:59:59Z";
     const DESIGN_ENVELOPE: &str = "rubin-gaussian-single-level-approved-v1";
+    const SUPPORTED_OBSERVATION_COUNTS: &[u64] = &[48, 160];
+    const SUPPORTED_DRAW_COUNTS: &[u64] = &[8, 32];
 
     const APPROVED: ApprovedRubinProjectionPairing = ApprovedRubinProjectionPairing {
         generator_contract_id: "gaussian_complete_data_draws",
@@ -372,6 +397,8 @@ mod tests {
         source_snapshot_id: SNAPSHOT_ID,
         source_snapshot_sha256: SNAPSHOT_DIGEST,
         design_envelope_id: DESIGN_ENVELOPE,
+        supported_observation_counts: SUPPORTED_OBSERVATION_COUNTS,
+        supported_draw_counts: SUPPORTED_DRAW_COUNTS,
         indicator_kind: "alr",
     };
 
@@ -414,10 +441,50 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
             RubinProjectionActivationDecision::Eligible
+        );
+    }
+
+    #[test]
+    fn design_envelope_does_not_generalize_between_validated_points() {
+        let receipt = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
+        for (observation_count, draw_count) in [(49, 8), (48, 9), (2, 8), (48, 2)] {
+            assert_eq!(
+                decide_with_registry(
+                    Some(&receipt),
+                    SNAPSHOT_ID,
+                    SNAPSHOT_DIGEST,
+                    cutoff("2026-08-01T00:00:00Z"),
+                    observation_count,
+                    draw_count,
+                    IndicatorKind::AdditiveLogRatio,
+                    &[APPROVED],
+                ),
+                RubinProjectionActivationDecision::Rejected
+            );
+        }
+
+        let malformed_points = ApprovedRubinProjectionPairing {
+            supported_observation_counts: &[48, 48],
+            ..APPROVED
+        };
+        assert_eq!(
+            decide_with_registry(
+                Some(&receipt),
+                SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
+                cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
+                IndicatorKind::AdditiveLogRatio,
+                &[malformed_points],
+            ),
+            RubinProjectionActivationDecision::Rejected
         );
     }
 
@@ -432,6 +499,8 @@ mod tests {
                 SNAPSHOT_ID,
                 other_digest,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
@@ -448,6 +517,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[wrong_owner_digest],
             ),
@@ -464,6 +535,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[malformed_owner_digest],
             ),
@@ -484,6 +557,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[late_authority],
             ),
@@ -504,6 +579,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[noncanonical_authority],
             ),
@@ -520,6 +597,8 @@ mod tests {
                 "",
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
@@ -531,6 +610,8 @@ mod tests {
                 "different-snapshot",
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
@@ -542,6 +623,8 @@ mod tests {
                 SNAPSHOT_ID,
                 "bad-digest",
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
@@ -553,6 +636,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-02T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
@@ -565,6 +650,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
@@ -576,6 +663,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::IsometricLogRatio,
                 &[APPROVED],
             ),
@@ -624,6 +713,8 @@ mod tests {
                     SNAPSHOT_ID,
                     SNAPSHOT_DIGEST,
                     cutoff("2026-08-01T00:00:00Z"),
+                    48,
+                    8,
                     IndicatorKind::AdditiveLogRatio,
                     &[mismatch],
                 ),
@@ -645,6 +736,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[cross_snapshot_authority],
             ),
@@ -661,6 +754,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[mutable_snapshot_authority],
             ),
@@ -792,6 +887,8 @@ mod tests {
                 SNAPSHOT_ID,
                 SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
+                48,
+                8,
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
