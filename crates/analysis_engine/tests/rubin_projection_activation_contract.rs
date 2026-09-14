@@ -24,13 +24,16 @@ fn cutoff() -> KnowledgeCutoff {
 
 fn receipt() -> RubinProjectionActivationReceiptV1 {
     RubinProjectionActivationReceiptV1::new(
-        "gaussian_complete_data_draws",
-        "candidate-v1",
-        "rubin_loading_uncertainty",
-        RUBIN_LOADING_MODEL_CONTRACT_VERSION,
-        "validation-evidence-rubin-candidate-v1",
-        EVIDENCE_DIGEST,
-        AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability"),
+        ("gaussian_complete_data_draws", "candidate-v1"),
+        (
+            "rubin_loading_uncertainty",
+            RUBIN_LOADING_MODEL_CONTRACT_VERSION,
+        ),
+        (
+            "validation-evidence-rubin-candidate-v1",
+            EVIDENCE_DIGEST,
+            AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability"),
+        ),
         SNAPSHOT_ID,
         cutoff(),
         "rubin-gaussian-single-level-candidate-v1",
@@ -84,13 +87,16 @@ fn receipt_wire_refuses_forged_digest_and_late_evidence() {
     assert!(RubinProjectionActivationReceiptV1::from_json(&forged.to_string()).is_err());
 
     let late = RubinProjectionActivationReceiptV1::new(
-        "gaussian_complete_data_draws",
-        "candidate-v1",
-        "rubin_loading_uncertainty",
-        RUBIN_LOADING_MODEL_CONTRACT_VERSION,
-        "validation-evidence-rubin-candidate-v1",
-        EVIDENCE_DIGEST,
-        AvailableTime::parse_rfc3339("2026-08-01T00:00:01Z").expect("availability"),
+        ("gaussian_complete_data_draws", "candidate-v1"),
+        (
+            "rubin_loading_uncertainty",
+            RUBIN_LOADING_MODEL_CONTRACT_VERSION,
+        ),
+        (
+            "validation-evidence-rubin-candidate-v1",
+            EVIDENCE_DIGEST,
+            AvailableTime::parse_rfc3339("2026-08-01T00:00:01Z").expect("availability"),
+        ),
         SNAPSHOT_ID,
         cutoff(),
         "rubin-gaussian-single-level-candidate-v1",
