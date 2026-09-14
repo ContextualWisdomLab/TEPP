@@ -38,6 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- `psychometric_core` executes Display of the four p. 16 `MANIFESTVARstd` claim-boundary errors (`θ = 0`, unstandardised `θ`, `MANIFESTTRAITVARstd`, Equation 5 `Var(y)`). Recovery tests already constructed those variants; nightly unique-line coverage still listed the `Display` arms. Meredith (1993) and Mislevy (1991) remain unread (Unpaywall 2026-08-31T06:36Z: `is_oa: false`). Still not a Kalman filter, not a matrix `expm`, not ESEM estimation, not DSEM, and not ctsem estimation.
 - Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
