@@ -66,8 +66,6 @@ struct RecoverySummary {
 struct MetricSeries<'a> {
     truth: &'a [f64],
     recovered: &'a [f64],
-    lower: &'a [f64],
-    upper: &'a [f64],
     coverage_samples: &'a [f64],
     total_variances: &'a [f64],
     within_variances: &'a [f64],
@@ -117,6 +115,13 @@ fn bounded_count(value: usize) -> f64 {
 fn finite_mean(values: &[f64]) -> f64 {
     assert!(!values.is_empty());
     values.iter().sum::<f64>() / bounded_count(values.len())
+}
+
+fn root_mean_square(values: &[f64]) -> f64 {
+    assert!(!values.is_empty());
+    let mean_square = values.iter().map(|value| value * value).sum::<f64>()
+        / bounded_count(values.len());
+    mean_square.sqrt()
 }
 
 fn sample_standard_deviation(values: &[f64], mean: f64) -> f64 {
@@ -208,12 +213,11 @@ fn make_rows(
 
 fn summarize(series: &MetricSeries<'_>, attempted: usize, failed: usize) -> RecoverySummary {
     assert_eq!(series.truth.len(), series.recovered.len());
-    assert_eq!(series.truth.len(), series.lower.len());
-    assert_eq!(series.truth.len(), series.upper.len());
     assert_eq!(series.truth.len(), series.coverage_samples.len());
     assert_eq!(series.truth.len(), series.total_variances.len());
     assert_eq!(series.truth.len(), series.within_variances.len());
     assert_eq!(series.truth.len(), series.between_variances.len());
+    assert_eq!(attempted, series.recovered.len() + failed);
 
     let errors: Vec<f64> = series
         .recovered
@@ -256,8 +260,6 @@ fn run_scenario(scenario: &Scenario) -> RecoverySummary {
     let mut rng = SplitMix64::new(scenario.seed);
     let mut truth = Vec::with_capacity(REPLICATIONS);
     let mut recovered = Vec::with_capacity(REPLICATIONS);
-    let mut lower = Vec::with_capacity(REPLICATIONS);
-    let mut upper = Vec::with_capacity(REPLICATIONS);
     let mut coverage_samples = Vec::with_capacity(REPLICATIONS);
     let mut total_variances = Vec::with_capacity(REPLICATIONS);
     let mut within_variances = Vec::with_capacity(REPLICATIONS);
@@ -291,8 +293,6 @@ fn run_scenario(scenario: &Scenario) -> RecoverySummary {
                 let interval_upper = interval_center + half_width;
                 truth.push(scenario.loading);
                 recovered.push(estimate);
-                lower.push(interval_lower);
-                upper.push(interval_upper);
                 coverage_samples.push(if (interval_lower..=interval_upper).contains(&scenario.loading)
                 {
                     1.0
@@ -310,8 +310,6 @@ fn run_scenario(scenario: &Scenario) -> RecoverySummary {
     let series = MetricSeries {
         truth: &truth,
         recovered: &recovered,
-        lower: &lower,
-        upper: &upper,
         coverage_samples: &coverage_samples,
         total_variances: &total_variances,
         within_variances: &within_variances,
@@ -641,21 +639,9 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
     }
 
     let early_bias = finite_mean(&early_errors);
-    let early_rmse = finite_mean(
-        &early_errors
-            .iter()
-            .map(|error| error * error)
-            .collect::<Vec<_>>(),
-    )
-    .sqrt();
+    let early_rmse = root_mean_square(&early_errors);
     let late_bias = finite_mean(&late_errors);
-    let late_rmse = finite_mean(
-        &late_errors
-            .iter()
-            .map(|error| error * error)
-            .collect::<Vec<_>>(),
-    )
-    .sqrt();
+    let late_rmse = root_mean_square(&late_errors);
     let early_mean_total = finite_mean(&early_total_variances);
     let late_mean_total = finite_mean(&late_total_variances);
 
