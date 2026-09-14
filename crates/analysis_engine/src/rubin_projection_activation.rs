@@ -533,6 +533,25 @@ mod tests {
     }
 
     #[test]
+    fn approved_validation_evidence_snapshot_must_match_receipt_and_runtime_snapshot() {
+        let valid = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
+        let cross_snapshot_authority = ApprovedRubinProjectionPairing {
+            source_snapshot_id: "snapshot-rubin-other",
+            ..APPROVED
+        };
+        assert_eq!(
+            decide_with_registry(
+                Some(&valid),
+                SNAPSHOT_ID,
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[cross_snapshot_authority],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
+    }
+
+    #[test]
     fn receipt_wire_refuses_unknown_fields_noncanonical_times_and_mutable_authority() {
         let receipt = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
         let canonical = receipt.to_json().expect("json");
