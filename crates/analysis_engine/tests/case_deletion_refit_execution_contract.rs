@@ -6,7 +6,7 @@ use analysis_engine::{
     AnalysisEngineError, CASE_DELETION_REFIT_ARTIFACT_SCHEMA_VERSION,
     CASE_DELETION_REFIT_MODEL_CONTRACT_VERSION, CASE_DELETION_REFIT_OUTPUT_PROFILE,
     CaseDeletionDocument, CaseDeletionFitContext, CaseDeletionRefitInput, CaseDeletionRefitter,
-    execute_case_deletion_refit_run,
+    MAX_EVIDENCE_UNITS, execute_case_deletion_refit_run,
 };
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
@@ -118,11 +118,12 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
     .expect("accepted")
 }
 
-fn execute_with_provenance<D, P, F>(
+fn execute_with_seed_domain<D, P, F>(
     request: &AnalysisRunRequest,
     documents: &[CaseDeletionDocument<D>],
     snapshot_ids: &[String],
     available_times: &[AvailableTime],
+    seed_domain_base: &str,
     fitter: &F,
 ) -> Result<analysis_engine::CaseDeletionRefitExecution, AnalysisEngineError>
 where
@@ -138,10 +139,31 @@ where
             documents,
             snapshot_ids,
             available_times,
-            "topic-model-run",
+            seed_domain_base,
             fitter,
         ),
         "2026-08-02T00:00:00Z",
+    )
+}
+
+fn execute_with_provenance<D, P, F>(
+    request: &AnalysisRunRequest,
+    documents: &[CaseDeletionDocument<D>],
+    snapshot_ids: &[String],
+    available_times: &[AvailableTime],
+    fitter: &F,
+) -> Result<analysis_engine::CaseDeletionRefitExecution, AnalysisEngineError>
+where
+    D: Clone,
+    F: CaseDeletionRefitter<D, P>,
+{
+    execute_with_seed_domain(
+        request,
+        documents,
+        snapshot_ids,
+        available_times,
+        "topic-model-run",
+        fitter,
     )
 }
 
@@ -272,6 +294,19 @@ fn cross_snapshot_and_misaligned_provenance_fail_closed() {
         ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
+
+    let snapshot_ids = visible_snapshot_ids(documents.len());
+    let short_available_times = visible_available_times(documents.len() - 1);
+    assert_eq!(
+        execute_with_provenance(
+            &request,
+            &documents,
+            &snapshot_ids,
+            &short_available_times,
+            &MeanFitter,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
 }
 
 #[test]
@@ -289,12 +324,75 @@ fn visible_duplicate_identity_still_fails_closed() {
 }
 
 #[test]
+fn oversized_visible_identity_and_derived_seed_fail_before_fitter() {
+    let request = request();
+    let mut invalid_documents = documents();
+    invalid_documents[0].document_id = "d".repeat(257);
+    let snapshot_ids = visible_snapshot_ids(invalid_documents.len());
+    let available_times = visible_available_times(invalid_documents.len());
+    let fitter = CountingFitter::default();
+    assert_eq!(
+        execute_with_provenance(
+            &request,
+            &invalid_documents,
+            &snapshot_ids,
+            &available_times,
+            &fitter,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(fitter.calls.load(Ordering::SeqCst), 0);
+
+    let documents = documents();
+    let snapshot_ids = visible_snapshot_ids(documents.len());
+    let available_times = visible_available_times(documents.len());
+    let fitter = CountingFitter::default();
+    assert_eq!(
+        execute_with_seed_domain(
+            &request,
+            &documents,
+            &snapshot_ids,
+            &available_times,
+            &"s".repeat(256),
+            &fitter,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(fitter.calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn oversized_case_deletion_census_fails_before_any_fitter_call() {
     let request = request();
     let documents = (0..257)
         .map(|index| CaseDeletionDocument {
             document_id: format!("document-{index}"),
             evidence: f64::from(u32::try_from(index).expect("small test index")),
+        })
+        .collect::<Vec<_>>();
+    let snapshot_ids = visible_snapshot_ids(documents.len());
+    let available_times = visible_available_times(documents.len());
+    let fitter = CountingFitter::default();
+    assert_eq!(
+        execute_with_provenance(
+            &request,
+            &documents,
+            &snapshot_ids,
+            &available_times,
+            &fitter,
+        ),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+    assert_eq!(fitter.calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn raw_population_limit_fails_before_any_fitter_call() {
+    let request = request();
+    let documents = (0..=MAX_EVIDENCE_UNITS)
+        .map(|_| CaseDeletionDocument {
+            document_id: "document".into(),
+            evidence: 1.0,
         })
         .collect::<Vec<_>>();
     let snapshot_ids = visible_snapshot_ids(documents.len());
