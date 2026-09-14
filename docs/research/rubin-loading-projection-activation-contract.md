@@ -1,62 +1,63 @@
 # Rubin loading projection activation contract
 
-Status: branch-local scientific design evidence for issue #505. This document does not authorize inferential activation and does not promote Draft #504 to scientific/product claim authority.
+Status: branch-local scientific design and implementation evidence for issue #505. This document does not authorize inferential activation and does not promote Draft #504 to scientific/product claim authority.
 
 ## Problem
 
 `rubin_loading_uncertainty_v1` can correctly compute the bounded descriptive quantities `Qbar`, `Ubar`, `B`, and `T` for finite complete-data indicator draws. The arithmetic does not identify how those draws were generated, whether the draw generator is compatible with the estimand/analysis procedure, or which claim-specific Validation Evidence supports an inferential projection.
 
-Rubin-style variance validity is therefore not inferred from the combining formula alone. Rubin (1996) ties multiple-imputation inference to the imputation procedure, while Meng (1994) and Xie and Meng (2017) show that imputer/analyst uncongeniality can change variance and coverage behavior. The supported unit of activation in TEPP must be a specific generator/analysis/evidence pairing, not an arbitrary finite draw matrix.
+Rubin-style variance validity is therefore not inferred from the combining formula alone. Rubin (1996) ties multiple-imputation inference to the imputation procedure, while Meng (1994) and Xie and Meng (2017) show that imputer/analyst uncongeniality can change variance and coverage behavior. The supported unit of activation in TEPP is a specific generator/analysis/evidence pairing, not an arbitrary finite draw matrix.
 
 ## Owner boundary
 
-- `psychometric_core` continues to own reusable `Qbar/Ubar/B/T` and robust loading-point arithmetic.
+- `psychometric_core` owns reusable `Qbar/Ubar/B/T` and robust loading-point arithmetic.
 - `analysis_engine` owns request admission, snapshot/cutoff composition, Validation Evidence binding, and projection policy.
 - Validation Evidence supplies claim-specific recovery/coverage evidence for one declared design envelope. It does not become estimator code.
 - LLM output is not numerical, scientific-acceptance, or activation authority.
 - No external generator source is copied into TEPP. A generator is consumed only through an immutable versioned contract identity plus evidence provenance.
 
-## Proposed receipt
+## Implemented receipt
 
-A future positive path should consume a bounded immutable receipt equivalent to the following logical schema. Field names are normative for the implementation design; this document is not yet a public wire-version commitment.
+Draft #506 now implements `RubinProjectionActivationReceiptV1` as a bounded immutable canonical-JSON value object with these fields:
 
 ```text
-RubinProjectionActivationReceiptV1
-  schema_version
-  generator_contract_id
-  generator_contract_version
-  analysis_contract_id
-  analysis_contract_version
-  validation_evidence_id
-  validation_evidence_sha256
-  validation_evidence_available_at
-  source_snapshot_id
-  knowledge_cutoff
-  design_envelope_id
+schema_version
+generator_contract_id
+generator_contract_version
+analysis_contract_id
+analysis_contract_version
+validation_evidence_id
+validation_evidence_sha256
+validation_evidence_available_at
+source_snapshot_id
+knowledge_cutoff
+design_envelope_id
 ```
 
-The receipt must be canonical-JSON serializable and digest-bound. Identifiers use the Analysis Run identifier bound. SHA-256 values use the repository's lowercase canonical digest representation. `validation_evidence_available_at` and `knowledge_cutoff` are parsed typed clocks and compared by instant, not RFC 3339 text.
+The receipt is limited to 16 KiB before parsing. Identifiers use the Analysis Run identifier bound. Validation Evidence SHA-256 is exactly 64 lowercase hexadecimal characters. `validation_evidence_available_at` and `knowledge_cutoff` are stored canonically after typed parsing. Receipt SHA-256 is computed from the validated canonical JSON.
 
 `source_snapshot_id` must equal the Analysis Run snapshot. The activation receipt does not replace row-level `AvailableTime`; both the source observations and the Validation Evidence itself must have been available at or before the run's `KnowledgeCutoff`.
 
 ## Activation decision
 
-The production decision is fail closed and ordered. Expensive/scientific work is not used to repair invalid authority metadata.
+`decide_rubin_projection_activation` is a pure fail-closed decision over the receipt, expected snapshot/cutoff, and indicator kind. The production approval registry is not caller-supplied and is intentionally empty on this Draft branch.
 
-1. Validate the bounded receipt wire representation and canonical timestamps.
-2. Require exact Analysis Run snapshot and knowledge-cutoff binding.
-3. Require `validation_evidence_available_at <= knowledge_cutoff` by instant.
-4. Require an exact immutable generator contract ID and version.
-5. Require the exact `rubin_loading_uncertainty_v1` analysis contract/version rather than a family-name match.
-6. Require exact Validation Evidence identity and SHA-256 for that generator/analysis pairing.
-7. Require the declared design envelope to cover the active indicator kind and scientific conditions being projected. An envelope is not widened by similarity, a newer mutable branch, or an LLM judgment.
-8. Only after all preceding checks pass may an artifact carry a claim-specific positive projection state. Otherwise the current `descriptive_only_unbound_draw_generation_provenance` state remains authoritative.
+The decision order is:
 
-The positive projection state should carry or digest-bind the activation receipt identity. A bare string such as `validated_rubin_inference` without the receipt is insufficient.
+1. no receipt -> `DescriptiveOnly`;
+2. validate the bounded receipt contract;
+3. require exact Analysis Run snapshot identity;
+4. compare receipt/run knowledge cutoffs by instant, not RFC 3339 spelling;
+5. require `validation_evidence_available_at <= knowledge_cutoff` by instant;
+6. require an exact immutable generator contract ID/version;
+7. require the exact Rubin analysis contract ID/version;
+8. require exact Validation Evidence identity and SHA-256;
+9. require exact design envelope and indicator-kind coverage;
+10. only an exact approved pairing can return `Eligible`; otherwise return `Rejected`.
+
+A positive artifact state is not emitted by #506. The current production registry contains no approved pairing, so a valid candidate receipt cannot self-authorize. A bare string such as `validated_rubin_inference` remains insufficient.
 
 ## Required refusal matrix
-
-The executable contract must distinguish the following cases without changing Rubin arithmetic:
 
 | Case | Required result |
 | --- | --- |
@@ -68,44 +69,43 @@ The executable contract must distinguish the following cases without changing Ru
 | correct evidence ID with digest mismatch | fail closed |
 | evidence available only after the run cutoff | fail closed |
 | receipt snapshot different from the Analysis Run snapshot | fail closed |
-| mutable branch/PR identity presented as approval | fail closed |
-| design envelope mismatch | fail closed |
-| exact approved pairing + exact evidence digest + cutoff-safe provenance | eligible for the claim-specific positive projection state |
+| mutable branch/PR identity presented as approval | fail closed because it has no approved immutable pairing |
+| design envelope or indicator-kind mismatch | fail closed |
+| exact approved pairing + exact evidence digest + cutoff-safe provenance | eligible in the pure decision algorithm |
 
-"Eligible" is deliberately narrower than release-ready. ADR 0014 still requires implementation authority, claim-specific scientific evidence, exact-head quality/security evidence, and qualifying review before a protected-main product claim.
+The executable unit contract includes a test-only approved pairing to prove the positive branch without inserting any production approval data. Test fixtures are private to the decision module and cannot populate the production registry.
+
+"Eligible" is narrower than release-ready. ADR 0014 still requires implementation authority, claim-specific scientific evidence, exact-head quality/security evidence, and qualifying review before a protected-main product claim.
 
 ## Current production registry
 
 There is intentionally no approved production Rubin generator/analysis pairing on this branch. Draft #504 is candidate repeated-sampling evidence for its declared synthetic Gaussian generator and rolling-origin design. Its branch-local results must not be inserted into a production allow-list while its exact head lacks terminal required checks and qualifying independent current-head approval.
 
-A test-only fixture may exercise the positive decision algorithm with an explicitly local fake registry, but production code must keep the approved registry empty until the evidence package has independently crossed ADR 0014 claim-promotion gates. Test fixtures must not share constants with production approval data in a way that can silently promote them.
-
 ## Design envelope for the current candidate evidence
 
-The #504 evidence is intentionally scoped. It covers the current single-level `rubin_loading_uncertainty_v1` profile for its declared Gaussian simulation design, the tested observation/draw settings, explicit attempted/recovered/failed denominators, bias/RMSE and Monte Carlo uncertainty, a scoped large-sample normal coverage diagnostic, and leakage-safe rolling-origin replay. It does not establish universal congeniality, multilevel/cross-classified/multiple-membership validity, arbitrary imputation-model validity, or Mislevy person-level plausible-value inference.
+The #504 evidence is scoped to the current single-level `rubin_loading_uncertainty_v1` profile for its declared Gaussian simulation design, tested observation/draw settings, explicit attempted/recovered/failed denominators, bias/RMSE and Monte Carlo uncertainty, a scoped large-sample normal coverage diagnostic, and leakage-safe rolling-origin replay. It does not establish universal congeniality, multilevel/cross-classified/multiple-membership validity, arbitrary imputation-model validity, or Mislevy person-level plausible-value inference.
 
-A future evidence package can widen the envelope only by adding the relevant known-truth recovery/coverage evidence and receiving a new immutable identity/digest. Updating a mutable PR body or replacing an evidence file under the same identity is not an admissible widening mechanism.
+A future evidence package can widen the envelope only by adding relevant known-truth recovery/coverage evidence and receiving a new immutable identity/digest. Updating a mutable PR body or replacing an evidence file under the same identity is not admissible widening.
 
 ## Leakage and replay invariants
 
-For a fixed snapshot and cutoff, later-available source rows cannot change the historical result. The same rule applies to activation authority: Validation Evidence that was not available at the historical cutoff cannot retroactively authorize the older run. A later evidence package may authorize a later run under a later cutoff, but the earlier artifact remains descriptive-only unless a new artifact is produced under the corresponding authority and product policy.
+For a fixed snapshot and cutoff, later-available source rows cannot change the historical result. The same rule applies to activation authority: Validation Evidence unavailable at the historical cutoff cannot retroactively authorize the older run. A later evidence package may authorize a later run under a later cutoff, but the earlier artifact remains descriptive-only unless a new artifact is produced under the corresponding authority and product policy.
 
-Equivalent RFC 3339 spellings of the same instant are equivalent after typed parsing. Cross-snapshot evidence is a provenance violation, not a censorable future row.
+Equivalent RFC 3339 spellings of the same instant compare equal after typed parsing. Cross-snapshot evidence is a provenance violation, not a censorable future row.
 
 ## Evidence identity and mutability
 
-A Validation Evidence digest is content identity, not a review badge. The receipt must bind the evidence artifact that contains the scientific design, attempted/recovered/failed population, recovery/coverage summaries, Monte Carlo uncertainty, implementation/source identity, and applicable design envelope. Git branch names, PR numbers, check URLs, comments, or latest-release aliases are mutable locators and cannot substitute for the digest-bound evidence identity.
+A Validation Evidence digest is content identity, not a review badge. The receipt binds the evidence artifact containing the scientific design, attempted/recovered/failed population, recovery/coverage summaries, Monte Carlo uncertainty, implementation/source identity, and applicable design envelope. Git branch names, PR numbers, check URLs, comments, or latest-release aliases are mutable locators and cannot substitute for the digest-bound evidence identity.
 
-If the approved evidence artifact is superseded, the replacement receives a new identity/digest. Existing historical receipts continue to name the evidence under which they were evaluated; they are not silently rewritten to the newest package.
+If an approved evidence artifact is superseded, the replacement receives a new identity/digest. Existing historical receipts continue to name the evidence under which they were evaluated; they are not silently rewritten to the newest package.
 
-## Implementation sequence
+## Remaining implementation sequence
 
-1. Keep #506's negative projection policy and public-wire refusal intact.
-2. Add a bounded activation-receipt value object and a pure fail-closed decision function with missing/unknown/mismatch/stale/approved tests.
-3. Keep the production approved-pairing registry empty while #504 is Draft or lacks exact-head scientific/review gates.
-4. Once the candidate evidence is independently accepted, publish its immutable Validation Evidence identity/digest and add that exact pairing through the owner path.
-5. Bind the positive artifact projection state to the receipt digest and reacquire exact-head tests, authored line/branch coverage, documentation, security, CodeQL, and independent review.
-6. Fold the complete source/test/evidence delta into the surviving Analysis Run vehicle by ordinary non-force conflict resolution; predecessor checks and approvals do not transfer.
+1. Keep #506's negative projection policy, bounded activation receipt, and public-wire refusal intact.
+2. Keep the production approved-pairing registry empty while #504 is Draft or lacks exact-head scientific/review gates.
+3. Once candidate evidence is independently accepted, publish its immutable Validation Evidence identity/digest and add only that exact pairing through the owner path.
+4. Bind any future positive artifact projection state to the activation-receipt digest and reacquire exact-head tests, authored line/branch coverage, documentation, security, CodeQL, and independent review.
+5. Fold the complete source/test/evidence delta into the surviving Analysis Run vehicle by ordinary non-force conflict resolution; predecessor checks and approvals do not transfer.
 
 ## Primary evidence
 
