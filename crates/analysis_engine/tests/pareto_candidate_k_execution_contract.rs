@@ -7,7 +7,7 @@ use analysis_engine::{
 };
 use model_selection::{ModelCandidate, ModelSelectionError};
 use temporal_core::KnowledgeCutoff;
-use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
+use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff")
@@ -185,4 +185,20 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+}
+
+#[test]
+fn invalid_completed_at_fails_terminal_result_construction() {
+    let request = request();
+    assert_eq!(
+        execute_pareto_candidate_k_run(
+            &request,
+            &accepted(&request),
+            "snapshot-pareto-candidate-k",
+            cutoff(),
+            &statistical_front(),
+            "not-a-timestamp",
+        ),
+        Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+    );
 }
