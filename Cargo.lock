@@ -80,6 +80,7 @@ dependencies = [
  "sha2",
  "temporal_core",
  "tepp_api",
+ "topic_lineage",
  "topic_measurement",
  "uuid",
 ]
