@@ -1,9 +1,10 @@
-//! Concrete complete-data draw authority for Rubin projection activation.
+//! Concrete numeric estimator-payload authority for Rubin projection activation.
 //!
 //! The underlying activation policy owns generator/analysis/evidence approval,
 //! temporal provenance, source-snapshot authority, and validated design points.
 //! This boundary additionally binds one activation receipt to the exact
-//! complete-data draw payload consumed by the run. A class-level approved
+//! cutoff-admitted numeric payload consumed by the run: the factor-score design
+//! vector and complete-data indicator-draw matrix. A class-level approved
 //! generator and a matching matrix shape are not authority for arbitrary values.
 
 use psychometric_core::IndicatorKind;
@@ -26,23 +27,26 @@ use crate::rubin_projection_activation::{
 };
 use crate::{AnalysisEngineError, format_digest};
 
-/// Versioned public wire schema for the draw-bound Rubin activation receipt.
+/// Versioned public wire schema for the payload-bound Rubin activation receipt.
 ///
 /// This contract is still Draft and has never been released from protected
-/// `main`; the draw commitment is therefore part of the eventual v1 definition,
-/// not a post-release incompatible mutation.
+/// `main`; the per-run payload commitment is therefore part of the eventual v1
+/// definition, not a post-release incompatible mutation.
 pub const RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION: &str = INNER_RECEIPT_SCHEMA_VERSION;
-/// Maximum canonical JSON size accepted for one draw-bound activation receipt.
+/// Maximum canonical JSON size accepted for one payload-bound activation receipt.
 pub const RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT: usize = INNER_RECEIPT_BYTE_LIMIT;
 
-/// Draw-bound Rubin projection activation receipt.
+/// Payload-bound Rubin projection activation receipt.
 ///
 /// The nested activation authority remains owned by the existing projection
 /// policy. This type adds a canonical SHA-256 commitment to the concrete
-/// complete-data draw payload and flattens that commitment into the public wire
-/// receipt. The digest prevents a receipt issued for one payload from being
-/// replayed for different draw values with the same dimensions. It does not, by
-/// itself, attest that a caller executed an approved generator.
+/// cutoff-admitted numeric estimator payload. The Draft v1 wire member is still
+/// named `complete_data_draws_sha256`; issue #522 owns its pre-release semantic
+/// rename. Its value commits both the factor-score design vector and the draw
+/// matrix produced by the executor. The digest prevents a receipt issued for one
+/// payload from being replayed for different factor scores or draw values with
+/// the same dimensions. It does not, by itself, attest that a caller executed an
+/// approved generator or factor-mapping implementation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RubinProjectionActivationReceiptV1 {
     inner: InnerRubinProjectionActivationReceiptV1,
@@ -50,17 +54,18 @@ pub struct RubinProjectionActivationReceiptV1 {
 }
 
 impl RubinProjectionActivationReceiptV1 {
-    /// Construct a draw-bound canonical activation receipt.
+    /// Construct a payload-bound canonical activation receipt.
     ///
     /// `generator_contract` and `analysis_contract` are `(id, version)` pairs.
-    /// `validation_evidence` is `(id, sha256, available_time)`. Snapshot and draw
-    /// payload digests are independent commitments and must both be lowercase
-    /// canonical SHA-256 values.
+    /// `validation_evidence` is `(id, sha256, available_time)`. Snapshot and
+    /// estimator-payload digests are independent commitments and must both be
+    /// lowercase canonical SHA-256 values. The payload parameter retains the
+    /// Draft draw-only name until issue #522's pre-release wire rename.
     ///
     /// # Errors
     ///
     /// Returns a fail-closed validation error when the underlying authority
-    /// receipt or concrete draw-payload digest is invalid.
+    /// receipt or concrete estimator-payload digest is invalid.
     pub fn new(
         generator_contract: (&str, &str),
         analysis_contract: (&str, &str),
@@ -90,13 +95,13 @@ impl RubinProjectionActivationReceiptV1 {
         })
     }
 
-    /// Parse and fully validate bounded draw-bound receipt JSON.
+    /// Parse and fully validate bounded payload-bound receipt JSON.
     ///
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::LimitExceeded`] before parsing an
     /// oversized payload and [`AnalysisEngineError::InvalidEvidence`] when the
-    /// draw commitment, schema version, duplicate authority members, or
+    /// payload commitment, schema version, duplicate authority members, or
     /// underlying activation contract is invalid.
     pub fn from_json(payload: &str) -> Result<Self, AnalysisEngineError> {
         require_receipt_byte_limit(payload.len())?;
@@ -127,7 +132,7 @@ impl RubinProjectionActivationReceiptV1 {
         })
     }
 
-    /// Serialize canonical validated receipt JSON with the draw commitment.
+    /// Serialize canonical validated receipt JSON with the estimator-payload commitment.
     ///
     /// # Errors
     ///
@@ -152,7 +157,7 @@ impl RubinProjectionActivationReceiptV1 {
         Ok(payload)
     }
 
-    /// Return the lowercase SHA-256 digest of canonical draw-bound receipt JSON.
+    /// Return the lowercase SHA-256 digest of canonical payload-bound receipt JSON.
     ///
     /// # Errors
     ///
@@ -174,7 +179,11 @@ impl RubinProjectionActivationReceiptV1 {
         self.inner.source_snapshot_sha256()
     }
 
-    /// Return the canonical SHA-256 of the exact complete-data draw payload.
+    /// Return the canonical SHA-256 of the exact numeric estimator payload.
+    ///
+    /// The Draft accessor name predates issue #522 and will be renamed before
+    /// protected-main publication. The returned digest commits both admitted
+    /// factor scores and complete-data draw values.
     #[must_use]
     pub fn complete_data_draws_sha256(&self) -> &str {
         &self.complete_data_draws_sha256
@@ -187,12 +196,12 @@ impl RubinProjectionActivationReceiptV1 {
     }
 }
 
-/// Decide whether a draw-bound receipt authorizes Rubin projection.
+/// Decide whether a payload-bound receipt authorizes Rubin projection.
 ///
-/// The runtime draw digest is independent input. It must be canonical and must
-/// match the receipt before the underlying generator/analysis/evidence authority
-/// decision is evaluated. Production approval remains controlled exclusively by
-/// the underlying owner registry.
+/// The runtime estimator-payload digest is independent input. It must be
+/// canonical and must match the receipt before the underlying
+/// generator/analysis/evidence authority decision is evaluated. Production
+/// approval remains controlled exclusively by the underlying owner registry.
 #[must_use]
 pub fn decide_rubin_projection_activation(
     receipt: Option<&RubinProjectionActivationReceiptV1>,
