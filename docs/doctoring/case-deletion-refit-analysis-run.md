@@ -15,11 +15,12 @@ Current repair lineage:
 - The same repair caps current exhaustive representation at 65,280 retained document identities (`256 * 255`), so at most 256 admitted documents and 257 full/deletion fitter invocations are allowed. An oversized admitted census is rejected before any fitter call.
 - `6d0fb9081334e30dbe062aa11bc594eed801f3e7` promotes canonical `corpus_split::cutoff_eligible` to a runtime dependency.
 - `4a85e41519bf806334d2d4f41cde9938d9cd8d6c` migrates the integration contract and proves future-duplicate replay invariance, cross-snapshot/misaligned-provenance refusal, visible-duplicate refusal, equivalent cutoff instants, and zero fitter calls at 257 admitted documents.
-- ADR repair `816917b5089320595f6dcf97db88f8929225a8b0` records the temporal/resource decision and returns ADR 0056 from premature `Accepted` authority to `Proposed`.
+- `7705111516eda65b38e4cf7d8d3069f786bab65d` bounds every cutoff-visible document identity before the runner's quadratic identity cloning and prevalidates the derived full-fit seed domain so malformed/oversized identity state cannot consume the full refit budget before failing artifact construction.
+- ADR repairs `816917b5089320595f6dcf97db88f8929225a8b0` and `8f2aca3ef9afd5d9ed573e9b15197ccb3b75f50f` record the temporal/resource decision and return ADR 0056 from premature `Accepted` authority to `Proposed`.
 
 Historical replay invariant: evidence from the requested snapshot whose `AvailableTime` is after the requested cutoff cannot alter the earlier admitted corpus, artifact, or terminal result. Cross-snapshot evidence is a provenance violation and fails closed rather than being silently censored.
 
-The resource ceiling is representation-specific, not a scientific claim that case-deletion analysis is intrinsically limited to 256 documents. Supporting larger corpora requires a separately reviewed representation/resource change, such as eliminating quadratic retained-identity materialization, while preserving actual deleted-data refits and fitter-owned posterior semantics.
+The resource ceiling is representation-specific, not a scientific claim that case-deletion analysis is intrinsically limited to 256 documents. The profile now bounds retained identity count and each visible identity's bytes and caps the number of fitter-owned posteriors. It still cannot make a truthful generic byte-size claim for arbitrary scientific evidence `D` or posterior `P`. Issue #499 owns that remaining production fitter/posterior resource-envelope gap; a larger ceiling or complete worker-memory/SLO claim requires a concrete fitter-owned resource contract or a runner representation change with exact measurement.
 
 Raw posteriors remain with the scientific fitter. Reweighting, a fixed posterior, or a diagonal approximation is not an acceptable substitute for an actual `D \ {i}` fit. This profile is not a Bayesian sampler, GPU execution, or topic birth/split/merge.
 
