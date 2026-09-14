@@ -3,6 +3,7 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
+    recover_asymptotes_true_time_independent_predictor_effect,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
@@ -51,6 +52,7 @@ use psychometric_core::{
     refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
     refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+    refuse_asymptotic_time_independent_effect_as_asymptotes_true_time_independent_effect,
     refuse_asymptotic_time_independent_effect_as_coefficient,
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -58,11 +60,13 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
+    refuse_continuous_intercept_as_asymptotes_true_time_independent_effect,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
     refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
+    refuse_discrete_time_independent_effect_as_asymptotes_true_time_independent_effect,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -179,6 +183,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
+    refuse_unstandardised_time_independent_coefficient_as_asymptotes_true_time_independent_effect,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
 };
@@ -3779,6 +3784,106 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
+        )
+    );
+}
+
+#[test]
+fn asymptotes_true_time_independent_effect_is_not_unstandardised_asym_discrete_or_cint() {
+    let effect = 0.4_f64;
+    let log_rate = -0.5_f64;
+    let recovered = recover_asymptotes_true_time_independent_predictor_effect(
+        effect,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymptotes=TRUE TIPREDEFFECT");
+    assert!(
+        (recovered - 0.2).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era summary.ctsemFit.R): asymptotes=TRUE TIPREDEFFECT is -a times B = 0.2"
+    );
+    let from_stored = recover_asymptotes_true_time_independent_predictor_effect(
+        0.8,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("stored");
+    assert!(
+        (from_stored - effect).abs() < 1e-15,
+        "Driver et al. (2017): stored -B/a = 0.8 recovers original TIPREDEFFECT"
+    );
+    let asymptotic = recover_asymptotic_time_independent_predictor_effect(
+        effect,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTIPREDEFFECT");
+    assert!(
+        (asymptotic - recovered).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): unit asymTIPREDEFFECT is not the asymptotes=TRUE rewrite"
+    );
+    let discrete = recover_discrete_time_independent_predictor_effect(
+        effect,
+        1.0,
+        log_rate,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("discreteTIPREDEFFECT");
+    assert!(
+        (discrete - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): discreteTIPREDEFFECT is not the asymptotes=TRUE rewrite"
+    );
+    assert!(
+        (effect - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): unstandardised TIPREDEFFECT is not the asymptotes=TRUE rewrite"
+    );
+    assert_eq!(
+        recover_asymptotes_true_time_independent_predictor_effect(0.0, 0.5, LagClock::EventTime)
+            .expect("zero")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        recover_asymptotes_true_time_independent_predictor_effect(0.4, 0.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::AsymptotesTrueTimeIndependentEffectRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotes_true_time_independent_predictor_effect(0.4, -0.5, LagClock::SystemTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        refuse_unstandardised_time_independent_coefficient_as_asymptotes_true_time_independent_effect(
+            effect,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedTimeIndependentCoefficientIsNotAsymptotesTrueTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_effect_as_asymptotes_true_time_independent_effect(
+            asymptotic,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_discrete_time_independent_effect_as_asymptotes_true_time_independent_effect(
+            discrete,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::DiscreteTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_continuous_intercept_as_asymptotes_true_time_independent_effect(effect, recovered),
+        Err(
+            psychometric_core::PsychometricError::ContinuousInterceptIsNotAsymptotesTrueTimeIndependentEffect
         )
     );
 }

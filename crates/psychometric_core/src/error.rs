@@ -710,6 +710,29 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+
+    /// 2017-era active `if(asymptotes==TRUE) TIPREDEFFECT <- -DRIFT %*%
+    /// TIPREDEFFECT` was requested for a non-stable drift. That rewrite
+    /// is `−a · B` and converts the asymptotic-parameterization stored
+    /// `TIPREDEFFECT` back to original `B`. Lasting conversion requires
+    /// `a < 0`. A zero coefficient is exactly zero even if `a ≥ 0`.
+    AsymptotesTrueTimeIndependentEffectRequiresStableDrift,
+    /// Unstandardised `TIPREDEFFECT` `B` was treated as the 2017-era
+    /// active `asymptotes=TRUE` rewrite. `B` is not `−a · B` when
+    /// `a ≠ −1`.
+    UnstandardisedTimeIndependentCoefficientIsNotAsymptotesTrueTimeIndependentEffect,
+    /// Driver §7.2 `asymTIPREDEFFECT` `-B / a` was treated as the
+    /// 2017-era active `asymptotes=TRUE` `TIPREDEFFECT` rewrite. The
+    /// stored asymptotic coefficient is not `−a · B`.
+    AsymptoticTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect,
+    /// Driver `discreteTIPREDEFFECT` `A^{-1}[e^{A Δt} − I] B` was
+    /// treated as the 2017-era active `asymptotes=TRUE` `TIPREDEFFECT`
+    /// rewrite. A finite event interval is not `−a · B`.
+    DiscreteTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect,
+    /// Driver Table 2 `CINT` `κ` was treated as the 2017-era active
+    /// `asymptotes=TRUE` `TIPREDEFFECT` rewrite. The same operator
+    /// on a different named matrix is not this coefficient rewrite.
+    ContinuousInterceptIsNotAsymptotesTrueTimeIndependentEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1257,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptotesTrueTimeIndependentEffectRequiresStableDrift => {
+                "asymptotes-true time-independent effect requires a stable negative drift"
+            }
+            Self::UnstandardisedTimeIndependentCoefficientIsNotAsymptotesTrueTimeIndependentEffect => {
+                "unstandardised time-independent coefficient is not asymptotes-true time-independent effect"
+            }
+            Self::AsymptoticTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect => {
+                "asymptotic time-independent effect is not asymptotes-true time-independent effect"
+            }
+            Self::DiscreteTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect => {
+                "discrete time-independent effect is not asymptotes-true time-independent effect"
+            }
+            Self::ContinuousInterceptIsNotAsymptotesTrueTimeIndependentEffect => {
+                "continuous intercept is not asymptotes-true time-independent effect"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2109,34 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_time_independent_effect_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptotesTrueTimeIndependentEffectRequiresStableDrift.to_string(),
+            "asymptotes-true time-independent effect requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedTimeIndependentCoefficientIsNotAsymptotesTrueTimeIndependentEffect
+                .to_string(),
+            "unstandardised time-independent coefficient is not asymptotes-true time-independent effect"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+                .to_string(),
+            "asymptotic time-independent effect is not asymptotes-true time-independent effect"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+                .to_string(),
+            "discrete time-independent effect is not asymptotes-true time-independent effect"
+        );
+        assert_eq!(
+            PsychometricError::ContinuousInterceptIsNotAsymptotesTrueTimeIndependentEffect
+                .to_string(),
+            "continuous intercept is not asymptotes-true time-independent effect"
         );
     }
 }
