@@ -283,10 +283,30 @@ fn valid_sha256(value: &str) -> bool {
 }
 
 fn is_mutable_authority_locator(value: &str) -> bool {
-    matches!(value, "latest" | "main" | "master")
-        || ["refs/", "http://", "https://"]
-            .into_iter()
-            .any(|prefix| value.starts_with(prefix))
+    let normalized = value.to_ascii_lowercase();
+    let numeric_alias = ["pr-", "pr/", "pull-", "pull/", "issue-", "issue/"]
+        .into_iter()
+        .filter_map(|prefix| normalized.strip_prefix(prefix))
+        .any(|suffix| !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit()));
+    let hash_alias = normalized
+        .strip_prefix('#')
+        .is_some_and(|suffix| !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit()));
+
+    matches!(
+        normalized.as_str(),
+        "latest" | "main" | "master" | "latest-release" | "release-latest"
+    ) || [
+        "refs/",
+        "http://",
+        "https://",
+        "git://",
+        "ssh://",
+        "github.com/",
+    ]
+    .into_iter()
+    .any(|prefix| normalized.starts_with(prefix))
+        || numeric_alias
+        || hash_alias
 }
 
 #[cfg(test)]
