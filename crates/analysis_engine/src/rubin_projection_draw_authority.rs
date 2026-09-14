@@ -13,10 +13,18 @@ use temporal_core::{AvailableTime, KnowledgeCutoff};
 
 use crate::{AnalysisEngineError, format_digest};
 use crate::rubin_projection_activation::{
+    RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT as INNER_RECEIPT_BYTE_LIMIT,
+    RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION as INNER_RECEIPT_SCHEMA_VERSION,
     RubinProjectionActivationDecision,
     RubinProjectionActivationReceiptV1 as InnerRubinProjectionActivationReceiptV1,
     decide_rubin_projection_activation as decide_inner_rubin_projection_activation,
 };
+
+/// Versioned public wire schema for the draw-bound Rubin activation receipt.
+pub const RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION: &str =
+    "tepp.rubin_projection_activation_receipt.v2";
+/// Maximum canonical JSON size accepted for one draw-bound activation receipt.
+pub const RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT: usize = INNER_RECEIPT_BYTE_LIMIT;
 
 /// Draw-bound Rubin projection activation receipt.
 ///
@@ -79,7 +87,7 @@ impl RubinProjectionActivationReceiptV1 {
     ///
     /// Returns [`AnalysisEngineError::LimitExceeded`] before parsing an
     /// oversized payload and [`AnalysisEngineError::InvalidEvidence`] when the
-    /// draw commitment or underlying activation contract is invalid.
+    /// draw commitment, schema version, or underlying activation contract is invalid.
     pub fn from_json(payload: &str) -> Result<Self, AnalysisEngineError> {
         require_receipt_byte_limit(payload.len())?;
         let mut value: Value =
@@ -87,6 +95,11 @@ impl RubinProjectionActivationReceiptV1 {
         let object = value
             .as_object_mut()
             .ok_or(AnalysisEngineError::InvalidEvidence)?;
+        if object.get("schema_version").and_then(Value::as_str)
+            != Some(RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION)
+        {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
         let complete_data_draws_sha256 = object
             .remove("complete_data_draws_sha256")
             .and_then(|value| value.as_str().map(ToOwned::to_owned))
@@ -94,6 +107,10 @@ impl RubinProjectionActivationReceiptV1 {
         if !valid_sha256(&complete_data_draws_sha256) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
+        object.insert(
+            "schema_version".into(),
+            Value::String(INNER_RECEIPT_SCHEMA_VERSION.into()),
+        );
         let inner_json =
             serde_json::to_string(object).map_err(|_| AnalysisEngineError::SerializationFailure)?;
         let inner = InnerRubinProjectionActivationReceiptV1::from_json(&inner_json)?;
@@ -115,13 +132,17 @@ impl RubinProjectionActivationReceiptV1 {
         let inner_json = self.inner.to_json()?;
         let mut value: Value =
             serde_json::from_str(&inner_json).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        value
+        let object = value
             .as_object_mut()
-            .ok_or(AnalysisEngineError::SerializationFailure)?
-            .insert(
-                "complete_data_draws_sha256".into(),
-                Value::String(self.complete_data_draws_sha256.clone()),
-            );
+            .ok_or(AnalysisEngineError::SerializationFailure)?;
+        object.insert(
+            "schema_version".into(),
+            Value::String(RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION.into()),
+        );
+        object.insert(
+            "complete_data_draws_sha256".into(),
+            Value::String(self.complete_data_draws_sha256.clone()),
+        );
         let payload =
             serde_json::to_string(&value).map_err(|_| AnalysisEngineError::SerializationFailure)?;
         require_receipt_byte_limit(payload.len())?;
@@ -225,9 +246,7 @@ fn valid_sha256(value: &str) -> bool {
 }
 
 fn require_receipt_byte_limit(payload_len: usize) -> Result<(), AnalysisEngineError> {
-    if payload_len
-        > crate::rubin_projection_activation::RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT
-    {
+    if payload_len > RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT {
         return Err(AnalysisEngineError::LimitExceeded);
     }
     Ok(())
@@ -235,8 +254,11 @@ fn require_receipt_byte_limit(payload_len: usize) -> Result<(), AnalysisEngineEr
 
 #[cfg(test)]
 mod tests {
-    use super::{RubinProjectionActivationReceiptV1, validated_inner_for_runtime_draws};
-    use crate::RUBIN_LOADING_MODEL_CONTRACT_VERSION;
+    use super::{
+        RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION, RubinProjectionActivationReceiptV1,
+        validated_inner_for_runtime_draws,
+    };
+    use crate::{AnalysisEngineError, RUBIN_LOADING_MODEL_CONTRACT_VERSION};
     use temporal_core::{AvailableTime, KnowledgeCutoff};
 
     const SNAPSHOT_DIGEST: &str =
@@ -278,18 +300,35 @@ mod tests {
     }
 
     #[test]
-    fn draw_digest_is_part_of_canonical_receipt_and_receipt_digest() {
+    fn draw_digest_is_part_of_canonical_v2_receipt_and_receipt_digest() {
         let receipt = receipt();
         let canonical = receipt.to_json().expect("json");
+        let wire: serde_json::Value = serde_json::from_str(&canonical).expect("json");
+        assert_eq!(
+            wire.get("schema_version").and_then(serde_json::Value::as_str),
+            Some(RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION)
+        );
         assert!(canonical.contains(DRAW_PAYLOAD_DIGEST));
         let reparsed = RubinProjectionActivationReceiptV1::from_json(&canonical).expect("receipt");
         assert_eq!(reparsed, receipt);
 
-        let mut changed = serde_json::from_str::<serde_json::Value>(&canonical).expect("json");
-        changed["complete_data_draws_sha256"] =
-            serde_json::json!(OTHER_DRAW_PAYLOAD_DIGEST);
+        let mut changed = wire;
+        changed["complete_data_draws_sha256"] = serde_json::json!(OTHER_DRAW_PAYLOAD_DIGEST);
         let changed = RubinProjectionActivationReceiptV1::from_json(&changed.to_string())
             .expect("alternate valid digest");
         assert_ne!(receipt.sha256().expect("digest"), changed.sha256().expect("digest"));
+    }
+
+    #[test]
+    fn legacy_v1_wire_fails_closed_after_draw_binding_contract_change() {
+        let receipt = receipt();
+        let mut legacy: serde_json::Value =
+            serde_json::from_str(&receipt.to_json().expect("json")).expect("json");
+        legacy["schema_version"] =
+            serde_json::json!("tepp.rubin_projection_activation_receipt.v1");
+        assert_eq!(
+            RubinProjectionActivationReceiptV1::from_json(&legacy.to_string()),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }
