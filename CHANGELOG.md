@@ -39,6 +39,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ## [Unreleased]
 
 - `analysis_engine` binds cutoff-safe longitudinal ESEM/DSEM engine composition as the `longitudinal_esem_dsem_composition_v1` analysis-run profile (`tepp.longitudinal_esem_dsem_composition.v1`). The executor consumes already-mapped posterior draws, refuses point estimates, non-event lag clocks, formative/network-as-reflective reinterpretation, collapsed non-nested membership, between-as-within change, metric-only latent means, OLS-as-DSEM, and causal promotion from temporal precedence, and emits a digest-bound artifact with inference status `composed_engine_not_estimator`. This is not an ESEM/DSEM sampler, not implemented-main, and not a Driver p.16 `std` restore.
+- Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 
