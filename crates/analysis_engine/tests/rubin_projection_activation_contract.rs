@@ -19,6 +19,8 @@ const SNAPSHOT_DIGEST: &str =
 const CUTOFF: &str = "2026-08-01T00:00:00Z";
 const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const OBSERVATION_COUNT: u64 = 48;
+const DRAW_COUNT: u64 = 8;
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339(CUTOFF).expect("cutoff")
@@ -86,6 +88,8 @@ fn no_receipt_remains_descriptive_only() {
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
             cutoff(),
+            OBSERVATION_COUNT,
+            DRAW_COUNT,
             IndicatorKind::AdditiveLogRatio,
         ),
         RubinProjectionActivationDecision::DescriptiveOnly
@@ -100,6 +104,8 @@ fn production_registry_does_not_preapprove_candidate_evidence() {
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
             cutoff(),
+            OBSERVATION_COUNT,
+            DRAW_COUNT,
             IndicatorKind::AdditiveLogRatio,
         ),
         RubinProjectionActivationDecision::Rejected
@@ -153,6 +159,8 @@ fn receipt_wire_refuses_forged_digest_and_late_evidence() {
             SNAPSHOT_ID,
             SNAPSHOT_DIGEST,
             cutoff(),
+            OBSERVATION_COUNT,
+            DRAW_COUNT,
             IndicatorKind::AdditiveLogRatio,
         ),
         RubinProjectionActivationDecision::Rejected
