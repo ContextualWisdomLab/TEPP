@@ -31,6 +31,21 @@ fn manifest_round_trips_through_the_bounded_validated_wire_contract() {
 }
 
 #[test]
+fn manifest_requires_an_explicit_support_evidence_availability_ledger() {
+    let json = manifest().to_json().expect("manifest json");
+    let mut value: serde_json::Value = serde_json::from_str(&json).expect("manifest value");
+    value["support_evidence_available_at"] = serde_json::json!({
+        "evidence-relation-1": "2026-07-20T00:00:00Z"
+    });
+    let payload = serde_json::to_string(&value).expect("manifest payload");
+
+    assert!(
+        TopicContextPosteriorSnapshotManifest::from_json(&payload).is_ok(),
+        "the authoritative manifest must carry independent availability for supporting evidence resources"
+    );
+}
+
+#[test]
 fn manifest_parser_rejects_unknown_fields_and_oversized_payloads() {
     let json = manifest().to_json().expect("manifest json");
     let unknown = json.replacen('{', "{\"unexpected\":true,", 1);
