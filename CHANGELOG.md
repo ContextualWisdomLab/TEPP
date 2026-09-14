@@ -39,6 +39,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ## [Unreleased]
 
 - `analysis_engine` jointly binds posterior-draw OLS loading means (`recover_loading_point_estimate_mean`) and Rubin (1996) total variance (`combine_draw_level_ols_loadings`) to the `rubin_loading_uncertainty_v1` analysis-run output profile. Observations unavailable at the request cutoff are excluded; the digest-bound `tepp.rubin_loading_uncertainty.v1` artifact records the point-estimate mean and Rubin `Q̄`/`Ū`/`B`/`T` and refuses Mislevy person-level plausible-value claims. This is not a new ESEM/DSEM estimator, not CWC, not a Driver p.16 `std` restore, and not persistence.
+- Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 
