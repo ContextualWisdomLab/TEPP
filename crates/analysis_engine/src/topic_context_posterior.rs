@@ -11,7 +11,7 @@ use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 
-use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
+use crate::{AnalysisEngineError, require_receipt_identity, valid_identifier};
 
 mod base {
     include!("topic_context_posterior_base.rs");
