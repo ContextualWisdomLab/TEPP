@@ -27,8 +27,9 @@ pub const LONGITUDINAL_CWC_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const LONGITUDINAL_CWC_INFERENCE_STATUS: &str = "composed_cwc_slopes_not_causal";
 
 /// One already-mapped clustered score offered to a cutoff-safe CWC run.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LongitudinalClusterScore {
+    snapshot_id: String,
     cluster_key: u64,
     predictor: f64,
     outcome: f64,
@@ -36,22 +37,25 @@ pub struct LongitudinalClusterScore {
 }
 
 impl LongitudinalClusterScore {
-    /// Bind one clustered predictor–outcome pair to an availability clock.
+    /// Bind one clustered predictor–outcome pair to immutable snapshot and availability provenance.
     ///
     /// # Errors
     ///
-    /// Returns [`AnalysisEngineError::InvalidEvidence`] when either coordinate
-    /// is non-finite.
+    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the snapshot identifier is invalid or
+    /// either coordinate is non-finite.
     pub fn new(
+        snapshot_id: impl Into<String>,
         cluster_key: u64,
         predictor: f64,
         outcome: f64,
         available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
-        if !predictor.is_finite() || !outcome.is_finite() {
+        let snapshot_id = snapshot_id.into();
+        if !valid_identifier(&snapshot_id) || !predictor.is_finite() || !outcome.is_finite() {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         Ok(Self {
+            snapshot_id,
             cluster_key,
             predictor,
             outcome,
@@ -59,27 +63,33 @@ impl LongitudinalClusterScore {
         })
     }
 
+    /// Return the immutable source snapshot identity.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
     /// Return the cluster identity.
     #[must_use]
-    pub const fn cluster_key(self) -> u64 {
+    pub const fn cluster_key(&self) -> u64 {
         self.cluster_key
     }
 
     /// Return the already-mapped predictor.
     #[must_use]
-    pub const fn predictor(self) -> f64 {
+    pub const fn predictor(&self) -> f64 {
         self.predictor
     }
 
     /// Return the already-mapped outcome.
     #[must_use]
-    pub const fn outcome(self) -> f64 {
+    pub const fn outcome(&self) -> f64 {
         self.outcome
     }
 
     /// Return the availability clock used for cutoff eligibility.
     #[must_use]
-    pub const fn available_time(self) -> AvailableTime {
+    pub const fn available_time(&self) -> AvailableTime {
         self.available_time
     }
 }
@@ -197,6 +207,7 @@ struct EligibleCwcRows {
 
 fn admit_scores_at_cutoff(
     scores: &[LongitudinalClusterScore],
+    snapshot_id: &str,
     knowledge_cutoff: KnowledgeCutoff,
 ) -> Result<EligibleCwcRows, AnalysisEngineError> {
     if scores.len() > MAX_EVIDENCE_UNITS {
@@ -205,6 +216,9 @@ fn admit_scores_at_cutoff(
     let mut eligible = Vec::new();
     let mut excluded_after_cutoff_count = 0_u64;
     for score in scores {
+        if score.snapshot_id != snapshot_id {
+            return Err(AnalysisEngineError::SnapshotMismatch);
+        }
         if score.available_time.instant() <= knowledge_cutoff.instant() {
             eligible.push(ClusteredScore {
                 cluster_key: score.cluster_key,
@@ -241,9 +255,9 @@ fn require_causal_refusal(
 )]
 /// Execute cutoff-safe CWC within/between composition as one analysis-run profile.
 ///
-/// The caller supplies already-mapped clustered coordinates. This executor does
-/// not invent an ESEM/DSEM estimator, persist rows, or treat the recovered
-/// slopes as a causal effect.
+/// The caller supplies already-mapped clustered coordinates. Each row carries its immutable
+/// source snapshot and availability provenance. This executor does not invent an ESEM/DSEM
+/// estimator, persist rows, or treat the recovered slopes as a causal effect.
 ///
 /// # Errors
 ///
@@ -272,7 +286,7 @@ pub fn execute_longitudinal_cwc_run(
         return Err(AnalysisEngineError::InvalidEvidence);
     }
 
-    let eligible = admit_scores_at_cutoff(scores, knowledge_cutoff)?;
+    let eligible = admit_scores_at_cutoff(scores, snapshot_id, knowledge_cutoff)?;
     let slopes = recover_cluster_mean_within_between_slopes(&eligible.scores)?;
     require_causal_refusal(claim_causal_effect(CausalHeuristic::TemporalPrecedence))?;
 
