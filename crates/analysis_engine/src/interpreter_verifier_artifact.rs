@@ -32,22 +32,19 @@ const INTERPRETER_VERIFIER_INFERENCE_STATUS: &str =
 const HYPOTHETICAL_STATUS: &str = "hypothetical";
 const VALIDATED_STATUS: &str = "validated";
 
-type EvidenceSpanRecord = (Uuid, String, AvailableTime);
-type ClaimRecord = (
-    Uuid,
-    InterpretationId,
-    String,
-    AvailableTime,
-    ClaimSupport,
-    ClaimSupport,
-);
-
 /// Offered evidence-bounded interpretation plus cutoff-bound known-truth claim labels.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct InterpreterVerifierInput {
     interpretation_id: InterpretationId,
-    evidence_spans: Vec<EvidenceSpanRecord>,
-    claims: Vec<ClaimRecord>,
+    evidence_spans: Vec<(Uuid, String, AvailableTime)>,
+    claims: Vec<(
+        Uuid,
+        InterpretationId,
+        String,
+        AvailableTime,
+        ClaimSupport,
+        ClaimSupport,
+    )>,
 }
 
 impl InterpreterVerifierInput {
@@ -68,8 +65,15 @@ impl InterpreterVerifierInput {
     /// identifier.
     pub fn new(
         interpretation_id: InterpretationId,
-        evidence_spans: Vec<EvidenceSpanRecord>,
-        claims: Vec<ClaimRecord>,
+        evidence_spans: Vec<(Uuid, String, AvailableTime)>,
+        claims: Vec<(
+            Uuid,
+            InterpretationId,
+            String,
+            AvailableTime,
+            ClaimSupport,
+            ClaimSupport,
+        )>,
     ) -> Result<Self, AnalysisEngineError> {
         if evidence_spans.len() > MAX_EVIDENCE_UNITS || claims.len() > MAX_EVIDENCE_UNITS {
             return Err(AnalysisEngineError::LimitExceeded);
@@ -98,13 +102,22 @@ impl InterpreterVerifierInput {
 
     /// Borrow offered evidence span records.
     #[must_use]
-    pub fn evidence_spans(&self) -> &[EvidenceSpanRecord] {
+    pub fn evidence_spans(&self) -> &[(Uuid, String, AvailableTime)] {
         &self.evidence_spans
     }
 
     /// Borrow offered claim records.
     #[must_use]
-    pub fn claims(&self) -> &[ClaimRecord] {
+    pub fn claims(
+        &self,
+    ) -> &[(
+        Uuid,
+        InterpretationId,
+        String,
+        AvailableTime,
+        ClaimSupport,
+        ClaimSupport,
+    )] {
         &self.claims
     }
 }
@@ -249,11 +262,11 @@ fn cutoff_admitted_claim_labels(
         if source_snapshot_id != snapshot_id {
             return Err(AnalysisEngineError::SnapshotMismatch);
         }
-        if *interpretation_id != input.interpretation_id() {
-            return Err(AnalysisEngineError::InvalidEvidence);
-        }
         if available_time.instant() > knowledge_cutoff.instant() {
             continue;
+        }
+        if *interpretation_id != input.interpretation_id() {
+            return Err(AnalysisEngineError::InvalidEvidence);
         }
         if !seen.insert(*claim_id) {
             return Err(AnalysisEngineError::DuplicateEvidence);
