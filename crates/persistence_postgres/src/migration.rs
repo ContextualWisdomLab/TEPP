@@ -109,9 +109,12 @@ pub fn validate_migration_catalog(
         if !is_multi_word_snake_case(table) {
             return Err(MigrationContractError::SingleWordObjectName);
         }
-        let body =
-            table_body(catalog.up_sql(), table).ok_or(MigrationContractError::EmptyMigrationSql)?;
-        validate_table_body(table, body)?;
+        // Lookups below match case-folded SQL; the contract check above used
+        // the declared spelling so `Document_Record` cannot pass as lowercase.
+        let folded = table.to_ascii_lowercase();
+        let body = table_body(catalog.up_sql(), &folded)
+            .ok_or(MigrationContractError::EmptyMigrationSql)?;
+        validate_table_body(&folded, body)?;
     }
 
     if declares_row_level_security(catalog.up_sql()) {
@@ -277,10 +280,11 @@ fn validate_tenant_rls_contract(
     }
 
     for table in tables {
-        if !table_has_rls_enabled(&lower, table) {
+        let folded = table.to_ascii_lowercase();
+        if !table_has_rls_enabled(&lower, &folded) {
             return Err(MigrationContractError::MissingRlsEnable);
         }
-        if !table_has_tenant_policy(&lower, table) {
+        if !table_has_tenant_policy(&lower, &folded) {
             return Err(MigrationContractError::MissingRlsPolicy);
         }
     }
@@ -362,7 +366,7 @@ fn parse_create_table_names(sql: &str) -> BTreeSet<String> {
             search_from = abs;
             continue;
         }
-        names.insert(name.to_ascii_lowercase());
+        names.insert(name);
         search_from = abs;
     }
     names
@@ -384,7 +388,7 @@ fn parse_create_policy_names(sql: &str) -> BTreeSet<String> {
             })
             .collect();
         if !name.is_empty() {
-            names.insert(name.to_ascii_lowercase());
+            names.insert(name);
         }
         search_from = abs;
     }
@@ -481,6 +485,42 @@ mod tests {
             "CREATE POLICY document_record_tenant_isolation ON document_record FOR ALL USING (true);",
         );
         assert!(policies.contains("document_record_tenant_isolation"));
+    }
+
+    #[test]
+    fn mixed_case_table_names_are_rejected() {
+        let catalog = MigrationCatalog::from_sql(
+            "CREATE TABLE Document_Record (document_record_id uuid PRIMARY KEY, system_time timestamptz NOT NULL, valid_from timestamptz NOT NULL);",
+            "DROP TABLE Document_Record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::SingleWordObjectName)
+        );
+    }
+
+    #[test]
+    fn mixed_case_policy_names_are_rejected() {
+        let catalog = MigrationCatalog::from_sql(
+            r"
+            CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            GRANT SELECT ON tenant_record TO tepp_app_runtime;
+            ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
+            CREATE POLICY Tenant_Isolation ON tenant_record
+                FOR ALL USING (
+                    tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+                );
+            ",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::SingleWordObjectName)
+        );
     }
 
     #[test]
