@@ -29,12 +29,19 @@ def validate_source(path: Path) -> list[str]:
         errors.append(f"{path}: missing crate/module-level //! rustdoc")
 
     documented = False
+    open_attribute_brackets = 0
     for line_number, line in enumerate(lines, start=1):
         stripped = line.strip()
+        if open_attribute_brackets:
+            open_attribute_brackets += stripped.count("[") - stripped.count("]")
+            continue
         if stripped.startswith("///") or stripped.startswith("#[doc"):
             documented = True
             continue
-        if stripped.startswith("#[") or not stripped:
+        if stripped.startswith("#["):
+            open_attribute_brackets = stripped.count("[") - stripped.count("]")
+            continue
+        if not stripped:
             continue
         if PUBLIC_ITEM_PATTERN.match(line):
             if not documented:
