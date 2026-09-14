@@ -273,7 +273,7 @@ fn valid_sha256(value: &str) -> bool {
 fn is_mutable_authority_locator(value: &str) -> bool {
     matches!(value, "latest" | "main" | "master")
         || ["refs/", "http://", "https://"]
-            .iter()
+            .into_iter()
             .any(|prefix| value.starts_with(prefix))
 }
 
