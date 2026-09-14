@@ -16,6 +16,7 @@ mod case_deletion_refit;
 mod lineage_criterion;
 mod rubin_loading_artifact;
 mod rubin_projection_activation;
+mod rubin_projection_draw_authority;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -58,10 +59,13 @@ pub use rubin_loading_artifact::{
     RubinLoadingUncertaintyArtifact, RubinLoadingUncertaintyExecution,
     execute_rubin_loading_uncertainty_run,
 };
-/// Rubin projection activation authority and bounded receipt contracts.
+/// Rubin projection activation constants and decision outcome.
 pub use rubin_projection_activation::{
     RUBIN_LOADING_ANALYSIS_CONTRACT_ID, RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT,
     RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION, RubinProjectionActivationDecision,
+};
+/// Draw-bound Rubin projection activation receipt and public decision boundary.
+pub use rubin_projection_draw_authority::{
     RubinProjectionActivationReceiptV1, decide_rubin_projection_activation,
 };
 /// Bounded posterior topic-context producer contract and record types.
