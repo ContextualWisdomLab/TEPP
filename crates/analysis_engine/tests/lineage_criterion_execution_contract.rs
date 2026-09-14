@@ -5,11 +5,17 @@ use analysis_engine::{
     LINEAGE_CRITERION_MODEL_CONTRACT_VERSION, LINEAGE_CRITERION_OUTPUT_PROFILE,
     LineageCriterionInput, LineageCriterionObservation, execute_lineage_criterion_run,
 };
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
+
+const SNAPSHOT_ID: &str = "snapshot-lineage-criterion";
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+}
+
+fn available_time(value: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(value).expect("available time")
 }
 
 fn observation(pair_id: &str, successes: u32, trials: u32) -> LineageCriterionObservation {
@@ -29,12 +35,20 @@ fn observations() -> Vec<LineageCriterionObservation> {
     ]
 }
 
+fn visible_snapshot_ids(len: usize) -> Vec<String> {
+    vec![SNAPSHOT_ID.to_owned(); len]
+}
+
+fn visible_available_times(len: usize) -> Vec<AvailableTime> {
+    vec![available_time("2026-07-01T00:00:00Z"); len]
+}
+
 fn request() -> AnalysisRunRequest {
     AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: "lineage-criterion-idem".into(),
         tenant_workspace_id: "tenant-workspace".into(),
-        snapshot_id: "snapshot-lineage-criterion".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
         model_contract_version: LINEAGE_CRITERION_MODEL_CONTRACT_VERSION.into(),
         output_profile: LINEAGE_CRITERION_OUTPUT_PROFILE.into(),
@@ -50,17 +64,35 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
     .expect("accepted")
 }
 
-fn execute_with_observations(
+fn execute_with_provenance(
     request: &AnalysisRunRequest,
     observations: &[LineageCriterionObservation],
+    snapshot_ids: &[String],
+    available_times: &[AvailableTime],
+    draw_count: usize,
 ) -> Result<analysis_engine::LineageCriterionExecution, AnalysisEngineError> {
     execute_lineage_criterion_run(
         request,
         &accepted(request),
-        "snapshot-lineage-criterion",
+        SNAPSHOT_ID,
         cutoff(),
-        &LineageCriterionInput::new(observations, 32),
+        &LineageCriterionInput::new(observations, snapshot_ids, available_times, draw_count),
         "2026-08-02T00:00:00Z",
+    )
+}
+
+fn execute_with_observations(
+    request: &AnalysisRunRequest,
+    observations: &[LineageCriterionObservation],
+) -> Result<analysis_engine::LineageCriterionExecution, AnalysisEngineError> {
+    let snapshot_ids = visible_snapshot_ids(observations.len());
+    let available_times = visible_available_times(observations.len());
+    execute_with_provenance(
+        request,
+        observations,
+        &snapshot_ids,
+        &available_times,
+        32,
     )
 }
 
@@ -88,6 +120,7 @@ fn identified_pairs_emit_digest_bound_counts_without_inferring_dates() {
         execution.terminal_result.run_state,
         AnalysisRunTerminalState::Succeeded
     );
+    assert_eq!(execution.terminal_result.summary.validation_status, "validated");
     assert_eq!(
         execution.terminal_result.result_sha256.as_deref(),
         Some(execution.artifact.sha256().expect("digest").as_str())
@@ -110,7 +143,65 @@ fn equivalent_cutoff_spellings_bind_the_same_instant() {
 }
 
 #[test]
-fn malformed_event_time_draws_fail_closed() {
+fn future_duplicate_and_malformed_evidence_cannot_change_historical_replay() {
+    let request = request();
+    let baseline_observations = observations();
+    let baseline = execute_with_observations(&request, &baseline_observations).expect("baseline");
+
+    let mut replay_observations = baseline_observations;
+    let mut future_duplicate = observation("pair-a", 10_000, 10_000);
+    future_duplicate.predecessor_event_time_draws[0] = "future-malformed-time".into();
+    replay_observations.push(future_duplicate);
+    let replay_snapshot_ids = visible_snapshot_ids(replay_observations.len());
+    let mut replay_available_times = visible_available_times(replay_observations.len());
+    *replay_available_times.last_mut().expect("future availability") =
+        available_time("2026-08-02T00:00:00Z");
+
+    let replay = execute_with_provenance(
+        &request,
+        &replay_observations,
+        &replay_snapshot_ids,
+        &replay_available_times,
+        32,
+    )
+    .expect("future evidence must be censored before validation");
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result.summary, baseline.terminal_result.summary);
+}
+
+#[test]
+fn cross_snapshot_evidence_and_misaligned_provenance_fail_closed() {
+    let request = request();
+    let observations = observations();
+    let available_times = visible_available_times(observations.len());
+    let mut wrong_snapshot_ids = visible_snapshot_ids(observations.len());
+    wrong_snapshot_ids[1] = "snapshot-other".into();
+    assert_eq!(
+        execute_with_provenance(
+            &request,
+            &observations,
+            &wrong_snapshot_ids,
+            &available_times,
+            32,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let short_snapshot_ids = vec![SNAPSHOT_ID.to_owned()];
+    assert_eq!(
+        execute_with_provenance(
+            &request,
+            &observations,
+            &short_snapshot_ids,
+            &available_times,
+            32,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn malformed_visible_event_time_draws_fail_closed() {
     let request = request();
     let mut invalid_predecessor = observations();
     invalid_predecessor[0].predecessor_event_time_draws[0] = "not-an-event-time".into();
@@ -128,40 +219,53 @@ fn malformed_event_time_draws_fail_closed() {
 }
 
 #[test]
+fn oversized_draw_budget_fails_before_posterior_materialization() {
+    let request = request();
+    let observations = vec![observation("pair-a", 1, 2)];
+    let snapshot_ids = visible_snapshot_ids(1);
+    let available_times = visible_available_times(1);
+    assert_eq!(
+        execute_with_provenance(
+            &request,
+            &observations,
+            &snapshot_ids,
+            &available_times,
+            1_000_001,
+        ),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
 fn invalid_observations_and_criterion_refusal_fail_closed() {
     let request = request();
     assert_eq!(
-        execute_lineage_criterion_run(
-            &request,
-            &accepted(&request),
-            "snapshot-lineage-criterion",
-            cutoff(),
-            &LineageCriterionInput::new(&[], 32),
-            "2026-08-02T00:00:00Z",
-        ),
+        execute_with_provenance(&request, &[], &[], &[], 32),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let observations = observations();
+    let snapshot_ids = visible_snapshot_ids(observations.len());
+    let available_times = visible_available_times(observations.len());
     assert_eq!(
-        execute_lineage_criterion_run(
+        execute_with_provenance(
             &request,
-            &accepted(&request),
-            "snapshot-lineage-criterion",
-            cutoff(),
-            &LineageCriterionInput::new(&observations, 0),
-            "2026-08-02T00:00:00Z",
+            &observations,
+            &snapshot_ids,
+            &available_times,
+            0,
         ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let invalid = vec![observation("pair-a", 3, 2)];
+    let snapshot_ids = visible_snapshot_ids(1);
+    let available_times = visible_available_times(1);
     assert_eq!(
-        execute_lineage_criterion_run(
+        execute_with_provenance(
             &request,
-            &accepted(&request),
-            "snapshot-lineage-criterion",
-            cutoff(),
-            &LineageCriterionInput::new(&invalid, 32),
-            "2026-08-02T00:00:00Z",
+            &invalid,
+            &snapshot_ids,
+            &available_times,
+            32,
         ),
         Err(AnalysisEngineError::LineageCriterionFitFailure)
     );
@@ -171,13 +275,20 @@ fn invalid_observations_and_criterion_refusal_fail_closed() {
 fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
     let request = request();
     let observations = observations();
+    let snapshot_ids = visible_snapshot_ids(observations.len());
+    let available_times = visible_available_times(observations.len());
     assert_eq!(
         execute_lineage_criterion_run(
             &request,
             &accepted(&request),
             "other-snapshot",
             cutoff(),
-            &LineageCriterionInput::new(&observations, 32),
+            &LineageCriterionInput::new(
+                &observations,
+                &snapshot_ids,
+                &available_times,
+                32,
+            ),
             "2026-08-02T00:00:00Z",
         ),
         Err(AnalysisEngineError::SnapshotMismatch)
