@@ -63,7 +63,6 @@ def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int
     return coordinates, true_count, false_count
 
 
-
 def is_live_sqlx_transport_source(filename: str) -> bool:
     """Return whether *filename* is the live-server SQLx transport source.
 
@@ -716,7 +715,14 @@ def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
             previous = previous.split("/*", 1)[0].strip()
             if not previous:
                 continue
-        return previous.endswith("=>") or previous.endswith("=> {")
+        if previous.endswith("=>") or previous.endswith("=> {"):
+            return True
+        for marker in range(len(previous) - 1):
+            if previous[marker : marker + 2] == "//" and previous[:marker].rstrip().endswith(
+                ("=>", "=> {")
+            ):
+                return True
+        return False
     return False
 
 
