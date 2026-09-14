@@ -4,8 +4,8 @@
 //! branch and pull-request locators therefore cannot be admitted as snapshot
 //! identities even when the expected snapshot argument repeats the same alias.
 //! Snapshot identity alone is not a content commitment, so the receipt also
-//! carries the canonical source snapshot SHA-256. Concrete draw bytes have a
-//! separate digest and do not weaken snapshot authority.
+//! carries the canonical source snapshot SHA-256. Concrete estimator inputs have
+//! a separate digest and do not weaken snapshot authority.
 
 use analysis_engine::{
     AnalysisEngineError, RUBIN_LOADING_MODEL_CONTRACT_VERSION,
@@ -17,7 +17,7 @@ const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const SNAPSHOT_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const DRAW_PAYLOAD_DIGEST: &str =
+const ESTIMATOR_PAYLOAD_DIGEST: &str =
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 fn receipt_with_snapshot(
@@ -36,7 +36,7 @@ fn receipt_with_snapshot(
         ),
         snapshot_id,
         SNAPSHOT_DIGEST,
-        DRAW_PAYLOAD_DIGEST,
+        ESTIMATOR_PAYLOAD_DIGEST,
         KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
         "rubin-gaussian-single-level-candidate-v1",
     )
@@ -68,7 +68,7 @@ fn immutable_snapshot_identifier_and_digest_remain_admissible() {
         .expect("immutable snapshot identifier");
     assert_eq!(receipt.source_snapshot_id(), "snapshot-rubin-activation-v1");
     assert_eq!(receipt.source_snapshot_sha256(), SNAPSHOT_DIGEST);
-    assert_eq!(receipt.complete_data_draws_sha256(), DRAW_PAYLOAD_DIGEST);
+    assert_eq!(receipt.estimator_payload_sha256(), ESTIMATOR_PAYLOAD_DIGEST);
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn malformed_snapshot_digest_fails_closed_at_receipt_construction() {
             ),
             "snapshot-rubin-activation-v1",
             "not-a-digest",
-            DRAW_PAYLOAD_DIGEST,
+            ESTIMATOR_PAYLOAD_DIGEST,
             KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
             "rubin-gaussian-single-level-candidate-v1",
         ),
