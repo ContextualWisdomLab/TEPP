@@ -3,7 +3,7 @@
 use analysis_engine::{
     AnalysisEngineError, MAX_EVIDENCE_UNITS, RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION,
     RUBIN_LOADING_MODEL_CONTRACT_VERSION, RUBIN_LOADING_OUTPUT_PROFILE, RubinLoadingObservation,
-    execute_rubin_loading_uncertainty_run,
+    RubinLoadingUncertaintyArtifact, execute_rubin_loading_uncertainty_run,
 };
 use psychometric_core::{IndicatorKind, PsychometricError};
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -103,6 +103,15 @@ fn noiseless_draws_emit_digest_bound_point_mean_and_rubin_t() {
         AnalysisRunTerminalState::Succeeded
     );
     assert_eq!(
+        execution
+            .terminal_result
+            .summary
+            .as_ref()
+            .expect("summary")
+            .validation_status,
+        "validated"
+    );
+    assert_eq!(
         execution.terminal_result.result_sha256.as_deref(),
         Some(execution.artifact.sha256().expect("digest").as_str())
     );
@@ -136,6 +145,96 @@ fn execution_excludes_rows_unavailable_at_the_request_cutoff() {
     assert_eq!(execution.artifact.observation_count, 3);
     assert_eq!(execution.artifact.excluded_after_cutoff_count, 1);
     assert!((execution.artifact.mean_loading - 0.8).abs() < 1e-12);
+}
+
+#[test]
+fn equivalent_rfc3339_cutoff_instants_bind_identically() {
+    let mut request = request();
+    request.knowledge_cutoff = "2026-08-01T01:00:00+01:00".into();
+    let accepted = accepted(&request);
+    let execution = execute(
+        &request,
+        &accepted,
+        "snapshot-rubin-loading",
+        cutoff(),
+        IndicatorKind::AdditiveLogRatio,
+        &noiseless_rows(),
+    )
+    .expect("same instant");
+    assert_eq!(execution.artifact.knowledge_cutoff, "2026-08-01T00:00:00Z");
+}
+
+#[test]
+fn robust_point_estimate_is_not_replaced_by_naive_rubin_mean() {
+    let request = request();
+    let accepted = accepted(&request);
+    let rows = vec![
+        RubinLoadingObservation::new(
+            -1.0,
+            vec![-1.0e16, -1.0, 1.0e16],
+            available("2026-07-01T00:00:00Z"),
+        )
+        .expect("r1"),
+        RubinLoadingObservation::new(
+            0.0,
+            vec![0.0, 0.0, 0.0],
+            available("2026-07-01T00:00:00Z"),
+        )
+        .expect("r2"),
+        RubinLoadingObservation::new(
+            1.0,
+            vec![1.0e16, 1.0, -1.0e16],
+            available("2026-07-01T00:00:00Z"),
+        )
+        .expect("r3"),
+    ];
+    let execution = execute(
+        &request,
+        &accepted,
+        "snapshot-rubin-loading",
+        cutoff(),
+        IndicatorKind::AdditiveLogRatio,
+        &rows,
+    )
+    .expect("execution");
+    assert_eq!(execution.artifact.mean_loading, 0.0);
+    assert!(execution.artifact.point_estimate_mean.abs() > 0.1);
+    assert_ne!(
+        execution.artifact.point_estimate_mean.to_bits(),
+        execution.artifact.mean_loading.to_bits()
+    );
+}
+
+#[test]
+fn artifact_refuses_inconsistent_rubin_total_and_unreachable_counts() {
+    let artifact = RubinLoadingUncertaintyArtifact {
+        schema_version: RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION.into(),
+        run_id: "run-rubin-loading".into(),
+        snapshot_id: "snapshot-rubin-loading".into(),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        observation_count: 3,
+        draw_count: 2,
+        excluded_after_cutoff_count: 0,
+        indicator_kind: "alr".into(),
+        point_estimate_mean: 0.8,
+        mean_loading: 0.8,
+        within_variance: 0.0,
+        between_variance: 0.02,
+        total_variance: 0.04,
+        inference_status: "rubin_combined_ols_loadings_not_mislevy_pv".into(),
+    };
+    assert_eq!(
+        artifact.to_json(),
+        Err(AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact)
+    );
+
+    let mut oversized = artifact;
+    oversized.total_variance = 0.03;
+    oversized.observation_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("bound") + 1;
+    assert_eq!(
+        oversized.to_json(),
+        Err(AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact)
+    );
 }
 
 #[test]
@@ -200,6 +299,14 @@ fn constructor_and_empty_cutoff_fail_closed() {
     assert_eq!(
         RubinLoadingObservation::new(1.0, vec![1.0, f64::NAN], available("2026-07-01T00:00:00Z")),
         Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        RubinLoadingObservation::new(
+            1.0,
+            vec![1.0; 257],
+            available("2026-07-01T00:00:00Z"),
+        ),
+        Err(AnalysisEngineError::LimitExceeded)
     );
 
     let mut early_request = request.clone();
