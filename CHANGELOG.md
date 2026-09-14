@@ -38,6 +38,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- **Membership-posterior ICC analysis-run profile**: cutoff-safe `membership_posterior_icc_v1` binds `posterior_draw_point_estimate_mean`, nested ANOVA ICC, and Kish ESS, and refuses nested ICC for multiple-membership and cross-classified designs (`analysis_engine`). Not MMMC and not implemented-main.
 - Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.

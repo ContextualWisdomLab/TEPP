@@ -8,13 +8,18 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Membership-posterior ICC
+//! composition is invoked through [`membership_core`] and [`psychometric_core`]
+//! and is not an MMMC sampler.
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod membership_posterior_icc_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use membership_core::MembershipError;
+use psychometric_core::PsychometricError;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -45,6 +50,13 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Membership-posterior ICC artifact and execution contracts.
+pub use membership_posterior_icc_artifact::{
+    MEMBERSHIP_POSTERIOR_ICC_ARTIFACT_BYTE_LIMIT, MEMBERSHIP_POSTERIOR_ICC_ARTIFACT_SCHEMA_VERSION,
+    MEMBERSHIP_POSTERIOR_ICC_MODEL_CONTRACT_VERSION, MEMBERSHIP_POSTERIOR_ICC_OUTPUT_PROFILE,
+    MembershipPosteriorIccArtifact, MembershipPosteriorIccExecution,
+    MembershipPosteriorObservation, execute_membership_posterior_icc_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +260,12 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A psychometric recovery rejected the offered coordinates.
+    Psychometric(PsychometricError),
+    /// A membership-network estimator rejected the offered design or weights.
+    Membership(MembershipError),
+    /// A membership-posterior ICC artifact violated its bounded schema or counts.
+    InvalidMembershipPosteriorIccArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +280,11 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::Psychometric(error) => return error.fmt(formatter),
+            Self::Membership(error) => return error.fmt(formatter),
+            Self::InvalidMembershipPosteriorIccArtifact => {
+                "invalid membership-posterior ICC artifact"
+            }
         };
         formatter.write_str(message)
     }
@@ -278,6 +301,18 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<PsychometricError> for AnalysisEngineError {
+    fn from(error: PsychometricError) -> Self {
+        Self::Psychometric(error)
+    }
+}
+
+impl From<MembershipError> for AnalysisEngineError {
+    fn from(error: MembershipError) -> Self {
+        Self::Membership(error)
     }
 }
 
@@ -680,6 +715,10 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidMembershipPosteriorIccArtifact,
+                "invalid membership-posterior ICC artifact",
             ),
         ];
         for (error, message) in messages {
