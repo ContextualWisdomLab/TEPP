@@ -2,7 +2,7 @@
 
 ## Scope
 
-This evidence belongs to the `rubin_loading_uncertainty_v1` Analysis Run profile. It exercises the public profile end to end while leaving reusable arithmetic in protected-main `psychometric_core::{recover_loading_point_estimate_mean, combine_draw_level_ols_loadings}`.
+This evidence belongs to the `rubin_loading_uncertainty_v1` Analysis Run profile. It exercises the public profile end to end while leaving reusable arithmetic in protected-main `psychometric_core::{recover_loading_point_estimate_mean, combine_draw_level_ols_loadings}`. Recovery and Monte Carlo metrics consume protected-main `validation_core` rather than reimplementing bias, RMSE, coverage, or replication summaries in the profile test.
 
 It is not evidence for Mislevy person-level plausible values, ESEM/DSEM estimation, multilevel or cross-classified models, or a general missing-data imputation engine. The profile consumes already-mapped factor scores and complete-data indicator draws, so the acceptance design preserves that input structure rather than inventing a different estimand.
 
@@ -18,26 +18,26 @@ Every fourth observation also receives draw-specific zero-mean Gaussian uncertai
 
 Eight predeclared scenarios cross two observation counts (`48`, `160`), two draw counts (`8`, `32`), two true loadings (`0.4`, `1.2`), and two residual scales (`0.5`, `1.2`). Each scenario uses 512 attempted replications. A replication is recovered only when the public Analysis Run executor succeeds; failures remain in the attempted denominator.
 
-Bias and RMSE are computed from `point_estimate_mean - lambda`. Monte Carlo standard error (MCSE) for bias is the sample standard deviation of recovery errors divided by `sqrt(R)`. RMSE MCSE uses the delta method from the sample standard deviation of squared errors. Coverage MCSE is `sqrt(p(1-p)/R)`.
+Bias, bias MCSE, RMSE, RMSE MCSE, empirical interval coverage, and Monte Carlo replication summaries are computed by `validation_core`. Coverage MCSE is the sample standard error of the 0/1 coverage indicator returned by the canonical Monte Carlo summary, so its finite-sample denominator follows that owner rather than a second formula in this test.
 
 The interval diagnostic is
 
-`point_estimate_mean +/- 1.959963984540054 * sqrt(T)`.
+`Qbar +/- 1.959963984540054 * sqrt(T)`.
 
-This is explicitly a large-sample normal diagnostic for these admitted designs, not a small-sample Rubin degrees-of-freedom implementation. A coverage claim is therefore limited to the predeclared repeated-sampling design below. The acceptance envelope is `|coverage - 0.95| <= 0.01 + 2 * MCSE`; it is not promoted to a universal interval guarantee.
+Here `Qbar` is the Rubin-combination artifact field `mean_loading`, so the uncertainty interval is centered on the quantity to which `T` belongs. The separately reported `point_estimate_mean` remains the robust point-estimate recovery target. This is explicitly a large-sample normal diagnostic for these admitted designs, not a small-sample Rubin degrees-of-freedom implementation. A coverage claim is therefore limited to the predeclared repeated-sampling design below. The acceptance envelope is `|coverage - 0.95| <= 0.01 + 2 * MCSE`; it is not promoted to a universal interval guarantee.
 
 ## Checked-in evidence
 
 | scenario | n | m | lambda | sigma | attempted / recovered / failed | bias | bias MCSE | RMSE | RMSE MCSE | coverage | coverage MCSE | mean Ubar | mean B | mean T |
 | --- | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| small_m8_low | 48 | 8 | 0.4 | 0.5 | 512 / 512 / 0 | 0.002108 | 0.003402 | 0.076943 | 0.002491 | 0.951172 | 0.009524 | 0.005945 | 0.000344 | 0.006333 |
-| small_m32_low | 48 | 32 | 0.4 | 0.5 | 512 / 512 / 0 | 0.000426 | 0.003284 | 0.074239 | 0.002370 | 0.964844 | 0.008139 | 0.005974 | 0.000343 | 0.006327 |
-| small_m8_high | 48 | 8 | 1.2 | 1.2 | 512 / 512 / 0 | -0.015361 | 0.007998 | 0.181450 | 0.005577 | 0.953125 | 0.009341 | 0.034424 | 0.001921 | 0.036585 |
-| small_m32_high | 48 | 32 | 1.2 | 1.2 | 512 / 512 / 0 | 0.003076 | 0.007818 | 0.176754 | 0.005550 | 0.957031 | 0.008962 | 0.034184 | 0.002005 | 0.036252 |
-| large_m8_low | 160 | 8 | 0.4 | 0.5 | 512 / 512 / 0 | 0.001179 | 0.001769 | 0.040007 | 0.001279 | 0.957031 | 0.008962 | 0.001694 | 0.000100 | 0.001807 |
-| large_m32_low | 160 | 32 | 0.4 | 0.5 | 512 / 512 / 0 | 0.000850 | 0.001835 | 0.041498 | 0.001359 | 0.951172 | 0.009524 | 0.001719 | 0.000100 | 0.001822 |
-| large_m8_high | 160 | 8 | 1.2 | 1.2 | 512 / 512 / 0 | -0.007944 | 0.004270 | 0.096856 | 0.003125 | 0.953125 | 0.009341 | 0.009633 | 0.000583 | 0.010289 |
-| large_m32_high | 160 | 32 | 1.2 | 1.2 | 512 / 512 / 0 | 0.003612 | 0.004269 | 0.096579 | 0.002863 | 0.960938 | 0.008562 | 0.009718 | 0.000584 | 0.010320 |
+| small_m8_low | 48 | 8 | 0.4 | 0.5 | 512 / 512 / 0 | 0.002108 | 0.003402 | 0.076943 | 0.002491 | 0.951172 | 0.009534 | 0.005945 | 0.000344 | 0.006333 |
+| small_m32_low | 48 | 32 | 0.4 | 0.5 | 512 / 512 / 0 | 0.000426 | 0.003284 | 0.074239 | 0.002370 | 0.964844 | 0.008147 | 0.005974 | 0.000343 | 0.006327 |
+| small_m8_high | 48 | 8 | 1.2 | 1.2 | 512 / 512 / 0 | -0.015361 | 0.007998 | 0.181450 | 0.005577 | 0.953125 | 0.009351 | 0.034424 | 0.001921 | 0.036585 |
+| small_m32_high | 48 | 32 | 1.2 | 1.2 | 512 / 512 / 0 | 0.003076 | 0.007818 | 0.176754 | 0.005550 | 0.957031 | 0.008971 | 0.034184 | 0.002005 | 0.036252 |
+| large_m8_low | 160 | 8 | 0.4 | 0.5 | 512 / 512 / 0 | 0.001179 | 0.001769 | 0.040007 | 0.001279 | 0.957031 | 0.008971 | 0.001694 | 0.000100 | 0.001807 |
+| large_m32_low | 160 | 32 | 0.4 | 0.5 | 512 / 512 / 0 | 0.000850 | 0.001835 | 0.041498 | 0.001359 | 0.951172 | 0.009534 | 0.001719 | 0.000100 | 0.001822 |
+| large_m8_high | 160 | 8 | 1.2 | 1.2 | 512 / 512 / 0 | -0.007944 | 0.004270 | 0.096856 | 0.003125 | 0.953125 | 0.009351 | 0.009633 | 0.000583 | 0.010289 |
+| large_m32_high | 160 | 32 | 1.2 | 1.2 | 512 / 512 / 0 | 0.003612 | 0.004269 | 0.096579 | 0.002863 | 0.960938 | 0.008571 | 0.009718 | 0.000584 | 0.010320 |
 
 The executable gate additionally requires zero profile refusals, `|bias| <= 0.01 + 3 * bias_MCSE`, `RMSE <= 0.25 * sigma`, positive mean between-draw variance, and mean `T > Ubar` in every scenario. The draw-count and application matrix ceilings remain resource envelopes only; no scientific recommendation is inferred from `m <= 256` or the one-million-cell admission bound.
 
