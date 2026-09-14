@@ -127,9 +127,7 @@ impl ParetoCandidateKInput {
         if self
             .source_evidence_available_times
             .iter()
-            .any(|available_time| {
-                available_time.instant() > self.knowledge_cutoff.instant()
-            })
+            .any(|available_time| available_time.instant() > self.knowledge_cutoff.instant())
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
@@ -153,32 +151,86 @@ impl ParetoCandidateKInput {
 }
 
 /// Completed, bounded Pareto candidate-`K` selection for analysis-run clients.
+///
+/// Fields are private so a validated completed artifact cannot be mutated into
+/// an unchecked in-memory state after execution. Consumers read through the
+/// accessors and obtain untrusted artifacts through [`Self::from_json`].
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParetoCandidateKArtifact {
-    /// Exact versioned schema identity.
-    pub schema_version: String,
-    /// Opaque accepted-run identity.
-    pub run_id: String,
-    /// Immutable source snapshot identity.
-    pub snapshot_id: String,
-    /// Historical evidence cutoff used by the selection.
-    pub knowledge_cutoff: String,
-    /// Statistically selected topic count `K`.
-    pub selected_k: u64,
-    /// Number of candidates offered to the Pareto gate.
-    pub candidate_count: u64,
-    /// Number of statistically supported candidates.
-    pub statistical_count: u64,
-    /// Known-truth topic count used for RMSE.
-    pub truth_k: u64,
-    /// RMSE of selected-`K` replications against known truth.
-    pub selected_k_rmse: f64,
-    /// Fixed claim boundary for consumer copy.
-    pub inference_status: String,
+    schema_version: String,
+    run_id: String,
+    snapshot_id: String,
+    knowledge_cutoff: String,
+    selected_k: u64,
+    candidate_count: u64,
+    statistical_count: u64,
+    truth_k: u64,
+    selected_k_rmse: f64,
+    inference_status: String,
 }
 
 impl ParetoCandidateKArtifact {
+    /// Return the exact versioned schema identity.
+    #[must_use]
+    pub fn schema_version(&self) -> &str {
+        &self.schema_version
+    }
+
+    /// Return the opaque accepted-run identity.
+    #[must_use]
+    pub fn run_id(&self) -> &str {
+        &self.run_id
+    }
+
+    /// Return the immutable source snapshot identity.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
+    /// Return the canonical historical evidence cutoff.
+    #[must_use]
+    pub fn knowledge_cutoff(&self) -> &str {
+        &self.knowledge_cutoff
+    }
+
+    /// Return the statistically selected topic count `K`.
+    #[must_use]
+    pub const fn selected_k(&self) -> u64 {
+        self.selected_k
+    }
+
+    /// Return the number of candidates offered to the Pareto gate.
+    #[must_use]
+    pub const fn candidate_count(&self) -> u64 {
+        self.candidate_count
+    }
+
+    /// Return the number of statistically supported candidates.
+    #[must_use]
+    pub const fn statistical_count(&self) -> u64 {
+        self.statistical_count
+    }
+
+    /// Return the known-truth topic count used for RMSE.
+    #[must_use]
+    pub const fn truth_k(&self) -> u64 {
+        self.truth_k
+    }
+
+    /// Return the RMSE of selected-`K` replications against known truth.
+    #[must_use]
+    pub const fn selected_k_rmse(&self) -> f64 {
+        self.selected_k_rmse
+    }
+
+    /// Return the fixed scientific claim boundary.
+    #[must_use]
+    pub fn inference_status(&self) -> &str {
+        &self.inference_status
+    }
+
     /// Parse and fully validate a bounded artifact JSON payload.
     ///
     /// # Errors
@@ -315,7 +367,8 @@ pub fn execute_pareto_candidate_k_run(
         inference_status: PARETO_CANDIDATE_K_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new("pareto_candidate_k", evidence_count, 2, "validated")?;
+    let summary =
+        AnalysisResultSummary::new("pareto_candidate_k", evidence_count, 2, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
@@ -380,6 +433,16 @@ mod tests {
             Ok(artifact.clone())
         );
         assert_eq!(artifact.sha256().expect("digest").len(), 64);
+        assert_eq!(artifact.schema_version(), PARETO_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION);
+        assert_eq!(artifact.run_id(), "run-1");
+        assert_eq!(artifact.snapshot_id(), "snapshot-1");
+        assert_eq!(artifact.knowledge_cutoff(), "2026-08-01T00:00:00Z");
+        assert_eq!(artifact.selected_k(), 2);
+        assert_eq!(artifact.candidate_count(), 2);
+        assert_eq!(artifact.statistical_count(), 2);
+        assert_eq!(artifact.truth_k(), 2);
+        assert_eq!(artifact.selected_k_rmse(), 0.0);
+        assert_eq!(artifact.inference_status(), PARETO_CANDIDATE_K_INFERENCE_STATUS);
         assert_eq!(
             ParetoCandidateKArtifact::from_json("{}"),
             Err(AnalysisEngineError::InvalidParetoCandidateKArtifact)
