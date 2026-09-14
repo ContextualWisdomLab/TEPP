@@ -7,11 +7,16 @@
 //! generator and a matching matrix shape are not authority for arbitrary values.
 
 use psychometric_core::IndicatorKind;
+use serde::{
+    Deserialize,
+    de::{Error as _, IgnoredAny, MapAccess, Visitor},
+};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
+use std::fmt;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 
-use crate::{AnalysisEngineError, format_digest};
 use crate::rubin_projection_activation::{
     RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT as INNER_RECEIPT_BYTE_LIMIT,
     RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION as INNER_RECEIPT_SCHEMA_VERSION,
@@ -19,6 +24,7 @@ use crate::rubin_projection_activation::{
     RubinProjectionActivationReceiptV1 as InnerRubinProjectionActivationReceiptV1,
     decide_rubin_projection_activation as decide_inner_rubin_projection_activation,
 };
+use crate::{AnalysisEngineError, format_digest};
 
 /// Versioned public wire schema for the draw-bound Rubin activation receipt.
 ///
@@ -90,9 +96,11 @@ impl RubinProjectionActivationReceiptV1 {
     ///
     /// Returns [`AnalysisEngineError::LimitExceeded`] before parsing an
     /// oversized payload and [`AnalysisEngineError::InvalidEvidence`] when the
-    /// draw commitment, schema version, or underlying activation contract is invalid.
+    /// draw commitment, schema version, duplicate authority members, or
+    /// underlying activation contract is invalid.
     pub fn from_json(payload: &str) -> Result<Self, AnalysisEngineError> {
         require_receipt_byte_limit(payload.len())?;
+        require_unique_top_level_keys(payload)?;
         let mut value: Value =
             serde_json::from_str(payload).map_err(|_| AnalysisEngineError::InvalidEvidence)?;
         let object = value
@@ -231,6 +239,50 @@ fn validated_inner_for_runtime_draws<'a>(
         return Err(RubinProjectionActivationDecision::Rejected);
     }
     Ok(&receipt.inner)
+}
+
+fn require_unique_top_level_keys(payload: &str) -> Result<(), AnalysisEngineError> {
+    let mut deserializer = serde_json::Deserializer::from_str(payload);
+    UniqueTopLevelKeys::deserialize(&mut deserializer)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    deserializer
+        .end()
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)
+}
+
+struct UniqueTopLevelKeys;
+
+impl<'de> Deserialize<'de> for UniqueTopLevelKeys {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_map(UniqueTopLevelKeysVisitor)
+    }
+}
+
+struct UniqueTopLevelKeysVisitor;
+
+impl<'de> Visitor<'de> for UniqueTopLevelKeysVisitor {
+    type Value = UniqueTopLevelKeys;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a JSON object with unique top-level member names")
+    }
+
+    fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+    where
+        M: MapAccess<'de>,
+    {
+        let mut keys = BTreeSet::new();
+        while let Some(key) = map.next_key::<String>()? {
+            if !keys.insert(key) {
+                return Err(M::Error::custom("duplicate top-level JSON member"));
+            }
+            map.next_value::<IgnoredAny>()?;
+        }
+        Ok(UniqueTopLevelKeys)
+    }
 }
 
 fn valid_sha256(value: &str) -> bool {
