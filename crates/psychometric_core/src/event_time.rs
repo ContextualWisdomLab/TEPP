@@ -41,7 +41,13 @@
 //! (`T0MEANS` is not `μ_t`; `CINT` is not that discrete increment). Equation 3's
 //! fourth summand is the contemporaneous Dirac impulse `M x` (Table 2
 //! `TDPREDEFFECT` is `M`, not `CINT`, not `TIPREDEFFECT`, and not
-//! Voelkle et al., 2012, Eq. 14). Equations 1–2 plus the Eq. 3
+//! Voelkle et al., 2012, Eq. 14). Table 2 names `TDPREDVAR` the
+//! variance / covariance of those time-dependent predictors.
+//! Page 16 `TDPREDVARstd` is `v / v = 1` after strictly positive
+//! `TDPREDVAR` (footnote 4; 2017-era `summary.ctsemFit.R`; JSS PDF
+//! re-opened 2026-08-31T01:16Z). Unstandardised `TDPREDVAR` is not
+//! that correlation. `TIPREDVARstd` and `MANIFESTVARstd` recover
+//! the same 1 and remain distinct named quantities. Equations 1–2 plus the Eq. 3
 //! exponential map a time-dependent impulse that occurred strictly
 //! inside `(t0, t)` as `e^{A(t−u)} M x` (`t0 < u < t`). That carry
 //! is not the contemporaneous Dirac, not `CINT`, not `TIPREDEFFECT`,
@@ -1628,6 +1634,156 @@ pub fn refuse_observed_variance_as_standardised_manifest_variance(
 ) -> Result<f64, PsychometricError> {
     let _ = (observed_indicator_variance, standardised_manifest_variance);
     Err(PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance)
+}
+
+/// Exact scalar p. 16 `TDPREDVARstd` after strictly positive
+/// `TDPREDVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; p. 16; footnote
+/// 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF re-opened
+/// 2026-08-31T01:16Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `TDPREDVAR` the variance / covariance matrix of time
+/// dependent predictors and default it to 0. Page 16 prints
+/// standardised matrices with the suffix `std` when appropriate.
+/// The printed example on p. 16 is `discreteDRIFTstd`, not
+/// `TDPREDVARstd`. Footnote 4: standardisations use only the
+/// relevant variance, not the total. The relevant variance for
+/// that named time-dependent predictor correlation is `TDPREDVAR`
+/// itself, not `TIPREDVAR` and not residual `MANIFESTVAR`. The
+/// 2017-era `summary.ctsemFit.R` forms `TDPREDVARstd` whenever
+/// `verbose = TRUE` and `n.TDpred > 0`, as
+/// `solve(sqrt(TDPREDVARdiag)) %&% TDPREDVAR` with
+/// `TDPREDVARdiag = diag((diag(TDPREDVAR))+diag(ridging,n.TDpred))`.
+/// `OpenMx` `%&%` is the quadratic form `t(A) %*% B %*% A`. Unlike
+/// `TRAITVARstd`, that formation adds `diag(ridging, n.TDpred)`.
+/// The default `ridging = FALSE` adds 0, not `0.0001`; that ridge
+/// is a numerical hack and is not this exact map. The 2017-era
+/// source assigns `dimnames(TDPREDVARstd)` to `TDpredNames`. The
+/// ridge length `n.TDpred` rather than `n.TDpred × Tpoints` is a
+/// source bug when the predictor matrix is stacked over occasions
+/// and is not this exact map. The scalar correlation is
+/// `v / v = 1` after strictly positive `TDPREDVAR`. Form strictly
+/// positive `v` first, then `1 / √v`, then `(1 / √v) v (1 / √v)`.
+/// Unstandardised `TDPREDVAR` is defined for a zero predictor;
+/// standardised `TDPREDVAR` is not. Zero `v` makes
+/// `solve(sqrt(0))` fail in the 2017-era source and fails closed
+/// here. Unlike `TRAITVAR` / `MANIFESTTRAITVAR`, that source does
+/// not skip forming `TDPREDVARstd` when `v = 0`; the quadratic
+/// still fails. Time-dependent predictor variance is an event-time
+/// structural quantity, so a non-event clock fails closed.
+/// `TDPREDVAR` does not require stable `a < 0`. Distinct positive
+/// `v` recover the same 1. `TIPREDVARstd` `v / v = 1` recovers the
+/// same number and remains a distinct named quantity. This crate
+/// does not currently export `TIPREDVARstd`; the refuse still
+/// names that quantity. `MANIFESTVARstd` `θ / θ = 1` recovers the
+/// same number and remains a distinct named quantity. This is not
+/// a Kalman filter, not a matrix `expm`, not DSEM, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedTimeDependentPredictorVarianceRequiresPositivePredictorVariance`]
+/// when `TDPREDVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the variance is
+/// non-finite, negative, or the quadratic form overflows.
+pub fn recover_standardised_time_dependent_predictor_variance(
+    time_dependent_predictor_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !time_dependent_predictor_variance.is_finite() || time_dependent_predictor_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if time_dependent_predictor_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedTimeDependentPredictorVarianceRequiresPositivePredictorVariance,
+        );
+    }
+    let process_sd = time_dependent_predictor_variance.sqrt();
+    let inverse_sd = require_finite(1.0 / process_sd)?;
+    let scaled = require_finite(inverse_sd * time_dependent_predictor_variance)?;
+    require_finite(scaled * inverse_sd)
+}
+
+/// Refuse treating unstandardised `TDPREDVAR` as p. 16
+/// `TDPREDVARstd`.
+///
+/// Unstandardised `TDPREDVAR` is defined for a zero predictor.
+/// Footnote 4 `TDPREDVARstd` requires strictly positive
+/// `TDPREDVAR`. Equal numbers when `v = 1` are still distinct
+/// named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedTimeDependentPredictorVarianceIsNotStandardisedTimeDependentPredictorVariance`].
+pub fn refuse_unstandardised_time_dependent_predictor_variance_as_standardised_time_dependent_predictor_variance(
+    unstandardised_time_dependent_predictor_variance: f64,
+    standardised_time_dependent_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_time_dependent_predictor_variance,
+        standardised_time_dependent_predictor_variance,
+    );
+    Err(
+        PsychometricError::UnstandardisedTimeDependentPredictorVarianceIsNotStandardisedTimeDependentPredictorVariance,
+    )
+}
+
+/// Refuse treating p. 16 `TIPREDVARstd` as p. 16 `TDPREDVARstd`.
+///
+/// Both scalar correlations equal 1 after strictly positive
+/// variances. `TIPREDVARstd` standardises time-independent
+/// predictor variance. `TDPREDVARstd` standardises time-dependent
+/// predictor variance. Equal numbers remain distinct named
+/// quantities. This crate does not currently export
+/// `TIPREDVARstd`; the refuse still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeDependentPredictorVariance`].
+pub fn refuse_standardised_time_independent_predictor_variance_as_standardised_time_dependent_predictor_variance(
+    standardised_time_independent_predictor_variance: f64,
+    standardised_time_dependent_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_time_independent_predictor_variance,
+        standardised_time_dependent_predictor_variance,
+    );
+    Err(
+        PsychometricError::StandardisedTimeIndependentPredictorVarianceIsNotStandardisedTimeDependentPredictorVariance,
+    )
+}
+
+/// Refuse treating p. 16 `MANIFESTVARstd` as p. 16 `TDPREDVARstd`.
+///
+/// Both scalar correlations equal 1 after strictly positive
+/// variances. `MANIFESTVARstd` standardises contemporaneous
+/// measurement error `Θ`. `TDPREDVARstd` standardises
+/// time-dependent predictor variance. Equal numbers remain
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeDependentPredictorVariance`].
+pub fn refuse_standardised_manifest_variance_as_standardised_time_dependent_predictor_variance(
+    standardised_manifest_variance: f64,
+    standardised_time_dependent_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_manifest_variance,
+        standardised_time_dependent_predictor_variance,
+    );
+    Err(
+        PsychometricError::StandardisedManifestVarianceIsNotStandardisedTimeDependentPredictorVariance,
+    )
 }
 
 /// Refuse treating `τ / √(λ² Var(η) + θ)` as p. 16
