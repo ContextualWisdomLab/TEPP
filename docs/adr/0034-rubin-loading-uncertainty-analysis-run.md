@@ -3,7 +3,7 @@
 **Decision status:** Proposed
 **Implementation maturity:** active-PR — composed on this branch; not implemented-main
 **Date:** 2026-08-31
-**Last reviewed:** 2026-09-14
+**Last reviewed:** 2026-09-15
 **Supersedes:** None; complements ADR 0005 (ESEM/DSEM interpretation), ADR 0014 (scientific claim promotion), and ADR 0022 (cutoff-safe analysis-run execution).
 **Figma File ID:** N/A — this increment changes a Rust service crate and has no user-interface surface.
 **Storybook inventory:** N/A — no reusable web object or interaction changed.
@@ -53,6 +53,13 @@ receipt type is specifically the authority object for
 `rubin_loading_uncertainty`; an owner-controlled pairing registry may approve a
 generator/evidence/design combination but must not be able to redefine the
 analysis contract or version that the receipt authorizes.
+
+A sixth provenance constraint applies to the owner-controlled pairing itself.
+Receipt-to-run snapshot equality proves which population the current execution
+names, but it does not prove that the approved Validation Evidence was generated
+for that same immutable population. The approved pairing must therefore bind its
+own immutable source snapshot and require exact agreement with the receipt/run
+snapshot before positive projection can be eligible.
 
 ## Decision
 
@@ -104,12 +111,15 @@ composition over the protected-main scientific owners. The executor:
 - evaluates that receipt through a pure fail-closed activation decision.
   Snapshot and cutoff binding precede registry matching, generator/analysis/
   evidence/design/indicator matching is exact rather than heuristic, and the
-  approved pairing itself carries the canonical Validation Evidence
-  `AvailableTime`;
+  approved pairing itself carries both the canonical Validation Evidence
+  `AvailableTime` and the immutable source snapshot covered by that evidence;
 - rejects positive activation unless the receipt availability equals that
   owner-controlled availability by typed instant and the authoritative
   availability is at or before the run cutoff. Noncanonical registry clocks
   fail closed;
+- rejects positive activation when the owner-controlled evidence snapshot is
+  malformed, mutable, or differs from the receipt/run snapshot. Cross-snapshot
+  Validation Evidence is not portable scientific authority;
 - keeps the production approved-pairing registry empty on this Draft branch.
   A test-private fake pairing exercises the `Eligible` branch without creating
   production claim authority.
@@ -146,7 +156,9 @@ registry timestamps remain canonical.
 Snapshot identity is part of replay authority. `main`, `refs/heads/main`, PR
 numbers, repository tree URLs, and equivalent mutable locators cannot identify
 the historical source population of an authoritative projection. The receipt
-and expected execution snapshot must both carry a stable snapshot identity.
+and expected execution snapshot must both carry a stable snapshot identity, and
+that identity must equal the immutable source snapshot recorded by the approved
+Validation Evidence pairing.
 
 ## Alternatives considered
 
@@ -191,6 +203,10 @@ and expected execution snapshot must both carry a stable snapshot identity.
     rejected because registry content is configuration authority over approved
     pairings, not semantic authority over the Rubin receipt type. The canonical
     analysis ID/version is enforced before any registry lookup.
+14. Treat receipt-to-run snapshot equality as sufficient even when the approved
+    Validation Evidence pairing has no snapshot binding — rejected because an
+    evidence digest validated for snapshot A could otherwise be replayed against
+    immutable snapshot B while preserving every other approved field.
 
 ## Scientific acceptance boundary
 
@@ -216,11 +232,11 @@ Issue #505 separately owns inferential activation. The Analysis Run must not
 project #504's design-specific coverage as universal authorization for an
 unknown or arbitrary draw generator. Promotion requires a versioned approved
 generator/analysis pairing and the exact Validation Evidence identity/digest,
-owner-controlled availability, snapshot, cutoff, and design envelope that
-support that pairing, consistent with ADR 0014's separation of implementation
-authority from scientific/product claim authority. Draft #506 can represent
-and reject this authority boundary but cannot populate the production registry
-from its own candidate evidence.
+owner-controlled availability, immutable source snapshot, cutoff, and design
+envelope that support that pairing, consistent with ADR 0014's separation of
+implementation authority from scientific/product claim authority. Draft #506
+can represent and reject this authority boundary but cannot populate the
+production registry from its own candidate evidence.
 
 Primary authorities for the current combining-rule and activation boundary are:
 
@@ -257,12 +273,14 @@ The activation receipt now has an executable bounded representation and pure
 decision algorithm, including the positive algorithmic branch under a private
 test pairing. Positive eligibility also requires the receipt's evidence
 availability to match the owner-controlled approved availability, so immutable
-evidence content cannot be backdated into an older cutoff. Issue #509 further
-closes the same mutability class for source snapshots: mutable refs cannot be
-used as the historical snapshot authority merely because receipt and executor
+evidence content cannot be backdated into an older cutoff. Issue #509 closes
+the same mutability class for receipt/run source snapshots: mutable refs cannot
+be used as historical snapshot authority merely because receipt and executor
 agree on the same string. Issue #510 binds the public Rubin receipt itself to
 the canonical analysis ID/version so a future registry entry cannot redefine
-which estimator contract that receipt authorizes.
+which estimator contract that receipt authorizes. Issue #511 additionally binds
+the owner-approved Validation Evidence package to its immutable source snapshot,
+so an approved evidence digest cannot be replayed against a different population.
 
 That does not make #504 or #506 scientific authority: the production approved-
 pairing registry is empty, the artifact remains descriptive-only, and exact-head
@@ -290,8 +308,9 @@ round-trip/digest validation, missing receipt, late Validation Evidence,
 snapshot/cutoff mismatch, mutable snapshot aliases, public refusal of a
 noncanonical Rubin analysis ID/version, unknown or mismatched generator/analysis/
 evidence/design/indicator authority, caller backdating versus owner-controlled
-evidence availability, noncanonical registry availability, and a private exact
-approved-pairing positive branch.
+evidence availability, noncanonical registry availability, owner-approved
+snapshot mismatch/mutable-snapshot refusal, and a private exact approved-pairing
+positive branch.
 
 A future positive artifact state still requires an independently promoted
 production pairing and must digest-bind the activation receipt. Predecessor
@@ -303,6 +322,7 @@ claim authority.
 Rollback removes the `rubin_loading_uncertainty_v1` profile and its activation
 policy. No persisted schema migration is introduced. Supersede only with an ADR
 that preserves the scientific owner split, temporal provenance, immutable
-snapshot authority, resource admission, claim-specific validation evidence,
-canonical analysis identity, and the Rubin-versus-Mislevy / draw-generation
-activation boundaries.
+receipt/run snapshot authority, owner-controlled Validation Evidence snapshot
+authority, resource admission, claim-specific validation evidence, canonical
+analysis identity, and the Rubin-versus-Mislevy / draw-generation activation
+boundaries.
