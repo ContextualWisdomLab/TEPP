@@ -8,10 +8,14 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Independent TDT
+//! link-criterion fitting is invoked through
+//! [`fit_lineage_criterion_posteriors`] and does not infer a date from
+//! record order.
 
 mod case_deletion_refit;
 mod lineage_criterion;
+mod lineage_criterion_artifact;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
@@ -45,6 +49,13 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
     fit_lineage_criterion_posteriors,
+};
+/// Independent TDT link-criterion artifact and execution contracts from this engine.
+pub use lineage_criterion_artifact::{
+    LINEAGE_CRITERION_ARTIFACT_BYTE_LIMIT, LINEAGE_CRITERION_ARTIFACT_SCHEMA_VERSION,
+    LINEAGE_CRITERION_MODEL_CONTRACT_VERSION, LINEAGE_CRITERION_OUTPUT_PROFILE,
+    LineageCriterionArtifact, LineageCriterionExecution, LineageCriterionInput,
+    execute_lineage_criterion_run,
 };
 /// Bounded posterior topic-context producer contract and record types.
 pub use topic_context_posterior::{
@@ -248,6 +259,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// A lineage-criterion artifact violated its bounded schema or counts.
+    InvalidLineageCriterionArtifact,
+    /// The independent TDT link-criterion fitter refused the observations.
+    LineageCriterionFitFailure,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +277,8 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::InvalidLineageCriterionArtifact => "invalid lineage-criterion artifact",
+            Self::LineageCriterionFitFailure => "lineage-criterion fitter refused the observations",
         };
         formatter.write_str(message)
     }
@@ -384,7 +401,7 @@ fn add_membership_count(sum: u64, membership_count: u32) -> Result<u64, Analysis
 }
 
 /// Require the accepted receipt to carry the request's idempotency identity.
-fn require_receipt_identity(
+pub(crate) fn require_receipt_identity(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
 ) -> Result<(), AnalysisEngineError> {
@@ -394,7 +411,7 @@ fn require_receipt_identity(
     Ok(())
 }
 
-fn format_digest(digest: impl AsRef<[u8]>) -> String {
+pub(crate) fn format_digest(digest: impl AsRef<[u8]>) -> String {
     let mut output = String::with_capacity(digest.as_ref().len() * 2);
     for byte in digest.as_ref() {
         let _ = write!(output, "{byte:02x}");
@@ -402,7 +419,7 @@ fn format_digest(digest: impl AsRef<[u8]>) -> String {
     output
 }
 
-fn valid_identifier(value: &str) -> bool {
+pub(crate) fn valid_identifier(value: &str) -> bool {
     !value.trim().is_empty()
         && value.len() <= MAX_ANALYSIS_IDENTIFIER_BYTES
         && !value.chars().any(char::is_control)
@@ -680,6 +697,14 @@ mod tests {
             (
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
+            ),
+            (
+                AnalysisEngineError::InvalidLineageCriterionArtifact,
+                "invalid lineage-criterion artifact",
+            ),
+            (
+                AnalysisEngineError::LineageCriterionFitFailure,
+                "lineage-criterion fitter refused the observations",
             ),
         ];
         for (error, message) in messages {
