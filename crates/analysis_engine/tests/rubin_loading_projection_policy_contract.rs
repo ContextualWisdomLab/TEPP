@@ -6,7 +6,8 @@
 //! evidence, the product artifact must say that its projection is descriptive.
 
 use analysis_engine::{
-    RUBIN_LOADING_MODEL_CONTRACT_VERSION, RUBIN_LOADING_OUTPUT_PROFILE, RubinLoadingObservation,
+    AnalysisEngineError, RUBIN_LOADING_MODEL_CONTRACT_VERSION, RUBIN_LOADING_OUTPUT_PROFILE,
+    RubinLoadingObservation, RubinLoadingUncertaintyArtifact,
     execute_rubin_loading_uncertainty_run,
 };
 use psychometric_core::IndicatorKind;
@@ -27,8 +28,7 @@ fn observation(factor_score: f64, draws: Vec<f64>) -> RubinLoadingObservation {
     .expect("observation")
 }
 
-#[test]
-fn provenance_free_draws_are_explicitly_descriptive_only() {
+fn execute() -> analysis_engine::RubinLoadingUncertaintyExecution {
     let request = AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: "rubin-projection-policy-idem".into(),
@@ -50,7 +50,7 @@ fn provenance_free_draws_are_explicitly_descriptive_only() {
         observation(1.0, vec![0.7, 0.9]),
     ];
 
-    let execution = execute_rubin_loading_uncertainty_run(
+    execute_rubin_loading_uncertainty_run(
         &request,
         &accepted,
         SNAPSHOT_ID,
@@ -59,14 +59,44 @@ fn provenance_free_draws_are_explicitly_descriptive_only() {
         &rows,
         "2026-08-02T00:00:00Z",
     )
-    .expect("descriptive combination remains executable");
+    .expect("descriptive combination remains executable")
+}
+
+#[test]
+fn provenance_free_draws_are_explicitly_descriptive_only() {
+    let execution = execute();
 
     assert_eq!(execution.artifact.projection_status(), DESCRIPTIVE_ONLY);
     let artifact_json: serde_json::Value =
         serde_json::from_str(&execution.artifact.to_json().expect("artifact json"))
             .expect("valid json");
     assert_eq!(
-        artifact_json.get("projection_status").and_then(serde_json::Value::as_str),
+        artifact_json
+            .get("projection_status")
+            .and_then(serde_json::Value::as_str),
         Some(DESCRIPTIVE_ONLY)
+    );
+}
+
+#[test]
+fn projection_policy_wire_refuses_missing_or_forged_status() {
+    let execution = execute();
+    let canonical = execution.artifact.to_json().expect("artifact json");
+
+    let mut missing: serde_json::Value = serde_json::from_str(&canonical).expect("valid json");
+    missing
+        .as_object_mut()
+        .expect("artifact object")
+        .remove("projection_status");
+    assert_eq!(
+        RubinLoadingUncertaintyArtifact::from_json(&missing.to_string()),
+        Err(AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact)
+    );
+
+    let mut forged: serde_json::Value = serde_json::from_str(&canonical).expect("valid json");
+    forged["projection_status"] = serde_json::json!("validated_rubin_inference");
+    assert_eq!(
+        RubinLoadingUncertaintyArtifact::from_json(&forged.to_string()),
+        Err(AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact)
     );
 }
