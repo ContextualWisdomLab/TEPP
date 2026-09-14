@@ -2126,7 +2126,8 @@ mod tests {
             "time-dependent impulse carry is not the discrete time-dependent predictor effect"
         );
         assert_eq!(
-            PsychometricError::TimeVaryingDiscreteEffectIsNotDiscreteTimeDependentEffect.to_string(),
+            PsychometricError::TimeVaryingDiscreteEffectIsNotDiscreteTimeDependentEffect
+                .to_string(),
             "time-varying predictor discrete effect is not the discrete time-dependent predictor effect"
         );
         assert_eq!(

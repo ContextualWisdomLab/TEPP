@@ -699,6 +699,8 @@ pub use event_time::refuse_stationary_later_latent_variance_as_observed_variance
 pub use event_time::refuse_stationary_later_latent_variance_as_process_noise;
 /// Refuse treating Eq. 5 of `asymDIFFUSION` as Eq. 5 of §4.3 stationary `T0VAR`.
 pub use event_time::refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance;
+/// Refuse treating Table 2 `TDPREDEFFECT` `M` as 2017-era `discreteTDPREDEFFECT`.
+pub use event_time::refuse_time_dependent_coefficient_as_discrete_time_dependent_effect;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
 pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
 /// Refuse treating the Eq. 3 contemporaneous impulse as 2017-era `discreteTDPREDEFFECT`.
@@ -717,8 +719,6 @@ pub use event_time::refuse_time_dependent_impulse_carry_as_discrete_time_depende
 pub use event_time::refuse_time_dependent_impulse_carry_as_time_independent_effect;
 /// Refuse treating Driver Eq. 1–2 impulse carry as Voelkle Eq. 14.
 pub use event_time::refuse_time_dependent_impulse_carry_as_time_varying_discrete_effect;
-/// Refuse treating Table 2 `TDPREDEFFECT` `M` as 2017-era `discreteTDPREDEFFECT`.
-pub use event_time::refuse_time_dependent_coefficient_as_discrete_time_dependent_effect;
 /// Refuse treating Driver Table 2 `TIPREDEFFECT` as the discrete increment.
 pub use event_time::refuse_time_independent_coefficient_as_discrete_effect;
 /// Refuse treating Driver Eq. 3 `TIPREDEFFECT` increment as `CINT`.
