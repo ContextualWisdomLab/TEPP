@@ -4,8 +4,8 @@
 use psychometric_core::{
     ClusteredEventScore, ClusteredScore, EventOccasion, IndicatorKind, LagClock,
     LaggedWithinResidual, PsychometricError, map_discrete_lag_across_event_intervals,
-    ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
-    recover_asymptotic_time_independent_predictor_effect,
+    ordinary_least_squares_slope, recover_asymptotes_true_continuous_diffusion,
+    recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
@@ -54,6 +54,7 @@ use psychometric_core::{
     refuse_asymptotic_continuous_intercept_as_discrete_increment,
     refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
     refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
+    refuse_asymptotic_diffusion_as_asymptotes_true_continuous_diffusion,
     refuse_asymptotic_time_independent_effect_as_coefficient,
     refuse_asymptotic_time_independent_effect_as_continuous_intercept,
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -64,6 +65,7 @@ use psychometric_core::{
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+    refuse_discrete_process_noise_as_asymptotes_true_continuous_diffusion,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -120,6 +122,7 @@ use psychometric_core::{
     refuse_observed_variance_as_standardised_manifest_variance,
     refuse_pooled_discrete_lag_across_unequal_intervals,
     refuse_process_noise_as_unconditional_variance,
+    refuse_standardised_continuous_diffusion_as_asymptotes_true_continuous_diffusion,
     refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
     refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
@@ -162,6 +165,7 @@ use psychometric_core::{
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
+    refuse_unstandardised_continuous_diffusion_as_asymptotes_true_continuous_diffusion,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
@@ -6537,6 +6541,113 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
     let non_event = clocks[non_event_index];
     assert_eq!(
         recover_standardised_manifest_variance(0.4, non_event),
+        Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn asymptotes_true_continuous_diffusion_recovers_negated_kronecker_sum_times_diffusion() {
+    let diffusion = 0.4_f64;
+    let log_rate = -0.25_f64;
+    let recovered =
+        recover_asymptotes_true_continuous_diffusion(diffusion, log_rate, LagClock::EventTime)
+            .expect("asymptotes-true DIFFUSION");
+    let recovered_error = rmse(&[0.2], &[recovered]);
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, 2017-era summary.ctsemFit.R): RMSE {recovered_error} for −2 a · q = 0.2"
+    );
+    let inverted = recover_asymptotes_true_continuous_diffusion(0.8, log_rate, LagClock::EventTime)
+        .expect("stored -q/(2a) recovers q");
+    let inverted_error = rmse(&[diffusion], &[inverted]);
+    assert!(
+        inverted_error < 1e-15,
+        "Driver et al. (2017): stored −q/(2a) recovers original q; RMSE {inverted_error}"
+    );
+    let unstandardised_error = rmse(&[0.2], &[diffusion]);
+    assert!(
+        recovered_error < unstandardised_error,
+        "Driver et al. (2017, Table 2): unstandardised q RMSE {unstandardised_error} must exceed rewrite RMSE {recovered_error}"
+    );
+    let asymptotic = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let asymptotic_error = rmse(&[0.2], &[asymptotic]);
+    assert!(
+        recovered_error < asymptotic_error,
+        "Driver et al. (2017, p. 16): asymDIFFUSION RMSE {asymptotic_error} must exceed rewrite RMSE {recovered_error}"
+    );
+    let discrete = recover_discrete_process_noise(diffusion, log_rate, 1.0, LagClock::EventTime)
+        .expect("discreteDIFFUSION");
+    let discrete_error = rmse(&[0.2], &[discrete]);
+    assert!(
+        recovered_error < discrete_error,
+        "Driver et al. (2017, Eq. 4): discreteDIFFUSION RMSE {discrete_error} must exceed rewrite RMSE {recovered_error}"
+    );
+    let standardised = -2.0 * log_rate;
+    let standardised_error = rmse(&[0.2], &[standardised]);
+    assert!(
+        recovered_error < standardised_error,
+        "Driver et al. (2017, p. 16): DIFFUSIONstd RMSE {standardised_error} must exceed rewrite RMSE {recovered_error}"
+    );
+    assert_eq!(
+        refuse_unstandardised_continuous_diffusion_as_asymptotes_true_continuous_diffusion(
+            diffusion, recovered
+        ),
+        Err(
+            PsychometricError::UnstandardisedContinuousDiffusionIsNotAsymptotesTrueContinuousDiffusion
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_diffusion_as_asymptotes_true_continuous_diffusion(asymptotic, recovered),
+        Err(PsychometricError::AsymptoticDiffusionIsNotAsymptotesTrueContinuousDiffusion)
+    );
+    assert_eq!(
+        refuse_discrete_process_noise_as_asymptotes_true_continuous_diffusion(discrete, recovered),
+        Err(PsychometricError::DiscreteProcessNoiseIsNotAsymptotesTrueContinuousDiffusion)
+    );
+    assert_eq!(
+        refuse_standardised_continuous_diffusion_as_asymptotes_true_continuous_diffusion(
+            standardised, recovered
+        ),
+        Err(
+            PsychometricError::StandardisedContinuousDiffusionIsNotAsymptotesTrueContinuousDiffusion
+        )
+    );
+}
+
+#[test]
+fn asymptotes_true_continuous_diffusion_refuses_non_event_clocks_and_unstable_drift() {
+    assert_eq!(
+        recover_asymptotes_true_continuous_diffusion(0.4, -0.25, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotes_true_continuous_diffusion(0.4, -0.25, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotes_true_continuous_diffusion(0.4, 0.5, LagClock::EventTime),
+        Err(PsychometricError::AsymptotesTrueContinuousDiffusionRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotes_true_continuous_diffusion(0.0, 0.5, LagClock::EventTime)
+            .expect("zero")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+}
+
+#[test]
+fn asymptotes_true_continuous_diffusion_clock_path_is_runtime_opaque() {
+    let clocks = [
+        LagClock::SystemTime,
+        LagClock::DocumentTime,
+        LagClock::AssertionTime,
+    ];
+    let non_event_index = std::process::id() as usize % clocks.len();
+    let non_event = clocks[non_event_index];
+    assert_eq!(
+        recover_asymptotes_true_continuous_diffusion(0.4, -0.25, non_event),
         Err(PsychometricError::EventTimeRequired)
     );
 }

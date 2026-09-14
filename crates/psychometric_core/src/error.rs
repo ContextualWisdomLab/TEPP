@@ -710,6 +710,28 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// The 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite was
+    /// requested for a non-stable drift. cran/ctsem 2.5.0
+    /// `summary.ctsemFit.R` forms `-DRIFTHATCH %*% vec(DIFFUSION)`;
+    /// the scalar map `−2 a · q` requires `a < 0` when `q` is
+    /// nonzero. A zero diffusion is exactly zero even if `a ≥ 0`.
+    AsymptotesTrueContinuousDiffusionRequiresStableDrift,
+    /// Unstandardised `DIFFUSION` `q` was treated as the 2017-era
+    /// active `asymptotes=TRUE` rewrite. `q` is not `−2 a · q` when
+    /// `a ≠ −0.5`.
+    UnstandardisedContinuousDiffusionIsNotAsymptotesTrueContinuousDiffusion,
+    /// Driver p. 16 `asymDIFFUSION` `p = −q / (2 a)` was treated as
+    /// the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+    /// Those are inverse maps, not the same map.
+    AsymptoticDiffusionIsNotAsymptotesTrueContinuousDiffusion,
+    /// Driver Eq. 4 `discreteDIFFUSION` `Q_Δt` was treated as the
+    /// 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+    /// `Q_Δt` depends on the event interval; `−2 a · q` does not.
+    DiscreteProcessNoiseIsNotAsymptotesTrueContinuousDiffusion,
+    /// Driver p. 16 `DIFFUSIONstd` `q / p = −2 a` was treated as
+    /// the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+    /// That ratio is not `−2 a · q`.
+    StandardisedContinuousDiffusionIsNotAsymptotesTrueContinuousDiffusion,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1256,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptotesTrueContinuousDiffusionRequiresStableDrift => {
+                "asymptotes-true continuous diffusion requires a stable negative drift"
+            }
+            Self::UnstandardisedContinuousDiffusionIsNotAsymptotesTrueContinuousDiffusion => {
+                "unstandardised continuous diffusion is not asymptotes-true continuous diffusion"
+            }
+            Self::AsymptoticDiffusionIsNotAsymptotesTrueContinuousDiffusion => {
+                "asymptotic diffusion is not asymptotes-true continuous diffusion"
+            }
+            Self::DiscreteProcessNoiseIsNotAsymptotesTrueContinuousDiffusion => {
+                "discrete process noise is not asymptotes-true continuous diffusion"
+            }
+            Self::StandardisedContinuousDiffusionIsNotAsymptotesTrueContinuousDiffusion => {
+                "standardised continuous diffusion is not asymptotes-true continuous diffusion"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2108,34 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_continuous_diffusion_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptotesTrueContinuousDiffusionRequiresStableDrift.to_string(),
+            "asymptotes-true continuous diffusion requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousDiffusionIsNotAsymptotesTrueContinuousDiffusion
+                .to_string(),
+            "unstandardised continuous diffusion is not asymptotes-true continuous diffusion"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticDiffusionIsNotAsymptotesTrueContinuousDiffusion
+                .to_string(),
+            "asymptotic diffusion is not asymptotes-true continuous diffusion"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteProcessNoiseIsNotAsymptotesTrueContinuousDiffusion
+                .to_string(),
+            "discrete process noise is not asymptotes-true continuous diffusion"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousDiffusionIsNotAsymptotesTrueContinuousDiffusion
+                .to_string(),
+            "standardised continuous diffusion is not asymptotes-true continuous diffusion"
         );
     }
 }
