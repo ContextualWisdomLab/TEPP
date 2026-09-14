@@ -48,6 +48,12 @@ refs can move after an artifact is produced. They therefore cannot serve as
 historical projection authority even when caller and executor currently resolve
 the same alias.
 
+A fifth contract-identity constraint applies before registry matching. This
+receipt type is specifically the authority object for
+`rubin_loading_uncertainty`; an owner-controlled pairing registry may approve a
+generator/evidence/design combination but must not be able to redefine the
+analysis contract or version that the receipt authorizes.
+
 ## Decision
 
 Add `rubin_loading_uncertainty_v1` to `analysis_engine` as an application
@@ -86,6 +92,11 @@ composition over the protected-main scientific owners. The executor:
   contract ID/version, exact Rubin analysis contract ID/version, Validation
   Evidence ID/SHA-256/availability, source snapshot, knowledge cutoff, and
   design envelope;
+- validates the receipt's analysis ID/version against the canonical
+  `RUBIN_LOADING_ANALYSIS_CONTRACT_ID` and
+  `RUBIN_LOADING_MODEL_CONTRACT_VERSION` before registry matching. Production
+  registry data may narrow approved pairings but cannot redefine the analysis
+  semantics of this receipt type;
 - treats the receipt snapshot and the expected Analysis Run snapshot as
   immutable authority fields. Activation rejects mutable branch/PR/issue/
   repository/latest locator shapes before identity comparison; matching the
@@ -176,6 +187,10 @@ and expected execution snapshot must both carry a stable snapshot identity.
     rejected because string equality does not establish immutable source
     identity. A branch or PR ref can later resolve to different evidence while
     preserving the same text, breaking historical replay and auditability.
+13. Let each approved registry entry choose an arbitrary analysis contract —
+    rejected because registry content is configuration authority over approved
+    pairings, not semantic authority over the Rubin receipt type. The canonical
+    analysis ID/version is enforced before any registry lookup.
 
 ## Scientific acceptance boundary
 
@@ -245,7 +260,9 @@ availability to match the owner-controlled approved availability, so immutable
 evidence content cannot be backdated into an older cutoff. Issue #509 further
 closes the same mutability class for source snapshots: mutable refs cannot be
 used as the historical snapshot authority merely because receipt and executor
-agree on the same string.
+agree on the same string. Issue #510 binds the public Rubin receipt itself to
+the canonical analysis ID/version so a future registry entry cannot redefine
+which estimator contract that receipt authorizes.
 
 That does not make #504 or #506 scientific authority: the production approved-
 pairing registry is empty, the artifact remains descriptive-only, and exact-head
@@ -270,10 +287,11 @@ exceeded draw/resource bounds, inconsistent Rubin totals, artifact count
 bounds, terminal provider/domain-status separation, Monte Carlo snapshot/run-
 identity non-aliasing, digest-bound descriptive-only projection, bounded receipt
 round-trip/digest validation, missing receipt, late Validation Evidence,
-snapshot/cutoff mismatch, mutable snapshot aliases, unknown or mismatched
-generator/analysis/evidence/design/indicator authority, caller backdating versus
-owner-controlled evidence availability, noncanonical registry availability, and
-a private exact approved-pairing positive branch.
+snapshot/cutoff mismatch, mutable snapshot aliases, public refusal of a
+noncanonical Rubin analysis ID/version, unknown or mismatched generator/analysis/
+evidence/design/indicator authority, caller backdating versus owner-controlled
+evidence availability, noncanonical registry availability, and a private exact
+approved-pairing positive branch.
 
 A future positive artifact state still requires an independently promoted
 production pairing and must digest-bind the activation receipt. Predecessor
@@ -285,5 +303,6 @@ claim authority.
 Rollback removes the `rubin_loading_uncertainty_v1` profile and its activation
 policy. No persisted schema migration is introduced. Supersede only with an ADR
 that preserves the scientific owner split, temporal provenance, immutable
-snapshot authority, resource admission, claim-specific validation evidence, and
-the Rubin-versus-Mislevy / draw-generation activation boundaries.
+snapshot authority, resource admission, claim-specific validation evidence,
+canonical analysis identity, and the Rubin-versus-Mislevy / draw-generation
+activation boundaries.
