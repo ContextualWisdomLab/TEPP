@@ -42,6 +42,38 @@ fn receipt() -> RubinProjectionActivationReceiptV1 {
 }
 
 #[test]
+fn noncanonical_analysis_identity_is_not_admitted_by_rubin_receipt() {
+    let evidence = (
+        "validation-evidence-rubin-candidate-v1",
+        EVIDENCE_DIGEST,
+        AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability"),
+    );
+
+    assert!(
+        RubinProjectionActivationReceiptV1::new(
+            ("gaussian_complete_data_draws", "candidate-v1"),
+            ("different_analysis_contract", RUBIN_LOADING_MODEL_CONTRACT_VERSION),
+            evidence.clone(),
+            SNAPSHOT_ID,
+            cutoff(),
+            "rubin-gaussian-single-level-candidate-v1",
+        )
+        .is_err()
+    );
+    assert!(
+        RubinProjectionActivationReceiptV1::new(
+            ("gaussian_complete_data_draws", "candidate-v1"),
+            ("rubin_loading_uncertainty", "noncanonical-version"),
+            evidence,
+            SNAPSHOT_ID,
+            cutoff(),
+            "rubin-gaussian-single-level-candidate-v1",
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn no_receipt_remains_descriptive_only() {
     assert_eq!(
         decide_rubin_projection_activation(
