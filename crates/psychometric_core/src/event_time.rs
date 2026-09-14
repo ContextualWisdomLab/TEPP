@@ -1030,6 +1030,168 @@ pub fn refuse_latent_variance_as_observed_variance(
     Err(PsychometricError::LatentVarianceIsNotObservedVariance)
 }
 
+/// Exact scalar Eq. 5 of the 2017-era active `asymptotes=TRUE`
+/// `DIFFUSION` rewrite.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Table 2, p. 12;
+/// Eq. 4, p. 5; p. 16; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-31T09:50Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `y_i(t) = τ + Λ η_i(t) + ε_i(t)` with `ε ~ N(0, Θ)` and
+/// `τ_i ~ N(μ_τ, Ψ_τ)`. cran/ctsem 2.5.0 `summary.ctsemFit.R` forms
+/// `DRIFTHATCH <- (DRIFT %x% I) + (I %x% DRIFT)` and then
+/// `if(asymptotes==TRUE) DIFFUSION <- matrix(-DRIFTHATCH %*%
+/// OpenMx::rvectorize(DIFFUSION), nrow=n.latent, ncol=n.latent)`
+/// immediately after `mxEval(DIFFUSION, mxobj, compute=TRUE)` and
+/// puts that rewrite in the active `outlist`. For one latent the
+/// Kronecker sum is `2 a`, so the scalar rewrite is `−2 a · q`.
+/// Equation 5 of that rewrite with `θ = 0` and `ψ = 0` is
+/// `λ² (−2 a · q)`. Form `2 a` first, then negate, then multiply by
+/// `q`, then `(λ extra) λ`. Do not form `λ²` first: at `λ = 1e308`,
+/// `extra = 1e-308`, `λ²` overflows and `λ² extra` is non-finite, but
+/// `(λ extra) λ = 1e308`. Do not import unpublished `#357` helpers.
+/// A zero loading or zero extra is exactly zero. A zero diffusion is
+/// exactly zero even if `a ≥ 0`. `a ≥ 0` with a nonzero diffusion
+/// fails closed. Unstandardised `λ² q` is not this map when
+/// `a ≠ −0.5`. `λ² p` of `asymDIFFUSION` `p = −q / (2 a)` is the
+/// inverse stored parameterization, not this rewrite. The latent
+/// rewrite `−2 a · q` is not `Var(y)`. `MANIFESTVAR` `θ` is not this
+/// extra. Distinct from the 2020-era `ctsemOMX:::summary.ctsemFit`
+/// rewrite and from `ctsem:::verboseSummary` (2026-era). This is not
+/// a Kalman filter, not a matrix `expm`, not ESEM estimation, not
+/// DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::AsymptotesTrueContinuousDiffusionObservedVarianceRequiresStableDrift`]
+/// when the drift is not strictly negative and the diffusion is
+/// nonzero, and [`PsychometricError::InvalidNumericInput`] when the
+/// loading is non-finite, the diffusion is negative or non-finite,
+/// the log-rate is non-finite, or a product overflows.
+pub fn recover_asymptotes_true_continuous_diffusion_observed_variance(
+    loading: f64,
+    continuous_diffusion: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !loading.is_finite()
+        || !continuous_diffusion.is_finite()
+        || continuous_diffusion < 0.0
+        || !log_rate.is_finite()
+    {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if continuous_diffusion == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(
+            PsychometricError::AsymptotesTrueContinuousDiffusionObservedVarianceRequiresStableDrift,
+        );
+    }
+    // cran/ctsem 2.5.0: -DRIFTHATCH %*% vec(DIFFUSION). Scalar
+    // DRIFTHATCH = 2 a. Form 2 a first, then negate, then multiply.
+    let twice_rate = log_rate * 2.0;
+    let negated_hatch = -twice_rate;
+    let extra = require_finite(negated_hatch * continuous_diffusion)?;
+    if loading == 0.0 {
+        return Ok(0.0);
+    }
+    require_finite((loading * extra) * loading)
+}
+
+/// Refuse treating the latent 2017-era active `asymptotes=TRUE`
+/// `DIFFUSION` rewrite as Eq. 5 of that map.
+///
+/// `−2 a · q` is the latent rewrite. Equation 5 maps
+/// `Var(y) = λ² (−2 a · q)` when `θ = 0` and `ψ = 0`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::LatentAsymptotesTrueContinuousDiffusionIsNotObservedVariance`].
+pub fn refuse_latent_asymptotes_true_continuous_diffusion_as_observed_variance(
+    latent_asymptotes_true_continuous_diffusion: f64,
+    asymptotes_true_continuous_diffusion_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        latent_asymptotes_true_continuous_diffusion,
+        asymptotes_true_continuous_diffusion_observed_variance,
+    );
+    Err(PsychometricError::LatentAsymptotesTrueContinuousDiffusionIsNotObservedVariance)
+}
+
+/// Refuse treating unstandardised `DIFFUSION` observed variance as
+/// Eq. 5 of the 2017-era active `asymptotes=TRUE` rewrite.
+///
+/// `λ² q` is not `λ² (−2 a · q)` when `a ≠ −0.5`. Equal numbers
+/// when `a = −0.5` remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedContinuousDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance`].
+pub fn refuse_unstandardised_continuous_diffusion_observed_variance_as_asymptotes_true_observed_variance(
+    unstandardised_continuous_diffusion_observed_variance: f64,
+    asymptotes_true_continuous_diffusion_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_continuous_diffusion_observed_variance,
+        asymptotes_true_continuous_diffusion_observed_variance,
+    );
+    Err(
+        PsychometricError::UnstandardisedContinuousDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance,
+    )
+}
+
+/// Refuse treating `asymDIFFUSION` observed variance as Eq. 5 of
+/// the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+///
+/// `p = −q / (2 a)` is the stored asymptotic parameterization. The
+/// rewrite `−2 a · q` converts that stored value back to original
+/// `q`. `λ² p` is not `λ² (−2 a · q)`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance`].
+pub fn refuse_asymptotic_diffusion_observed_variance_as_asymptotes_true_observed_variance(
+    asymptotic_diffusion_observed_variance: f64,
+    asymptotes_true_continuous_diffusion_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        asymptotic_diffusion_observed_variance,
+        asymptotes_true_continuous_diffusion_observed_variance,
+    );
+    Err(PsychometricError::AsymptoticDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance)
+}
+
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of the 2017-era active
+/// `asymptotes=TRUE` `DIFFUSION` rewrite.
+///
+/// Table 2 names `θ` `MANIFESTVAR`. `λ² (−2 a · q)` is not `θ` when
+/// the loading and rewrite extra are nonzero.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::MeasurementErrorIsNotAsymptotesTrueContinuousDiffusionObservedVariance`].
+pub fn refuse_measurement_error_as_asymptotes_true_continuous_diffusion_observed_variance(
+    measurement_error_variance: f64,
+    asymptotes_true_continuous_diffusion_observed_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        measurement_error_variance,
+        asymptotes_true_continuous_diffusion_observed_variance,
+    );
+    Err(PsychometricError::MeasurementErrorIsNotAsymptotesTrueContinuousDiffusionObservedVariance)
+}
+
 /// Exact scalar observed-indicator variance from Driver Equation 5
 /// with nonzero `MANIFESTTRAITVAR`.
 ///
@@ -6854,7 +7016,9 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 mod tests {
     use super::{
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
+        map_discrete_lag_across_event_intervals,
+        recover_asymptotes_true_continuous_diffusion_observed_variance,
+        recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -6906,6 +7070,7 @@ mod tests {
         refuse_asymptotic_continuous_intercept_as_discrete_increment,
         refuse_asymptotic_continuous_intercept_as_initial_latent_mean,
         refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
+        refuse_asymptotic_diffusion_observed_variance_as_asymptotes_true_observed_variance,
         refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_coefficient,
@@ -6960,6 +7125,7 @@ mod tests {
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_initial_time_independent_variance_as_standardised_trait_variance,
+        refuse_latent_asymptotes_true_continuous_diffusion_as_observed_variance,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
         refuse_level_change_extra_process_as_impulse,
@@ -6971,6 +7137,7 @@ mod tests {
         refuse_level_change_intercept_as_impulse,
         refuse_level_change_intercept_as_process_increment, refuse_manifest_means_as_observed_mean,
         refuse_manifest_trait_variance_as_measurement_error,
+        refuse_measurement_error_as_asymptotes_true_continuous_diffusion_observed_variance,
         refuse_measurement_error_as_lagged_observed_covariance,
         refuse_measurement_error_as_observed_variance,
         refuse_measurement_error_as_standardised_manifest_trait_variance,
@@ -7032,6 +7199,7 @@ mod tests {
         refuse_unmatched_time_varying_predictor_interval,
         refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
+        refuse_unstandardised_continuous_diffusion_observed_variance_as_asymptotes_true_observed_variance,
         refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
@@ -16348,6 +16516,215 @@ mod tests {
                 f64::MAX,
                 0.5,
                 -1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_continuous_diffusion_observed_variance_recovers_eq5_of_rewrite() {
+        // cran/ctsem 2.5.0: if(asymptotes==TRUE) DIFFUSION <- -DRIFTHATCH %*% vec(DIFFUSION).
+        // Scalar DRIFTHATCH = 2 a so extra = −2 a · q. Eq. 5 with θ=0, ψ=0 is λ² extra.
+        // a = −0.25, q = 0.4, λ = 2 → extra = 0.2, observed = 0.8.
+        let log_rate = -0.25_f64;
+        let continuous_diffusion = 0.4_f64;
+        let loading = 2.0_f64;
+        let recovered = recover_asymptotes_true_continuous_diffusion_observed_variance(
+            loading,
+            continuous_diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("Eq.5 DIFFUSION rewrite");
+        let twice_rate = log_rate * 2.0;
+        let extra = (-twice_rate) * continuous_diffusion;
+        let expected = (loading * extra) * loading;
+        assert!((recovered - expected).abs() < 1e-15);
+        assert!((recovered - 0.8).abs() < 1e-15);
+        assert!((extra - 0.2).abs() < 1e-15);
+        let unstandardised_observed = (loading * continuous_diffusion) * loading;
+        assert!((unstandardised_observed - 1.6).abs() < 1e-15);
+        let asymptotic = continuous_diffusion / (-2.0 * log_rate);
+        let asymptotic_observed = (loading * asymptotic) * loading;
+        assert!((asymptotic - 0.8).abs() < 1e-15);
+        assert!((asymptotic_observed - 3.2).abs() < 1e-15);
+        let theta = 0.1_f64;
+        assert!((unstandardised_observed - recovered).abs() > 1e-3);
+        assert!((asymptotic_observed - recovered).abs() > 1e-3);
+        assert!((extra - recovered).abs() > 1e-3);
+        assert!((theta - recovered).abs() > 1e-3);
+        let zero_diffusion = recover_asymptotes_true_continuous_diffusion_observed_variance(
+            loading,
+            0.0,
+            0.5,
+            LagClock::EventTime,
+        )
+        .expect("zero extra");
+        assert_eq!(zero_diffusion.to_bits(), 0.0_f64.to_bits());
+        let zero_loading = recover_asymptotes_true_continuous_diffusion_observed_variance(
+            0.0,
+            continuous_diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("zero loading");
+        assert_eq!(zero_loading.to_bits(), 0.0_f64.to_bits());
+        let signed = recover_asymptotes_true_continuous_diffusion_observed_variance(
+            -loading,
+            continuous_diffusion,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("signed loading");
+        assert_eq!(signed.to_bits(), recovered.to_bits());
+        let scaled = recover_asymptotes_true_continuous_diffusion_observed_variance(
+            1e308,
+            2e-308,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("scale");
+        assert!(scaled.is_finite());
+        assert!((scaled - 1e308).abs() / 1e308 < 1e-12);
+        assert_eq!(
+            refuse_latent_asymptotes_true_continuous_diffusion_as_observed_variance(
+                extra, recovered
+            ),
+            Err(PsychometricError::LatentAsymptotesTrueContinuousDiffusionIsNotObservedVariance)
+        );
+        assert_eq!(
+            refuse_unstandardised_continuous_diffusion_observed_variance_as_asymptotes_true_observed_variance(
+                unstandardised_observed,
+                recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedContinuousDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance
+            )
+        );
+        assert_eq!(
+            refuse_asymptotic_diffusion_observed_variance_as_asymptotes_true_observed_variance(
+                asymptotic_observed,
+                recovered
+            ),
+            Err(
+                PsychometricError::AsymptoticDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance
+            )
+        );
+        assert_eq!(
+            refuse_measurement_error_as_asymptotes_true_continuous_diffusion_observed_variance(
+                theta,
+                recovered
+            ),
+            Err(
+                PsychometricError::MeasurementErrorIsNotAsymptotesTrueContinuousDiffusionObservedVariance
+            )
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_continuous_diffusion_observed_variance_fails_closed_when_untransformed_is_defined()
+     {
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                2.0,
+                0.4,
+                0.5,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::AsymptotesTrueContinuousDiffusionObservedVarianceRequiresStableDrift
+            )
+        );
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                2.0,
+                0.4,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::AsymptotesTrueContinuousDiffusionObservedVarianceRequiresStableDrift
+            )
+        );
+        for clock in [
+            LagClock::SystemTime,
+            LagClock::AssertionTime,
+            LagClock::DocumentTime,
+            LagClock::AvailabilityTime,
+            LagClock::KnowledgeCutoff,
+        ] {
+            assert_eq!(
+                recover_asymptotes_true_continuous_diffusion_observed_variance(
+                    2.0, 0.4, -0.25, clock
+                ),
+                Err(PsychometricError::EventTimeRequired)
+            );
+        }
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                2.0,
+                -0.1,
+                -0.25,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_continuous_diffusion_observed_variance_fails_closed_on_non_finite_or_overflow()
+     {
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                f64::NAN,
+                0.4,
+                -0.25,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                2.0,
+                0.4,
+                f64::NAN,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                2.0,
+                f64::INFINITY,
+                -0.25,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                1e308,
+                1.0,
+                -0.25,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                2.0,
+                f64::MAX,
+                -2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_continuous_diffusion_observed_variance(
+                1.0,
+                1.0,
+                -1e308,
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)

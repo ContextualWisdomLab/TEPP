@@ -261,6 +261,16 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers Eq. 5 of the 2017-era active `asymptotes=TRUE`
+//! `DIFFUSION` rewrite as `λ² (−2 a · q)` with `θ = 0` and `ψ = 0`
+//! (form `2 a`, negate, multiply by `q`, then `(λ extra) λ`; do not
+//! form `λ²` first; do not import unpublished `#357` helpers; a zero
+//! loading or zero extra is exactly zero; a zero diffusion is
+//! exactly zero even if `a ≥ 0`; `a ≥ 0` with a nonzero diffusion
+//! fails closed; unstandardised `λ² q` is not that map; `λ² p` of
+//! `asymDIFFUSION` is not that map; the latent rewrite `−2 a · q` is
+//! not `Var(y)`; `MANIFESTVAR` `θ` is not that map; JSS PDF
+//! re-opened 2026-08-31T09:50Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -311,6 +321,8 @@ pub use event_time::LagClock;
 pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar Eq. 5 of 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite `λ² (−2 a · q)`.
+pub use event_time::recover_asymptotes_true_continuous_diffusion_observed_variance;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
 pub use event_time::recover_asymptotic_continuous_intercept;
 /// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
@@ -462,6 +474,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_as_discrete_increment
 pub use event_time::refuse_asymptotic_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating `τ + λ(−κ / a)` as Eq. 5 of §4.3 stationary `T0MEANS`.
 pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean;
+/// Refuse treating `asymDIFFUSION` observed variance as Eq. 5 of the 2017-era active `asymptotes=TRUE` rewrite.
+pub use event_time::refuse_asymptotic_diffusion_observed_variance_as_asymptotes_true_observed_variance;
 /// Refuse treating p. 16 `asymCINTstd` as `CINTstd`.
 pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `asymCINTstd` as `discreteCINTstd`.
@@ -572,6 +586,8 @@ pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_imp
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_initial_time_independent_variance_as_standardised_trait_variance;
+/// Refuse treating the latent 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite as Eq. 5 of that map.
+pub use event_time::refuse_latent_asymptotes_true_continuous_diffusion_as_observed_variance;
 /// Refuse treating Driver Eq. 3–4 lagged latent covariance as `cov(y_t, y_{t-1})`.
 pub use event_time::refuse_latent_lagged_covariance_as_observed_covariance;
 /// Refuse treating Driver Eq. 5 latent mean as `E(y)`.
@@ -600,6 +616,8 @@ pub use event_time::refuse_level_change_intercept_as_process_increment;
 pub use event_time::refuse_manifest_means_as_observed_mean;
 /// Refuse treating Driver Eq. 5 `MANIFESTTRAITVAR` as `MANIFESTVAR`.
 pub use event_time::refuse_manifest_trait_variance_as_measurement_error;
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+pub use event_time::refuse_measurement_error_as_asymptotes_true_continuous_diffusion_observed_variance;
 /// Refuse treating Driver Eq. 5 measurement error as lagged observed covariance.
 pub use event_time::refuse_measurement_error_as_lagged_observed_covariance;
 /// Refuse treating Driver Eq. 5 measurement error as `Var(y)`.
@@ -729,6 +747,8 @@ pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating unstandardised `asymDIFFUSION` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion;
+/// Refuse treating unstandardised `DIFFUSION` observed variance as Eq. 5 of the 2017-era active `asymptotes=TRUE` rewrite.
+pub use event_time::refuse_unstandardised_continuous_diffusion_observed_variance_as_asymptotes_true_observed_variance;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.

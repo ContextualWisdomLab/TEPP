@@ -710,6 +710,29 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Eq. 5 of the 2017-era active `asymptotes=TRUE` `DIFFUSION`
+    /// rewrite was requested for a non-stable drift. That map is
+    /// `λ² (−2 a · q)` and requires `a < 0` when the diffusion is
+    /// nonzero. A zero diffusion is exactly zero even if `a ≥ 0`.
+    AsymptotesTrueContinuousDiffusionObservedVarianceRequiresStableDrift,
+    /// The latent 2017-era active `asymptotes=TRUE` `DIFFUSION`
+    /// rewrite `−2 a · q` was treated as Eq. 5 of that map. The
+    /// latent rewrite is not `Var(y)`.
+    LatentAsymptotesTrueContinuousDiffusionIsNotObservedVariance,
+    /// Unstandardised `DIFFUSION` observed variance `λ² q` was
+    /// treated as Eq. 5 of the 2017-era active `asymptotes=TRUE`
+    /// rewrite. `λ² q` is not `λ² (−2 a · q)` when `a ≠ −0.5`.
+    UnstandardisedContinuousDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance,
+    /// `asymDIFFUSION` observed variance `λ² p` was treated as Eq. 5
+    /// of the 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+    /// `p = −q / (2 a)` is the stored asymptotic parameterization.
+    /// `λ² p` is not `λ² (−2 a · q)`.
+    AsymptoticDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance,
+    /// Driver Table 2 `MANIFESTVAR` `θ` was treated as Eq. 5 of the
+    /// 2017-era active `asymptotes=TRUE` `DIFFUSION` rewrite.
+    /// Measurement error is not `λ² (−2 a · q)` when the loading and
+    /// rewrite extra are nonzero.
+    MeasurementErrorIsNotAsymptotesTrueContinuousDiffusionObservedVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1257,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptotesTrueContinuousDiffusionObservedVarianceRequiresStableDrift => {
+                "asymptotes-true continuous-diffusion observed variance requires a stable negative drift"
+            }
+            Self::LatentAsymptotesTrueContinuousDiffusionIsNotObservedVariance => {
+                "latent asymptotes-true continuous diffusion is not observed variance"
+            }
+            Self::UnstandardisedContinuousDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance => {
+                "unstandardised continuous-diffusion observed variance is not asymptotes-true observed variance"
+            }
+            Self::AsymptoticDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance => {
+                "asymptotic-diffusion observed variance is not asymptotes-true observed variance"
+            }
+            Self::MeasurementErrorIsNotAsymptotesTrueContinuousDiffusionObservedVariance => {
+                "measurement error is not asymptotes-true continuous-diffusion observed variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2109,35 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_continuous_diffusion_observed_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptotesTrueContinuousDiffusionObservedVarianceRequiresStableDrift
+                .to_string(),
+            "asymptotes-true continuous-diffusion observed variance requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::LatentAsymptotesTrueContinuousDiffusionIsNotObservedVariance
+                .to_string(),
+            "latent asymptotes-true continuous diffusion is not observed variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance
+                .to_string(),
+            "unstandardised continuous-diffusion observed variance is not asymptotes-true observed variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticDiffusionObservedVarianceIsNotAsymptotesTrueObservedVariance
+                .to_string(),
+            "asymptotic-diffusion observed variance is not asymptotes-true observed variance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotAsymptotesTrueContinuousDiffusionObservedVariance
+                .to_string(),
+            "measurement error is not asymptotes-true continuous-diffusion observed variance"
         );
     }
 }
