@@ -61,6 +61,8 @@ pub enum PersistenceError {
     LegalHoldBlocksDeletion,
     /// Tombstoned evidence cannot be restored, and raw-source deletion cannot keep reproduction available.
     UngovernedEvidenceRestore,
+    /// An analysis-run request or lifecycle event violated its durable contract.
+    InvalidAnalysisRun,
 }
 
 impl fmt::Display for PersistenceError {
@@ -95,6 +97,7 @@ impl fmt::Display for PersistenceError {
             Self::InvalidRetentionLifecycle => "invalid retention lifecycle",
             Self::LegalHoldBlocksDeletion => "legal hold blocks deletion",
             Self::UngovernedEvidenceRestore => "ungoverned evidence restore",
+            Self::InvalidAnalysisRun => "invalid analysis run",
         };
         formatter.write_str(message)
     }

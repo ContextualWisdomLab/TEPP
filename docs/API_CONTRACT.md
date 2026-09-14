@@ -73,8 +73,23 @@ GET    /v1/exports/{export_id}
 
 Long-running analysis is durable asynchronous work. `POST /v1/analysis-runs` accepts an idempotency key, immutable input snapshot identity, knowledge cutoff, versioned model contract/configuration, and requested output profile. A retry with the same principal/idempotency key and semantically identical request returns the same run identity; a conflicting body fails closed.
 
+The active persistence slice stores canonical request JSON and its SHA-256
+digest, then reconstructs status from the latest append-only state event.
+PostgreSQL serializes event appends on the run row and permits only
+`accepted → running|succeeded|failed` and `running → succeeded|failed`. This remains active-PR evidence and
+does not itself prove worker restart or backup/restore acceptance.
+
+The worker-facing live persistence adapter loads the canonical stored request
+and latest status only under an explicit tenant/run identity, recomputes the
+request digest, and revalidates the terminal binding. A retained-session
+advisory lock serializes one-shot execution, while artifact and terminal-event
+statements commit in one transaction. This is an internal execution boundary,
+not a new customer HTTP endpoint or proof of a scheduler.
+
 The typed status/read contract returns `accepted`, `running`, `succeeded`, or
-`failed`. Accepted and running statuses contain no measurement result. A
+`failed`. An accepted run may move to `running` or directly to a terminal state
+when validation or setup finishes before worker execution; a running run may
+move only to a terminal state. Accepted and running statuses contain no measurement result. A
 terminal status contains exactly one request-bound `AnalysisRunTerminalResult`;
 consumers validate its request, receipt, snapshot, cutoff, model, profile, and
 idempotency bindings before treating it as measurement evidence.
