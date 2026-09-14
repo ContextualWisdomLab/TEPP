@@ -22,6 +22,7 @@ use psychometric_core::{
     recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
+    recover_initial_time_independent_observed_variance,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
     recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
@@ -102,6 +103,10 @@ use psychometric_core::{
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
+    refuse_initial_time_independent_observed_variance_as_asymptotic_time_independent_observed_variance,
+    refuse_initial_time_independent_observed_variance_as_initial_observed_variance,
+    refuse_initial_time_independent_observed_variance_as_initial_time_independent_variance,
+    refuse_initial_time_independent_observed_variance_as_measurement_error,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
@@ -3779,6 +3784,101 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
+        )
+    );
+}
+
+#[allow(clippy::too_many_lines)]
+#[test]
+fn initial_time_independent_observed_variance_is_not_latent_extra_or_measurement_error() {
+    let loading = 2.0_f64;
+    let coefficient = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let extra = coefficient * coefficient * predictor_variance;
+    let recovered = recover_initial_time_independent_observed_variance(
+        loading,
+        coefficient,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("eq5 addedT0TIPREDVAR");
+    assert!(
+        (recovered - loading * loading * extra).abs() < 1e-15,
+        "Driver et al. (2017, Eq. 5 of 2017-era addedT0TIPREDVAR): extra observed TI variance is λ² t0_b² v"
+    );
+    assert!(
+        (extra - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5): latent extra is not observed extra"
+    );
+    let initial_observed =
+        recover_manifest_observed_variance(loading, 1.6, 0.1).expect("λ² p_0 + θ");
+    assert!(
+        (initial_observed - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 / Table 2): λ² p_0 + θ is not extra observed TI variance"
+    );
+    let asymptotic_extra = recover_asymptotic_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        -0.5,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let asymptotic_observed =
+        recover_manifest_observed_variance(loading, asymptotic_extra, 0.0).expect("λ² (B/a)² v");
+    assert!(
+        (asymptotic_observed - recovered).abs() > 1e-3,
+        "Driver et al. (2017, Eq. 5 / §7.2): λ² (B/a)² v is not first-occasion extra observed TI variance"
+    );
+    assert_eq!(
+        recover_initial_time_independent_observed_variance(
+            loading,
+            coefficient,
+            predictor_variance,
+            LagClock::SystemTime
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_time_independent_observed_variance(
+            0.0,
+            coefficient,
+            predictor_variance,
+            LagClock::EventTime
+        )
+        .expect("zero loading")
+        .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        refuse_initial_time_independent_observed_variance_as_initial_time_independent_variance(
+            recovered, extra
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentObservedVarianceIsNotInitialTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_observed_variance_as_initial_observed_variance(
+            recovered,
+            initial_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentObservedVarianceIsNotInitialObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_observed_variance_as_asymptotic_time_independent_observed_variance(
+            recovered,
+            asymptotic_observed
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentObservedVarianceIsNotAsymptoticTimeIndependentObservedVariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_observed_variance_as_measurement_error(recovered, 0.1),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentObservedVarianceIsNotMeasurementError
         )
     );
 }
