@@ -7,7 +7,7 @@ use analysis_engine::{
 };
 use interpretation_gateway::{ClaimSupport, InterpretationError, InterpretationId};
 use temporal_core::KnowledgeCutoff;
-use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
+use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 use uuid::Uuid;
 
 fn cutoff() -> KnowledgeCutoff {
@@ -198,4 +198,20 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+}
+
+#[test]
+fn invalid_completed_at_fails_terminal_result_construction() {
+    let request = request();
+    assert_eq!(
+        execute_interpreter_verifier_run(
+            &request,
+            &accepted(&request),
+            "snapshot-interpreter-verifier",
+            cutoff(),
+            &cited_input(),
+            "not-a-timestamp",
+        ),
+        Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+    );
 }
