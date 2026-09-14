@@ -710,6 +710,26 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` was treated as
+    /// unstandardised `T0TOTALVAR`. Observed total variance
+    /// `λ² (t0_trait² · trait + p_0) + θ` is not the latent total.
+    InitialTotalObservedVarianceIsNotInitialTotalVariance,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` was treated as
+    /// 2017-era `T0TOTALVARstd`. Observed total variance is not
+    /// the correlation form `total / total = 1`.
+    InitialTotalObservedVarianceIsNotStandardisedInitialTotalVariance,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` was treated as Eq. 5 of
+    /// free `T0VAR` (`λ² p_0 + θ`). Omitting first-occasion trait
+    /// extra is not the observed total.
+    InitialTotalObservedVarianceIsNotInitialObservedVariance,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` was treated as
+    /// `MANIFESTVAR` `θ`. Measurement error is not the observed
+    /// composition of extra plus free `T0VAR`.
+    InitialTotalObservedVarianceIsNotMeasurementError,
+    /// Driver Eq. 5 of 2017-era `T0TOTALVAR` was treated as Eq. 5 of
+    /// 2017-era `T0TRAITVAR` (`λ² t0_trait² · trait + θ`). Omitting
+    /// free `T0VAR` is not the observed total.
+    InitialTotalObservedVarianceIsNotInitialTraitObservedVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1254,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::InitialTotalObservedVarianceIsNotInitialTotalVariance => {
+                "initial total observed variance is not initial total latent variance"
+            }
+            Self::InitialTotalObservedVarianceIsNotStandardisedInitialTotalVariance => {
+                "initial total observed variance is not standardised initial total variance"
+            }
+            Self::InitialTotalObservedVarianceIsNotInitialObservedVariance => {
+                "initial total observed variance is not first-occasion observed variance"
+            }
+            Self::InitialTotalObservedVarianceIsNotMeasurementError => {
+                "initial total observed variance is not measurement-error variance"
+            }
+            Self::InitialTotalObservedVarianceIsNotInitialTraitObservedVariance => {
+                "initial total observed variance is not initial trait observed variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2106,32 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn initial_total_observed_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceIsNotInitialTotalVariance.to_string(),
+            "initial total observed variance is not initial total latent variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceIsNotStandardisedInitialTotalVariance
+                .to_string(),
+            "initial total observed variance is not standardised initial total variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceIsNotInitialObservedVariance.to_string(),
+            "initial total observed variance is not first-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceIsNotMeasurementError.to_string(),
+            "initial total observed variance is not measurement-error variance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTotalObservedVarianceIsNotInitialTraitObservedVariance
+                .to_string(),
+            "initial total observed variance is not initial trait observed variance"
         );
     }
 }
