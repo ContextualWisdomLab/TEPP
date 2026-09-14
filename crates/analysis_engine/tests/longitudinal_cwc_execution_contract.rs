@@ -9,6 +9,8 @@ use psychometric_core::PsychometricError;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
+const SNAPSHOT_ID: &str = "snapshot-longitudinal-cwc";
+
 fn available(stamp: &str) -> AvailableTime {
     AvailableTime::parse_rfc3339(stamp).expect("available")
 }
@@ -17,12 +19,28 @@ fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
 }
 
+fn score(
+    cluster_key: u64,
+    predictor: f64,
+    outcome: f64,
+    available_at: &str,
+) -> LongitudinalClusterScore {
+    LongitudinalClusterScore::new(
+        SNAPSHOT_ID,
+        cluster_key,
+        predictor,
+        outcome,
+        available(available_at),
+    )
+    .expect("score")
+}
+
 fn noiseless_rows() -> Vec<LongitudinalClusterScore> {
     vec![
-        LongitudinalClusterScore::new(1, 0.0, 2.0, available("2026-07-01T00:00:00Z")).expect("r1"),
-        LongitudinalClusterScore::new(1, 2.0, 3.0, available("2026-07-01T00:00:00Z")).expect("r2"),
-        LongitudinalClusterScore::new(2, 4.0, 10.0, available("2026-07-01T00:00:00Z")).expect("r3"),
-        LongitudinalClusterScore::new(2, 6.0, 11.0, available("2026-07-01T00:00:00Z")).expect("r4"),
+        score(1, 0.0, 2.0, "2026-07-01T00:00:00Z"),
+        score(1, 2.0, 3.0, "2026-07-01T00:00:00Z"),
+        score(2, 4.0, 10.0, "2026-07-01T00:00:00Z"),
+        score(2, 6.0, 11.0, "2026-07-01T00:00:00Z"),
     ]
 }
 
@@ -31,7 +49,7 @@ fn request() -> AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: "longitudinal-cwc-idem".into(),
         tenant_workspace_id: "tenant-workspace".into(),
-        snapshot_id: "snapshot-longitudinal-cwc".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
         model_contract_version: LONGITUDINAL_CWC_MODEL_CONTRACT_VERSION.into(),
         output_profile: LONGITUDINAL_CWC_OUTPUT_PROFILE.into(),
@@ -51,7 +69,7 @@ fn noiseless_cwc_emits_digest_bound_within_between_and_contextual() {
     let execution = execute_longitudinal_cwc_run(
         &request,
         &accepted,
-        "snapshot-longitudinal-cwc",
+        SNAPSHOT_ID,
         cutoff(),
         &rows,
         "2026-08-02T00:00:00Z",
@@ -84,6 +102,7 @@ fn noiseless_cwc_emits_digest_bound_within_between_and_contextual() {
         execution.terminal_result.result_schema_version.as_deref(),
         Some(LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION)
     );
+    assert_eq!(rows[0].snapshot_id(), SNAPSHOT_ID);
     assert_eq!(rows[0].cluster_key(), 1);
     assert!((rows[0].predictor() - 0.0).abs() < f64::EPSILON);
     assert!((rows[0].outcome() - 2.0).abs() < f64::EPSILON);
@@ -95,14 +114,11 @@ fn execution_excludes_rows_unavailable_at_the_request_cutoff() {
     let request = request();
     let accepted = accepted(&request);
     let mut rows = noiseless_rows();
-    rows.push(
-        LongitudinalClusterScore::new(3, 8.0, 20.0, available("2026-08-15T00:00:00Z"))
-            .expect("late"),
-    );
+    rows.push(score(3, 8.0, 20.0, "2026-08-15T00:00:00Z"));
     let execution = execute_longitudinal_cwc_run(
         &request,
         &accepted,
-        "snapshot-longitudinal-cwc",
+        SNAPSHOT_ID,
         cutoff(),
         &rows,
         "2026-08-02T00:00:00Z",
@@ -152,7 +168,7 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             execute_longitudinal_cwc_run(
                 &invalid_request,
                 &accepted,
-                "snapshot-longitudinal-cwc",
+                SNAPSHOT_ID,
                 cutoff(),
                 &rows,
                 "2026-08-02T00:00:00Z",
@@ -167,11 +183,33 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
     let request = request();
     let accepted = accepted(&request);
     assert_eq!(
-        LongitudinalClusterScore::new(1, f64::NAN, 1.0, available("2026-07-01T00:00:00Z")),
+        LongitudinalClusterScore::new(
+            SNAPSHOT_ID,
+            1,
+            f64::NAN,
+            1.0,
+            available("2026-07-01T00:00:00Z")
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     assert_eq!(
-        LongitudinalClusterScore::new(1, 1.0, f64::NAN, available("2026-07-01T00:00:00Z")),
+        LongitudinalClusterScore::new(
+            SNAPSHOT_ID,
+            1,
+            1.0,
+            f64::NAN,
+            available("2026-07-01T00:00:00Z")
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        LongitudinalClusterScore::new(
+            "",
+            1,
+            1.0,
+            1.0,
+            available("2026-07-01T00:00:00Z")
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 
@@ -182,7 +220,7 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
         execute_longitudinal_cwc_run(
             &early_request,
             &accepted,
-            "snapshot-longitudinal-cwc",
+            SNAPSHOT_ID,
             too_early,
             &noiseless_rows(),
             "2026-08-02T00:00:00Z",
@@ -193,16 +231,16 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
     );
 
     let late_cluster_two = vec![
-        LongitudinalClusterScore::new(1, 0.0, 2.0, available("2026-07-01T00:00:00Z")).expect("r1"),
-        LongitudinalClusterScore::new(1, 2.0, 3.0, available("2026-07-01T00:00:00Z")).expect("r2"),
-        LongitudinalClusterScore::new(2, 4.0, 10.0, available("2026-08-15T00:00:00Z")).expect("r3"),
-        LongitudinalClusterScore::new(2, 6.0, 11.0, available("2026-08-15T00:00:00Z")).expect("r4"),
+        score(1, 0.0, 2.0, "2026-07-01T00:00:00Z"),
+        score(1, 2.0, 3.0, "2026-07-01T00:00:00Z"),
+        score(2, 4.0, 10.0, "2026-08-15T00:00:00Z"),
+        score(2, 6.0, 11.0, "2026-08-15T00:00:00Z"),
     ];
     assert_eq!(
         execute_longitudinal_cwc_run(
             &request,
             &accepted,
-            "snapshot-longitudinal-cwc",
+            SNAPSHOT_ID,
             cutoff(),
             &late_cluster_two,
             "2026-08-02T00:00:00Z",
@@ -218,7 +256,7 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
         execute_longitudinal_cwc_run(
             &request,
             &wrong_receipt,
-            "snapshot-longitudinal-cwc",
+            SNAPSHOT_ID,
             cutoff(),
             &noiseless_rows(),
             "2026-08-02T00:00:00Z",
@@ -227,17 +265,12 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
         AnalysisEngineError::Api(tepp_api::ApiError::InvalidWirePayload)
     );
 
-    let oversized =
-        vec![
-            LongitudinalClusterScore::new(1, 0.0, 1.0, available("2026-07-01T00:00:00Z"))
-                .expect("row");
-            MAX_EVIDENCE_UNITS + 1
-        ];
+    let oversized = vec![score(1, 0.0, 1.0, "2026-07-01T00:00:00Z"); MAX_EVIDENCE_UNITS + 1];
     assert_eq!(
         execute_longitudinal_cwc_run(
             &request,
             &accepted,
-            "snapshot-longitudinal-cwc",
+            SNAPSHOT_ID,
             cutoff(),
             &oversized,
             "2026-08-02T00:00:00Z",
@@ -254,7 +287,7 @@ fn execution_refuses_invalid_completion_time() {
         execute_longitudinal_cwc_run(
             &request,
             &accepted,
-            "snapshot-longitudinal-cwc",
+            SNAPSHOT_ID,
             cutoff(),
             &noiseless_rows(),
             "invalid",
