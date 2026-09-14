@@ -67,6 +67,17 @@ struct RecoverySummary {
     mean_between_variance: f64,
 }
 
+struct MetricSeries<'a> {
+    truth: &'a [f64],
+    recovered: &'a [f64],
+    lower: &'a [f64],
+    upper: &'a [f64],
+    coverage_samples: &'a [f64],
+    total_variances: &'a [f64],
+    within_variances: &'a [f64],
+    between_variances: &'a [f64],
+}
+
 struct SplitMix64 {
     state: u64,
 }
@@ -145,13 +156,15 @@ fn make_rows(
     let mut row_draws = vec![Vec::with_capacity(draws); observations];
 
     for _ in 0..draws {
-        for row_index in 0..observations {
+        for (row_index, (draws_for_row, base_outcome)) in
+            row_draws.iter_mut().zip(&base_outcomes).enumerate()
+        {
             let draw_noise = if row_index.is_multiple_of(4) {
                 draw_noise_sd * rng.standard_normal()
             } else {
                 0.0
             };
-            row_draws[row_index].push(base_outcomes[row_index] + draw_noise);
+            draws_for_row.push(base_outcome + draw_noise);
         }
     }
 
@@ -176,39 +189,28 @@ fn make_rows(
         .collect()
 }
 
-fn summarize(
-    truth: &[f64],
-    recovered: &[f64],
-    lower: &[f64],
-    upper: &[f64],
-    coverage_samples: &[f64],
-    total_variances: &[f64],
-    within_variances: &[f64],
-    between_variances: &[f64],
-    attempted: usize,
-    failed: usize,
-) -> RecoverySummary {
-    let bias = mean_bias(truth, recovered).expect("bias");
-    let rmse = root_mean_square_error(truth, recovered).expect("rmse");
-    let bias_mcse = bias_standard_error(truth, recovered).expect("bias MCSE");
-    let rmse_mcse = rmse_standard_error(truth, recovered).expect("RMSE MCSE");
-    let coverage = interval_coverage(truth, lower, upper).expect("coverage");
-    let coverage_mcse = summarize_replications(coverage_samples, 0.0, 1.0)
+fn summarize(series: &MetricSeries<'_>, attempted: usize, failed: usize) -> RecoverySummary {
+    let bias = mean_bias(series.truth, series.recovered).expect("bias");
+    let rmse = root_mean_square_error(series.truth, series.recovered).expect("rmse");
+    let bias_mcse = bias_standard_error(series.truth, series.recovered).expect("bias MCSE");
+    let rmse_mcse = rmse_standard_error(series.truth, series.recovered).expect("RMSE MCSE");
+    let coverage = interval_coverage(series.truth, series.lower, series.upper).expect("coverage");
+    let coverage_mcse = summarize_replications(series.coverage_samples, 0.0, 1.0)
         .expect("coverage Monte Carlo summary")
         .standard_error;
-    let mean_total_variance = summarize_replications(total_variances, 0.0, 1.0)
+    let mean_total_variance = summarize_replications(series.total_variances, 0.0, 1.0)
         .expect("total variance summary")
         .mean;
-    let mean_within_variance = summarize_replications(within_variances, 0.0, 1.0)
+    let mean_within_variance = summarize_replications(series.within_variances, 0.0, 1.0)
         .expect("within variance summary")
         .mean;
-    let mean_between_variance = summarize_replications(between_variances, 0.0, 1.0)
+    let mean_between_variance = summarize_replications(series.between_variances, 0.0, 1.0)
         .expect("between variance summary")
         .mean;
 
     RecoverySummary {
         attempted,
-        recovered: recovered.len(),
+        recovered: series.recovered.len(),
         failed,
         bias,
         rmse,
@@ -258,9 +260,10 @@ fn run_scenario(scenario: &Scenario) -> RecoverySummary {
         ) {
             Ok(execution) => {
                 let estimate = execution.artifact.point_estimate_mean;
+                let interval_center = execution.artifact.mean_loading;
                 let half_width = NORMAL_975 * execution.artifact.total_variance.sqrt();
-                let interval_lower = estimate - half_width;
-                let interval_upper = estimate + half_width;
+                let interval_lower = interval_center - half_width;
+                let interval_upper = interval_center + half_width;
                 truth.push(scenario.loading);
                 recovered.push(estimate);
                 lower.push(interval_lower);
@@ -279,18 +282,17 @@ fn run_scenario(scenario: &Scenario) -> RecoverySummary {
         }
     }
 
-    summarize(
-        &truth,
-        &recovered,
-        &lower,
-        &upper,
-        &coverage_samples,
-        &total_variances,
-        &within_variances,
-        &between_variances,
-        REPLICATIONS,
-        failed,
-    )
+    let series = MetricSeries {
+        truth: &truth,
+        recovered: &recovered,
+        lower: &lower,
+        upper: &upper,
+        coverage_samples: &coverage_samples,
+        total_variances: &total_variances,
+        within_variances: &within_variances,
+        between_variances: &between_variances,
+    };
+    summarize(&series, REPLICATIONS, failed)
 }
 
 fn assert_near(actual: f64, expected: f64, tolerance: f64, label: &str, scenario: &str) {
@@ -469,76 +471,61 @@ fn scenarios() -> [Scenario; 8] {
 fn repeated_sampling_recovery_and_interval_coverage_match_checked_in_evidence() {
     for scenario in scenarios() {
         let summary = run_scenario(&scenario);
-        assert_eq!(summary.attempted, REPLICATIONS, "{} attempted", scenario.name);
-        assert_eq!(summary.recovered, REPLICATIONS, "{} recovered", scenario.name);
-        assert_eq!(summary.failed, 0, "{} failed", scenario.name);
+        let name = scenario.name;
+        assert_eq!(summary.attempted, REPLICATIONS, "{name} attempted");
+        assert_eq!(summary.recovered, REPLICATIONS, "{name} recovered");
+        assert_eq!(summary.failed, 0, "{name} failed");
         assert!(
             summary.bias.abs() <= 0.01 + 3.0 * summary.bias_mcse,
-            "{} bias exceeds predeclared Monte Carlo envelope: {summary:?}",
-            scenario.name
+            "{name} bias exceeds predeclared Monte Carlo envelope: {summary:?}"
         );
         assert!(
             summary.rmse <= 0.25 * scenario.residual_sd,
-            "{} RMSE exceeds predeclared design envelope: {summary:?}",
-            scenario.name
+            "{name} RMSE exceeds predeclared design envelope: {summary:?}"
         );
         assert!(
             (summary.coverage - 0.95).abs() <= 0.01 + 2.0 * summary.coverage_mcse,
-            "{} coverage departs from the 95% diagnostic target: {summary:?}",
-            scenario.name
+            "{name} coverage departs from the 95% diagnostic target: {summary:?}"
         );
-        assert!(summary.mean_between_variance > 0.0, "{} B must be exercised", scenario.name);
+        assert!(summary.mean_between_variance > 0.0, "{name} B must be exercised");
         assert!(
             summary.mean_total_variance > summary.mean_within_variance,
-            "{} T must include positive between-draw uncertainty",
-            scenario.name
+            "{name} T must include positive between-draw uncertainty"
         );
 
         let expected = scenario.expected;
-        assert_near(summary.bias, expected.bias, 5e-6, "bias", scenario.name);
-        assert_near(summary.rmse, expected.rmse, 5e-6, "rmse", scenario.name);
-        assert_near(
-            summary.bias_mcse,
-            expected.bias_mcse,
-            5e-6,
-            "bias_mcse",
-            scenario.name,
-        );
-        assert_near(
-            summary.rmse_mcse,
-            expected.rmse_mcse,
-            5e-6,
-            "rmse_mcse",
-            scenario.name,
-        );
-        assert_near(summary.coverage, expected.coverage, 5e-6, "coverage", scenario.name);
+        assert_near(summary.bias, expected.bias, 5e-6, "bias", name);
+        assert_near(summary.rmse, expected.rmse, 5e-6, "rmse", name);
+        assert_near(summary.bias_mcse, expected.bias_mcse, 5e-6, "bias_mcse", name);
+        assert_near(summary.rmse_mcse, expected.rmse_mcse, 5e-6, "rmse_mcse", name);
+        assert_near(summary.coverage, expected.coverage, 5e-6, "coverage", name);
         assert_near(
             summary.coverage_mcse,
             expected.coverage_mcse,
             5e-6,
             "coverage_mcse",
-            scenario.name,
+            name,
         );
         assert_near(
             summary.mean_total_variance,
             expected.mean_total_variance,
             5e-6,
             "mean_total_variance",
-            scenario.name,
+            name,
         );
         assert_near(
             summary.mean_within_variance,
             expected.mean_within_variance,
             5e-6,
             "mean_within_variance",
-            scenario.name,
+            name,
         );
         assert_near(
             summary.mean_between_variance,
             expected.mean_between_variance,
             5e-6,
             "mean_between_variance",
-            scenario.name,
+            name,
         );
     }
 }
