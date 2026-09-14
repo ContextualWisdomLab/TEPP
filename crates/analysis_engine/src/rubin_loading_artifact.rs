@@ -132,7 +132,7 @@ pub struct RubinLoadingUncertaintyArtifact {
     /// Fixed claim boundary for consumer copy.
     pub inference_status: String,
     /// Fail-closed projection policy for unbound draw-generation provenance.
-    pub projection_status: String,
+    projection_status: String,
 }
 
 fn require_artifact_byte_limit(payload_len: usize) -> Result<(), AnalysisEngineError> {
@@ -143,6 +143,12 @@ fn require_artifact_byte_limit(payload_len: usize) -> Result<(), AnalysisEngineE
 }
 
 impl RubinLoadingUncertaintyArtifact {
+    /// Return the read-only projection status bound into this artifact's digest.
+    #[must_use]
+    pub fn projection_status(&self) -> &str {
+        &self.projection_status
+    }
+
     /// Parse and fully validate a bounded artifact JSON payload.
     ///
     /// # Errors
