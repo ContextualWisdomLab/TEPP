@@ -493,6 +493,7 @@ jobs:
           python3 -m compileall -q scripts tests/quality
           python3 scripts/check_workspace_contract.py
           python3 scripts/check_docstrings.py
+          python3 scripts/check_database_naming.py
           python3 -m coverage run --branch -m unittest discover -s tests/quality -p 'test_*.py'
           python3 -m coverage report --fail-under=100 --show-missing
           rustup toolchain install 1.98.0 --profile minimal --component clippy --component rustfmt --component llvm-tools-preview
