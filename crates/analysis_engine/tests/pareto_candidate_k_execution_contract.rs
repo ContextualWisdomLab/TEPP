@@ -95,16 +95,16 @@ fn pareto_front_selects_smaller_k_and_reports_source_evidence_count() {
     let request = request();
     let execution = execute(&request, &statistical_front()).expect("execution");
     assert_eq!(
-        execution.artifact.schema_version,
+        execution.artifact.schema_version(),
         PARETO_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION
     );
-    assert_eq!(execution.artifact.selected_k, 2);
-    assert_eq!(execution.artifact.candidate_count, 3);
-    assert_eq!(execution.artifact.statistical_count, 2);
-    assert_eq!(execution.artifact.truth_k, 2);
-    assert!((execution.artifact.selected_k_rmse - 0.0).abs() < f64::EPSILON);
+    assert_eq!(execution.artifact.selected_k(), 2);
+    assert_eq!(execution.artifact.candidate_count(), 3);
+    assert_eq!(execution.artifact.statistical_count(), 2);
+    assert_eq!(execution.artifact.truth_k(), 2);
+    assert!((execution.artifact.selected_k_rmse() - 0.0).abs() < f64::EPSILON);
     assert_eq!(
-        execution.artifact.inference_status,
+        execution.artifact.inference_status(),
         "pareto_statistical_front_not_fitted_schwarz_sampler"
     );
     assert_eq!(
@@ -113,7 +113,7 @@ fn pareto_front_selects_smaller_k_and_reports_source_evidence_count() {
     );
     let summary = execution.terminal_result.summary.as_ref().expect("summary");
     assert_eq!(summary.evidence_count, 5);
-    assert_ne!(summary.evidence_count, execution.artifact.candidate_count);
+    assert_ne!(summary.evidence_count, execution.artifact.candidate_count());
     assert_eq!(summary.validation_status, "validated");
     assert_eq!(
         execution.terminal_result.result_sha256.as_deref(),
@@ -137,8 +137,8 @@ fn higher_likelihood_wins_and_llm_only_sets_fail_closed() {
         8,
     );
     let execution = execute(&request, &higher).expect("likelihood");
-    assert_eq!(execution.artifact.selected_k, 8);
-    assert!((execution.artifact.selected_k_rmse - 0.0).abs() < f64::EPSILON);
+    assert_eq!(execution.artifact.selected_k(), 8);
+    assert!((execution.artifact.selected_k_rmse() - 0.0).abs() < f64::EPSILON);
 
     let llm_only = input(
         vec![ModelCandidate::llm_vote_only(3).expect("llm")],
@@ -169,8 +169,8 @@ fn mismatched_replications_record_positive_rmse() {
         2,
     );
     let execution = execute(&request, &mismatched).expect("rmse");
-    assert_eq!(execution.artifact.selected_k, 2);
-    assert!((execution.artifact.selected_k_rmse - 2.0).abs() < f64::EPSILON);
+    assert_eq!(execution.artifact.selected_k(), 2);
+    assert!((execution.artifact.selected_k_rmse() - 2.0).abs() < f64::EPSILON);
 }
 
 #[test]
