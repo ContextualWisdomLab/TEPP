@@ -1648,6 +1648,158 @@ pub fn refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean(
     Err(PsychometricError::ObservedScaledManifestMeanIsNotStandardisedManifestMean)
 }
 
+/// Exact scalar p. 16 `LAMBDAstd` after strictly positive
+/// `asymDIFFUSION` and strictly positive `MANIFESTVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; Eq. 5, p. 5;
+/// p. 16; footnote 4; 2017-era ctsem `summary.ctsemFit.R`; JSS PDF
+/// re-opened 2026-08-30T16:45Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `LAMBDA` the `n.manifest × n.latent` loading matrix
+/// relating latent to manifest variables. Equation 5 writes
+/// `y_i(t) = Γ + Λ η_i(t) + ζ_i(t)` with `ζ ~ N(0, Θ)`. Page 16
+/// prints standardised matrices with the suffix `std` when
+/// appropriate. The printed example on p. 16 is
+/// `discreteDRIFTstd`, not `LAMBDAstd`. Footnote 4:
+/// standardisations use only the relevant variance, not the total.
+/// The 2017-era `summary.ctsemFit.R` forms unstandardised
+/// `LAMBDA` as `OpenMx::mxEval(LAMBDA, mxobj, compute=TRUE)` and
+/// does not form a `LAMBDAstd` matrix. That source's effect
+/// standardiser is "std dev of affecting divided by std dev of
+/// affected" (`discreteDRIFTstd`, `asymTIPREDEFFECTstd`,
+/// `T0TIPREDEFFECTstd`). For `LAMBDA` the affecting process is
+/// the latent (`asymDIFFUSION` `p = −q / (2 a)`); the affected
+/// process is residual `MANIFESTVAR` `θ`, not total observed
+/// `Var(y) = λ² p + θ`. The scalar map is `λ · √p / √θ`. Form
+/// strictly positive `p` first, then strictly positive `θ`, then
+/// the SD ratio `√p / √θ`, then multiply by `λ`. A zero loading
+/// is exactly zero after those positive SDs. Unstandardised `λ`
+/// is defined for growing `a ≥ 0` and for a zero residual;
+/// standardised `LAMBDA` is not. Zero `q` has no positive process
+/// SD and fails closed. Zero `θ` has no positive measurement SD
+/// and fails closed. Lasting `asymDIFFUSION` requires stable
+/// `a < 0`. A non-event clock fails closed. `τ / √θ` is
+/// `MANIFESTMEANSstd` and is not this loading. `λ √p / √(λ² p + θ)`
+/// uses total observed variance and is not this residual map.
+/// `λ √(trait + p + added) / √θ` uses `TRAITVAR` and is not this
+/// map. `TRAITVAR` is not the standardisation variance. This is
+/// not a Kalman filter, not a matrix `expm`, not DSEM, and not
+/// ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StationaryVarianceRequiresStableDrift`]
+/// when `a ≥ 0`,
+/// [`PsychometricError::StandardisedLoadingRequiresPositiveStationaryVariance`]
+/// when `asymDIFFUSION` is zero,
+/// [`PsychometricError::StandardisedLoadingRequiresPositiveManifestVariance`]
+/// when `MANIFESTVAR` is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when the loading,
+/// diffusion, or residual is non-finite, the residual is negative,
+/// or the mapped product overflows. Negative loadings remain
+/// valid signed slopes.
+pub fn recover_standardised_loading(
+    loading: f64,
+    continuous_diffusion: f64,
+    log_rate: f64,
+    measurement_error: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let stationary = recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?;
+    if stationary == 0.0 {
+        return Err(PsychometricError::StandardisedLoadingRequiresPositiveStationaryVariance);
+    }
+    if !measurement_error.is_finite() || measurement_error < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if measurement_error == 0.0 {
+        return Err(PsychometricError::StandardisedLoadingRequiresPositiveManifestVariance);
+    }
+    let loading = require_finite(loading)?;
+    if loading == 0.0 {
+        return Ok(0.0);
+    }
+    let latent_sd = stationary.sqrt();
+    let manifest_sd = measurement_error.sqrt();
+    let sd_ratio = require_finite(latent_sd / manifest_sd)?;
+    require_finite(loading * sd_ratio)
+}
+
+/// Refuse treating unstandardised `LAMBDA` as p. 16 `LAMBDAstd`.
+///
+/// Free `λ` is defined for a zero process and for a zero residual.
+/// Footnote 4 `LAMBDAstd` requires strictly positive `asymDIFFUSION`
+/// and strictly positive `MANIFESTVAR`. Equal numbers when `p = θ`
+/// are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedLoadingIsNotStandardisedLoading`].
+pub fn refuse_unstandardised_loading_as_standardised_loading(
+    unstandardised_loading: f64,
+    standardised_loading: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_loading, standardised_loading);
+    Err(PsychometricError::UnstandardisedLoadingIsNotStandardisedLoading)
+}
+
+/// Refuse treating p. 16 `MANIFESTMEANSstd` as p. 16 `LAMBDAstd`.
+///
+/// Both scalar maps equal `τ / √θ` when `λ √p = τ`.
+/// `MANIFESTMEANSstd` is the measurement intercept. `LAMBDAstd` is
+/// the loading. Equal numbers remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedManifestMeanIsNotStandardisedLoading`].
+pub fn refuse_standardised_manifest_mean_as_standardised_loading(
+    standardised_manifest_mean: f64,
+    standardised_loading: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_manifest_mean, standardised_loading);
+    Err(PsychometricError::StandardisedManifestMeanIsNotStandardisedLoading)
+}
+
+/// Refuse treating `λ √p / √(λ² p + θ)` as p. 16 `LAMBDAstd`.
+///
+/// Footnote 4 loading standardisation uses residual `MANIFESTVAR`,
+/// not total observed `Var(y)`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ObservedScaledLoadingIsNotStandardisedLoading`].
+pub fn refuse_observed_scaled_loading_as_standardised_loading(
+    observed_scaled_loading: f64,
+    standardised_loading: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (observed_scaled_loading, standardised_loading);
+    Err(PsychometricError::ObservedScaledLoadingIsNotStandardisedLoading)
+}
+
+/// Refuse treating `λ √(trait + p + added) / √θ` as p. 16
+/// `LAMBDAstd`.
+///
+/// Footnote 4 measurement of the loading uses `asymDIFFUSION` for
+/// the affecting latent, not total variance. `TRAITVAR` is not the
+/// standardisation variance.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TraitScaledLoadingIsNotStandardisedLoading`].
+pub fn refuse_trait_scaled_loading_as_standardised_loading(
+    trait_scaled_loading: f64,
+    standardised_loading: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (trait_scaled_loading, standardised_loading);
+    Err(PsychometricError::TraitScaledLoadingIsNotStandardisedLoading)
+}
+
 /// Exact scalar p. 16 `T0MEANSstd` after strictly positive free
 /// `T0VAR`.
 ///
@@ -6890,15 +7042,15 @@ mod tests {
         recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
         recover_standardised_discrete_continuous_intercept,
         recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
-        recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
-        recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-        recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-        recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-        recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-        recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-        recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-        recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-        recover_within_residual_event_time_log_rate,
+        recover_standardised_loading, recover_standardised_manifest_mean,
+        recover_standardised_manifest_trait_variance, recover_standardised_trait_variance,
+        recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+        recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+        recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+        recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+        recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+        recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+        recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
         refuse_after_extra_process_contribution_as_observed_mean,
         refuse_after_extra_process_latent_mean_as_observed_mean,
         refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -6976,6 +7128,7 @@ mod tests {
         refuse_measurement_error_as_standardised_manifest_trait_variance,
         refuse_measurement_error_as_stationary_lagged_observed_covariance,
         refuse_measurement_error_as_stationary_later_observed_variance,
+        refuse_observed_scaled_loading_as_standardised_loading,
         refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
         refuse_pooled_discrete_lag_across_unequal_intervals,
         refuse_process_noise_as_unconditional_variance,
@@ -6987,6 +7140,7 @@ mod tests {
         refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion,
         refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
         refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
+        refuse_standardised_manifest_mean_as_standardised_loading,
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
         refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
         refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
@@ -7028,6 +7182,7 @@ mod tests {
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
         refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
+        refuse_trait_scaled_loading_as_standardised_loading,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
         refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
@@ -7036,6 +7191,7 @@ mod tests {
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
+        refuse_unstandardised_loading_as_standardised_loading,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
@@ -15697,6 +15853,133 @@ mod tests {
         assert_eq!(
             recover_standardised_manifest_mean(f64::MAX, 1e-4, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput),
+        );
+    }
+
+    #[test]
+    fn standardised_loading_recovers_driver_page_sixteen_after_positive_p_and_theta() {
+        // Driver et al. (2017, p. 16 LAMBDAstd; Table 2; Eq. 5; footnote 4;
+        // 2017-era summary.ctsemFit.R LAMBDA): form strictly positive
+        // asymDIFFUSION p = −q/(2a) and strictly positive MANIFESTVAR θ,
+        // then λ · √p / √θ. Relevant variances are p and θ, not
+        // λ² p + θ.
+        let loading = 1.2_f64;
+        let diffusion = 0.8_f64;
+        let log_rate = -0.5_f64;
+        let measurement_error = 1.6_f64;
+        let recovered = recover_standardised_loading(
+            loading,
+            diffusion,
+            log_rate,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("LAMBDAstd");
+        let stationary =
+            recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+                .expect("p");
+        let expected = loading * (stationary.sqrt() / measurement_error.sqrt());
+        assert!((recovered - expected).abs() < 1e-15);
+        let larger_q = recover_standardised_loading(
+            loading,
+            3.2,
+            log_rate,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("LAMBDAstd q=3.2");
+        assert!((larger_q - recovered).abs() > 1e-3);
+        assert!(larger_q.abs() > recovered.abs());
+        let larger_theta =
+            recover_standardised_loading(loading, diffusion, log_rate, 6.4, LagClock::EventTime)
+                .expect("LAMBDAstd θ=6.4");
+        assert!((larger_theta - recovered).abs() > 1e-3);
+        assert!(larger_theta.abs() < recovered.abs());
+        let matching_mean = recover_standardised_manifest_mean(
+            loading * stationary.sqrt(),
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("MANIFESTMEANSstd matching numbers");
+        assert!((matching_mean - recovered).abs() < 1e-15);
+        let observed = loading * loading * stationary + measurement_error;
+        let observed_scaled = loading * stationary.sqrt() / observed.sqrt();
+        assert!((observed_scaled - recovered).abs() > 1e-3);
+        let trait_scaled = loading * (0.5 + stationary).sqrt() / measurement_error.sqrt();
+        assert!((trait_scaled - recovered).abs() > 1e-3);
+        let zero = recover_standardised_loading(
+            0.0,
+            diffusion,
+            log_rate,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("zero LAMBDA");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative = recover_standardised_loading(
+            -loading,
+            diffusion,
+            log_rate,
+            measurement_error,
+            LagClock::EventTime,
+        )
+        .expect("negative signed LAMBDAstd");
+        assert!((negative + expected).abs() < 1e-15);
+        assert_eq!(
+            refuse_unstandardised_loading_as_standardised_loading(loading, recovered),
+            Err(PsychometricError::UnstandardisedLoadingIsNotStandardisedLoading)
+        );
+        assert_eq!(
+            refuse_standardised_manifest_mean_as_standardised_loading(matching_mean, recovered),
+            Err(PsychometricError::StandardisedManifestMeanIsNotStandardisedLoading)
+        );
+        assert_eq!(
+            refuse_observed_scaled_loading_as_standardised_loading(observed_scaled, recovered),
+            Err(PsychometricError::ObservedScaledLoadingIsNotStandardisedLoading)
+        );
+        assert_eq!(
+            refuse_trait_scaled_loading_as_standardised_loading(trait_scaled, recovered),
+            Err(PsychometricError::TraitScaledLoadingIsNotStandardisedLoading)
+        );
+    }
+
+    #[test]
+    fn standardised_loading_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_loading(1.2, 0.0, -0.5, 1.6, LagClock::EventTime),
+            Err(PsychometricError::StandardisedLoadingRequiresPositiveStationaryVariance)
+        );
+        assert_eq!(
+            recover_standardised_loading(1.2, 0.8, 0.5, 1.6, LagClock::EventTime),
+            Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_standardised_loading(1.2, 0.8, -0.5, 0.0, LagClock::EventTime),
+            Err(PsychometricError::StandardisedLoadingRequiresPositiveManifestVariance)
+        );
+        assert_eq!(
+            recover_standardised_loading(1.2, 0.8, -0.5, 1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_loading(1.2, -0.8, -0.5, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_loading(1.2, 0.8, -0.5, -1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_loading(f64::NAN, 0.8, -0.5, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_loading(1.2, 0.8, -0.5, f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_loading(f64::MAX, 0.5, -1.0, 1e-4, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
         );
     }
 

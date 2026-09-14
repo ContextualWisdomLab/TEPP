@@ -32,16 +32,16 @@ use psychometric_core::{
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
-    recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_initial_latent_variance, recover_standardised_loading,
+    recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
+    recover_standardised_manifest_variance, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -116,6 +116,7 @@ use psychometric_core::{
     refuse_measurement_error_as_standardised_manifest_trait_variance,
     refuse_measurement_error_as_stationary_lagged_observed_covariance,
     refuse_measurement_error_as_stationary_later_observed_variance,
+    refuse_observed_scaled_loading_as_standardised_loading,
     refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean,
     refuse_observed_variance_as_standardised_manifest_variance,
     refuse_process_noise_as_unconditional_variance,
@@ -127,6 +128,7 @@ use psychometric_core::{
     refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion,
     refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
     refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
+    refuse_standardised_manifest_mean_as_standardised_loading,
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
     refuse_standardised_manifest_variance_as_standardised_manifest_mean,
     refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
@@ -169,13 +171,15 @@ use psychometric_core::{
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
-    refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
+    refuse_trait_scaled_loading_as_standardised_loading, refuse_trait_variance_as_process_noise,
+    refuse_trait_variance_as_stationary_within_subject,
     refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
     refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
     refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
     refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
     refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
+    refuse_unstandardised_loading_as_standardised_loading,
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
@@ -3164,6 +3168,91 @@ fn standardised_manifest_mean_is_not_unstandardised_or_total_observed_scale() {
     );
     assert_eq!(
         recover_standardised_manifest_mean(mean, measurement_error, LagClock::DocumentTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn standardised_loading_is_not_unstandardised_or_total_observed_scale() {
+    let loading = 1.2_f64;
+    let diffusion = 0.8_f64;
+    let log_rate = -0.5_f64;
+    let measurement_error = 1.6_f64;
+    let recovered = recover_standardised_loading(
+        loading,
+        diffusion,
+        log_rate,
+        measurement_error,
+        LagClock::EventTime,
+    )
+    .expect("LAMBDAstd");
+    let stationary =
+        recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime).expect("p");
+    assert!(
+        (recovered - loading * (stationary.sqrt() / measurement_error.sqrt())).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 footnote 4): LAMBDAstd is λ · √p / √θ"
+    );
+    assert!(
+        (recovered - loading).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): unstandardised LAMBDA is not LAMBDAstd"
+    );
+    let matching_mean = recover_standardised_manifest_mean(
+        loading * stationary.sqrt(),
+        measurement_error,
+        LagClock::EventTime,
+    )
+    .expect("MANIFESTMEANSstd matching numbers");
+    assert!(
+        (matching_mean - recovered).abs() < 1e-15,
+        "Driver et al. (2017, p. 16): equal numbers when λ √p = τ remain distinct named quantities"
+    );
+    let observed = loading * loading * stationary + measurement_error;
+    let observed_scaled = loading * stationary.sqrt() / observed.sqrt();
+    assert!(
+        (observed_scaled - recovered).abs() > 1e-3,
+        "Driver et al. (2017, footnote 4): λ √p / √(λ² p + θ) is not LAMBDAstd"
+    );
+    let trait_scaled = loading * (0.5 + stationary).sqrt() / measurement_error.sqrt();
+    assert!(
+        (trait_scaled - recovered).abs() > 1e-3,
+        "Driver et al. (2017, footnote 4): λ √(trait + p + added) / √θ is not LAMBDAstd"
+    );
+    assert_eq!(
+        refuse_unstandardised_loading_as_standardised_loading(loading, recovered),
+        Err(psychometric_core::PsychometricError::UnstandardisedLoadingIsNotStandardisedLoading)
+    );
+    assert_eq!(
+        refuse_standardised_manifest_mean_as_standardised_loading(matching_mean, recovered),
+        Err(psychometric_core::PsychometricError::StandardisedManifestMeanIsNotStandardisedLoading)
+    );
+    assert_eq!(
+        refuse_observed_scaled_loading_as_standardised_loading(observed_scaled, recovered),
+        Err(psychometric_core::PsychometricError::ObservedScaledLoadingIsNotStandardisedLoading)
+    );
+    assert_eq!(
+        refuse_trait_scaled_loading_as_standardised_loading(trait_scaled, recovered),
+        Err(psychometric_core::PsychometricError::TraitScaledLoadingIsNotStandardisedLoading)
+    );
+    assert_eq!(
+        recover_standardised_loading(loading, 0.0, log_rate, measurement_error, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedLoadingRequiresPositiveStationaryVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_loading(loading, diffusion, log_rate, 0.0, LagClock::EventTime),
+        Err(
+            psychometric_core::PsychometricError::StandardisedLoadingRequiresPositiveManifestVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_loading(
+            loading,
+            diffusion,
+            log_rate,
+            measurement_error,
+            LagClock::DocumentTime
+        ),
         Err(psychometric_core::PsychometricError::EventTimeRequired)
     );
 }

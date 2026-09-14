@@ -37,16 +37,16 @@ use psychometric_core::{
     recover_standardised_asymptotic_continuous_intercept,
     recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
-    recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
-    recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_initial_latent_variance, recover_standardised_loading,
+    recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
+    recover_standardised_manifest_variance, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -5953,6 +5953,76 @@ fn standardised_manifest_mean_refuses_non_event_clocks_and_does_not_keep_zero_re
     );
     let zero =
         recover_standardised_manifest_mean(0.0, 1.6, LagClock::EventTime).expect("zero mean");
+    assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+}
+
+#[test]
+fn standardised_loading_recovers_driver_page_sixteen_after_positive_p_and_manifestvar() {
+    let loading = 1.2_f64;
+    let diffusion = 0.8_f64;
+    let log_rate = -0.5_f64;
+    let measurement_error = 1.6_f64;
+    let recovered = recover_standardised_loading(
+        loading,
+        diffusion,
+        log_rate,
+        measurement_error,
+        LagClock::EventTime,
+    )
+    .expect("LAMBDAstd");
+    let stationary =
+        recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime).expect("p");
+    let expected = loading * (stationary.sqrt() / measurement_error.sqrt());
+    let error = (recovered - expected).abs();
+    assert!(
+        error < 1e-15,
+        "Driver et al. (2017, p. 16 LAMBDAstd): RMSE {error} for λ · √p / √θ"
+    );
+    let larger_q = recover_standardised_loading(
+        loading,
+        3.2,
+        log_rate,
+        measurement_error,
+        LagClock::EventTime,
+    )
+    .expect("larger q");
+    assert!(
+        larger_q.abs() > recovered.abs(),
+        "Driver et al. (2017, footnote 4): larger process SD inflates LAMBDAstd"
+    );
+    let larger_theta =
+        recover_standardised_loading(loading, diffusion, log_rate, 6.4, LagClock::EventTime)
+            .expect("larger θ");
+    assert!(
+        larger_theta.abs() < recovered.abs(),
+        "Driver et al. (2017, footnote 4): larger residual SD shrinks LAMBDAstd"
+    );
+}
+
+#[test]
+fn standardised_loading_refuses_non_event_clocks_and_does_not_keep_zero_q_or_theta() {
+    assert_eq!(
+        recover_standardised_loading(1.2, 0.8, -0.5, 1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_loading(1.2, 0.8, -0.5, 1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_standardised_loading(1.2, 0.0, -0.5, 1.6, LagClock::EventTime),
+        Err(PsychometricError::StandardisedLoadingRequiresPositiveStationaryVariance)
+    );
+    assert_eq!(
+        recover_standardised_loading(1.2, 0.8, 0.5, 1.6, LagClock::EventTime),
+        Err(PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_standardised_loading(1.2, 0.8, -0.5, 0.0, LagClock::EventTime),
+        Err(PsychometricError::StandardisedLoadingRequiresPositiveManifestVariance)
+    );
+    let zero = recover_standardised_loading(0.0, 0.8, -0.5, 1.6, LagClock::EventTime)
+        .expect("zero LAMBDA");
     assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
 }
 
