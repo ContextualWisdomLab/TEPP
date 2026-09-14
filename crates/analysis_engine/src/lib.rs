@@ -8,13 +8,17 @@
 //! through [`tepp_api`]. It deliberately does not claim latent-variable or topic
 //! estimation authority; those estimators remain separate scientific crates.
 //! estimation authority; it invokes estimators through their scientific crate
-//! contracts and preserves their artifact meaning.
+//! contracts and preserves their artifact meaning. Interpreter/verifier
+//! composition invokes [`interpretation_gateway`] and cannot promote an
+//! interpretation to an estimator result or observed fact.
 
 mod case_deletion_refit;
+mod interpreter_verifier_artifact;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
 
+use interpretation_gateway::InterpretationError;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -41,6 +45,17 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Known-truth claim support labels used by interpreter/verifier composition.
+pub use interpretation_gateway::ClaimSupport;
+/// Opaque interpretation identity used by interpreter/verifier composition.
+pub use interpretation_gateway::InterpretationId;
+/// Interpreter/verifier artifact and execution contracts from this engine.
+pub use interpreter_verifier_artifact::{
+    INTERPRETER_VERIFIER_ARTIFACT_BYTE_LIMIT, INTERPRETER_VERIFIER_ARTIFACT_SCHEMA_VERSION,
+    INTERPRETER_VERIFIER_MODEL_CONTRACT_VERSION, INTERPRETER_VERIFIER_OUTPUT_PROFILE,
+    InterpreterVerifierArtifact, InterpreterVerifierExecution, InterpreterVerifierInput,
+    execute_interpreter_verifier_run,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
@@ -248,6 +263,10 @@ pub enum AnalysisEngineError {
     TopicMeasurement(TopicMeasurementError),
     /// A topic-lineage artifact violated its bounded schema or count invariants.
     InvalidTopicLineageArtifact,
+    /// An interpretation-gateway gate rejected the offered proposal or labels.
+    Interpretation(InterpretationError),
+    /// An interpreter/verifier artifact violated its bounded schema or rates.
+    InvalidInterpreterVerifierArtifact,
 }
 
 impl fmt::Display for AnalysisEngineError {
@@ -262,6 +281,8 @@ impl fmt::Display for AnalysisEngineError {
             Self::LimitExceeded => "analysis corpus exceeded its execution bound",
             Self::TopicMeasurement(error) => return error.fmt(formatter),
             Self::InvalidTopicLineageArtifact => "invalid topic lineage artifact",
+            Self::Interpretation(error) => return error.fmt(formatter),
+            Self::InvalidInterpreterVerifierArtifact => "invalid interpreter verifier artifact",
         };
         formatter.write_str(message)
     }
@@ -278,6 +299,12 @@ impl From<ApiError> for AnalysisEngineError {
 impl From<TopicMeasurementError> for AnalysisEngineError {
     fn from(error: TopicMeasurementError) -> Self {
         Self::TopicMeasurement(error)
+    }
+}
+
+impl From<InterpretationError> for AnalysisEngineError {
+    fn from(error: InterpretationError) -> Self {
+        Self::Interpretation(error)
     }
 }
 
@@ -415,6 +442,7 @@ mod tests {
         AnalysisEngineError, AnalysisEvidenceUnit, MAX_ANALYSIS_IDENTIFIER_BYTES,
         MAX_EVIDENCE_UNITS, TopicMeasurementError, add_membership_count, execute_analysis_run,
     };
+    use interpretation_gateway::InterpretationError;
     use temporal_core::{AvailableTime, EventTime};
     use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 
@@ -681,6 +709,14 @@ mod tests {
                 AnalysisEngineError::InvalidTopicLineageArtifact,
                 "invalid topic lineage artifact",
             ),
+            (
+                AnalysisEngineError::InvalidInterpreterVerifierArtifact,
+                "invalid interpreter verifier artifact",
+            ),
+            (
+                AnalysisEngineError::Interpretation(InterpretationError::MissingEvidenceSpan),
+                "interpretation is missing an evidence span",
+            ),
         ];
         for (error, message) in messages {
             assert_eq!(error.to_string(), message);
@@ -689,6 +725,12 @@ mod tests {
         assert_eq!(converted.to_string(), "invalid API wire payload");
         let from_topic: AnalysisEngineError = TopicMeasurementError::DidNotConverge.into();
         assert_eq!(from_topic.to_string(), "topic estimator did not converge");
+        let from_interpretation: AnalysisEngineError =
+            InterpretationError::MissingEvidenceSpan.into();
+        assert_eq!(
+            from_interpretation.to_string(),
+            "interpretation is missing an evidence span"
+        );
         assert_eq!(
             add_membership_count(u64::MAX, 1),
             Err(AnalysisEngineError::ArithmeticOverflow)
