@@ -50,18 +50,24 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
     .expect("accepted")
 }
 
-fn execute(
+fn execute_with_observations(
     request: &AnalysisRunRequest,
+    observations: &[LineageCriterionObservation],
 ) -> Result<analysis_engine::LineageCriterionExecution, AnalysisEngineError> {
-    let observations = observations();
     execute_lineage_criterion_run(
         request,
         &accepted(request),
         "snapshot-lineage-criterion",
         cutoff(),
-        &LineageCriterionInput::new(&observations, 32),
+        &LineageCriterionInput::new(observations, 32),
         "2026-08-02T00:00:00Z",
     )
+}
+
+fn execute(
+    request: &AnalysisRunRequest,
+) -> Result<analysis_engine::LineageCriterionExecution, AnalysisEngineError> {
+    execute_with_observations(request, &observations())
 }
 
 #[test]
@@ -89,6 +95,35 @@ fn identified_pairs_emit_digest_bound_counts_without_inferring_dates() {
     assert_eq!(
         execution.terminal_result.result_schema_version.as_deref(),
         Some(LINEAGE_CRITERION_ARTIFACT_SCHEMA_VERSION)
+    );
+}
+
+#[test]
+fn equivalent_cutoff_spellings_bind_the_same_instant() {
+    let canonical_request = request();
+    let baseline = execute(&canonical_request).expect("canonical cutoff");
+    let mut offset_request = canonical_request;
+    offset_request.knowledge_cutoff = "2026-08-01T01:00:00+01:00".into();
+    let equivalent = execute(&offset_request).expect("equivalent instant");
+    assert_eq!(equivalent.artifact, baseline.artifact);
+    assert_eq!(equivalent.terminal_result.summary, baseline.terminal_result.summary);
+}
+
+#[test]
+fn malformed_event_time_draws_fail_closed() {
+    let request = request();
+    let mut invalid_predecessor = observations();
+    invalid_predecessor[0].predecessor_event_time_draws[0] = "not-an-event-time".into();
+    assert_eq!(
+        execute_with_observations(&request, &invalid_predecessor),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut invalid_successor = observations();
+    invalid_successor[0].successor_event_time_draws[0] = "also-not-an-event-time".into();
+    assert_eq!(
+        execute_with_observations(&request, &invalid_successor),
+        Err(AnalysisEngineError::InvalidEvidence)
     );
 }
 
