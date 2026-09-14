@@ -14,6 +14,8 @@ const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const SNAPSHOT_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const DRAW_PAYLOAD_DIGEST: &str =
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
 fn canonical_receipt_json() -> String {
     RubinProjectionActivationReceiptV1::new(
@@ -26,6 +28,7 @@ fn canonical_receipt_json() -> String {
         ),
         "snapshot-rubin-activation",
         SNAPSHOT_DIGEST,
+        DRAW_PAYLOAD_DIGEST,
         KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
         "rubin-gaussian-single-level-candidate-v1",
     )
