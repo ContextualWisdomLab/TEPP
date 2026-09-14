@@ -1,5 +1,8 @@
 //! GAP-003A naruon export-retrieval CLI.
 
+use std::io::{Read as _, Write as _};
+use std::net::TcpListener;
+
 use tepp_api::{
     AnalysisRunLiveService, AnalyticalPurpose, ApiError, EXPORT_RETRIEVAL_ID_MAX_LEN,
     ExportAuthorizationRequest, ExportRetrieval, ExportRetrievalCliInvocation,
@@ -368,4 +371,185 @@ fn execute_over_tcp_and_stdin_reader() {
     assert!(empty.is_empty());
     let piped = read_export_retrieval_cli_stdin(false, std::io::Cursor::new(b"")).expect("pipe");
     assert!(piped.is_empty());
+}
+
+/// Bind an ephemeral loopback listener, hand back one raw HTTP/1.1 response on
+/// the first accepted connection, then close it so the client's read-to-end
+/// observes EOF. Returns the bound `host:port`.
+fn respond_once(response: String) -> String {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let addr = listener.local_addr().expect("addr").to_string();
+    std::thread::spawn(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            // Drain the client's request before writing so the OS sends a
+            // clean FIN (not RST) when this thread drops the stream.
+            let mut sink = [0_u8; 4096];
+            let _ = stream.read(&mut sink);
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+        }
+    });
+    addr
+}
+
+#[test]
+fn parse_flags_refuses_bare_tokens_and_duplicate_or_missing_values() {
+    assert_eq!(
+        ExportRetrievalCliInvocation::from_args(["get", "not-a-flag"], "").unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
+    assert_eq!(
+        ExportRetrievalCliInvocation::from_args(["get", "--host"], "").unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
+    assert_eq!(
+        ExportRetrievalCliInvocation::from_args(
+            ["get", "--host", "127.0.0.1:1", "--host", "127.0.0.1:2"],
+            "",
+        )
+        .unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
+}
+
+#[test]
+fn loopback_http1_filters_host_and_content_length_headers() {
+    let exchange = NaruonHttpExchange {
+        method: "GET",
+        target_url: format!("{ORIGIN}{NARUON_EXPORT_PATH}/export-1"),
+        headers: vec![
+            ("Host".into(), "attacker.example".into()),
+            ("Content-Length".into(), "999".into()),
+            ("tepp-consumer".into(), NARUON_CONSUMER_CODE.into()),
+        ],
+        body: String::new(),
+    };
+    let request =
+        loopback_http1_from_export_retrieval_exchange(&exchange, "127.0.0.1:18081").expect("ok");
+    assert_eq!(request.matches("Host:").count(), 1);
+    assert_eq!(
+        request
+            .to_ascii_lowercase()
+            .matches("content-length:")
+            .count(),
+        1
+    );
+    assert!(!request.contains("999"));
+    assert!(!request.contains("attacker.example"));
+    assert!(request.contains("tepp-consumer"));
+}
+
+#[test]
+fn render_refuses_non_200_success_status() {
+    let invocation = ExportRetrievalCliInvocation::from_args(
+        get_args("127.0.0.1:18081", "export-1", NARUON_CONSUMER_CODE),
+        "",
+    )
+    .expect("invocation");
+    assert_eq!(
+        render_export_retrieval_cli_stdout(
+            &invocation,
+            &NaruonLiveResponse {
+                status_code: 202,
+                reason_phrase: "Accepted",
+                body: r#"{"contract_version":1}"#.into(),
+            }
+        )
+        .unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
+}
+
+#[test]
+fn execute_over_tcp_rejects_non_http11_status_line() {
+    let addr = respond_once("HTTP/1.0 200 OK\r\ncontent-length: 2\r\n\r\n{}".to_owned());
+    let invocation = ExportRetrievalCliInvocation::from_args(
+        get_args(addr.as_str(), "export-1", NARUON_CONSUMER_CODE),
+        "",
+    )
+    .expect("invocation");
+    assert_eq!(
+        execute_export_retrieval_cli(&invocation).unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
+}
+
+#[test]
+fn execute_over_tcp_maps_every_published_reason_phrase() {
+    for (code, body) in [
+        (202u16, "{}"),
+        (400, r#"{"error":"invalid_wire_payload"}"#),
+        (403, r#"{"error":"authorization_denied"}"#),
+        (413, r#"{"error":"limit_exceeded"}"#),
+        (422, r#"{"error":"invalid_wire_payload"}"#),
+    ] {
+        let reason = match code {
+            202 => "Accepted",
+            400 => "Bad Request",
+            403 => "Forbidden",
+            413 => "Payload Too Large",
+            422 => "Unprocessable Entity",
+            _ => unreachable!("test only iterates published codes"),
+        };
+        let response = format!(
+            "HTTP/1.1 {code} {reason}\r\ncontent-length: {}\r\n\r\n{body}",
+            body.len()
+        );
+        let addr = respond_once(response);
+        let invocation = ExportRetrievalCliInvocation::from_args(
+            get_args(addr.as_str(), "export-1", NARUON_CONSUMER_CODE),
+            "",
+        )
+        .expect("invocation");
+        let got = execute_export_retrieval_cli(&invocation).expect("response");
+        assert_eq!(got.status_code, code);
+        assert_eq!(got.reason_phrase, reason);
+        assert_eq!(got.body, body);
+    }
+}
+
+#[test]
+fn execute_over_tcp_rejects_unpublished_status_code() {
+    let addr = respond_once(
+        "HTTP/1.1 500 Internal Server Error\r\ncontent-length: 2\r\n\r\n{}".to_owned(),
+    );
+    let invocation = ExportRetrievalCliInvocation::from_args(
+        get_args(addr.as_str(), "export-1", NARUON_CONSUMER_CODE),
+        "",
+    )
+    .expect("invocation");
+    assert_eq!(
+        execute_export_retrieval_cli(&invocation).unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
+}
+
+#[test]
+fn execute_over_tcp_rejects_duplicate_content_length_header() {
+    let addr = respond_once(
+        "HTTP/1.1 200 OK\r\ncontent-length: 2\r\ncontent-length: 2\r\n\r\n{}".to_owned(),
+    );
+    let invocation = ExportRetrievalCliInvocation::from_args(
+        get_args(addr.as_str(), "export-1", NARUON_CONSUMER_CODE),
+        "",
+    )
+    .expect("invocation");
+    assert_eq!(
+        execute_export_retrieval_cli(&invocation).unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
+}
+
+#[test]
+fn execute_over_tcp_rejects_content_length_body_mismatch() {
+    let addr = respond_once("HTTP/1.1 200 OK\r\ncontent-length: 5\r\n\r\n{}".to_owned());
+    let invocation = ExportRetrievalCliInvocation::from_args(
+        get_args(addr.as_str(), "export-1", NARUON_CONSUMER_CODE),
+        "",
+    )
+    .expect("invocation");
+    assert_eq!(
+        execute_export_retrieval_cli(&invocation).unwrap_err(),
+        ApiError::InvalidWirePayload
+    );
 }
