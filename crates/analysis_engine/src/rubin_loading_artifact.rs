@@ -30,8 +30,11 @@ const RUBIN_LOADING_INFERENCE_STATUS: &str = "rubin_combined_ols_loadings_not_mi
 const RUBIN_LOADING_PROJECTION_STATUS: &str =
     "descriptive_only_unbound_draw_generation_provenance";
 const RUBIN_LOADING_STATISTIC_COUNT: u64 = 5;
+// The Draft wire member is still named `complete_data_draws_sha256`, but the
+// commitment must cover every cutoff-admitted numeric input consumed by the
+// loading estimators. Issue #522 owns the pre-release semantic field rename.
 const RUBIN_COMPLETE_DATA_DRAWS_DIGEST_DOMAIN: &[u8] =
-    b"tepp.rubin_loading.complete_data_draws.v1\0";
+    b"tepp.rubin_loading.analysis_payload.v1\0";
 
 /// One already-mapped factor score with complete-data indicator draws.
 #[derive(Clone, Debug, PartialEq)]
@@ -121,7 +124,10 @@ pub struct RubinLoadingUncertaintyArtifact {
     pub excluded_after_cutoff_count: u64,
     /// Admitted indicator-kind wire name.
     pub indicator_kind: String,
-    /// Canonical SHA-256 of the admitted complete-data draw matrix.
+    /// Canonical SHA-256 of the admitted factor-score/design and draw payload.
+    ///
+    /// The Draft v1 wire member retains its earlier draw-only name until the
+    /// owner-visible pre-release rename tracked by issue #522 is folded.
     complete_data_draws_sha256: String,
     /// Robust arithmetic mean of per-draw OLS loadings. Not Rubin `T`.
     pub point_estimate_mean: f64,
@@ -147,7 +153,11 @@ fn require_artifact_byte_limit(payload_len: usize) -> Result<(), AnalysisEngineE
 }
 
 impl RubinLoadingUncertaintyArtifact {
-    /// Return the canonical SHA-256 of the exact admitted complete-data draw matrix.
+    /// Return the canonical SHA-256 of the exact admitted numeric estimator payload.
+    ///
+    /// The Draft v1 accessor keeps the earlier name while issue #522 owns the
+    /// pre-release semantic rename. The digest now commits both admitted factor
+    /// scores and the complete-data draw matrix.
     #[must_use]
     pub fn complete_data_draws_sha256(&self) -> &str {
         &self.complete_data_draws_sha256
@@ -272,6 +282,12 @@ impl EligibleRubinRows {
         hasher.update(RUBIN_COMPLETE_DATA_DRAWS_DIGEST_DOMAIN);
         hasher.update(observation_count.to_be_bytes());
         hasher.update(draw_count.to_be_bytes());
+        for factor_score in &self.factor_scores {
+            if !factor_score.is_finite() {
+                return Err(AnalysisEngineError::InvalidEvidence);
+            }
+            hasher.update(factor_score.to_bits().to_be_bytes());
+        }
         for draw in &self.indicator_draws {
             if draw.len() != self.factor_scores.len() || draw.iter().any(|value| !value.is_finite()) {
                 return Err(AnalysisEngineError::InvalidEvidence);
