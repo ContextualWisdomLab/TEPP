@@ -117,6 +117,17 @@ pub fn validate_migration_catalog(
         validate_table_body(&folded, body)?;
     }
 
+    for object in parse_created_object_names(catalog.up_sql()) {
+        if !is_multi_word_snake_case(&object) {
+            return Err(MigrationContractError::SingleWordObjectName);
+        }
+    }
+    for constraint in parse_constraint_names(catalog.up_sql()) {
+        if !is_multi_word_snake_case(&constraint) {
+            return Err(MigrationContractError::SingleWordObjectName);
+        }
+    }
+
     if declares_row_level_security(catalog.up_sql()) {
         validate_tenant_rls_contract(catalog.up_sql(), &tables)?;
     }
@@ -237,6 +248,11 @@ fn validate_retention_legal_hold(up_sql: &str) -> Result<(), MigrationContractEr
 }
 
 fn validate_table_body(table: &str, body: &str) -> Result<(), MigrationContractError> {
+    for column in parse_column_names(body) {
+        if !is_multi_word_snake_case(&column) {
+            return Err(MigrationContractError::SingleWordObjectName);
+        }
+    }
     let lower = body.to_ascii_lowercase();
     if requires_tenant_boundary(table) && !lower.contains("tenant_record_id") {
         return Err(MigrationContractError::MissingTenantBoundary);
@@ -269,16 +285,12 @@ fn validate_tenant_rls_contract(
         return Err(MigrationContractError::MissingTenantSessionGuc);
     }
 
+    // Policy names are contract-checked with every other created object in
+    // `validate_migration_catalog`; this scan only proves a policy exists.
     let policies = parse_create_policy_names(up_sql);
     if policies.is_empty() {
         return Err(MigrationContractError::MissingRlsPolicy);
     }
-    for policy in &policies {
-        if !is_multi_word_snake_case(policy) {
-            return Err(MigrationContractError::SingleWordObjectName);
-        }
-    }
-
     for table in tables {
         let folded = table.to_ascii_lowercase();
         if !table_has_rls_enabled(&lower, &folded) {
@@ -343,54 +355,134 @@ fn has_domain_time_column(lower_body: &str) -> bool {
     has_available | has_valid_from
 }
 
-fn parse_create_table_names(sql: &str) -> BTreeSet<String> {
+/// Object kinds whose `CREATE` statements name a database object.
+const CREATE_KEYWORDS: [&str; 10] = [
+    "CREATE TABLE",
+    "CREATE POLICY",
+    "CREATE INDEX",
+    "CREATE UNIQUE INDEX",
+    "CREATE TRIGGER",
+    "CREATE FUNCTION",
+    "CREATE OR REPLACE FUNCTION",
+    "CREATE TYPE",
+    "CREATE VIEW",
+    "CREATE SEQUENCE",
+];
+
+/// Leading words of a table-level constraint clause, which names no column.
+const TABLE_CONSTRAINT_KEYWORDS: [&str; 7] = [
+    "constraint",
+    "primary",
+    "foreign",
+    "unique",
+    "check",
+    "exclude",
+    "like",
+];
+
+/// Return whether `index` starts a keyword rather than continuing a word.
+fn is_word_start(sql: &str, index: usize) -> bool {
+    sql[..index]
+        .chars()
+        .next_back()
+        .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_')
+}
+
+/// Return the identifier at the start of `rest`, skipping an existence clause.
+fn leading_identifier(rest: &str) -> String {
+    let rest = rest.trim_start();
+    let lower = rest.to_ascii_lowercase();
+    let rest = lower
+        .strip_prefix("if not exists")
+        .or_else(|| lower.strip_prefix("if exists"))
+        .map_or(rest, |stripped| &rest[rest.len() - stripped.len()..])
+        .trim_start();
+    rest.chars()
+        .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+        .collect()
+}
+
+/// Return the declared names that follow each occurrence of `keyword`.
+///
+/// Names keep their declared spelling so the `snake_case` half of the naming
+/// contract stays observable; callers fold their own lookup keys.
+fn parse_names_after(sql: &str, keyword: &str) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     let upper = sql.to_ascii_uppercase();
     let mut search_from = 0usize;
-    while let Some(rel) = upper[search_from..].find("CREATE TABLE") {
-        let abs = search_from + rel + "CREATE TABLE".len();
-        let rest = sql[abs..].trim_start();
-        let rest = rest
-            .strip_prefix("IF NOT EXISTS")
-            .or_else(|| rest.strip_prefix("if not exists"))
-            .map_or(rest, str::trim_start);
-        let name: String = rest
-            .chars()
-            .take_while(|ch| {
-                let alphanumeric = ch.is_ascii_alphanumeric();
-                let underscore = *ch == '_';
-                alphanumeric | underscore
-            })
-            .collect();
-        if name.is_empty() {
-            search_from = abs;
+    while let Some(rel) = upper[search_from..].find(keyword) {
+        let keyword_start = search_from + rel;
+        let abs = keyword_start + keyword.len();
+        search_from = abs;
+        // Reject `integrity_constraint_violation` and `CREATE TABLEX`: the
+        // keyword must stand alone on both sides.
+        if !is_word_start(sql, keyword_start) {
             continue;
         }
-        names.insert(name);
-        search_from = abs;
+        if sql[abs..]
+            .chars()
+            .next()
+            .is_some_and(|ch| !ch.is_whitespace())
+        {
+            continue;
+        }
+        let name = leading_identifier(&sql[abs..]);
+        if !name.is_empty() {
+            names.insert(name);
+        }
     }
     names
 }
 
+fn parse_create_table_names(sql: &str) -> BTreeSet<String> {
+    parse_names_after(sql, "CREATE TABLE")
+}
+
 fn parse_create_policy_names(sql: &str) -> BTreeSet<String> {
+    parse_names_after(sql, "CREATE POLICY")
+}
+
+/// Return every object name declared by a `CREATE` statement in `sql`.
+fn parse_created_object_names(sql: &str) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
-    let upper = sql.to_ascii_uppercase();
-    let mut search_from = 0usize;
-    while let Some(rel) = upper[search_from..].find("CREATE POLICY") {
-        let abs = search_from + rel + "CREATE POLICY".len();
-        let rest = sql[abs..].trim_start();
-        let name: String = rest
-            .chars()
-            .take_while(|ch| {
-                let alphanumeric = ch.is_ascii_alphanumeric();
-                let underscore = *ch == '_';
-                alphanumeric | underscore
-            })
-            .collect();
-        if !name.is_empty() {
+    for keyword in CREATE_KEYWORDS {
+        names.extend(parse_names_after(sql, keyword));
+    }
+    names
+}
+
+/// Return every explicitly named constraint in `sql`.
+fn parse_constraint_names(sql: &str) -> BTreeSet<String> {
+    parse_names_after(sql, "CONSTRAINT")
+}
+
+/// Return the column names declared directly in a `CREATE TABLE` body.
+///
+/// Table-level constraint clauses name no column and are skipped.
+fn parse_column_names(body: &str) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let mut depth = 0i32;
+    let mut start = 0usize;
+    let mut segments = Vec::new();
+    for (index, ch) in body.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth -= 1,
+            ',' if depth == 1 => {
+                segments.push(&body[start..index]);
+                start = index + 1;
+            }
+            _ => {}
+        }
+    }
+    segments.push(&body[start..]);
+    for segment in segments {
+        let segment = segment.trim_start_matches(['(', ')']).trim();
+        let name = leading_identifier(segment);
+        let lowered = name.to_ascii_lowercase();
+        if !name.is_empty() && !TABLE_CONSTRAINT_KEYWORDS.contains(&lowered.as_str()) {
             names.insert(name);
         }
-        search_from = abs;
     }
     names
 }
@@ -485,6 +577,113 @@ mod tests {
             "CREATE POLICY document_record_tenant_isolation ON document_record FOR ALL USING (true);",
         );
         assert!(policies.contains("document_record_tenant_isolation"));
+    }
+
+    /// A valid single-table migration that the added clause is appended to.
+    fn conforming_up_sql(extra: &str) -> String {
+        format!(
+            "CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL
+            );
+            {extra}"
+        )
+    }
+
+    #[test]
+    fn every_created_object_kind_must_be_multi_word_snake_case() {
+        for clause in [
+            "CREATE INDEX idx ON tenant_record (tenant_record_id);",
+            "CREATE UNIQUE INDEX Tenant_Idx ON tenant_record (tenant_record_id);",
+            "CREATE TRIGGER guard BEFORE UPDATE ON tenant_record;",
+            "CREATE FUNCTION reject() RETURNS trigger;",
+            "CREATE OR REPLACE FUNCTION Reject_Mutation() RETURNS trigger;",
+            "CREATE TYPE kind AS ENUM ('a');",
+            "CREATE VIEW records AS SELECT 1;",
+            "CREATE SEQUENCE counter;",
+            "CREATE POLICY isolation ON tenant_record FOR ALL USING (true);",
+        ] {
+            let catalog =
+                MigrationCatalog::from_sql(&conforming_up_sql(clause), "DROP TABLE tenant_record;");
+            assert_eq!(
+                validate_migration_catalog(&catalog),
+                Err(MigrationContractError::SingleWordObjectName),
+                "{clause} was accepted"
+            );
+        }
+    }
+
+    #[test]
+    fn column_and_constraint_names_must_be_multi_word_snake_case() {
+        let single_word_column = MigrationCatalog::from_sql(
+            "CREATE TABLE tenant_record (id uuid PRIMARY KEY, system_time timestamptz NOT NULL);",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&single_word_column),
+            Err(MigrationContractError::SingleWordObjectName)
+        );
+
+        let mixed_case_column = MigrationCatalog::from_sql(
+            "CREATE TABLE tenant_record (Tenant_Id uuid PRIMARY KEY, system_time timestamptz NOT NULL);",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&mixed_case_column),
+            Err(MigrationContractError::SingleWordObjectName)
+        );
+
+        let named_constraint = MigrationCatalog::from_sql(
+            "CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                system_time timestamptz NOT NULL,
+                CONSTRAINT pk UNIQUE (tenant_record_id)
+            );",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(
+            validate_migration_catalog(&named_constraint),
+            Err(MigrationContractError::SingleWordObjectName)
+        );
+    }
+
+    #[test]
+    fn parenthesised_types_and_table_constraints_do_not_shift_column_names() {
+        let catalog = MigrationCatalog::from_sql(
+            "CREATE TABLE tenant_record (
+                tenant_record_id uuid PRIMARY KEY,
+                run_cost numeric(12, 4) NOT NULL,
+                system_time timestamptz NOT NULL,
+                PRIMARY KEY (tenant_record_id),
+                CHECK (run_cost > 0)
+            );",
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+    }
+
+    #[test]
+    fn keywords_inside_identifiers_and_literals_name_no_object() {
+        // `integrity_constraint_violation` embeds CONSTRAINT; `CREATE TABLEX`
+        // embeds CREATE TABLE. Neither declares an object.
+        let catalog = MigrationCatalog::from_sql(
+            &conforming_up_sql(
+                "RAISE EXCEPTION 'x' USING ERRCODE = 'integrity_constraint_violation';
+                 -- CREATE TABLEX nothing;
+                 ALTER TABLE tenant_record DROP CONSTRAINT IF EXISTS tenant_record_unique;",
+            ),
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+    }
+
+    #[test]
+    fn a_create_keyword_with_no_following_name_declares_nothing() {
+        let catalog = MigrationCatalog::from_sql(
+            &conforming_up_sql("CREATE VIEW (broken;"),
+            "DROP TABLE tenant_record;",
+        );
+        assert_eq!(validate_migration_catalog(&catalog), Ok(()));
     }
 
     #[test]
