@@ -243,18 +243,26 @@ pub fn execute_copied_text_run(
         }
         match document.kind() {
             CopiedKind::UniqueContent => {
-                require_unique_content_result(refuse_copied_text_as_unique_content(document.kind()))?;
-                require_unique_content_result(refuse_copied_text_as_stopword_deletion(document.kind()))?;
+                require_unique_content_result(refuse_copied_text_as_unique_content(
+                    document.kind(),
+                ))?;
+                require_unique_content_result(refuse_copied_text_as_stopword_deletion(
+                    document.kind(),
+                ))?;
                 unique_content_count = unique_content_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
             }
             CopiedKind::CopiedText => {
-                require_unique_content_refusal(refuse_copied_text_as_unique_content(document.kind()))?;
+                require_unique_content_refusal(refuse_copied_text_as_unique_content(
+                    document.kind(),
+                ))?;
                 refused_as_unique_content_count = refused_as_unique_content_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                require_stopword_refusal(refuse_copied_text_as_stopword_deletion(document.kind()))?;
+                require_stopword_refusal(refuse_copied_text_as_stopword_deletion(
+                    document.kind(),
+                ))?;
                 refused_as_stopword_deletion_count = refused_as_stopword_deletion_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
