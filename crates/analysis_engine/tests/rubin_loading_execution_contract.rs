@@ -9,6 +9,8 @@ use psychometric_core::{IndicatorKind, PsychometricError};
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
+const SNAPSHOT_ID: &str = "snapshot-rubin-loading";
+
 fn available(stamp: &str) -> AvailableTime {
     AvailableTime::parse_rfc3339(stamp).expect("available")
 }
@@ -17,14 +19,26 @@ fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
 }
 
+fn observation(
+    snapshot_id: &str,
+    factor_score: f64,
+    indicator_draws: Vec<f64>,
+    available_at: &str,
+) -> RubinLoadingObservation {
+    RubinLoadingObservation::new(
+        snapshot_id,
+        factor_score,
+        indicator_draws,
+        available(available_at),
+    )
+    .expect("observation")
+}
+
 fn noiseless_rows() -> Vec<RubinLoadingObservation> {
     vec![
-        RubinLoadingObservation::new(-1.0, vec![-0.7, -0.9], available("2026-07-01T00:00:00Z"))
-            .expect("r1"),
-        RubinLoadingObservation::new(0.0, vec![0.0, 0.0], available("2026-07-01T00:00:00Z"))
-            .expect("r2"),
-        RubinLoadingObservation::new(1.0, vec![0.7, 0.9], available("2026-07-01T00:00:00Z"))
-            .expect("r3"),
+        observation(SNAPSHOT_ID, -1.0, vec![-0.7, -0.9], "2026-07-01T00:00:00Z"),
+        observation(SNAPSHOT_ID, 0.0, vec![0.0, 0.0], "2026-07-01T00:00:00Z"),
+        observation(SNAPSHOT_ID, 1.0, vec![0.7, 0.9], "2026-07-01T00:00:00Z"),
     ]
 }
 
@@ -33,7 +47,7 @@ fn request() -> AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: "rubin-loading-idem".into(),
         tenant_workspace_id: "tenant-workspace".into(),
-        snapshot_id: "snapshot-rubin-loading".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
         model_contract_version: RUBIN_LOADING_MODEL_CONTRACT_VERSION.into(),
         output_profile: RUBIN_LOADING_OUTPUT_PROFILE.into(),
@@ -72,7 +86,7 @@ fn noiseless_draws_emit_digest_bound_point_mean_and_rubin_t() {
     let execution = execute(
         &request,
         &accepted,
-        "snapshot-rubin-loading",
+        SNAPSHOT_ID,
         cutoff(),
         IndicatorKind::AdditiveLogRatio,
         &rows,
@@ -119,32 +133,72 @@ fn noiseless_draws_emit_digest_bound_point_mean_and_rubin_t() {
         execution.terminal_result.result_schema_version.as_deref(),
         Some(RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION)
     );
+    assert_eq!(rows[0].snapshot_id(), SNAPSHOT_ID);
     assert!((rows[0].factor_score() + 1.0).abs() < f64::EPSILON);
     assert_eq!(rows[0].indicator_draws(), &[-0.7, -0.9]);
     assert_eq!(rows[0].available_time(), available("2026-07-01T00:00:00Z"));
 }
 
 #[test]
-fn execution_excludes_rows_unavailable_at_the_request_cutoff() {
+fn future_unavailable_rows_do_not_change_historical_replay() {
     let request = request();
     let accepted = accepted(&request);
-    let mut rows = noiseless_rows();
-    rows.push(
-        RubinLoadingObservation::new(2.0, vec![10.0, 10.0], available("2026-08-15T00:00:00Z"))
-            .expect("late"),
-    );
-    let execution = execute(
+    let baseline = execute(
         &request,
         &accepted,
-        "snapshot-rubin-loading",
+        SNAPSHOT_ID,
+        cutoff(),
+        IndicatorKind::AdditiveLogRatio,
+        &noiseless_rows(),
+    )
+    .expect("baseline");
+
+    let mut rows = noiseless_rows();
+    rows.push(observation(
+        SNAPSHOT_ID,
+        2.0,
+        vec![10.0, 10.0, 10.0],
+        "2026-08-15T00:00:00Z",
+    ));
+    let replay = execute(
+        &request,
+        &accepted,
+        SNAPSHOT_ID,
         cutoff(),
         IndicatorKind::AdditiveLogRatio,
         &rows,
     )
-    .expect("execution");
-    assert_eq!(execution.artifact.observation_count, 3);
-    assert_eq!(execution.artifact.excluded_after_cutoff_count, 1);
-    assert!((execution.artifact.mean_loading - 0.8).abs() < 1e-12);
+    .expect("historical replay");
+
+    assert_eq!(replay.artifact.observation_count, baseline.artifact.observation_count);
+    assert_eq!(replay.artifact.excluded_after_cutoff_count, 1);
+    assert_eq!(replay.artifact.point_estimate_mean, baseline.artifact.point_estimate_mean);
+    assert_eq!(replay.artifact.mean_loading, baseline.artifact.mean_loading);
+    assert_eq!(replay.artifact.total_variance, baseline.artifact.total_variance);
+}
+
+#[test]
+fn cross_snapshot_rows_fail_before_scientific_composition() {
+    let request = request();
+    let accepted = accepted(&request);
+    let mut rows = noiseless_rows();
+    rows.push(observation(
+        "other-snapshot",
+        2.0,
+        vec![10.0, 10.0, 10.0],
+        "2026-08-15T00:00:00Z",
+    ));
+    assert_eq!(
+        execute(
+            &request,
+            &accepted,
+            SNAPSHOT_ID,
+            cutoff(),
+            IndicatorKind::AdditiveLogRatio,
+            &rows,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
 }
 
 #[test]
@@ -155,7 +209,7 @@ fn equivalent_rfc3339_cutoff_instants_bind_identically() {
     let execution = execute(
         &request,
         &accepted,
-        "snapshot-rubin-loading",
+        SNAPSHOT_ID,
         cutoff(),
         IndicatorKind::AdditiveLogRatio,
         &noiseless_rows(),
@@ -169,29 +223,29 @@ fn robust_point_estimate_is_not_replaced_by_naive_rubin_mean() {
     let request = request();
     let accepted = accepted(&request);
     let rows = vec![
-        RubinLoadingObservation::new(
+        observation(
+            SNAPSHOT_ID,
             -1.0,
             vec![-1.0e16, -1.0, 1.0e16],
-            available("2026-07-01T00:00:00Z"),
-        )
-        .expect("r1"),
-        RubinLoadingObservation::new(
+            "2026-07-01T00:00:00Z",
+        ),
+        observation(
+            SNAPSHOT_ID,
             0.0,
             vec![0.0, 0.0, 0.0],
-            available("2026-07-01T00:00:00Z"),
-        )
-        .expect("r2"),
-        RubinLoadingObservation::new(
+            "2026-07-01T00:00:00Z",
+        ),
+        observation(
+            SNAPSHOT_ID,
             1.0,
             vec![1.0e16, 1.0, -1.0e16],
-            available("2026-07-01T00:00:00Z"),
-        )
-        .expect("r3"),
+            "2026-07-01T00:00:00Z",
+        ),
     ];
     let execution = execute(
         &request,
         &accepted,
-        "snapshot-rubin-loading",
+        SNAPSHOT_ID,
         cutoff(),
         IndicatorKind::AdditiveLogRatio,
         &rows,
@@ -210,7 +264,7 @@ fn artifact_refuses_inconsistent_rubin_total_and_unreachable_counts() {
     let artifact = RubinLoadingUncertaintyArtifact {
         schema_version: RUBIN_LOADING_ARTIFACT_SCHEMA_VERSION.into(),
         run_id: "run-rubin-loading".into(),
-        snapshot_id: "snapshot-rubin-loading".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
         observation_count: 3,
         draw_count: 2,
@@ -274,7 +328,7 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             execute(
                 &invalid_request,
                 &accepted,
-                "snapshot-rubin-loading",
+                SNAPSHOT_ID,
                 cutoff(),
                 IndicatorKind::AdditiveLogRatio,
                 &rows,
@@ -289,19 +343,44 @@ fn constructor_and_empty_cutoff_fail_closed() {
     let request = request();
     let accepted = accepted(&request);
     assert_eq!(
-        RubinLoadingObservation::new(f64::NAN, vec![1.0, 2.0], available("2026-07-01T00:00:00Z")),
-        Err(AnalysisEngineError::InvalidEvidence)
-    );
-    assert_eq!(
-        RubinLoadingObservation::new(1.0, vec![], available("2026-07-01T00:00:00Z")),
-        Err(AnalysisEngineError::InvalidEvidence)
-    );
-    assert_eq!(
-        RubinLoadingObservation::new(1.0, vec![1.0, f64::NAN], available("2026-07-01T00:00:00Z")),
+        RubinLoadingObservation::new(
+            "",
+            1.0,
+            vec![1.0, 2.0],
+            available("2026-07-01T00:00:00Z"),
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     assert_eq!(
         RubinLoadingObservation::new(
+            SNAPSHOT_ID,
+            f64::NAN,
+            vec![1.0, 2.0],
+            available("2026-07-01T00:00:00Z"),
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        RubinLoadingObservation::new(
+            SNAPSHOT_ID,
+            1.0,
+            vec![],
+            available("2026-07-01T00:00:00Z"),
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        RubinLoadingObservation::new(
+            SNAPSHOT_ID,
+            1.0,
+            vec![1.0, f64::NAN],
+            available("2026-07-01T00:00:00Z"),
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        RubinLoadingObservation::new(
+            SNAPSHOT_ID,
             1.0,
             vec![1.0; 257],
             available("2026-07-01T00:00:00Z"),
@@ -316,7 +395,7 @@ fn constructor_and_empty_cutoff_fail_closed() {
         execute(
             &early_request,
             &accepted,
-            "snapshot-rubin-loading",
+            SNAPSHOT_ID,
             too_early,
             IndicatorKind::AdditiveLogRatio,
             &noiseless_rows(),
@@ -335,7 +414,7 @@ fn execution_refuses_raw_proportion_single_draw_and_unequal_lengths() {
         execute(
             &request,
             &accepted,
-            "snapshot-rubin-loading",
+            SNAPSHOT_ID,
             cutoff(),
             IndicatorKind::RawProportion,
             &noiseless_rows(),
@@ -346,16 +425,14 @@ fn execution_refuses_raw_proportion_single_draw_and_unequal_lengths() {
     );
 
     let single_draw = vec![
-        RubinLoadingObservation::new(-1.0, vec![-0.7], available("2026-07-01T00:00:00Z"))
-            .expect("d1"),
-        RubinLoadingObservation::new(1.0, vec![0.7], available("2026-07-01T00:00:00Z"))
-            .expect("d2"),
+        observation(SNAPSHOT_ID, -1.0, vec![-0.7], "2026-07-01T00:00:00Z"),
+        observation(SNAPSHOT_ID, 1.0, vec![0.7], "2026-07-01T00:00:00Z"),
     ];
     assert_eq!(
         execute(
             &request,
             &accepted,
-            "snapshot-rubin-loading",
+            SNAPSHOT_ID,
             cutoff(),
             IndicatorKind::AdditiveLogRatio,
             &single_draw,
@@ -366,16 +443,14 @@ fn execution_refuses_raw_proportion_single_draw_and_unequal_lengths() {
     );
 
     let unequal = vec![
-        RubinLoadingObservation::new(-1.0, vec![-0.7, -0.9], available("2026-07-01T00:00:00Z"))
-            .expect("u1"),
-        RubinLoadingObservation::new(1.0, vec![0.7, 0.9, 1.1], available("2026-07-01T00:00:00Z"))
-            .expect("u2"),
+        observation(SNAPSHOT_ID, -1.0, vec![-0.7, -0.9], "2026-07-01T00:00:00Z"),
+        observation(SNAPSHOT_ID, 1.0, vec![0.7, 0.9, 1.1], "2026-07-01T00:00:00Z"),
     ];
     assert_eq!(
         execute(
             &request,
             &accepted,
-            "snapshot-rubin-loading",
+            SNAPSHOT_ID,
             cutoff(),
             IndicatorKind::AdditiveLogRatio,
             &unequal,
@@ -383,6 +458,32 @@ fn execution_refuses_raw_proportion_single_draw_and_unequal_lengths() {
         Err(AnalysisEngineError::Psychometric(
             PsychometricError::InvalidNumericInput
         ))
+    );
+}
+
+#[test]
+fn matrix_resource_budget_fails_before_scientific_fit() {
+    let request = request();
+    let accepted = accepted(&request);
+    let rows = vec![
+        observation(
+            SNAPSHOT_ID,
+            1.0,
+            vec![1.0; 256],
+            "2026-07-01T00:00:00Z",
+        );
+        3_907
+    ];
+    assert_eq!(
+        execute(
+            &request,
+            &accepted,
+            SNAPSHOT_ID,
+            cutoff(),
+            IndicatorKind::AdditiveLogRatio,
+            &rows,
+        ),
+        Err(AnalysisEngineError::LimitExceeded)
     );
 }
 
@@ -396,7 +497,7 @@ fn execution_refuses_receipt_mismatch_and_oversized_corpus() {
         execute(
             &request,
             &wrong_receipt,
-            "snapshot-rubin-loading",
+            SNAPSHOT_ID,
             cutoff(),
             IndicatorKind::AdditiveLogRatio,
             &noiseless_rows(),
@@ -405,17 +506,20 @@ fn execution_refuses_receipt_mismatch_and_oversized_corpus() {
         AnalysisEngineError::Api(tepp_api::ApiError::InvalidWirePayload)
     );
 
-    let oversized =
-        vec![
-            RubinLoadingObservation::new(1.0, vec![1.0, 2.0], available("2026-07-01T00:00:00Z"))
-                .expect("row");
-            MAX_EVIDENCE_UNITS + 1
-        ];
+    let oversized = vec![
+        observation(
+            SNAPSHOT_ID,
+            1.0,
+            vec![1.0, 2.0],
+            "2026-07-01T00:00:00Z",
+        );
+        MAX_EVIDENCE_UNITS + 1
+    ];
     assert_eq!(
         execute(
             &request,
             &accepted,
-            "snapshot-rubin-loading",
+            SNAPSHOT_ID,
             cutoff(),
             IndicatorKind::AdditiveLogRatio,
             &oversized,
@@ -432,7 +536,7 @@ fn execution_refuses_invalid_completion_time() {
         execute_rubin_loading_uncertainty_run(
             &request,
             &accepted,
-            "snapshot-rubin-loading",
+            SNAPSHOT_ID,
             cutoff(),
             IndicatorKind::AdditiveLogRatio,
             &noiseless_rows(),
