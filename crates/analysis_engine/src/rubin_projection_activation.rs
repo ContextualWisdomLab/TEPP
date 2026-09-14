@@ -38,38 +38,36 @@ pub struct RubinProjectionActivationReceiptV1 {
 }
 
 impl RubinProjectionActivationReceiptV1 {
-    /// Construct one canonical activation receipt from typed temporal clocks.
+    /// Construct one canonical activation receipt from immutable contract and
+    /// Validation Evidence references plus typed temporal clocks.
     ///
-    /// Construction validates identifiers and digest syntax but does not grant
-    /// authority. In particular, late Validation Evidence remains a valid wire
-    /// object that the projection decision rejects by cutoff.
+    /// `generator_contract` and `analysis_contract` are `(id, version)` pairs.
+    /// `validation_evidence` is `(id, sha256, available_time)`. Construction
+    /// validates identity and digest syntax but does not grant authority. Late
+    /// Validation Evidence remains a valid wire object that the projection
+    /// decision rejects by cutoff.
     ///
     /// # Errors
     ///
-    /// Returns a fail-closed validation error when an identifier or digest is
-    /// malformed.
-    #[allow(clippy::too_many_arguments)]
+    /// Returns a fail-closed validation error when an identifier, immutable
+    /// authority reference, or digest is malformed.
     pub fn new(
-        generator_contract_id: impl Into<String>,
-        generator_contract_version: impl Into<String>,
-        analysis_contract_id: impl Into<String>,
-        analysis_contract_version: impl Into<String>,
-        validation_evidence_id: impl Into<String>,
-        validation_evidence_sha256: impl Into<String>,
-        validation_evidence_available_at: AvailableTime,
+        generator_contract: (&str, &str),
+        analysis_contract: (&str, &str),
+        validation_evidence: (&str, &str, AvailableTime),
         source_snapshot_id: impl Into<String>,
         knowledge_cutoff: KnowledgeCutoff,
         design_envelope_id: impl Into<String>,
     ) -> Result<Self, AnalysisEngineError> {
         let receipt = Self {
             schema_version: RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION.into(),
-            generator_contract_id: generator_contract_id.into(),
-            generator_contract_version: generator_contract_version.into(),
-            analysis_contract_id: analysis_contract_id.into(),
-            analysis_contract_version: analysis_contract_version.into(),
-            validation_evidence_id: validation_evidence_id.into(),
-            validation_evidence_sha256: validation_evidence_sha256.into(),
-            validation_evidence_available_at: validation_evidence_available_at.to_rfc3339(),
+            generator_contract_id: generator_contract.0.into(),
+            generator_contract_version: generator_contract.1.into(),
+            analysis_contract_id: analysis_contract.0.into(),
+            analysis_contract_version: analysis_contract.1.into(),
+            validation_evidence_id: validation_evidence.0.into(),
+            validation_evidence_sha256: validation_evidence.1.into(),
+            validation_evidence_available_at: validation_evidence.2.to_rfc3339(),
             source_snapshot_id: source_snapshot_id.into(),
             knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
             design_envelope_id: design_envelope_id.into(),
@@ -129,21 +127,32 @@ impl RubinProjectionActivationReceiptV1 {
     }
 
     fn validate(&self) -> Result<(), AnalysisEngineError> {
-        let identifiers = [
+        self.validate_authority_fields()?;
+        self.validated_clocks().map(|_| ())
+    }
+
+    fn validate_authority_fields(&self) -> Result<(), AnalysisEngineError> {
+        let immutable_authority_fields = [
             self.generator_contract_id.as_str(),
             self.generator_contract_version.as_str(),
             self.analysis_contract_id.as_str(),
             self.analysis_contract_version.as_str(),
             self.validation_evidence_id.as_str(),
-            self.source_snapshot_id.as_str(),
             self.design_envelope_id.as_str(),
         ];
         if self.schema_version != RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION
-            || identifiers.iter().any(|value| !valid_identifier(value))
+            || immutable_authority_fields
+                .iter()
+                .any(|value| !valid_identifier(value) || is_mutable_authority_locator(value))
+            || !valid_identifier(&self.source_snapshot_id)
             || !valid_sha256(&self.validation_evidence_sha256)
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
+        Ok(())
+    }
+
+    fn validated_clocks(&self) -> Result<(AvailableTime, KnowledgeCutoff), AnalysisEngineError> {
         let available = AvailableTime::parse_rfc3339(&self.validation_evidence_available_at)
             .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
         let cutoff = KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff)
@@ -153,7 +162,7 @@ impl RubinProjectionActivationReceiptV1 {
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        Ok(())
+        Ok((available, cutoff))
     }
 }
 
@@ -217,24 +226,16 @@ fn decide_with_registry(
     let Some(receipt) = receipt else {
         return RubinProjectionActivationDecision::DescriptiveOnly;
     };
-    if receipt.validate().is_err() || !valid_identifier(expected_snapshot_id) {
+    if receipt.validate_authority_fields().is_err() || !valid_identifier(expected_snapshot_id) {
         return RubinProjectionActivationDecision::Rejected;
     }
-    if receipt.source_snapshot_id != expected_snapshot_id {
-        return RubinProjectionActivationDecision::Rejected;
-    }
-    let Ok(receipt_cutoff) = KnowledgeCutoff::parse_rfc3339(&receipt.knowledge_cutoff) else {
+    let Ok((evidence_available_at, receipt_cutoff)) = receipt.validated_clocks() else {
         return RubinProjectionActivationDecision::Rejected;
     };
-    if receipt_cutoff.instant() != expected_knowledge_cutoff.instant() {
-        return RubinProjectionActivationDecision::Rejected;
-    }
-    let Ok(evidence_available_at) =
-        AvailableTime::parse_rfc3339(&receipt.validation_evidence_available_at)
-    else {
-        return RubinProjectionActivationDecision::Rejected;
-    };
-    if evidence_available_at.instant() > expected_knowledge_cutoff.instant() {
+    if receipt.source_snapshot_id != expected_snapshot_id
+        || receipt_cutoff.instant() != expected_knowledge_cutoff.instant()
+        || evidence_available_at.instant() > expected_knowledge_cutoff.instant()
+    {
         return RubinProjectionActivationDecision::Rejected;
     }
 
@@ -266,7 +267,14 @@ fn valid_sha256(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn is_mutable_authority_locator(value: &str) -> bool {
+    matches!(value, "latest" | "main" | "master")
+        || ["refs/", "http://", "https://"]
+            .iter()
+            .any(|prefix| value.starts_with(prefix))
 }
 
 #[cfg(test)]
@@ -306,13 +314,19 @@ mod tests {
         receipt_cutoff: &str,
     ) -> RubinProjectionActivationReceiptV1 {
         RubinProjectionActivationReceiptV1::new(
-            APPROVED.generator_contract_id,
-            APPROVED.generator_contract_version,
-            APPROVED.analysis_contract_id,
-            APPROVED.analysis_contract_version,
-            APPROVED.validation_evidence_id,
-            APPROVED.validation_evidence_sha256,
-            AvailableTime::parse_rfc3339(available_at).expect("availability"),
+            (
+                APPROVED.generator_contract_id,
+                APPROVED.generator_contract_version,
+            ),
+            (
+                APPROVED.analysis_contract_id,
+                APPROVED.analysis_contract_version,
+            ),
+            (
+                APPROVED.validation_evidence_id,
+                APPROVED.validation_evidence_sha256,
+                AvailableTime::parse_rfc3339(available_at).expect("availability"),
+            ),
             SNAPSHOT_ID,
             cutoff(receipt_cutoff),
             APPROVED.design_envelope_id,
@@ -336,8 +350,18 @@ mod tests {
     }
 
     #[test]
-    fn authority_mismatches_and_late_evidence_fail_closed() {
+    fn authority_metadata_snapshot_cutoff_and_late_evidence_fail_closed() {
         let valid = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
+        assert_eq!(
+            decide_with_registry(
+                Some(&valid),
+                "",
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[APPROVED],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
         assert_eq!(
             decide_with_registry(
                 Some(&valid),
@@ -386,7 +410,15 @@ mod tests {
         let valid = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
         let mismatches = [
             ApprovedRubinProjectionPairing {
+                generator_contract_id: "other-generator",
+                ..APPROVED
+            },
+            ApprovedRubinProjectionPairing {
                 generator_contract_version: "other-generator-version",
+                ..APPROVED
+            },
+            ApprovedRubinProjectionPairing {
+                analysis_contract_id: "other-analysis",
                 ..APPROVED
             },
             ApprovedRubinProjectionPairing {
@@ -422,7 +454,7 @@ mod tests {
     }
 
     #[test]
-    fn receipt_wire_refuses_unknown_fields_noncanonical_time_and_invalid_identity() {
+    fn receipt_wire_refuses_unknown_fields_noncanonical_times_and_mutable_authority() {
         let receipt = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
         let canonical = receipt.to_json().expect("json");
         let mut unknown: serde_json::Value = serde_json::from_str(&canonical).expect("json");
@@ -432,26 +464,90 @@ mod tests {
             Err(AnalysisEngineError::InvalidEvidence)
         );
 
-        let mut noncanonical: serde_json::Value = serde_json::from_str(&canonical).expect("json");
-        noncanonical["knowledge_cutoff"] = serde_json::json!("2026-08-01T01:00:00+01:00");
+        let mut noncanonical_cutoff: serde_json::Value =
+            serde_json::from_str(&canonical).expect("json");
+        noncanonical_cutoff["knowledge_cutoff"] =
+            serde_json::json!("2026-08-01T01:00:00+01:00");
         assert_eq!(
-            RubinProjectionActivationReceiptV1::from_json(&noncanonical.to_string()),
+            RubinProjectionActivationReceiptV1::from_json(&noncanonical_cutoff.to_string()),
             Err(AnalysisEngineError::InvalidEvidence)
         );
 
-        let invalid = RubinProjectionActivationReceiptV1::new(
-            "",
-            APPROVED.generator_contract_version,
-            APPROVED.analysis_contract_id,
-            APPROVED.analysis_contract_version,
-            APPROVED.validation_evidence_id,
-            "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
-            AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability"),
-            SNAPSHOT_ID,
-            cutoff("2026-08-01T00:00:00Z"),
-            APPROVED.design_envelope_id,
+        let mut noncanonical_availability: serde_json::Value =
+            serde_json::from_str(&canonical).expect("json");
+        noncanonical_availability["validation_evidence_available_at"] =
+            serde_json::json!("2026-08-01T00:59:59+01:00");
+        assert_eq!(
+            RubinProjectionActivationReceiptV1::from_json(
+                &noncanonical_availability.to_string()
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
         );
-        assert_eq!(invalid, Err(AnalysisEngineError::InvalidEvidence));
+
+        let mut mutable: serde_json::Value = serde_json::from_str(&canonical).expect("json");
+        mutable["validation_evidence_id"] = serde_json::json!("refs/pull/504/head");
+        assert_eq!(
+            RubinProjectionActivationReceiptV1::from_json(&mutable.to_string()),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+    }
+
+    #[test]
+    fn receipt_refuses_invalid_identity_digest_and_private_malformed_state() {
+        assert_eq!(
+            RubinProjectionActivationReceiptV1::new(
+                ("", APPROVED.generator_contract_version),
+                (
+                    APPROVED.analysis_contract_id,
+                    APPROVED.analysis_contract_version,
+                ),
+                (
+                    APPROVED.validation_evidence_id,
+                    APPROVED.validation_evidence_sha256,
+                    AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z")
+                        .expect("availability"),
+                ),
+                SNAPSHOT_ID,
+                cutoff("2026-08-01T00:00:00Z"),
+                APPROVED.design_envelope_id,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            RubinProjectionActivationReceiptV1::new(
+                (
+                    APPROVED.generator_contract_id,
+                    APPROVED.generator_contract_version,
+                ),
+                (
+                    APPROVED.analysis_contract_id,
+                    APPROVED.analysis_contract_version,
+                ),
+                (
+                    APPROVED.validation_evidence_id,
+                    "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
+                    AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z")
+                        .expect("availability"),
+                ),
+                SNAPSHOT_ID,
+                cutoff("2026-08-01T00:00:00Z"),
+                APPROVED.design_envelope_id,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+
+        let mut malformed = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
+        malformed.knowledge_cutoff = "not-a-time".into();
+        assert_eq!(
+            decide_with_registry(
+                Some(&malformed),
+                SNAPSHOT_ID,
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[APPROVED],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
     }
 
     #[test]
