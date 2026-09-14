@@ -185,6 +185,7 @@ struct ApprovedRubinProjectionPairing {
     analysis_contract_version: &'static str,
     validation_evidence_id: &'static str,
     validation_evidence_sha256: &'static str,
+    validation_evidence_available_at: &'static str,
     design_envelope_id: &'static str,
     indicator_kind: &'static str,
 }
@@ -292,6 +293,7 @@ mod tests {
     const EVIDENCE_ID: &str = "validation-evidence-rubin-approved-v1";
     const EVIDENCE_DIGEST: &str =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const EVIDENCE_AVAILABLE_AT: &str = "2026-07-31T23:59:59Z";
     const DESIGN_ENVELOPE: &str = "rubin-gaussian-single-level-approved-v1";
 
     const APPROVED: ApprovedRubinProjectionPairing = ApprovedRubinProjectionPairing {
@@ -301,6 +303,7 @@ mod tests {
         analysis_contract_version: RUBIN_LOADING_MODEL_CONTRACT_VERSION,
         validation_evidence_id: EVIDENCE_ID,
         validation_evidence_sha256: EVIDENCE_DIGEST,
+        validation_evidence_available_at: EVIDENCE_AVAILABLE_AT,
         design_envelope_id: DESIGN_ENVELOPE,
         indicator_kind: "alr",
     };
@@ -336,7 +339,7 @@ mod tests {
 
     #[test]
     fn exact_fake_pairing_is_eligible_and_equivalent_cutoffs_match_by_instant() {
-        let receipt = receipt("2026-07-31T23:59:59Z", "2026-08-01T01:00:00+01:00");
+        let receipt = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T01:00:00+01:00");
         assert_eq!(
             decide_with_registry(
                 Some(&receipt),
@@ -350,8 +353,27 @@ mod tests {
     }
 
     #[test]
+    fn authoritative_evidence_availability_cannot_be_backdated_by_receipt() {
+        let backdated = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
+        let late_authority = ApprovedRubinProjectionPairing {
+            validation_evidence_available_at: "2026-08-01T00:00:01Z",
+            ..APPROVED
+        };
+        assert_eq!(
+            decide_with_registry(
+                Some(&backdated),
+                SNAPSHOT_ID,
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[late_authority],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
+    }
+
+    #[test]
     fn authority_metadata_snapshot_cutoff_and_late_evidence_fail_closed() {
-        let valid = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
+        let valid = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
         assert_eq!(
             decide_with_registry(
                 Some(&valid),
@@ -407,7 +429,7 @@ mod tests {
 
     #[test]
     fn registry_requires_exact_generator_analysis_evidence_digest_and_envelope() {
-        let valid = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
+        let valid = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
         let mismatches = [
             ApprovedRubinProjectionPairing {
                 generator_contract_id: "other-generator",
@@ -455,7 +477,7 @@ mod tests {
 
     #[test]
     fn receipt_wire_refuses_unknown_fields_noncanonical_times_and_mutable_authority() {
-        let receipt = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
+        let receipt = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
         let canonical = receipt.to_json().expect("json");
         let mut unknown: serde_json::Value = serde_json::from_str(&canonical).expect("json");
         unknown["unexpected"] = serde_json::json!(true);
@@ -504,7 +526,7 @@ mod tests {
                 (
                     APPROVED.validation_evidence_id,
                     APPROVED.validation_evidence_sha256,
-                    AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z")
+                    AvailableTime::parse_rfc3339(EVIDENCE_AVAILABLE_AT)
                         .expect("availability"),
                 ),
                 SNAPSHOT_ID,
@@ -526,7 +548,7 @@ mod tests {
                 (
                     APPROVED.validation_evidence_id,
                     "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
-                    AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z")
+                    AvailableTime::parse_rfc3339(EVIDENCE_AVAILABLE_AT)
                         .expect("availability"),
                 ),
                 SNAPSHOT_ID,
@@ -536,7 +558,7 @@ mod tests {
             Err(AnalysisEngineError::InvalidEvidence)
         );
 
-        let mut malformed = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
+        let mut malformed = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
         malformed.knowledge_cutoff = "not-a-time".into();
         assert_eq!(
             decide_with_registry(
@@ -557,7 +579,7 @@ mod tests {
             RubinProjectionActivationReceiptV1::from_json(&oversized),
             Err(AnalysisEngineError::LimitExceeded)
         );
-        let receipt = receipt("2026-07-31T23:59:59Z", "2026-08-01T00:00:00Z");
+        let receipt = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
         assert_eq!(receipt.sha256().expect("digest").len(), 64);
         assert_eq!(
             RubinProjectionActivationReceiptV1::from_json(&receipt.to_json().expect("json")),
