@@ -3,12 +3,15 @@
 use model_selection::{ModelCandidate, select_candidate_k, selected_k_root_mean_square_error};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 
-use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
+use crate::{
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, format_digest, require_receipt_identity,
+    valid_identifier,
+};
 
 /// Versioned schema for a completed Pareto candidate-`K` artifact.
 pub const PARETO_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION: &str = "tepp.pareto_candidate_k.v1";
@@ -20,28 +23,77 @@ pub const PARETO_CANDIDATE_K_OUTPUT_PROFILE: &str = "pareto_candidate_k_v1";
 pub const PARETO_CANDIDATE_K_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const PARETO_CANDIDATE_K_INFERENCE_STATUS: &str =
     "pareto_statistical_front_not_fitted_schwarz_sampler";
+// `select_candidate_k` performs an O(n^2) dominance scan. This application-path
+// ceiling bounds one request to at most 65,536 ordered candidate comparisons;
+// it is an operational resource contract, not a scientific claim about valid K.
+const MAX_PARETO_CANDIDATES: usize = 256;
 
-/// Cutoff-safe Pareto-front input bound to offered candidates and known truth.
+/// Provenance-bound Pareto-front input over one historical evidence universe.
+///
+/// `source_evidence_available_times` is the complete availability-time vector
+/// for the evidence universe used to construct both the candidate diagnostics
+/// and the selected-`K` replications. Construction fails closed when any source
+/// evidence was unavailable at the bound knowledge cutoff. The engine therefore
+/// never attempts to subtract future evidence from already-aggregated model
+/// diagnostics.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParetoCandidateKInput {
+    snapshot_id: String,
+    knowledge_cutoff: KnowledgeCutoff,
+    source_evidence_available_times: Vec<AvailableTime>,
     candidates: Vec<ModelCandidate>,
     selected_replications: Vec<u32>,
     truth_k: u32,
 }
 
 impl ParetoCandidateKInput {
-    /// Construct a Pareto-front selection payload.
-    #[must_use]
+    /// Construct a Pareto-front selection payload with exact historical
+    /// provenance for the evidence used to create its diagnostics.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AnalysisEngineError::InvalidEvidence`] for invalid snapshot
+    /// identity, empty evidence provenance, or post-cutoff source evidence.
+    /// Returns [`AnalysisEngineError::LimitExceeded`] before selection when the
+    /// evidence, replication, or O(n²) candidate population exceeds its
+    /// application-path bound.
     pub fn new(
+        snapshot_id: impl Into<String>,
+        knowledge_cutoff: KnowledgeCutoff,
+        source_evidence_available_times: Vec<AvailableTime>,
         candidates: Vec<ModelCandidate>,
         selected_replications: Vec<u32>,
         truth_k: u32,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, AnalysisEngineError> {
+        let value = Self {
+            snapshot_id: snapshot_id.into(),
+            knowledge_cutoff,
+            source_evidence_available_times,
             candidates,
             selected_replications,
             truth_k,
-        }
+        };
+        value.validate_provenance()?;
+        Ok(value)
+    }
+
+    /// Return the immutable snapshot identity of the diagnostic evidence.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
+    /// Return the knowledge cutoff used when constructing the diagnostics.
+    #[must_use]
+    pub const fn knowledge_cutoff(&self) -> KnowledgeCutoff {
+        self.knowledge_cutoff
+    }
+
+    /// Return the number of source evidence units represented by the
+    /// candidate diagnostics and replication RMSE.
+    #[must_use]
+    pub fn evidence_count(&self) -> usize {
+        self.source_evidence_available_times.len()
     }
 
     /// Borrow the offered candidates.
@@ -60,6 +112,43 @@ impl ParetoCandidateKInput {
     #[must_use]
     pub const fn truth_k(&self) -> u32 {
         self.truth_k
+    }
+
+    fn validate_provenance(&self) -> Result<(), AnalysisEngineError> {
+        if !valid_identifier(&self.snapshot_id) || self.source_evidence_available_times.is_empty() {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        if self.source_evidence_available_times.len() > MAX_EVIDENCE_UNITS
+            || self.selected_replications.len() > MAX_EVIDENCE_UNITS
+            || self.candidates.len() > MAX_PARETO_CANDIDATES
+        {
+            return Err(AnalysisEngineError::LimitExceeded);
+        }
+        if self
+            .source_evidence_available_times
+            .iter()
+            .any(|available_time| {
+                available_time.instant() > self.knowledge_cutoff.instant()
+            })
+        {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        Ok(())
+    }
+
+    fn validate_against(
+        &self,
+        snapshot_id: &str,
+        knowledge_cutoff: KnowledgeCutoff,
+    ) -> Result<(), AnalysisEngineError> {
+        self.validate_provenance()?;
+        if self.snapshot_id != snapshot_id {
+            return Err(AnalysisEngineError::SnapshotMismatch);
+        }
+        if self.knowledge_cutoff.instant() != knowledge_cutoff.instant() {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        Ok(())
     }
 }
 
@@ -138,6 +227,7 @@ impl ParetoCandidateKArtifact {
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.selected_k < 2
             || self.candidate_count == 0
+            || self.candidate_count > MAX_PARETO_CANDIDATES as u64
             || self.statistical_count == 0
             || self.statistical_count > self.candidate_count
             || self.truth_k < 2
@@ -164,13 +254,15 @@ pub struct ParetoCandidateKExecution {
 ///
 /// The executor invokes [`select_candidate_k`] and
 /// [`selected_k_root_mean_square_error`] and does not reimplement Pareto
-/// dominance or RMSE. LLM votes cannot define the numerical optimum. This is
-/// not Schwarz fitted selection, not a Bayesian sampler, and not GPU execution.
+/// dominance or RMSE. Candidate diagnostics and RMSE replications are admitted
+/// only when their construction provenance is bound to this snapshot and cutoff.
+/// LLM votes cannot define the numerical optimum. This is not Schwarz fitted
+/// selection, not a Bayesian sampler, and not GPU execution.
 ///
 /// # Errors
 ///
-/// Returns a request/receipt/snapshot/cutoff/profile error, model-selection
-/// failure, or invalid artifact error.
+/// Returns a request/receipt/snapshot/cutoff/profile error, provenance or
+/// resource-bound failure, model-selection failure, or invalid artifact error.
 pub fn execute_pareto_candidate_k_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -185,18 +277,23 @@ pub fn execute_pareto_candidate_k_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != PARETO_CANDIDATE_K_MODEL_CONTRACT_VERSION
         || request.output_profile != PARETO_CANDIDATE_K_OUTPUT_PROFILE
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
+    input.validate_against(snapshot_id, knowledge_cutoff)?;
 
+    let candidate_count = u64::try_from(input.candidates().len())
+        .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+    let evidence_count = u64::try_from(input.evidence_count())
+        .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let selected_k = u64::from(select_candidate_k(input.candidates())?);
     let selected_k_rmse =
         selected_k_root_mean_square_error(input.selected_replications(), input.truth_k())?;
-    let candidate_count = u64::try_from(input.candidates().len())
-        .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let statistical_count = u64::try_from(
         input
             .candidates()
@@ -218,12 +315,7 @@ pub fn execute_pareto_candidate_k_run(
         inference_status: PARETO_CANDIDATE_K_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "pareto_candidate_k",
-        candidate_count,
-        2,
-        PARETO_CANDIDATE_K_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("pareto_candidate_k", evidence_count, 2, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
@@ -247,6 +339,7 @@ mod tests {
     };
     use crate::AnalysisEngineError;
     use model_selection::ModelCandidate;
+    use temporal_core::{AvailableTime, KnowledgeCutoff};
 
     fn artifact() -> ParetoCandidateKArtifact {
         ParetoCandidateKArtifact {
@@ -268,6 +361,14 @@ mod tests {
             artifact.to_json(),
             Err(AnalysisEngineError::InvalidParetoCandidateKArtifact)
         );
+    }
+
+    fn cutoff() -> KnowledgeCutoff {
+        KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+    }
+
+    fn available() -> AvailableTime {
+        AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available")
     }
 
     #[test]
@@ -327,6 +428,11 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.candidate_count = 257;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.statistical_count = 0;
                 value
             },
@@ -362,9 +468,20 @@ mod tests {
     }
 
     #[test]
-    fn input_accessors_expose_candidates_and_truth() {
+    fn input_accessors_expose_provenance_candidates_and_truth() {
         let a = ModelCandidate::statistical(2, -30.0, 8.0).expect("a");
-        let input = ParetoCandidateKInput::new(vec![a], vec![2], 2);
+        let input = ParetoCandidateKInput::new(
+            "snapshot-1",
+            cutoff(),
+            vec![available()],
+            vec![a],
+            vec![2],
+            2,
+        )
+        .expect("input");
+        assert_eq!(input.snapshot_id(), "snapshot-1");
+        assert_eq!(input.knowledge_cutoff(), cutoff());
+        assert_eq!(input.evidence_count(), 1);
         assert_eq!(input.candidates(), &[a]);
         assert_eq!(input.selected_replications(), &[2]);
         assert_eq!(input.truth_k(), 2);
