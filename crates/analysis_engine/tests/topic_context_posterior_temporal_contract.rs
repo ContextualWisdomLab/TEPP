@@ -96,6 +96,29 @@ fn request(cutoff: &str) -> AnalysisRunRequest {
     }
 }
 
+fn support_evidence_available_at(
+    artifact: &TopicContextPosteriorArtifact,
+) -> BTreeMap<String, String> {
+    artifact
+        .lineage_events
+        .iter()
+        .map(|event| event.evidence_resource_id.clone())
+        .chain(
+            artifact
+                .document_relations
+                .iter()
+                .map(|relation| relation.evidence_resource_id.clone()),
+        )
+        .chain(
+            artifact
+                .memberships
+                .iter()
+                .map(|membership| membership.evidence_resource_id.clone()),
+        )
+        .map(|evidence_resource_id| (evidence_resource_id, "2026-08-01T00:00:00Z".into()))
+        .collect()
+}
+
 fn manifest(artifact: &TopicContextPosteriorArtifact) -> TopicContextPosteriorSnapshotManifest {
     TopicContextPosteriorSnapshotManifest {
         snapshot_id: artifact.snapshot_id.clone(),
@@ -112,6 +135,7 @@ fn manifest(artifact: &TopicContextPosteriorArtifact) -> TopicContextPosteriorSn
                 "2026-08-01T00:00:00Z".into(),
             ),
         ]),
+        support_evidence_available_at: support_evidence_available_at(artifact),
     }
 }
 
