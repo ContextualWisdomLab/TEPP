@@ -61,6 +61,14 @@
 //! accounted for by those predictors. The scalar map is `(B / a)² v`
 //! for predictor variance `v ≥ 0`. That variance is not `TRAITVAR`,
 //! not `asymDIFFUSION`, and not the expected total change `-B z / a`.
+//! The 2017-era `summary.ctsemFit.R` (ctsem 2.5.0, lines 322–331)
+//! comments the SEM path-tracing
+//! `T0TRAITVAR <- T0TRAITEFFECT %*% TRAITVAR %*% t(T0TRAITEFFECT)`
+//! with `#is this valid?`. The scalar analog is `t0_trait² · trait`.
+//! That first-occasion trait extra is not `TRAITVAR` even when
+//! stationary `T0TRAITEFFECT = I` so they equal, not `addedT0TIPREDVAR`
+//! `t0_b² v`, not `addedTIPREDVAR` `(B / a)² v`, not free `T0VAR`,
+//! and not the ctGenerate unit-normal extra `t0_trait²`.
 //! Table 2 (p. 12) names `asymCINT` the asymptotic (`Δt = ∞`)
 //! expected change in processes for a 1 unit change in intercept
 //! (`CINT`). Equation 3 maps a finite event interval as
@@ -6793,6 +6801,154 @@ pub fn recover_irregular_centered_residual_log_rate(
     }
     let count = pairs.len() as f64;
     require_finite(sum / count)
+}
+
+/// Exact scalar 2017-era `T0TRAITVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12 `TRAITVAR`; §7.1,
+/// pp. 18–19; 2017-era ctsem `ctFit.R` / `summary.ctsemFit.R` /
+/// `ctGenerate.R`; JSS PDF re-opened 2026-08-30T18:50Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `TRAITVAR` `φ_ξ` the latent trait variance. `T0TRAITEFFECT`
+/// is not in Table 2 or Table 3. The 2017-era `ctFit.R` (ctsem 2.5.0,
+/// lines 693–696) places it as the `OpenMx` `A` path from the trait
+/// latent onto the process at `T0`. When `'T0TRAITEFFECT'` is in
+/// `stationary` (lines 1494–1508) that path is the identity. The
+/// 2017-era `summary.ctsemFit.R` (lines 322–331) comments
+/// `T0TRAITVAR <- T0TRAITEFFECT %*% TRAITVAR %*% t(T0TRAITEFFECT)`
+/// with `#is this valid?` — the same comment as `addedT0TIPREDVAR`.
+/// The scalar analog of that quadratic form is `t0_trait² · trait`.
+/// Form `t0_trait` first, then square, then multiply by `trait`. A
+/// zero coefficient or zero trait is exactly zero. `trait < 0` fails
+/// closed. `T0` is an event-time occasion, so a non-event clock fails
+/// closed. Free `T0TRAITEFFECT` does not require stable `a < 0`.
+/// Stationary `T0TRAITEFFECT = I` makes `T0TRAITVAR` equal `TRAITVAR`
+/// numerically; those remain distinct named quantities. `t0_b² v` is
+/// `addedT0TIPREDVAR` and is not this trait extra. `(B / a)² v` is
+/// `addedTIPREDVAR` and is not this first-occasion map. Free `T0VAR`
+/// `p_0` is not this extra. `ctGenerate.R` (lines 113–116) draws
+/// traits from `N(0, I)` and adds `T0TRAITEFFECT %*% traits` to
+/// `T0MEANS`, so the generate extra at `T0` is `t0_trait²`, not
+/// `t0_trait² · trait`. This crate does not currently export
+/// `recover_initial_trait_effect`; form the quadratic directly. This
+/// is not a Kalman filter, not a matrix `expm`, not DSEM, and not
+/// ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, the trait variance is negative, or the product
+/// overflows.
+pub fn recover_initial_trait_variance(
+    initial_trait_effect: f64,
+    trait_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !initial_trait_effect.is_finite() || !trait_variance.is_finite() || trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_trait_effect == 0.0 || trait_variance == 0.0 {
+        return Ok(0.0);
+    }
+    let squared = require_finite(initial_trait_effect * initial_trait_effect)?;
+    require_finite(squared * trait_variance)
+}
+
+/// Refuse treating 2017-era `T0TRAITVAR` as Table 2 `TRAITVAR`.
+///
+/// `t0_trait² · trait` is extra first-occasion trait variance.
+/// `TRAITVAR` is the between-subject process. Stationary
+/// `T0TRAITEFFECT = I` makes the numbers equal; they remain
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTraitVarianceIsNotTraitVariance`].
+pub fn refuse_initial_trait_variance_as_trait_variance(
+    initial_trait_variance: f64,
+    trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_trait_variance, trait_variance);
+    Err(PsychometricError::InitialTraitVarianceIsNotTraitVariance)
+}
+
+/// Refuse treating 2017-era `T0TRAITVAR` as 2017-era `addedT0TIPREDVAR`.
+///
+/// `t0_trait² · trait` is extra first-occasion trait variance.
+/// `t0_b² v` is extra first-occasion TI predictor variance. This
+/// crate does not currently export `addedT0TIPREDVAR`; the refuse
+/// still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTraitVarianceIsNotInitialTimeIndependentVariance`].
+pub fn refuse_initial_trait_variance_as_initial_time_independent_variance(
+    initial_trait_variance: f64,
+    initial_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_trait_variance, initial_predictor_variance);
+    Err(PsychometricError::InitialTraitVarianceIsNotInitialTimeIndependentVariance)
+}
+
+/// Refuse treating 2017-era `T0TRAITVAR` as §7.2 `addedTIPREDVAR`.
+///
+/// `t0_trait² · trait` is extra first-occasion trait variance.
+/// `(B / a)² v` is the asymptotic TI extra. Those are not the
+/// same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTraitVarianceIsNotAsymptoticTimeIndependentVariance`].
+pub fn refuse_initial_trait_variance_as_asymptotic_time_independent_variance(
+    initial_trait_variance: f64,
+    asymptotic_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_trait_variance, asymptotic_predictor_variance);
+    Err(PsychometricError::InitialTraitVarianceIsNotAsymptoticTimeIndependentVariance)
+}
+
+/// Refuse treating 2017-era `T0TRAITVAR` as free `T0VAR`.
+///
+/// `t0_trait² · trait` is extra first-occasion trait variance.
+/// Free `T0VAR` `p_0` is the first-occasion state. Those are not
+/// the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTraitVarianceIsNotInitialLatentVariance`].
+pub fn refuse_initial_trait_variance_as_initial_latent_variance(
+    initial_trait_variance: f64,
+    initial_latent_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_trait_variance, initial_latent_variance);
+    Err(PsychometricError::InitialTraitVarianceIsNotInitialLatentVariance)
+}
+
+/// Refuse treating 2017-era `T0TRAITVAR` as the ctGenerate unit extra.
+///
+/// `ctGenerate.R` draws traits from `N(0, I)` and adds
+/// `T0TRAITEFFECT %*% traits` to `T0MEANS`, so the generate extra
+/// at `T0` is `t0_trait²`. SEM path-tracing uses `TRAITVAR`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTraitVarianceIsNotUnitTraitGenerateVariance`].
+pub fn refuse_initial_trait_variance_as_unit_trait_generate_variance(
+    initial_trait_variance: f64,
+    unit_generate_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_trait_variance, unit_generate_variance);
+    Err(PsychometricError::InitialTraitVarianceIsNotUnitTraitGenerateVariance)
 }
 
 /// Least-squares scalar log-rate for already-formed residual pairs.
