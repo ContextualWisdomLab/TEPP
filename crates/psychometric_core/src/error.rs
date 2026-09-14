@@ -710,6 +710,28 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+
+    /// 2017-era active `if(asymptotes==TRUE) CINT <- -DRIFT %*% CINT`
+    /// was requested for a non-stable drift. That rewrite is
+    /// `−a · κ` and converts the asymptotic-parameterization stored
+    /// `CINT` back to original `CINT`. Lasting conversion requires
+    /// `a < 0`. A zero intercept is exactly zero even if `a ≥ 0`.
+    AsymptotesTrueContinuousInterceptRequiresStableDrift,
+    /// Unstandardised `CINT` was treated as the 2017-era active
+    /// `asymptotes=TRUE` rewrite. `κ` is not `−a · κ` when `a ≠ −1`.
+    UnstandardisedContinuousInterceptIsNotAsymptotesTrueContinuousIntercept,
+    /// Driver Table 2 `asymCINT` `-κ / a` was treated as the 2017-era
+    /// active `asymptotes=TRUE` `CINT` rewrite. The stored
+    /// asymptotic intercept is not `−a · κ`.
+    AsymptoticContinuousInterceptIsNotAsymptotesTrueContinuousIntercept,
+    /// Driver Table 2 `discreteCINT` `A^{-1}[e^{A Δt} − I] κ` was
+    /// treated as the 2017-era active `asymptotes=TRUE` `CINT`
+    /// rewrite. A finite event interval is not `−a · κ`.
+    DiscreteContinuousInterceptIsNotAsymptotesTrueContinuousIntercept,
+    /// Driver p. 16 `CINTstd` `κ / √p` was treated as the 2017-era
+    /// active `asymptotes=TRUE` `CINT` rewrite. The standardised
+    /// intercept is not `−a · κ`.
+    StandardisedContinuousInterceptIsNotAsymptotesTrueContinuousIntercept,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1256,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptotesTrueContinuousInterceptRequiresStableDrift => {
+                "asymptotes-true continuous intercept requires a stable negative drift"
+            }
+            Self::UnstandardisedContinuousInterceptIsNotAsymptotesTrueContinuousIntercept => {
+                "unstandardised continuous intercept is not asymptotes-true continuous intercept"
+            }
+            Self::AsymptoticContinuousInterceptIsNotAsymptotesTrueContinuousIntercept => {
+                "asymptotic continuous intercept is not asymptotes-true continuous intercept"
+            }
+            Self::DiscreteContinuousInterceptIsNotAsymptotesTrueContinuousIntercept => {
+                "discrete continuous intercept is not asymptotes-true continuous intercept"
+            }
+            Self::StandardisedContinuousInterceptIsNotAsymptotesTrueContinuousIntercept => {
+                "standardised continuous intercept is not asymptotes-true continuous intercept"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2108,34 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_continuous_intercept_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptotesTrueContinuousInterceptRequiresStableDrift.to_string(),
+            "asymptotes-true continuous intercept requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedContinuousInterceptIsNotAsymptotesTrueContinuousIntercept
+                .to_string(),
+            "unstandardised continuous intercept is not asymptotes-true continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticContinuousInterceptIsNotAsymptotesTrueContinuousIntercept
+                .to_string(),
+            "asymptotic continuous intercept is not asymptotes-true continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteContinuousInterceptIsNotAsymptotesTrueContinuousIntercept
+                .to_string(),
+            "discrete continuous intercept is not asymptotes-true continuous intercept"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousInterceptIsNotAsymptotesTrueContinuousIntercept
+                .to_string(),
+            "standardised continuous intercept is not asymptotes-true continuous intercept"
         );
     }
 }

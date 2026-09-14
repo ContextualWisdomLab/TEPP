@@ -261,6 +261,15 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era active `asymptotes=TRUE` `CINT` rewrite as
+//! `−a · κ` (`summary.ctsemFit.R` forms
+//! `if(asymptotes==TRUE) CINT <- -DRIFT %*% CINT` immediately after
+//! `mxobj$CINT$values`; form `a` first, then negate, then multiply
+//! by `κ`; a zero intercept is exactly zero even if `a ≥ 0`;
+//! `a ≥ 0` with a nonzero intercept fails closed; unstandardised
+//! `CINT` is not that rewrite; `asymCINT` `-κ / a` is not that
+//! rewrite; `discreteCINT` is not that rewrite; `CINTstd` is not
+//! that rewrite; JSS PDF re-opened 2026-08-31T05:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -311,6 +320,8 @@ pub use event_time::LagClock;
 pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar 2017-era active `asymptotes=TRUE` `CINT` rewrite `−a · κ`.
+pub use event_time::recover_asymptotes_true_continuous_intercept;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
 pub use event_time::recover_asymptotic_continuous_intercept;
 /// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
@@ -452,6 +463,8 @@ pub use event_time::recover_within_residual_event_time_log_rate;
 pub use event_time::refuse_after_extra_process_contribution_as_observed_mean;
 /// Refuse treating the evolved-plus-after-contribution latent mean as `E(y_t)`.
 pub use event_time::refuse_after_extra_process_latent_mean_as_observed_mean;
+/// Refuse treating Table 2 `asymCINT` as the 2017-era active `asymptotes=TRUE` `CINT` rewrite.
+pub use event_time::refuse_asymptotic_continuous_intercept_as_asymptotes_true_continuous_intercept;
 /// Refuse treating Table 2 `asymCINT` as `asymTIPREDEFFECT`.
 pub use event_time::refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect;
 /// Refuse treating Table 2 `asymCINT` as `CINT`.
@@ -488,6 +501,8 @@ pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
+/// Refuse treating Table 2 `discreteCINT` as the 2017-era active `asymptotes=TRUE` `CINT` rewrite.
+pub use event_time::refuse_discrete_continuous_intercept_as_asymptotes_true_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `asymCINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
@@ -620,6 +635,8 @@ pub use event_time::refuse_process_noise_as_unconditional_variance;
 pub use event_time::refuse_standardised_asymptotic_diffusion_as_standardised_initial_latent_variance;
 /// Refuse treating p. 16 `DIFFUSIONstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion;
+/// Refuse treating p. 16 `CINTstd` as the 2017-era active `asymptotes=TRUE` `CINT` rewrite.
+pub use event_time::refuse_standardised_continuous_intercept_as_asymptotes_true_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `asymCINTstd`.
 pub use event_time::refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `CINTstd` as `discreteCINTstd`.
@@ -729,6 +746,8 @@ pub use event_time::refuse_unmatched_time_varying_predictor_interval;
 pub use event_time::refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating unstandardised `asymDIFFUSION` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion;
+/// Refuse treating unstandardised `CINT` as the 2017-era active `asymptotes=TRUE` rewrite.
+pub use event_time::refuse_unstandardised_continuous_intercept_as_asymptotes_true_continuous_intercept;
 /// Refuse treating unstandardised `CINT` as `CINTstd`.
 pub use event_time::refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating unstandardised `discreteCINT` as `discreteCINTstd`.
