@@ -1,82 +1,137 @@
 # ADR 0034 — Rubin loading uncertainty as an analysis-run output profile
 
-**Decision status:** Accepted
+**Decision status:** Proposed
 **Implementation maturity:** active-PR — composed on this branch; not implemented-main
 **Date:** 2026-08-31
+**Last reviewed:** 2026-09-14
 **Supersedes:** None; complements ADR 0005 (ESEM/DSEM interpretation) and ADR 0022 (cutoff-safe analysis-run execution).
 **Figma File ID:** N/A — this increment changes a Rust service crate and has no user-interface surface.
 **Storybook inventory:** N/A — no reusable web object or interaction changed.
 
 ## Context
 
-Protected main already averages posterior-draw OLS loadings and combines those
-loadings with Rubin (1996) total variance `T = Ū + (1 + 1/m) B` inside
-`psychometric_core`. Operators still cannot request that joint uncertainty
-wiring as a digest-bound analysis-run output. Recovery primitives alone are
-not the ESEM/DSEM engine (GAP-006 / #169). A second Driver p.16 `std`-family
-restore, another CWC bind, or another GAP-003A HTTP slice would not close this
-operator-visible gap.
+Protected main owns two deliberately different `psychometric_core` contracts:
+`recover_loading_point_estimate_mean` computes a scaled, compensated mean of
+posterior-draw OLS loading point estimates, while
+`combine_draw_level_ols_loadings` computes Rubin (1996) `Q̄`, `Ū`, `B`, and
+`T = Ū + (1 + 1/m)B` for complete-data OLS loadings. The latter's ordinary
+loading accumulation is not a substitute for the former's robust point
+estimate under large cancellation.
 
-The library helpers are explicit: the draw-mean is not Rubin pooling, and
-Rubin `T` on complete-data OLS loadings is not Mislevy person-level
-plausible-value draws.
+Operators still cannot request the joint result as a historical, digest-bound
+Analysis Run output. The original branch also left several application
+contracts weaker than the profile name implied: row availability lacked an
+immutable snapshot identity, request/executor cutoffs were compared as RFC
+3339 text, draw/matrix materialization was unbounded, artifact counts could
+claim unreachable executions, serialized `T` was not checked against its
+components, and terminal provider validation reused the scientific inference
+label.
 
 ## Decision
 
-Add the `rubin_loading_uncertainty_v1` analysis-run output profile to
-`analysis_engine`. The executor:
+Add `rubin_loading_uncertainty_v1` to `analysis_engine` as an application
+composition over the protected-main scientific owners. The executor:
 
-- consumes already-mapped factor scores, complete-data indicator draws, an
-  admitted indicator kind, and `available_time`;
-- excludes observations whose availability is later than the request
-  `knowledge_cutoff`;
-- jointly invokes `recover_loading_point_estimate_mean` and
-  `combine_draw_level_ols_loadings` without reimplementing either helper;
-- emits a canonical SHA-256-digested `tepp.rubin_loading_uncertainty.v1`
-  artifact with observation/draw counts, excluded-after-cutoff count,
-  indicator kind, point-estimate mean, Rubin `Q̄`/`Ū`/`B`/`T`, and inference
-  status `rubin_combined_ols_loadings_not_mislevy_pv`;
-- does not invent an ESEM/DSEM sampler, persist rows, treat the draws as
-  Mislevy person-level plausible values, or claim strong invariance.
+- requires every `RubinLoadingObservation` to carry the requested immutable
+  `snapshot_id` and typed `AvailableTime`;
+- rejects cross-snapshot observations and excludes same-snapshot observations
+  with `AvailableTime > KnowledgeCutoff` before matrix/scientific admission;
+- parses request cutoffs and compares temporal instants, while persisted
+  artifacts retain one canonical RFC 3339 cutoff representation;
+- invokes `recover_loading_point_estimate_mean` for the robust point estimate
+  and `combine_draw_level_ols_loadings` independently for Rubin `Q̄/Ū/B/T`;
+- limits the current application representation to at most 256 complete-data
+  draws and 1,000,000 admitted observation-by-draw cells before transposition.
+  These are resource envelopes, not psychometric validity recommendations;
+- bounds total raw observation population with `MAX_EVIDENCE_UNITS` and makes
+  imported artifact counts obey the same reachable envelope;
+- validates imported `T` by recomputing the exact binary64 expression used by
+  the scientific owner. Canonical JSON round-tripping preserves the component
+  values, so exact equality is the chosen wire-integrity policy rather than a
+  tolerance that could admit a different scientific result;
+- applies the 256 KiB artifact envelope to both untrusted `from_json` and
+  canonical `to_json`, with a maximal-valid escaping proof for the output
+  direction;
+- propagates artifact/digest errors instead of asserting that accepted request
+  identifiers make serialization infallible;
+- emits terminal `AnalysisResultSummary.validation_status = "validated"` and
+  keeps `rubin_combined_ols_loadings_not_mislevy_pv` solely as the artifact's
+  scientific inference boundary.
 
-This is draw-level OLS combination, not multiple imputation of persons, not
-CWC, and not a random-effects sampler.
+This remains draw-level OLS combination. It is not person-level plausible-value
+pooling, an ESEM/DSEM sampler, CWC, persistence, or a causal estimator.
+
+## Historical replay invariant
+
+For a fixed requested snapshot and knowledge cutoff, adding evidence that only
+becomes available after that cutoff must not change the earlier admitted
+factor-score/draw matrix or its scientific result. Such rows may change only
+the excluded-after-cutoff count. A row from another immutable snapshot is not
+historical censoring; it is a provenance violation and fails closed even when
+its availability is later than the cutoff.
 
 ## Alternatives considered
 
-1. Restore another Driver p.16 standardised matrix — rejected because those
-   recoveries are already a live micro-PR family and do not bind uncertainty
-   to an analysis run.
-2. Duplicate the GAP-006 CWC analysis-run bind — rejected because CWC slopes
-   are a different estimand already occupied by a live PR.
-3. Put Rubin combination into `tepp_api` — rejected because transport
-   contracts and scientific combination would become one service boundary.
-4. Bind the existing `psychometric_core` draw-mean and Rubin `T` helpers to
-   ADR 0022's analysis-run profile — accepted.
+1. Use `combine_draw_level_ols_loadings.mean_loading` for both fields — rejected
+   because it bypasses the protected robust point-estimate contract and can
+   differ under large cancellation.
+2. Compare cutoff strings — rejected because legal RFC 3339 representations of
+   one instant must not alter historical execution.
+3. Drop late rows without snapshot provenance — rejected because unrelated
+   snapshot data could be silently attributed to the requested run.
+4. Accept any finite nonnegative serialized `T` — rejected because a digest-
+   bound uncertainty artifact must be internally consistent with its own
+   components and draw count.
+5. Leave draws unbounded and rely on `MAX_EVIDENCE_UNITS` — rejected because
+   matrix materialization is a separate multiplicative resource dimension.
+6. Put Rubin arithmetic into `analysis_engine` — rejected because reusable
+   scientific arithmetic remains `psychometric_core`-owned.
+
+## Scientific acceptance boundary
+
+Known-truth/noiseless fixtures and edge contracts are regression evidence, not
+commercial scientific acceptance. Issue #503 owns repeated true-loading
+recovery, bias/RMSE with Monte Carlo uncertainty, an explicitly justified
+interval construction and empirical coverage, attempted/recovered/failed
+denominators, design sensitivity, and leakage-safe historical evaluation.
+Neither LLM judgment nor synthetic unit fixtures may close that gap.
+
+Primary authority for the current combining rule remains:
+
+Rubin, D. B. (1996). Multiple imputation after 18+ years. *Journal of the
+American Statistical Association, 91*(434), 473–489.
+https://doi.org/10.1080/01621459.1996.10476908
+
+Repository research authority is `docs/research/rubin-total-variance.md`.
 
 ## Consequences
 
-Operators can request cutoff-safe joint point-estimate and Rubin-`T` loading
-uncertainty as a digest-bound terminal result. The artifact is not Mislevy
-person-level plausible values, not an ESEM fit, and not implemented-main
-until exact-head Checks and two independent approvals land.
+The profile has a narrower, auditable temporal and resource boundary, and its
+artifact can no longer claim a Rubin total inconsistent with its serialized
+components. Consumers can distinguish provider validation from the scientific
+claim boundary and can distinguish the robust point estimate from Rubin `Q̄`.
+The profile remains Draft/Proposed and not implemented-main while #503 and the
+normal exact-head merge gates remain unresolved.
 
 ## Verification
 
+Required exact-head verification includes:
+
 ```text
-cargo fmt -p analysis_engine -- --check
+cargo fmt --all -- --check
 cargo test -p analysis_engine
 cargo clippy -p analysis_engine --all-targets -- -D warnings
+python3 scripts/validate_documentation.py
 ```
 
-Known-truth noiseless draws recover mean loading `0.8` with strictly positive
-between-draw variance and Rubin `T = Ū + (1 + 1/m) B`. Cutoff exclusion,
-snapshot/profile mismatch, empty eligibility, a single draw, raw proportions,
-and unequal draw lengths fail closed.
+Regression contracts cover equivalent cutoff instants, future-evidence replay,
+cross-snapshot refusal, robust-point versus naive-mean cancellation, exact and
+exceeded draw/resource bounds, inconsistent Rubin totals, artifact count
+bounds, and terminal provider/domain-status separation.
 
 ## Rollback and supersession
 
 Rollback removes the `rubin_loading_uncertainty_v1` profile. No persisted
-schema migration is introduced. Supersede only with an ADR that keeps Rubin
-`T` on complete-data OLS loadings distinct from Mislevy person-level
-plausible values.
+schema migration is introduced. Supersede only with an ADR that preserves the
+scientific owner split, temporal provenance, resource admission, and the
+Rubin-versus-Mislevy claim boundary.
