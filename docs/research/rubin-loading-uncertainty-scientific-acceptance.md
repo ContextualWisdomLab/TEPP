@@ -18,6 +18,8 @@ Every fourth observation also receives draw-specific zero-mean Gaussian uncertai
 
 Eight predeclared scenarios cross two observation counts (`48`, `160`), two draw counts (`8`, `32`), two true loadings (`0.4`, `1.2`), and two residual scales (`0.5`, `1.2`). Each scenario uses 512 attempted replications. A replication is recovered only when the public Analysis Run executor succeeds; failures remain in the attempted/recovered/failed accounting.
 
+Every generated population has its own immutable snapshot identity and its own accepted Analysis Run identity. This matters because a Monte Carlo replication changes the underlying population; reusing one `snapshot_id` or one run receipt across different generated datasets would contradict the same provenance semantics this acceptance test is intended to exercise. The rolling-origin comparison is different: the early-full, early-prefix, and later-cutoff executions inside one replication share that replication's snapshot because they are alternative historical views of one generated population, but they use distinct run/idempotency identities. RED `16e3c151d6cadd79c1ec8e32d74a8401333be42c` exposed the original snapshot aliasing; repair `ed2ac416ac42cb15909cefde0581af408de652e7` binds the corrected identities.
+
 Bias is the mean signed recovery error. Bias MCSE is the sample standard deviation of recovery errors divided by `sqrt(R)`. RMSE is the square root of mean squared recovery error; its MCSE uses the delta method from the sample standard deviation of squared errors. Coverage MCSE is the sample standard error of the 0/1 coverage indicator. These numerical summaries are computed over recovered executions. The acceptance gate separately requires `recovered = attempted` and `failed = 0`, so a passing scenario cannot silently omit a refused execution from the metric denominator. All count-to-floating conversions are bounded and checked in the Rust harness rather than using unchecked integer casts.
 
 The interval diagnostic is
@@ -45,7 +47,7 @@ The executable gate additionally requires zero profile refusals, `|bias| <= 0.01
 
 A separate 512-replication design generates 64 rows with `lambda = 0.8`, `sigma = 1.0`, 16 draws, and draw-specific uncertainty `0.5`. The first 48 rows are available before the early knowledge cutoff; the last 16 become available only later.
 
-For every replication the early run over all 64 supplied rows must be bit-identical on `point_estimate_mean`, Rubin mean, and `T` to a run supplied only the first 48 rows. The early artifact must report 48 admitted and 16 excluded rows. A later cutoff admits all 64 rows.
+For every replication the early run over all 64 supplied rows must be bit-identical on `point_estimate_mean`, Rubin mean, and `T` to a run supplied only the first 48 rows. The early artifact must report 48 admitted and 16 excluded rows. A later cutoff admits all 64 rows. These three executions share one replication-specific immutable snapshot and carry three distinct run identities; no Analysis Run receipt is reused across different input views.
 
 | rolling-origin state | attempted / recovered / failed | bias | RMSE | mean T |
 | --- | --- | ---: | ---: | ---: |
