@@ -19,7 +19,7 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | interval relation/reasoner API | `temporal_core` | event/relation validation | implemented-main (`temporal-core/v1`; in-memory reasoner; merged PR #9; Allen, 1983; [`relation_contract.rs`](../crates/temporal_core/tests/relation_contract.rs), [`reasoner_contract.rs`](../crates/temporal_core/tests/reasoner_contract.rs), [`temporal-event-foundation.md`](validation/temporal-event-foundation.md)) |
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
-| topic-context posterior plausible values | `analysis_engine` `tepp.topic_context_posterior.v1` | fast-mlsirm, LineageWeave | contract-only active-PR |
+| topic-context posterior plausible values | `analysis_engine` `tepp.topic_context_posterior.v2` | fast-mlsirm, LineageWeave | contract-only active-PR |
 | LLM interpretation provider port | `orchestrator_live` loopback `POST /v1/interpretation-runs` | contextual-orchestrator | partial |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
@@ -104,17 +104,25 @@ path behind these DTOs. It consumes a bounded identity-free snapshot, excludes
 evidence unavailable at the historical cutoff, preserves multiple-membership
 counts, and emits a digest-bound terminal result or a redacted failure. For the
 `trsl_topic_lineage_v1` profile it invokes the ADR-0012 `topic_measurement`
-reference estimator and publishes validated fitted associations and counts in
-`tepp.trsl_topic_lineage.v1`; it does not infer causality or replace production
-`K` selection. This remains active product-branch evidence until its exact-head
+reference estimator and publishes validated fitted associations, counts,
+candidate-fit evidence, and separate source-snapshot and numerical-input digests
+in `tepp.trsl_topic_lineage.v2`; it does not infer causality or replace
+production `K` selection. This remains active product-branch evidence until its exact-head
 checks and protected merge pass.
 
-The separate `tepp.topic_context_posterior.v1` artifact carries per-post
+Version 1 artifacts cannot be upgraded by filling fields: they do not contain
+the candidate-fit evidence or complete numerical-input digest required by v2.
+Clients retain v1 as historical evidence and rerun its immutable source snapshot
+at the original knowledge cutoff to produce v2; the parser rejects v1 rather
+than inventing missing scientific provenance.
+
+The separate `tepp.topic_context_posterior.v2` artifact carries per-post
 posterior logistic-normal plausible values, a declared event clock, opaque
 stable topic identities, artifact-local coordinate order, topic activity,
 explicit topic-lineage events, admitted Event Lineage document relations, and
 provenance-bound time-valid business-unit, PU, team, and person memberships.
-The ordered `topic_ids` array defines coordinate order. Each lineage,
+The ordered `topic_ids` array defines coordinate order; `topic_basis_sha256`
+binds that order to `posterior_draw_set_id` and fails closed on relabeling. Each lineage,
 document-relation, or membership assertion identifies its immutable evidence
 resource, provenance assertion, and digest so consumers can materialize
 normalized qualified provenance. It is the only admitted handoff to the
@@ -125,9 +133,10 @@ Serialization sorts every record collection by its stable identity/time key,
 so input permutations produce the same canonical JSON and SHA-256. The sole
 document-relation kind in v1 is `event_lineage_precedes`; its source document
 event time cannot follow its target document event time.
-The strict DTO/schema is contract-only: the current CPU reference estimator
-does not yet emit posterior draws through this artifact, and no accepted GPU
-or asynchronous producer result exists.
+The CPU reference path emits bound joint posterior draws and materializes the
+complete document-by-draw plausible-value grid through
+`assemble_topic_context_posterior`. No accepted GPU or asynchronous producer
+result exists.
 The JSON Schema is the bounded record-shape contract. Cross-record invariants
 that require joining opaque document identities—at least two distinct
 documents, a complete document-by-draw grid, and all four time-covering

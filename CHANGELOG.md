@@ -38,6 +38,11 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+- `analysis_engine` now assembles complete `tepp.topic_context_posterior.v2` CPU `f64` artifacts from a converged fit and exact accepted-run evidence, preserving joint Philox plausible values, a digest-bound topic basis, declared event time, stable topic activity, provenance-bound Event Lineage branches, and time-valid BU/PU/team/person multiple memberships. Missing evidence fails closed, no importance score is inferred, and exact JSON `f64` round trips prevent digest drift; accelerator execution remains unclaimed.
+
+- `analysis_engine` now runs real fitted candidate-`K` selection before completing a v2 topic-lineage artifact, retaining only the selected CPU `f64` fit while prefix-free digest-binding the complete numerical input and source snapshot, enforcing bounded fit/input work, and recording per-candidate success/failure diagnostics with the winning seed, iterations, objective, and separately non-authoritative LLM recommendations.
+
+- Current ADR identities are unique again: the post-ADR-0025 lineage-pair and Project Journey decision is ADR 0026, the pre-remap analysis-run draft is archived behind canonical ADR 0022, and documentation validation now rejects duplicate numbered ADR files before one can overwrite another in the registry scan.
 - Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.

@@ -41,12 +41,16 @@ For the `trsl_topic_lineage_v1` output profile, the engine may invoke the
 ADR-0012 `topic_measurement` CPU `f64` reference estimator through its validated
 `ReferenceTopicInput`. The engine does not reimplement or reinterpret the
 estimator. It binds the request snapshot and cutoff, then emits a canonical
-`tepp.trsl_topic_lineage.v1` artifact containing only the selected seed,
-iteration/objective evidence, topic count, evidence count, fitted
+`tepp.trsl_topic_lineage.v2` artifact containing the selected seed,
+iteration/objective evidence, candidate-fit manifest, separate source-snapshot
+and numerical-input digests, topic count, evidence count, fitted
 predecessor/successor topic edges, connectable-post count, and lineage count.
 The artifact is bounded, digest-bound, and self-validating; invalid or
 non-converged estimation returns no partial artifact. Production selection of
 `K` remains governed by ADR 0012 and `model_selection`, outside this executor.
+Because v1 did not bind the candidate-fit manifest or complete numerical input,
+its migration is a cutoff-identical rerun from the immutable source snapshot;
+field synthesis is prohibited and v1 remains historical evidence.
 
 ## Alternatives considered
 

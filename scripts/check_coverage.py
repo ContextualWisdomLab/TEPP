@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -235,13 +236,17 @@ def is_executable_source_line(
         "}",
         "(",
         ")",
+        ") {",
         "},",
         ");",
+        ")?;",
         "];",
         "();",
         "};",
         "});",
         "Ok(())",
+        "Ok((",
+        "]",
     }:
         return False
     if _is_standalone_string_literal(text) or text.startswith("} else"):
@@ -250,7 +255,11 @@ def is_executable_source_line(
         type_name = text[:-2]
         if type_name and all(character.isalnum() or character in "_:" for character in type_name):
             return False
+        if not text.startswith("return ") and _opens_struct_literal(text):
+            return False
     if text.startswith("use ") or text.startswith("pub use "):
+        return False
+    if text.startswith("type "):
         return False
     if text.startswith("mod ") or text.startswith("pub mod "):
         return False
@@ -288,16 +297,41 @@ def is_executable_source_line(
         return False
     if text.startswith("Ok(Self") or text in {")}", "})"}:
         return False
-    if text in {"} else {", "else {", "));"} or text.startswith((".", "||", "&&")):
-        return False
-    if (
-        text.endswith(",")
-        and not text.startswith("let ")
-        and not text.startswith("return ")
-        and _is_structural_comma_continuation(lines, line_number, text)
+    if text.endswith(",") and not text.startswith(("let ", "return ")):
+        if _is_structural_comma_continuation(lines, line_number, text):
+            return False
+        if _has_executable_comma_syntax(text):
+            return True
+    if text in {"} else {", "else {", "));"} or text.startswith(
+        (".", "||", "&&")
     ):
         return False
+    if text.startswith(("/", "*")) and not any(
+        character in text for character in "()="
+    ):
+        return False
+    following = next(
+        (candidate.strip() for candidate in lines[line_number:] if candidate.strip()),
+        "",
+    )
+    if following.startswith("."):
+        receiver = text.rsplit("=>", 1)[-1].strip()
+        if all(character.isalnum() or character in "_:" for character in receiver) and (
+            (
+                "=>" in text
+                and " if " not in text
+                and not _is_multiline_match_guard(lines, line_number)
+            )
+            or _is_structural_comma_continuation(lines, line_number, f"{text},")
+        ):
+            return False
     return True
+
+
+def _has_executable_comma_syntax(text: str) -> bool:
+    """Return whether a comma line contains expression-only syntax."""
+
+    return any(character in text for character in ".()[]=+-*/%<>!&|?")
 
 
 def _is_structural_comma_continuation(
@@ -306,22 +340,16 @@ def _is_structural_comma_continuation(
     """Return whether a comma-terminated line is proven to be structural.
 
     A comma can terminate a declaration field, enum variant, function
-    parameter, or ordinary call argument. Operators, calls, and assignments
-    remain executable because their expressions can perform observable work.
+    parameter, or multiline delimiter continuation. Only lines proven to sit
+    in one of those structural contexts are excluded from the authored-line
+    denominator; every other comma-terminated line remains executable.
     """
-
-    if any(character in text for character in "()=+-*/%<>!&|?"):
-        return False
-    previous = ""
-    for candidate in reversed(lines[: line_number - 1]):
-        if candidate.strip():
-            previous = candidate.strip()
-            break
-    if previous.endswith("(") and "let " not in previous and "=" not in previous:
-        return True
 
     declaration_depth = 0
     function_parenthesis_depth = 0
+    expression_parenthesis_depth = 0
+    array_depth = 0
+    struct_literal_depth = 0
     for candidate in lines[: line_number - 1]:
         stripped = candidate.strip()
         if declaration_depth:
@@ -348,7 +376,51 @@ def _is_structural_comma_continuation(
             continue
         if "fn " in stripped and "(" in candidate:
             function_parenthesis_depth = candidate.count("(") - candidate.count(")")
-    return declaration_depth > 0 or function_parenthesis_depth > 0
+            continue
+        expression_parenthesis_depth = max(
+            0,
+            expression_parenthesis_depth + candidate.count("(") - candidate.count(")"),
+        )
+        array_depth = max(0, array_depth + candidate.count("[") - candidate.count("]"))
+        if _opens_struct_literal(candidate):
+            struct_literal_depth = max(
+                0, struct_literal_depth + candidate.count("{") - candidate.count("}")
+            )
+        elif struct_literal_depth:
+            struct_literal_depth = max(
+                0, struct_literal_depth + candidate.count("{") - candidate.count("}")
+            )
+    if declaration_depth > 0 or function_parenthesis_depth > 0:
+        return True
+    if _has_executable_comma_syntax(text):
+        return False
+    previous = ""
+    for candidate in reversed(lines[: line_number - 1]):
+        if candidate.strip():
+            previous = candidate.strip()
+            break
+    if previous.endswith("(") and "let " not in previous and "=" not in previous:
+        return True
+    return (
+        expression_parenthesis_depth > 0
+        or array_depth > 0
+        or struct_literal_depth > 0
+    )
+
+
+def _opens_struct_literal(candidate: str) -> bool:
+    """Return whether a Rust source line opens a named struct literal."""
+
+    prefix, separator, _ = candidate.rpartition("{")
+    if not separator:
+        return False
+    prefix = prefix.strip()
+    if not prefix:
+        return False
+    if prefix.startswith(("if ", "while ", "for ", "match ", "fn ", "struct ", "enum ")):
+        return False
+    final_token = prefix.rsplit(maxsplit=1)[-1]
+    return re.fullmatch(r"(?:[A-Za-z_]\w*::)*[A-Za-z_]\w*", final_token) is not None
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
@@ -452,6 +524,7 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 ('"', "r\"", "r#", "br\"", "br#")
             )
     return False
+
 
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""

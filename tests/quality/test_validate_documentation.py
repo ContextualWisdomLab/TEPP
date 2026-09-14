@@ -543,5 +543,117 @@ class PromotionAuthorityPointerTests(unittest.TestCase):
         self.assertIn("superseded draft", str(raised.exception))
 
 
+class AdrIdentityTests(unittest.TestCase):
+    """Require one current decision document for each ADR number."""
+
+    def test_duplicate_adr_numbers_fail_before_one_file_is_overwritten(self) -> None:
+        """Two filenames cannot silently share one normative identity."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0024](0024-first.md) | First | Accepted | partial | note |\n",
+                encoding="utf-8",
+            )
+            for name in ("0024-first.md", "0024-second.md"):
+                (adr_root / name).write_text("# duplicate\n", encoding="utf-8")
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError,
+                    r"duplicate ADR numbers: 0024=.*0024-first\.md.*0024-second\.md",
+                ):
+                    documentation.validate_adr_graph()
+
+    def test_adr_heading_must_match_filename_number(self) -> None:
+        """A unique filename cannot conceal a duplicate semantic ADR identity."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0026](0026-current.md) | Current | Accepted | partial | note |\n",
+                encoding="utf-8",
+            )
+            (adr_root / "0026-current.md").write_text(
+                "# ADR 0025: Duplicate identity\n",
+                encoding="utf-8",
+            )
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError, "ADR 0026 heading does not match its filename"
+                ):
+                    documentation.validate_adr_graph()
+
+    def test_adr_index_target_must_match_numbered_file(self) -> None:
+        """The displayed ADR number cannot link to a different decision file."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0026](0025-existing.md) | Current | Accepted | partial | note |\n",
+                encoding="utf-8",
+            )
+            (adr_root / "0026-current.md").write_text(
+                "# ADR 0026: Current identity\n",
+                encoding="utf-8",
+            )
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError, "ADR 0026 index target does not match 0026-current.md"
+                ):
+                    documentation.validate_adr_graph()
+
+    def test_adr_index_rejects_conflicting_targets_for_one_number(self) -> None:
+        """Repeated index rows cannot silently redirect one ADR identity."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0026](0026-current.md) | Current | Accepted | partial | note |\n"
+                "| [0026](0026-other.md) | Other | Accepted | partial | note |\n",
+                encoding="utf-8",
+            )
+            (adr_root / "0026-current.md").write_text(
+                "# ADR 0026: Current identity\n",
+                encoding="utf-8",
+            )
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError,
+                    "ADR 0026 has conflicting index targets: "
+                    "0026-current.md, 0026-other.md",
+                ):
+                    documentation.validate_adr_graph()
+
+    def test_adr_index_rejects_repeated_same_target_rows(self) -> None:
+        """One ADR cannot carry multiple index rows or maturity claims."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            adr_root = root / "docs" / "adr"
+            adr_root.mkdir(parents=True)
+            (adr_root / "README.md").write_text(
+                "| [0026](0026-current.md) | Current | Accepted | partial | note |\n"
+                "| [0026](0026-current.md) | Current | Accepted | active-PR | other |\n",
+                encoding="utf-8",
+            )
+            (adr_root / "0026-current.md").write_text(
+                "# ADR 0026: Current identity\n",
+                encoding="utf-8",
+            )
+            with unittest.mock.patch.object(documentation, "ROOT", root):
+                with self.assertRaisesRegex(
+                    AssertionError, "ADR 0026 appears more than once in the index"
+                ):
+                    documentation.validate_adr_graph()
+
+
 if __name__ == "__main__":
     unittest.main()

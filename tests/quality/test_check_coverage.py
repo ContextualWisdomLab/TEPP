@@ -677,6 +677,23 @@ class CoverageContractTests(unittest.TestCase):
                 "pub(crate) fn crate_visible() {",  # 73 visibility-qualified fn
                 "State::Accepted => {",  # 74 match-arm structure
                 "State::Guarded(value) if valid(value) => {",  # 75 guarded arm is executable
+                ")?;",  # 76 fallible multiline call close
+                ") {",  # 77 multiline condition close
+                "    *slot = value;",  # 78 executable dereference assignment
+                "fn fail(",  # 79 multiline signature
+                ") -> Result<(), Error>",  # 80 multiline return type
+                "{",  # 81 standalone function brace
+                "    return Err(Error::Invalid);",  # 82 executable error return
+                "}",  # 83 function close
+                "    return Item {",  # 84 executable return
+                "        field,",  # 85 structural field
+                "        nested: Nested {",  # 86 structural nested literal
+                "            value,",  # 87 structural nested field
+                "        },",  # 88 structural close
+                "    };",  # 89 structural close
+                "    Item {",  # 90 structural implicit-return literal
+                "        field,",  # 91 structural field
+                "    }",  # 92 structural close
             ]
             source.write_text("\n".join(source_lines) + "\n", encoding="utf-8")
             path = str(source)
@@ -691,7 +708,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 75}
+            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 75, 78, 82, 84}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -714,6 +731,9 @@ class CoverageContractTests(unittest.TestCase):
                         "DA:62,0",
                         "DA:66,0",
                         "DA:67,0",
+                        "DA:85,0",
+                        "DA:87,0",
+                        "DA:91,0",
                         "DA:1,0",
                         "DA:2,0",
                         "DA:51,0",
@@ -1113,6 +1133,7 @@ class CoverageContractTests(unittest.TestCase):
 
             self.assertFalse(coverage_contract.is_executable_source_line(path, 3))
             self.assertTrue(coverage_contract.is_executable_source_line(path, 5))
+
             self.assertTrue(coverage_contract.is_executable_source_line(path, 7))
             self.assertTrue(coverage_contract.is_executable_source_line(path, 8))
 
@@ -1243,6 +1264,115 @@ class CoverageContractTests(unittest.TestCase):
             self.assertFalse(coverage_contract.is_executable_source_line(path, 9))
             self.assertFalse(coverage_contract.is_executable_source_line(path, 11))
 
+    def test_line_filter_excludes_split_expression_regions(self) -> None:
+        """LLVM-attributed expression fragments are not independent authored lines."""
+
+        lines = [
+            "    Ok((",
+            "        source,",
+            "    ));",
+            "    let fields = [",
+            "        event.evidence_sha256.as_bytes(),",
+            "    ]",
+            "    let output = values",
+            "        .iter();",
+            "    type Output = (u8, u8);",
+            "    let penalty = total",
+            "        * config.strength",
+            "        / 2.0;",
+            "    _ => event",
+            "        .target(),",
+            "    if invalid",
+            "    {",
+            "        return Err(Error::Invalid);",
+            "    }",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "split.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            for line_number in (1, 2, 6, 9, 11, 12, 13):
+                self.assertFalse(
+                    coverage_contract.is_executable_source_line(
+                        str(source), line_number
+                    )
+                )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 5)
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 17)
+            )
+
+    def test_line_filter_keeps_observable_nested_expressions(self) -> None:
+        """Structural-depth handling cannot hide calls inside expressions."""
+
+        cases = {
+            "array_call": "fn f() {\n let x = [\n  side_effect(),\n ];\n}\n",
+            "tuple_call": "fn f() {\n let x = (\n  side_effect(),\n );\n}\n",
+            "struct_call": "fn f() {\n let x = Item {\n  field: side_effect(),\n };\n}\n",
+            "division_call": "fn f(a: f64) {\n let x = a\n  / denominator();\n}\n",
+            "multiplication_call": "fn f(a: f64) {\n let x = a\n  * multiplier();\n}\n",
+            "array_block_call": "fn f() {\n let x = [\n  { side_effect(); 1 },\n ];\n}\n",
+            "dot_call": "fn f() {\n let x = [value\n  .side_effect(),\n ];\n}\n",
+            "dot_await": "fn f() {\n let x = [future\n  .await,\n ];\n}\n",
+            "indexed_value": "fn f() {\n let x = [\n  values[index],\n ];\n}\n",
+            "dereference": "fn f() {\n let x = [\n  *pointer,\n ];\n}\n",
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            for name, source_text in cases.items():
+                with self.subTest(name=name):
+                    source = Path(temporary) / f"{name}.rs"
+                    source.write_text(source_text, encoding="utf-8")
+                    self.assertTrue(
+                        coverage_contract.is_executable_source_line(str(source), 3)
+                    )
+
+    def test_line_filter_excludes_array_type_declarations(self) -> None:
+        """Array types in parameters and struct fields are structural syntax."""
+
+        lines = [
+            "struct Packet {",
+            "    bytes: [u8; 4],",
+            "}",
+            "fn decode(",
+            "    bytes: [u8; 4],",
+            ") {}",
+            "fn use_value(values: &[u8], index: usize) {",
+            "    consume(values[index],",
+            "}",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "array_types.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 5)
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 8)
+            )
+
+    def test_lcov_keeps_uncovered_dot_call_in_authored_denominator(self) -> None:
+        """An uncovered chained call cannot pass as structural punctuation."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "src.rs"
+            source.write_text(
+                "fn f() {\n value\n  .side_effect(),\n covered();\n}\n",
+                encoding="utf-8",
+            )
+            report = self.write_lcov(
+                temporary,
+                "SF:src.rs\nDA:3,0\nDA:4,1\nend_of_record\n",
+            )
+            self.assertEqual(
+                coverage_contract.load_lcov_line_totals(report, root),
+                {"lines": {"count": 2, "covered": 1}},
+            )
+
     def test_line_filter_keeps_inline_functions_and_block_comment_followers(self) -> None:
         """Inline function bodies and code after quoted block comments stay visible."""
 
@@ -1326,12 +1456,63 @@ class CoverageContractTests(unittest.TestCase):
                 lines, 3, "field_name,"
             )
         )
+        self.assertTrue(
+            coverage_contract._is_structural_comma_continuation(
+                [")", "record_value(", "field_name,"], 3, "field_name,"
+            )
+        )
+
+        nested_struct = ["let value = Item {", "nested: Nested {", "field,"]
+        self.assertTrue(
+            coverage_contract._is_structural_comma_continuation(
+                nested_struct, 3, "field,"
+            )
+        )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "receiver.rs"
+            source.write_text("fn call(\nvalue\n.method()\n", encoding="utf-8")
+            self.assertFalse(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "call_opener.rs"
             source.write_text("\n".join(lines) + "\n", encoding="utf-8")
             self.assertFalse(
                 coverage_contract.is_executable_source_line(str(source), 3)
             )
+
+    def test_multiline_call_argument_remains_executable(self) -> None:
+        """A nested call argument cannot disappear from the authored denominator."""
+
+        lines = ["record_value(", "    build_value(),", ")"]
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "call_argument.rs"
+            source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 2)
+            )
+
+    def test_match_receiver_filter_is_structural_not_identifier_specific(self) -> None:
+        """Only a simple match receiver continued by a method chain is structural."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "match_receiver.rs"
+            source.write_text(
+                "Some(item) => item\n    .method(),\nSome(item) => item\nSome(item) => build_item()\nSome(item) if authorize(item) => item\n    .method(),\n",
+                encoding="utf-8",
+            )
+            path = str(source)
+            self.assertFalse(coverage_contract.is_executable_source_line(path, 1))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 3))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 4))
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 5))
+
+            source.write_text(
+                "Some(item)\nif authorize(item)\n=> item\n    .method(),\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(path, 3))
 
     def test_multiline_string_scanner_handles_escaped_char_and_past_eof(self) -> None:
         """Escaped char literals keep later lines classified; past-EOF is closed."""
@@ -1410,6 +1591,11 @@ class CoverageContractTests(unittest.TestCase):
     def test_structural_comma_continuation_edge_cases(self) -> None:
         """Exercise structural comma continuation detection edge branches."""
 
+        self.assertFalse(
+            coverage_contract._is_structural_comma_continuation(
+                [], 1, ".side_effect(),"
+            )
+        )
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "commas.rs"
             # A comma-terminated line whose preceding lines are entirely blank

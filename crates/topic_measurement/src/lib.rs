@@ -39,6 +39,10 @@ pub use posterior_draw::JointPosteriorDrawSet;
 pub use posterior_draw::JointPosteriorPlausibleValue;
 /// Identified joint precision in document-major ALR coordinate order.
 pub use reference::JointCoordinatePrecision;
+/// Maximum seeds, iterations, or candidate controls admitted to one CPU fit.
+pub use reference::MAX_REFERENCE_FIT_BUDGET;
+/// Maximum cells in any dense CPU reference-estimator working matrix.
+pub use reference::MAX_REFERENCE_WORKING_CELLS;
 /// Posterior uncertainty representation retained by a fitted reference model.
 pub use reference::PosteriorApproximation;
 /// One admitted structural prevalence feature.
@@ -49,6 +53,8 @@ pub use reference::ReferenceTopicInput;
 pub use reference::ReferenceTopicModel;
 /// Bounded deterministic reference-estimator configuration.
 pub use reference::ReferenceTopicModelConfig;
+/// Immutable source snapshot identity bound to a reference input.
+pub use reference::ReferenceTopicSourceBinding;
 /// One inferred predecessor/successor association within a fitted topic.
 pub use reference::TopicSequenceEdge;
 /// Fit the bounded deterministic CPU `f64` TRSL-TM reference estimator.

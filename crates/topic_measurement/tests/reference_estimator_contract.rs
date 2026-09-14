@@ -236,7 +236,7 @@ fn invalid_configuration_and_topic_dimension_fail_closed() {
     .expect("counts");
     let input = ReferenceTopicInput::new(
         &snapshot,
-        document_ids,
+        document_ids.clone(),
         &counts,
         &times,
         None,
@@ -247,12 +247,48 @@ fn invalid_configuration_and_topic_dimension_fail_closed() {
     assert!(ReferenceTopicModelConfig::new(1, vec![1], 10, 1e-6).is_err());
     let too_many = ReferenceTopicModelConfig::new(3, vec![1], 10, 1e-6).expect("config");
     assert!(fit_reference_topic_model(&input, &too_many).is_err());
+    let oversized_counts = SparseMatrix::from_csr(
+        6,
+        topic_measurement::MAX_REFERENCE_WORKING_CELLS + 1,
+        vec![0, 1, 2, 3, 4, 5, 6],
+        vec![0, 0, 0, 1, 1, 1],
+        vec![1.0; 6],
+    )
+    .expect("sparse oversized vocabulary");
+    let oversized_input = ReferenceTopicInput::new(
+        &snapshot,
+        document_ids,
+        &oversized_counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("oversized sparse input");
+    let bounded_topics = ReferenceTopicModelConfig::new(2, vec![1], 10, 1e-6).expect("config");
+    assert_eq!(
+        fit_reference_topic_model(&oversized_input, &bounded_topics),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
 
     for (topics, seeds, iterations, tolerance) in [
         (2, vec![], 10, 1e-6),
+        (
+            2,
+            vec![1; topic_measurement::MAX_REFERENCE_FIT_BUDGET + 1],
+            10,
+            1e-6,
+        ),
         (2, vec![1], 1, 1e-6),
+        (
+            2,
+            vec![1],
+            topic_measurement::MAX_REFERENCE_FIT_BUDGET + 1,
+            1e-6,
+        ),
         (2, vec![1], 10, f64::NAN),
         (2, vec![1], 10, 0.0),
+        (2, vec![1; 2_049], 2_048, 1e-6),
     ] {
         assert!(ReferenceTopicModelConfig::new(topics, seeds, iterations, tolerance).is_err());
     }
@@ -282,6 +318,68 @@ fn invalid_configuration_and_topic_dimension_fail_closed() {
 fn invalid_structural_inputs_and_nonconvergence_fail_closed() {
     let (snapshot, document_ids, times, memberships, relations) = fixture();
     let counts = separated_counts();
+    let oversized_covariates = SparseMatrix::from_csr(
+        6,
+        topic_measurement::MAX_REFERENCE_FIT_BUDGET + 1,
+        vec![0, 1, 1, 1, 1, 1, 1],
+        vec![topic_measurement::MAX_REFERENCE_FIT_BUDGET],
+        vec![1.0],
+    )
+    .expect("sparse high-column covariate");
+    assert!(matches!(
+        ReferenceTopicInput::new(
+            &snapshot,
+            document_ids.clone(),
+            &counts,
+            &times,
+            Some(&oversized_covariates),
+            &memberships,
+            &relations,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    ));
+    let mut oversized_memberships = memberships.clone();
+    for index in 0..=topic_measurement::MAX_REFERENCE_FIT_BUDGET {
+        oversized_memberships
+            .insert(
+                MembershipAssignment::new(
+                    MemberId::from_uuid(Uuid::from_u128(10_000 + index as u128)),
+                    GroupId::from_uuid(Uuid::from_u128(20_000 + index as u128)),
+                    MembershipRole::Project,
+                    MembershipWeight::full().expect("full"),
+                    event_time(1),
+                    event_time(9),
+                )
+                .expect("bounded membership"),
+            )
+            .expect("unique membership");
+    }
+    assert!(matches!(
+        ReferenceTopicInput::new(
+            &snapshot,
+            document_ids.clone(),
+            &counts,
+            &times,
+            None,
+            &oversized_memberships,
+            &relations,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    ));
+    assert!(matches!(
+        ReferenceTopicInput::new_bound(
+            &snapshot,
+            "snapshot-reference",
+            KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff"),
+            document_ids.clone(),
+            &counts,
+            &times,
+            None,
+            &oversized_memberships,
+            &relations,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    ));
     assert!(
         ReferenceTopicInput::new(
             &snapshot,
@@ -546,4 +644,122 @@ fn invalid_structural_inputs_and_nonconvergence_fail_closed() {
         .with_hyperparameters(1.0, 0.5, 0.01, 0.05, f64::MAX)
         .expect("finite hyperparameters");
     assert!(fit_reference_topic_model(&input, &unstable).is_err());
+}
+
+#[test]
+fn source_binding_is_snapshot_and_cutoff_bound() {
+    let (snapshot, document_ids, times, memberships, relations) = fixture();
+    let counts = separated_counts();
+    let cutoff = KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff");
+    let covariate = SparseMatrix::from_csc(
+        6,
+        1,
+        vec![0, 6],
+        vec![0, 1, 2, 3, 4, 5],
+        vec![-1.0, -0.5, 0.0, 0.0, 0.5, 1.0],
+    )
+    .expect("covariate");
+    let input = ReferenceTopicInput::new_bound(
+        &snapshot,
+        "snapshot-reference",
+        cutoff,
+        document_ids.clone(),
+        &counts,
+        &times,
+        Some(&covariate),
+        &memberships,
+        &relations,
+    )
+    .expect("bound input");
+    let binding = input.source_binding().expect("binding");
+    assert_eq!(binding.snapshot_id(), "snapshot-reference");
+    assert_eq!(binding.knowledge_cutoff(), cutoff.to_rfc3339());
+    assert_eq!(binding.source_snapshot_sha256().len(), 64);
+    assert_eq!(binding.model_input_sha256().len(), 64);
+    let mut reversed_ids = document_ids.clone();
+    reversed_ids.reverse();
+    let mut reversed_times = times.clone();
+    reversed_times.reverse();
+    let reordered = ReferenceTopicInput::new_bound(
+        &snapshot,
+        "snapshot-reference",
+        cutoff,
+        reversed_ids,
+        &counts,
+        &reversed_times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("reordered input");
+    assert_ne!(
+        binding.model_input_sha256(),
+        reordered
+            .source_binding()
+            .expect("reordered binding")
+            .model_input_sha256()
+    );
+    assert_eq!(
+        ReferenceTopicInput::new(
+            &snapshot,
+            document_ids.clone(),
+            &counts,
+            &times,
+            None,
+            &memberships,
+            &relations,
+        )
+        .expect("legacy input")
+        .source_binding(),
+        None
+    );
+    assert!(
+        ReferenceTopicInput::new_bound(
+            &snapshot,
+            "",
+            cutoff,
+            document_ids.clone(),
+            &counts,
+            &times,
+            None,
+            &memberships,
+            &relations,
+        )
+        .is_err()
+    );
+    assert!(
+        ReferenceTopicInput::new_bound(
+            &snapshot,
+            "snapshot-reference",
+            KnowledgeCutoff::parse_rfc3339("2026-01-01T00:00:00Z").expect("early cutoff"),
+            document_ids,
+            &counts,
+            &times,
+            None,
+            &memberships,
+            &relations,
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn source_binding_reapplies_ordinary_input_validation() {
+    let (snapshot, document_ids, times, memberships, relations) = fixture();
+    let wrong_rows =
+        SparseMatrix::from_csr(2, 4, vec![0, 0, 0], vec![], vec![]).expect("wrong-row counts");
+    assert!(
+        ReferenceTopicInput::new_bound(
+            &snapshot,
+            "snapshot-reference",
+            KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff"),
+            document_ids,
+            &wrong_rows,
+            &times,
+            None,
+            &memberships,
+            &relations,
+        )
+        .is_err()
+    );
 }
