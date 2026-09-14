@@ -16,9 +16,9 @@ Each replication generates factor scores `f_i ~ N(0, 1)` and a base indicator
 
 Every fourth observation also receives draw-specific zero-mean Gaussian uncertainty with standard deviation `0.5 * sigma`. Other observations are held fixed across draws. This deliberately makes `B > 0` without replacing the profile with a second estimator. The deterministic SplitMix64 seed and Box-Muller transform are implemented in the Rust test; no external RNG or generated fixture is required.
 
-Eight predeclared scenarios cross two observation counts (`48`, `160`), two draw counts (`8`, `32`), two true loadings (`0.4`, `1.2`), and two residual scales (`0.5`, `1.2`). Each scenario uses 512 attempted replications. A replication is recovered only when the public Analysis Run executor succeeds; failures remain in the attempted denominator.
+Eight predeclared scenarios cross two observation counts (`48`, `160`), two draw counts (`8`, `32`), two true loadings (`0.4`, `1.2`), and two residual scales (`0.5`, `1.2`). Each scenario uses 512 attempted replications. A replication is recovered only when the public Analysis Run executor succeeds; failures remain in the attempted/recovered/failed accounting.
 
-Bias is the mean signed recovery error. Bias MCSE is the sample standard deviation of recovery errors divided by `sqrt(R)`. RMSE is the square root of mean squared recovery error; its MCSE uses the delta method from the sample standard deviation of squared errors. Coverage MCSE is the sample standard error of the 0/1 coverage indicator. All count-to-floating conversions are bounded and checked in the Rust harness rather than using unchecked integer casts.
+Bias is the mean signed recovery error. Bias MCSE is the sample standard deviation of recovery errors divided by `sqrt(R)`. RMSE is the square root of mean squared recovery error; its MCSE uses the delta method from the sample standard deviation of squared errors. Coverage MCSE is the sample standard error of the 0/1 coverage indicator. These numerical summaries are computed over recovered executions. The acceptance gate separately requires `recovered = attempted` and `failed = 0`, so a passing scenario cannot silently omit a refused execution from the metric denominator. All count-to-floating conversions are bounded and checked in the Rust harness rather than using unchecked integer casts.
 
 The interval diagnostic is
 
@@ -58,10 +58,24 @@ The later-cutoff RMSE is lower in this predeclared design, but that is a design-
 
 This evidence is intentionally single-level because `rubin_loading_uncertainty_v1` currently accepts one factor-score vector plus complete-data indicator draws. It does not flatten a multilevel, cross-classified, or multiple-membership design: those structures are absent from this profile contract. If the profile later gains such membership structure, this evidence must be extended before the corresponding scientific claim can be carried forward.
 
+## Draw-generation activation boundary
+
+This repeated-sampling study validates the behavior of the exact generator/analysis design declared above. It does **not** establish that an arbitrary caller-supplied finite draw matrix is a proper multiple-imputation or posterior draw set for Rubin-style frequentist inference. The current Analysis Run input identifies snapshot, availability, indicator kind, and the draw values, but it does not yet carry a versioned draw-generation/imputer contract or a validation-evidence identity for the generator/analysis pairing.
+
+That distinction matters because Rubin combining-rule validity depends on more than the algebraic identity for `T`. Rubin's proper-imputation framework ties the repeated-imputation behavior to the estimand and imputation procedure; uncongenial imputer/analyst combinations can make Rubin variance biased even when each complete-data analysis is well defined. Therefore the coverage results in this document are scoped to this predeclared design and must not be projected as universal inferential authorization for arbitrary complete-data draws.
+
+Issue #505 owns the missing product activation/projection contract. Until an approved versioned generator/analysis pairing is digest-bound to its validation evidence, TEPP may preserve the bounded descriptive `Qbar/Ubar/B/T` arithmetic but must keep any broader inferential claim fail closed. This does not change the protected numerical owner and does not invalidate the scoped #503 recovery study.
+
 ## Primary authority and traceability
+
+Rubin, D. B. (1987). *Multiple Imputation for Nonresponse in Surveys*. Wiley. https://doi.org/10.1002/9780470316696
 
 Rubin, D. B. (1996). Multiple imputation after 18+ years. *Journal of the American Statistical Association, 91*(434), 473–489. https://doi.org/10.1080/01621459.1996.10476908
 
+Meng, X.-L. (1994). Multiple-imputation inferences with uncongenial sources of input. *Statistical Science, 9*(4), 538–558. https://doi.org/10.1214/ss/1177010269
+
+Xie, X., & Meng, X.-L. (2017). Dissecting multiple imputation from a multi-phase inference perspective: What happens when God's, imputer's and analyst's models are uncongenial? *Statistica Sinica, 27*(4), 1485–1545. https://doi.org/10.5705/ss.2014.067
+
 Repository formula authority remains `docs/research/rubin-total-variance.md`. Rubin (1996) supports `T = Ubar + (1 + 1/m)B`; it does not by itself authorize the normal interval diagnostic above, which is deliberately labeled and empirically checked rather than presented as Rubin's small-sample interval rule.
 
-Issue #503 is satisfied only when the exact-head Rust acceptance test, documentation checks, security gates, coverage gates, and required review all pass on the surviving implementation/fold head. Predecessor receipts do not transfer.
+Issue #503 is satisfied only when the exact-head Rust acceptance test, documentation checks, security gates, coverage gates, and required review all pass on the surviving implementation/fold head. Issue #505 remains a separate activation/projection-policy gap. Predecessor receipts do not transfer.
