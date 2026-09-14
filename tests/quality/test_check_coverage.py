@@ -793,6 +793,44 @@ class CoverageContractTests(unittest.TestCase):
             )
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
 
+    def test_match_arm_string_body_is_executable(self) -> None:
+        """A match arm whose body is one literal is production behavior."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "arm_bodies.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Braced => {\n'
+                '        "braced arm body"\n'
+                '    }\n'
+                '    Self::Bare =>\n'
+                '        "bare arm body",\n'
+                '    Self::Commented => {\n'
+                '        // why this arm exists\n'
+                '        "arm body after a comment"\n'
+                '    }\n'
+                '};\n'
+                'let plain =\n'
+                '    "not an arm body";\n',
+                encoding="utf-8",
+            )
+
+            for line_number in (3, 6, 9):
+                with self.subTest(line=line_number):
+                    self.assertTrue(
+                        coverage_contract.is_executable_source_line(str(source), line_number)
+                    )
+            # A literal that continues an ordinary binding stays excluded.
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 13))
+
+    def test_match_arm_body_detection_needs_a_preceding_line(self) -> None:
+        """A literal on the first line has no arm to belong to."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "leading_literal.rs"
+            source.write_text('"leading literal",\n', encoding="utf-8")
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 1))
+
     def test_guard_after_brace_closing_pattern_is_executable(self) -> None:
         """Count a guard after a destructuring pattern that closes with a brace."""
 
