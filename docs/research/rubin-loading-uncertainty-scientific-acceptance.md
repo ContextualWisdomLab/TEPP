@@ -2,11 +2,11 @@
 
 ## Scope
 
-This evidence belongs to the `rubin_loading_uncertainty_v1` Analysis Run profile. It exercises the public profile end to end while leaving reusable arithmetic in protected-main `psychometric_core::{recover_loading_point_estimate_mean, combine_draw_level_ols_loadings}`. Recovery and Monte Carlo metrics consume protected-main `validation_core` rather than reimplementing bias, RMSE, coverage, or replication summaries in the profile test.
+This evidence belongs to the `rubin_loading_uncertainty_v1` Analysis Run profile. It exercises the public profile end to end while leaving reusable estimator arithmetic in protected-main `psychometric_core::{recover_loading_point_estimate_mean, combine_draw_level_ols_loadings}`.
 
 It is not evidence for Mislevy person-level plausible values, ESEM/DSEM estimation, multilevel or cross-classified models, or a general missing-data imputation engine. The profile consumes already-mapped factor scores and complete-data indicator draws, so the acceptance design preserves that input structure rather than inventing a different estimand.
 
-The executable authority is `crates/analysis_engine/tests/rubin_loading_scientific_acceptance.rs` on the exact PR head. The values below are deterministic rounded outputs of that test design. CI must reproduce them within the checked tolerance; this document alone is not a passing receipt.
+The executable authority is `crates/analysis_engine/tests/rubin_loading_scientific_acceptance.rs` on the exact PR head. The values below are deterministic rounded outputs of that test design. CI must reproduce them within the checked tolerance; this document alone is not a passing receipt. Bias, RMSE, empirical coverage, and Monte Carlo standard errors are acceptance-harness diagnostics only; they are not exported as product estimation APIs and do not duplicate the profile's loading or Rubin-combination estimator.
 
 ## Repeated-sampling design
 
@@ -18,7 +18,7 @@ Every fourth observation also receives draw-specific zero-mean Gaussian uncertai
 
 Eight predeclared scenarios cross two observation counts (`48`, `160`), two draw counts (`8`, `32`), two true loadings (`0.4`, `1.2`), and two residual scales (`0.5`, `1.2`). Each scenario uses 512 attempted replications. A replication is recovered only when the public Analysis Run executor succeeds; failures remain in the attempted denominator.
 
-Bias, bias MCSE, RMSE, RMSE MCSE, empirical interval coverage, and Monte Carlo replication summaries are computed by `validation_core`. Coverage MCSE is the sample standard error of the 0/1 coverage indicator returned by the canonical Monte Carlo summary, so its finite-sample denominator follows that owner rather than a second formula in this test.
+Bias is the mean signed recovery error. Bias MCSE is the sample standard deviation of recovery errors divided by `sqrt(R)`. RMSE is the square root of mean squared recovery error; its MCSE uses the delta method from the sample standard deviation of squared errors. Coverage MCSE is the sample standard error of the 0/1 coverage indicator. All count-to-floating conversions are bounded and checked in the Rust harness rather than using unchecked integer casts.
 
 The interval diagnostic is
 
