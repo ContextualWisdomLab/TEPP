@@ -2115,8 +2115,8 @@ mod tests {
     }
 
     #[test]
-    fn initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_boundary_messages_are_stable(
-    ) {
+    fn initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_boundary_messages_are_stable()
+     {
         assert_eq!(
             PsychometricError::InitialTotalObservedVarianceWithTimeIndependentPredictorAndManifestTraitIsNotLatentTotal
                 .to_string(),

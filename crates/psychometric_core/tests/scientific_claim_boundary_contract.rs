@@ -1,6 +1,7 @@
 //! Scientific claim boundaries for compositional coordinates and posterior draws.
 
 use psychometric_core::{
+    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
@@ -186,7 +187,6 @@ use psychometric_core::{
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
-    ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
 };
 
 #[test]
@@ -3791,8 +3791,8 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
 
 #[test]
 #[allow(clippy::too_many_lines)]
-fn initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_is_not_latent_total_or_measurement_error(
-) {
+fn initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait_is_not_latent_total_or_measurement_error()
+ {
     let loading = 2.0_f64;
     let effect = 0.5_f64;
     let trait_variance = 0.8_f64;
