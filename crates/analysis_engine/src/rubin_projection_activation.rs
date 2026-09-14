@@ -241,6 +241,17 @@ fn decide_with_registry(
     }
 
     let approved = approved_pairings.iter().any(|pairing| {
+        let Ok(authoritative_available_at) =
+            AvailableTime::parse_rfc3339(pairing.validation_evidence_available_at)
+        else {
+            return false;
+        };
+        if authoritative_available_at.to_rfc3339() != pairing.validation_evidence_available_at
+            || authoritative_available_at.instant() != evidence_available_at.instant()
+            || authoritative_available_at.instant() > expected_knowledge_cutoff.instant()
+        {
+            return false;
+        }
         receipt.generator_contract_id == pairing.generator_contract_id
             && receipt.generator_contract_version == pairing.generator_contract_version
             && receipt.analysis_contract_id == pairing.analysis_contract_id
@@ -366,6 +377,25 @@ mod tests {
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[late_authority],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
+    }
+
+    #[test]
+    fn noncanonical_authority_availability_fails_closed() {
+        let receipt = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
+        let noncanonical_authority = ApprovedRubinProjectionPairing {
+            validation_evidence_available_at: "2026-08-01T00:59:59+01:00",
+            ..APPROVED
+        };
+        assert_eq!(
+            decide_with_registry(
+                Some(&receipt),
+                SNAPSHOT_ID,
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[noncanonical_authority],
             ),
             RubinProjectionActivationDecision::Rejected
         );
