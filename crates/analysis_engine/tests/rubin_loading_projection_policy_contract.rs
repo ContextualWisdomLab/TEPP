@@ -15,6 +15,7 @@ use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest};
 
 const SNAPSHOT_ID: &str = "snapshot-rubin-projection-policy";
 const CUTOFF: &str = "2026-08-01T00:00:00Z";
+const DESCRIPTIVE_ONLY: &str = "descriptive_only_unbound_draw_generation_provenance";
 
 fn observation(factor_score: f64, draws: Vec<f64>) -> RubinLoadingObservation {
     RubinLoadingObservation::new(
@@ -60,11 +61,12 @@ fn provenance_free_draws_are_explicitly_descriptive_only() {
     )
     .expect("descriptive combination remains executable");
 
+    assert_eq!(execution.artifact.projection_status(), DESCRIPTIVE_ONLY);
     let artifact_json: serde_json::Value =
         serde_json::from_str(&execution.artifact.to_json().expect("artifact json"))
             .expect("valid json");
     assert_eq!(
         artifact_json.get("projection_status").and_then(serde_json::Value::as_str),
-        Some("descriptive_only_unbound_draw_generation_provenance")
+        Some(DESCRIPTIVE_ONLY)
     );
 }
