@@ -70,7 +70,7 @@ fn execute(rows: &[RubinLoadingObservation]) -> analysis_engine::RubinLoadingUnc
 #[test]
 fn canonical_payload_digest_is_cutoff_safe_and_value_sensitive() {
     let baseline = execute(&baseline_rows());
-    let baseline_digest = baseline.artifact.complete_data_draws_sha256();
+    let baseline_digest = baseline.artifact.estimator_payload_sha256();
     assert_eq!(baseline_digest.len(), 64);
     assert!(baseline_digest
         .bytes()
@@ -84,8 +84,8 @@ fn canonical_payload_digest_is_cutoff_safe_and_value_sensitive() {
     ));
     let replay = execute(&with_late);
     assert_eq!(
-        replay.artifact.complete_data_draws_sha256(),
-        baseline.artifact.complete_data_draws_sha256(),
+        replay.artifact.estimator_payload_sha256(),
+        baseline.artifact.estimator_payload_sha256(),
         "future-unavailable rows must not change the historical admitted estimator-payload digest"
     );
 
@@ -97,8 +97,8 @@ fn canonical_payload_digest_is_cutoff_safe_and_value_sensitive() {
     );
     let changed_draw = execute(&changed_draw);
     assert_ne!(
-        changed_draw.artifact.complete_data_draws_sha256(),
-        baseline.artifact.complete_data_draws_sha256(),
+        changed_draw.artifact.estimator_payload_sha256(),
+        baseline.artifact.estimator_payload_sha256(),
         "one admitted draw-bit change must change payload identity"
     );
 
@@ -110,18 +110,18 @@ fn canonical_payload_digest_is_cutoff_safe_and_value_sensitive() {
     );
     let changed_factor_score = execute(&changed_factor_score);
     assert_ne!(
-        changed_factor_score.artifact.complete_data_draws_sha256(),
-        baseline.artifact.complete_data_draws_sha256(),
+        changed_factor_score.artifact.estimator_payload_sha256(),
+        baseline.artifact.estimator_payload_sha256(),
         "one admitted factor-score bit change must change payload identity because factor scores enter both loading estimators"
     );
 }
 
 #[test]
-fn artifact_import_rejects_malformed_draw_payload_digest() {
+fn artifact_import_rejects_malformed_estimator_payload_digest() {
     let execution = execute(&baseline_rows());
     let canonical = execution.artifact.to_json().expect("artifact json");
     let mut value: serde_json::Value = serde_json::from_str(&canonical).expect("json");
-    value["complete_data_draws_sha256"] = serde_json::json!("not-a-digest");
+    value["estimator_payload_sha256"] = serde_json::json!("not-a-digest");
     assert_eq!(
         RubinLoadingUncertaintyArtifact::from_json(&value.to_string()),
         Err(AnalysisEngineError::InvalidRubinLoadingUncertaintyArtifact)
