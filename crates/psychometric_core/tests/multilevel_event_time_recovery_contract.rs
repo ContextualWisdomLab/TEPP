@@ -23,8 +23,9 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_initial_time_independent_predictor,
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
-    recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-    recover_event_time_discrete_lag_and_log_rate, recover_initial_time_dependent_predictor_carry,
+    recover_discrete_time_varying_predictor_effect, recover_discrete_trait_observed_variance,
+    recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
+    recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -112,6 +113,7 @@ use psychometric_core::{
     refuse_level_change_intercept_as_free_continuous_intercept,
     refuse_level_change_intercept_as_impulse, refuse_level_change_intercept_as_process_increment,
     refuse_manifest_means_as_observed_mean, refuse_manifest_trait_variance_as_measurement_error,
+    refuse_measurement_error_as_discrete_trait_observed_variance,
     refuse_measurement_error_as_lagged_observed_covariance,
     refuse_measurement_error_as_observed_variance,
     refuse_measurement_error_as_standardised_manifest_trait_variance,
@@ -122,6 +124,7 @@ use psychometric_core::{
     refuse_process_noise_as_unconditional_variance,
     refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
+    refuse_standardised_trait_variance_as_discrete_trait_observed_variance,
     refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
     refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -162,8 +165,10 @@ use psychometric_core::{
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
     refuse_unmatched_time_varying_predictor_interval,
+    refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
+    refuse_unstandardised_trait_variance_as_discrete_trait_observed_variance,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
 };
 
@@ -6538,5 +6543,151 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
     assert_eq!(
         recover_standardised_manifest_variance(0.4, non_event),
         Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn discrete_trait_observed_variance_recovers_eq5_of_commented_discrete_traitvar() {
+    let log_rate = -0.5_f64;
+    let event_delta = 1.0_f64;
+    let trait_variance = 1.0_f64;
+    let loading = 2.0_f64;
+    let theta = 0.3_f64;
+    let recovered = recover_discrete_trait_observed_variance(
+        loading,
+        trait_variance,
+        log_rate,
+        event_delta,
+        theta,
+        LagClock::EventTime,
+    )
+    .expect("Eq.5 discreteTRAITVAR");
+    let recovered_error = (recovered - 2.777_089_947_938_807_6).abs();
+    assert!(
+        recovered_error < 1e-12,
+        "Driver et al. (2017, Eq. 5 of 2017-era commented discreteTRAITVAR): RMSE {recovered_error}"
+    );
+    let discrete_lag =
+        recover_discrete_lag_from_log_rate(log_rate, event_delta, LagClock::EventTime).expect("φ");
+    let one_minus = 1.0 - discrete_lag;
+    let inverse = 1.0 / log_rate;
+    let discrete_trait = (one_minus * one_minus) * ((inverse * inverse) * trait_variance);
+    let latent_error = (discrete_trait - 2.777_089_947_938_807_6).abs();
+    assert!(
+        recovered_error < latent_error,
+        "Driver et al. (2017, Eq. 5): unstandardised discreteTRAITVAR RMSE {latent_error} must exceed Eq. 5 RMSE {recovered_error}"
+    );
+    let trait_error = (trait_variance - 2.777_089_947_938_807_6).abs();
+    assert!(
+        recovered_error < trait_error,
+        "Driver et al. (2017, Table 2): untransformed TRAITVAR RMSE {trait_error} must exceed Eq. 5 RMSE {recovered_error}"
+    );
+    let theta_error = (theta - 2.777_089_947_938_807_6).abs();
+    assert!(
+        recovered_error < theta_error,
+        "Driver et al. (2017, Table 2): MANIFESTVAR RMSE {theta_error} must exceed Eq. 5 RMSE {recovered_error}"
+    );
+    let standardised = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)
+        .expect("TRAITVARstd");
+    let std_error = (standardised - 2.777_089_947_938_807_6).abs();
+    assert!(
+        recovered_error < std_error,
+        "Driver et al. (2017, p. 16): TRAITVARstd RMSE {std_error} must exceed Eq. 5 RMSE {recovered_error}"
+    );
+    let zero_trait = recover_discrete_trait_observed_variance(
+        loading,
+        0.0,
+        0.5,
+        event_delta,
+        theta,
+        LagClock::EventTime,
+    )
+    .expect("zero trait");
+    assert_eq!(zero_trait.to_bits(), theta.to_bits());
+    let zero_loading = recover_discrete_trait_observed_variance(
+        0.0,
+        trait_variance,
+        log_rate,
+        event_delta,
+        theta,
+        LagClock::EventTime,
+    )
+    .expect("zero loading");
+    assert_eq!(zero_loading.to_bits(), theta.to_bits());
+    assert_eq!(
+        refuse_unstandardised_discrete_trait_variance_as_discrete_trait_observed_variance(
+            discrete_trait,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVariance)
+    );
+    assert_eq!(
+        refuse_unstandardised_trait_variance_as_discrete_trait_observed_variance(
+            trait_variance,
+            recovered
+        ),
+        Err(PsychometricError::UnstandardisedTraitVarianceIsNotDiscreteTraitObservedVariance)
+    );
+    assert_eq!(
+        refuse_measurement_error_as_discrete_trait_observed_variance(theta, recovered),
+        Err(PsychometricError::MeasurementErrorIsNotDiscreteTraitObservedVariance)
+    );
+    assert_eq!(
+        refuse_standardised_trait_variance_as_discrete_trait_observed_variance(
+            standardised,
+            recovered
+        ),
+        Err(PsychometricError::StandardisedTraitVarianceIsNotDiscreteTraitObservedVariance)
+    );
+}
+
+#[test]
+fn discrete_trait_observed_variance_refuses_non_event_clocks_and_non_stable_drift() {
+    assert_eq!(
+        recover_discrete_trait_observed_variance(2.0, 1.0, 0.5, 1.0, 0.3, LagClock::EventTime),
+        Err(PsychometricError::DiscreteTraitObservedVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance(2.0, 1.0, 0.0, 1.0, 0.3, LagClock::EventTime),
+        Err(PsychometricError::DiscreteTraitObservedVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance(2.0, 1.0, -0.5, 1.0, 0.3, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance(2.0, 1.0, -0.5, 1.0, 0.3, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance(
+            2.0,
+            1.0,
+            -0.5,
+            1.0,
+            0.3,
+            LagClock::KnowledgeCutoff
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance(2.0, 1.0, -0.5, 0.0, 0.3, LagClock::EventTime),
+        Err(PsychometricError::NonPositiveInterval)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance(2.0, -1.0, -0.5, 1.0, 0.3, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_discrete_trait_observed_variance(
+            f64::NAN,
+            1.0,
+            -0.5,
+            1.0,
+            0.3,
+            LagClock::EventTime
+        ),
+        Err(PsychometricError::InvalidNumericInput)
     );
 }

@@ -710,6 +710,28 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Eq. 5 of 2017-era commented `discreteTRAITVAR` was requested
+    /// for a non-stable drift. That map is
+    /// `λ² (1 − e^{a Δt})² (trait / a²) + θ` and requires `a < 0`
+    /// when the trait is nonzero. A zero trait is exactly `θ` even
+    /// if `a ≥ 0`.
+    DiscreteTraitObservedVarianceRequiresStableDrift,
+    /// Unstandardised 2017-era commented `discreteTRAITVAR`
+    /// `(1 − e^{a Δt})² (trait / a²)` was treated as Eq. 5 of that
+    /// map. The latent discrete trait is not `Var(y)`.
+    UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVariance,
+    /// Untransformed `TRAITVAR` was treated as Eq. 5 of 2017-era
+    /// commented `discreteTRAITVAR`. `trait` is not
+    /// `λ² (1 − e^{a Δt})² (trait / a²) + θ`.
+    UnstandardisedTraitVarianceIsNotDiscreteTraitObservedVariance,
+    /// Driver Table 2 `MANIFESTVAR` `θ` was treated as Eq. 5 of
+    /// 2017-era commented `discreteTRAITVAR`. Measurement error is
+    /// not `Var(y)` when the loading and discrete trait are nonzero.
+    MeasurementErrorIsNotDiscreteTraitObservedVariance,
+    /// Driver p. 16 `TRAITVARstd` was treated as Eq. 5 of 2017-era
+    /// commented `discreteTRAITVAR`. `trait / trait = 1` is not
+    /// `λ² (1 − e^{a Δt})² (trait / a²) + θ`.
+    StandardisedTraitVarianceIsNotDiscreteTraitObservedVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1256,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::DiscreteTraitObservedVarianceRequiresStableDrift => {
+                "discrete-trait observed variance requires a stable negative drift"
+            }
+            Self::UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVariance => {
+                "unstandardised discrete trait variance is not discrete-trait observed variance"
+            }
+            Self::UnstandardisedTraitVarianceIsNotDiscreteTraitObservedVariance => {
+                "unstandardised trait variance is not discrete-trait observed variance"
+            }
+            Self::MeasurementErrorIsNotDiscreteTraitObservedVariance => {
+                "measurement error is not discrete-trait observed variance"
+            }
+            Self::StandardisedTraitVarianceIsNotDiscreteTraitObservedVariance => {
+                "standardised trait variance is not discrete-trait observed variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2108,33 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn discrete_trait_observed_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::DiscreteTraitObservedVarianceRequiresStableDrift.to_string(),
+            "discrete-trait observed variance requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedDiscreteTraitVarianceIsNotDiscreteTraitObservedVariance
+                .to_string(),
+            "unstandardised discrete trait variance is not discrete-trait observed variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedTraitVarianceIsNotDiscreteTraitObservedVariance
+                .to_string(),
+            "unstandardised trait variance is not discrete-trait observed variance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotDiscreteTraitObservedVariance.to_string(),
+            "measurement error is not discrete-trait observed variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedTraitVarianceIsNotDiscreteTraitObservedVariance
+                .to_string(),
+            "standardised trait variance is not discrete-trait observed variance"
         );
     }
 }
