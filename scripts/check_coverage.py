@@ -687,14 +687,35 @@ def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
     """Return whether *line_number* is the whole body of a ``match`` arm.
 
     A match arm whose body is one string literal is executable production
-    behavior: a zero count means the arm was never taken. Without this the
-    standalone-literal exclusion would hide every such arm from the gate.
+    behavior: a zero count means the arm was never taken. Comments between the
+    arm label and its literal body are not executable code and must not hide it
+    from the authored-line denominator.
     """
 
+    block_comment_depth = 0
     for index in range(line_number - 2, -1, -1):
         previous = lines[index].strip()
-        if not previous or previous.startswith("//"):
+        if not previous:
             continue
+        if block_comment_depth:
+            block_comment_depth += previous.count("*/") - previous.count("/*")
+            if block_comment_depth > 0:
+                continue
+            block_comment_depth = 0
+            previous = previous.rsplit("/*", 1)[0].strip()
+            if not previous:
+                continue
+        if previous.startswith("//"):
+            continue
+        if previous.startswith("/*"):
+            continue
+        if previous.endswith("*/") and "/*" not in previous:
+            block_comment_depth = previous.count("*/")
+            continue
+        if "/*" in previous and previous.endswith("*/"):
+            previous = previous.split("/*", 1)[0].strip()
+            if not previous:
+                continue
         return previous.endswith("=>") or previous.endswith("=> {")
     return False
 

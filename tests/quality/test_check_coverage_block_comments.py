@@ -39,6 +39,7 @@ class CoverageBlockCommentRegressionTests(unittest.TestCase):
                 'let message = match self {\n'
                 '    Self::Commented => {\n'
                 '        /* why this arm\n'
+                '           spans another line\n'
                 '           exists */\n'
                 '        "arm body after multiline block comment"\n'
                 '    }\n'
@@ -46,7 +47,33 @@ class CoverageBlockCommentRegressionTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertTrue(
-                coverage_contract.is_executable_source_line(str(source), 5)
+                coverage_contract.is_executable_source_line(str(source), 6)
+            )
+
+    def test_lcov_retains_match_arm_literal_after_block_comment(self) -> None:
+        """LCOV denominator keeps the literal even when LLVM reports zero hits."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "lcov_block_comment.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Commented => {\n'
+                '        /* audited branch */\n'
+                '        "uncovered arm body"\n'
+                '    }\n'
+                '};\n'
+                'consume(message);\n',
+                encoding="utf-8",
+            )
+            report = root / "coverage.lcov"
+            report.write_text(
+                f"SF:{source}\nDA:4,0\nDA:7,1\nend_of_record\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                coverage_contract.load_lcov_line_totals(report, repository_root=root),
+                {"lines": {"count": 2, "covered": 1}},
             )
 
 
