@@ -30,17 +30,23 @@ Add the `topic_context_posterior_v1` analysis-run output profile to
 
 - consumes an already-constructed `TopicContextPosteriorArtifact`;
 - requires an authoritative snapshot manifest to bind the request and artifact
-  snapshot identity, source digest, cutoff, exact artifact digest, and every
-  represented document's availability time;
+  snapshot identity, source digest, cutoff, exact artifact digest, every
+  represented document's availability time, and every lineage/relation/membership
+  `evidence_resource_id` actually used by the artifact;
+- requires the support-evidence availability ledger to be an exact set match to
+  the artifact's used evidence-resource identities: missing and substituted
+  resources fail closed, and no used support resource may have
+  `AvailableTime > KnowledgeCutoff`;
 - compares request, artifact, and manifest knowledge cutoffs by temporal instant
   while requiring canonical RFC 3339 for persisted artifact/manifest evidence;
 - validates and serializes the snapshot manifest through the same bounded 16 MiB
   wire envelope used by the posterior artifact rather than accepting an
   unbounded in-memory side contract;
-- rejects missing, extra, malformed, or post-cutoff document availability and
-  artifacts not emitted under the approved `trsl-tm-v1` producer contract;
+- rejects missing, extra, malformed, or post-cutoff document/support availability
+  and artifacts not emitted under the approved `trsl-tm-v1` producer contract;
 - invokes the existing producer `sha256`/validate path without
-  reimplementing TRSL-TM fitting;
+  reimplementing TRSL-TM fitting or subtracting post-cutoff support from an
+  already-fitted posterior;
 - emits a digest-bound terminal result under
   `tepp.topic_context_posterior.v1`; provider validation remains `validated`,
   while the artifact retains the scientific inference boundary
@@ -52,11 +58,10 @@ Add the `topic_context_posterior_v1` analysis-run output profile to
   infer topic importance, or emit invented birth/split/merge events.
   Lineage events remain producer-supplied.
 
-Supporting lineage/relation/membership evidence-resource availability is not yet
-represented by the current manifest shape. The profile therefore remains
-Proposed: it must not be promoted to implemented-main or scientific acceptance
-until those support resources are independently cutoff-bound instead of relying
-only on represented-document availability.
+The manifest-level support-evidence contract is intentionally admission-only.
+It does not reinterpret producer scientific evidence, alter posterior weights,
+or make a late support row historical. A posterior whose actually used support
+includes any resource unavailable at the requested cutoff is refused as a whole.
 
 This is posterior topic coordinates, not importance and not a sampler.
 
@@ -72,26 +77,35 @@ This is posterior topic coordinates, not importance and not a sampler.
    offset representations can denote the same instant.
 5. Treat artifact inference language as terminal provider validation — rejected
    because scientific interpretation and execution validation are distinct claims.
-6. Bind the existing producer validator to ADR 0022's analysis-run
-   profile — selected, subject to the remaining support-evidence availability gate.
+6. Infer support availability from represented-document availability — rejected
+   because relation, lineage, and membership evidence can become available later
+   than the documents they support.
+7. Drop post-cutoff support rows from an already-fitted posterior — rejected
+   because that would misrepresent the fitted scientific artifact rather than
+   reconstructing it from a historically eligible evidence set.
+8. Bind the existing producer validator to ADR 0022's analysis-run profile with
+   an exact-set document/support availability manifest — selected.
 
 ## Consequences
 
 Operators can exercise the draft profile with instant-safe cutoff comparison and
 a bounded snapshot-manifest wire contract. The artifact does not claim topic
 importance, Bayesian sampling, GPU parity, or invented birth/split/merge.
-Snapshot/profile/cutoff/digest mismatch, incomplete document cutoff eligibility,
-and producer-contract refusal fail closed. Support evidence-resource availability
-remains an explicit merge blocker rather than being silently treated as document
-availability.
+Snapshot/profile/cutoff/digest mismatch, incomplete document or support cutoff
+eligibility, substituted support identities, future support evidence, and
+producer-contract refusal fail closed. The profile remains Proposed until this
+branch is validated and integrated into protected main; branch-local completion
+is not implementation-main authority.
 
 ## Verification
 
 The PR includes Rust integration tests for equivalent cutoff instants, terminal
 validation/inference separation, bounded manifest round-trip and rejection,
-successful digest-bound coordinates, incomplete draw refusal, run-identity
-mismatch, snapshot/profile/source/artifact-digest mismatch, future document
-evidence, producer-contract mismatch, and reuse of live sibling profiles. Run:
+mandatory support-evidence availability, successful digest-bound coordinates,
+incomplete draw refusal, run-identity mismatch, snapshot/profile/source/artifact
+digest mismatch, future document evidence, future support evidence, missing or
+substituted support resources, producer-contract mismatch, and reuse of live
+sibling profiles. Run:
 
 ```text
 cargo fmt --all -- --check
@@ -105,4 +119,5 @@ python3 scripts/validate_documentation.py
 Rollback removes the `topic_context_posterior_v1` profile. No persisted
 schema migration is introduced. Supersede only with an ADR that keeps
 posterior coordinates distinct from importance, sampling, and invented
-lineage events and preserves leakage-safe support-evidence admission.
+lineage events and preserves leakage-safe document and support-evidence
+admission.
