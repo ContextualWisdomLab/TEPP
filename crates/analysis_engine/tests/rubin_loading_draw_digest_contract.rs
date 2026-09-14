@@ -1,4 +1,4 @@
-//! Canonical executor-owned complete-data draw-payload digest contract.
+//! Canonical executor-owned complete-data analysis-payload digest contract.
 
 use analysis_engine::{
     AnalysisEngineError, RUBIN_LOADING_MODEL_CONTRACT_VERSION, RUBIN_LOADING_OUTPUT_PROFILE,
@@ -68,11 +68,13 @@ fn execute(rows: &[RubinLoadingObservation]) -> analysis_engine::RubinLoadingUnc
 }
 
 #[test]
-fn canonical_draw_digest_is_cutoff_safe_and_value_sensitive() {
+fn canonical_payload_digest_is_cutoff_safe_and_value_sensitive() {
     let baseline = execute(&baseline_rows());
     let baseline_digest = baseline.artifact.complete_data_draws_sha256();
     assert_eq!(baseline_digest.len(), 64);
-    assert!(baseline_digest.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()));
+    assert!(baseline_digest
+        .bytes()
+        .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()));
 
     let mut with_late = baseline_rows();
     with_late.push(observation(
@@ -84,16 +86,33 @@ fn canonical_draw_digest_is_cutoff_safe_and_value_sensitive() {
     assert_eq!(
         replay.artifact.complete_data_draws_sha256(),
         baseline.artifact.complete_data_draws_sha256(),
-        "future-unavailable rows must not change the historical admitted matrix digest"
+        "future-unavailable rows must not change the historical admitted estimator-payload digest"
     );
 
-    let mut changed = baseline_rows();
-    changed[2] = observation(1.0, vec![0.700_000_000_000_000_1, 0.9], "2026-07-01T00:00:00Z");
-    let changed = execute(&changed);
+    let mut changed_draw = baseline_rows();
+    changed_draw[2] = observation(
+        1.0,
+        vec![0.700_000_000_000_000_1, 0.9],
+        "2026-07-01T00:00:00Z",
+    );
+    let changed_draw = execute(&changed_draw);
     assert_ne!(
-        changed.artifact.complete_data_draws_sha256(),
+        changed_draw.artifact.complete_data_draws_sha256(),
         baseline.artifact.complete_data_draws_sha256(),
         "one admitted draw-bit change must change payload identity"
+    );
+
+    let mut changed_factor_score = baseline_rows();
+    changed_factor_score[2] = observation(
+        1.000_000_000_000_000_2,
+        vec![0.7, 0.9],
+        "2026-07-01T00:00:00Z",
+    );
+    let changed_factor_score = execute(&changed_factor_score);
+    assert_ne!(
+        changed_factor_score.artifact.complete_data_draws_sha256(),
+        baseline.artifact.complete_data_draws_sha256(),
+        "one admitted factor-score bit change must change payload identity because factor scores enter both loading estimators"
     );
 }
 
