@@ -64,19 +64,24 @@ composition over the protected-main scientific owners. The executor:
   identifiers make serialization infallible;
 - emits terminal `AnalysisResultSummary.validation_status = "validated"` and
   keeps `rubin_combined_ols_loadings_not_mislevy_pv` solely as the artifact's
-  scientific inference boundary.
+  scientific inference boundary;
+- emits the digest-bound, read-only projection status
+  `descriptive_only_unbound_draw_generation_provenance` whenever the draw
+  generator is not bound to claim-specific Validation Evidence. Callers cannot
+  mutate that status through the public artifact API.
 
 This remains draw-level OLS combination. It is not person-level plausible-value
 pooling, an ESEM/DSEM sampler, CWC, persistence, or a causal estimator.
 
-The current profile also does not yet authorize arbitrary supplied draw sets
-as generally valid multiple-imputation inference. Issue #505 owns the required
-versioned draw-generation/analysis provenance and claim-projection policy. An
-approved implementation must bind the generator/model contract and the exact
-validation-evidence identity for that pairing without copying external source
-truth into TEPP. Until then, `Q̄/Ū/B/T` may be computed descriptively while any
-broader inferential promotion remains fail closed outside the explicitly
-validated design envelope.
+The current profile does not authorize arbitrary supplied draw sets as
+generally valid multiple-imputation inference. Issue #505 owns the remaining
+positive activation contract: a versioned generator/analysis pairing, exact
+Validation Evidence identity/digest, and historical availability/cutoff binding.
+Draft #506 implements the fail-closed negative projection rule now, rather than
+waiting for a future approved pairing and leaving provenance-free artifacts
+semantically ambiguous. Until an approved pairing exists, `Q̄/Ū/B/T` may be
+computed descriptively but cannot be projected as validated interval/variance
+inference.
 
 ## Historical replay invariant
 
@@ -110,6 +115,10 @@ its availability is later than the cutoff.
    sources — rejected as neither realistic nor necessary. Bind each supported
    generator/analysis pairing to versioned provenance and claim-specific
    validation evidence instead.
+9. Pre-authorize Draft #504's generator from a branch-local test result —
+   rejected because its exact-head workflows and independent approval are not
+   complete. Activation evidence cannot be promoted by the same branch that is
+   still establishing it.
 
 ## Scientific acceptance boundary
 
@@ -131,12 +140,14 @@ views still use distinct run/idempotency identities. Reusing one snapshot or
 accepted-run receipt across different generated populations is invalid
 evidence even when the resulting numerical summaries are deterministic.
 
-Issue #505 separately owns inferential activation. The Analysis Run must not
-project #504's design-specific coverage as universal authorization for an
-unknown or arbitrary draw generator. Promotion requires a versioned approved
-generator/analysis pairing and the validation evidence that supports that
+Issue #505 separately owns positive inferential activation. The Analysis Run
+must not project #504's design-specific coverage as universal authorization for
+an unknown or arbitrary draw generator. Promotion requires a versioned approved
+generator/analysis pairing and the Validation Evidence that supports that
 pairing, consistent with ADR 0014's separation of implementation authority from
-scientific/product claim authority.
+scientific/product claim authority. Until those conditions are met, the
+artifact's read-only projection status remains descriptive-only and is included
+in the canonical digest.
 
 Primary authorities for the current combining-rule and activation boundary are:
 
@@ -165,11 +176,13 @@ current profile-level repeated-sampling evidence.
 The profile has a narrower, auditable temporal and resource boundary, and its
 artifact can no longer claim a Rubin total inconsistent with its serialized
 components. Consumers can distinguish provider validation from the scientific
-claim boundary and can distinguish the robust point estimate from Rubin `Q̄`.
-The checked-in #504 evidence can support the declared generator/design without
-silently promoting arbitrary draw sources. The profile remains Draft/Proposed
-and not implemented-main while #503, #505, and the normal exact-head merge
-gates remain unresolved.
+claim boundary, distinguish the robust point estimate from Rubin `Q̄`, and now
+also distinguish descriptive combination arithmetic from an authoritative
+projection backed by draw-generation Validation Evidence. The checked-in #504
+evidence can support only its declared generator/design after its own gates are
+satisfied; #506 does not silently promote it. The profile remains
+Draft/Proposed and not implemented-main while #503, #505, and the normal
+exact-head merge gates remain unresolved.
 
 ## Verification
 
@@ -185,11 +198,12 @@ python3 scripts/validate_documentation.py
 Regression contracts cover equivalent cutoff instants, future-evidence replay,
 cross-snapshot refusal, robust-point versus naive-mean cancellation, exact and
 exceeded draw/resource bounds, inconsistent Rubin totals, artifact count
-bounds, terminal provider/domain-status separation, and Monte Carlo
-snapshot/run-identity non-aliasing. #505 must add an executable activation
-contract distinguishing missing/unknown draw-generation provenance from an
-explicitly approved versioned generator/analysis pairing; that RED must not
-duplicate the Rubin arithmetic.
+bounds, terminal provider/domain-status separation, Monte Carlo snapshot/run-
+identity non-aliasing, and the digest-bound descriptive-only projection state
+for provenance-free draw matrices. #505 still requires the positive executable
+activation contract for missing/unknown/mismatched/stale versus explicitly
+approved versioned generator/analysis evidence; that step must not duplicate the
+Rubin arithmetic or promote Draft #504 prematurely.
 
 ## Rollback and supersession
 
