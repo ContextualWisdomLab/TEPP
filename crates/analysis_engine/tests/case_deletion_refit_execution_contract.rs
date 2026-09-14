@@ -7,7 +7,7 @@ use analysis_engine::{
     execute_case_deletion_refit_run,
 };
 use temporal_core::KnowledgeCutoff;
-use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
+use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 
 struct MeanFitter;
 
@@ -216,4 +216,22 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+}
+
+#[test]
+fn invalid_completed_at_fails_terminal_result_construction() {
+    let request = request();
+    let documents = documents();
+    let fitter = MeanFitter;
+    assert_eq!(
+        execute_case_deletion_refit_run(
+            &request,
+            &accepted(&request),
+            "snapshot-case-deletion-refit",
+            cutoff(),
+            &CaseDeletionRefitInput::new(&documents, "topic-model-run", &fitter),
+            "not-a-timestamp",
+        ),
+        Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+    );
 }
