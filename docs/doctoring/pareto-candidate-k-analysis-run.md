@@ -30,7 +30,16 @@ Current branch repair lineage:
   private while retaining validated serde parsing and explicit accessors;
 - ADR repair `1cd3bdf49a02dec84e7d4986d627394b3e24732d` returns ADR 0053 from premature
   `Accepted` authority to `Proposed` and records the temporal/resource/claim
-  boundaries.
+  boundaries;
+- doctoring repair `4f4c84500a0676c9edd8a84f219585ed29086e88` aligns this profile description
+  with those boundaries;
+- test-only `03a2a9bbe2225b6110d0f1f715332cb01493fbfd` exercises invalid/empty source
+  provenance, exact and +1 source-evidence/replication/candidate ceilings, and
+  input-cutoff revalidation; and
+- repair `71086e9eacff6e1a4db025a73132d497902027ff` proves a maximal valid artifact
+  with worst-case JSON-escaped 256-byte identifiers remains below the 256 KiB
+  input wire limit, keeps the untrusted `from_json` limit, and removes only the
+  unreachable post-validation egress-size branch.
 
 Historical admission is intentionally conservative. The input represents the
 complete evidence universe that produced its candidate diagnostics and
