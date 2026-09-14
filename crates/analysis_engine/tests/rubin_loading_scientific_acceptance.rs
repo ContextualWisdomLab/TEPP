@@ -668,3 +668,10 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
         "later availability should improve this predeclared design in aggregate"
     );
 }
+
+#[test]
+fn monte_carlo_request_helpers_do_not_alias_immutable_snapshot_identity() {
+    let first = request(EARLY_CUTOFF, "identity-red-0");
+    let second = request(EARLY_CUTOFF, "identity-red-1");
+    assert_ne!(first.snapshot_id, second.snapshot_id);
+}
