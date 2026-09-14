@@ -19,7 +19,7 @@ pub const PARETO_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION: &str = "tepp.pareto_candid
 pub const PARETO_CANDIDATE_K_MODEL_CONTRACT_VERSION: &str = "pareto_candidate_k_v1";
 /// Analysis-run output profile required for a Pareto candidate-`K` artifact.
 pub const PARETO_CANDIDATE_K_OUTPUT_PROFILE: &str = "pareto_candidate_k_v1";
-/// Maximum canonical artifact JSON size.
+/// Maximum canonical artifact JSON size accepted at the untrusted input boundary.
 pub const PARETO_CANDIDATE_K_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const PARETO_CANDIDATE_K_INFERENCE_STATUS: &str =
     "pareto_statistical_front_not_fitted_schwarz_sampler";
@@ -236,7 +236,9 @@ impl ParetoCandidateKArtifact {
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::InvalidParetoCandidateKArtifact`] when the
-    /// schema, identifiers, counts, RMSE, or claim boundary fail.
+    /// schema, identifiers, counts, RMSE, or claim boundary fail, and
+    /// [`AnalysisEngineError::LimitExceeded`] when an untrusted payload exceeds
+    /// the 256 KiB admission limit.
     pub fn from_json(payload: &str) -> Result<Self, AnalysisEngineError> {
         if payload.len() > PARETO_CANDIDATE_K_ARTIFACT_BYTE_LIMIT {
             return Err(AnalysisEngineError::LimitExceeded);
@@ -249,17 +251,17 @@ impl ParetoCandidateKArtifact {
 
     /// Serialize canonical validated artifact JSON.
     ///
+    /// Validation bounds both identifiers to 256 bytes and all remaining fields
+    /// to fixed strings or scalar wire values, so a valid canonical artifact is
+    /// structurally smaller than the separate 256 KiB untrusted-input limit.
+    ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns [`AnalysisEngineError::SerializationFailure`] if serialization
+    /// unexpectedly fails.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > PARETO_CANDIDATE_K_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
@@ -433,7 +435,10 @@ mod tests {
             Ok(artifact.clone())
         );
         assert_eq!(artifact.sha256().expect("digest").len(), 64);
-        assert_eq!(artifact.schema_version(), PARETO_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION);
+        assert_eq!(
+            artifact.schema_version(),
+            PARETO_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION
+        );
         assert_eq!(artifact.run_id(), "run-1");
         assert_eq!(artifact.snapshot_id(), "snapshot-1");
         assert_eq!(artifact.knowledge_cutoff(), "2026-08-01T00:00:00Z");
@@ -442,7 +447,10 @@ mod tests {
         assert_eq!(artifact.statistical_count(), 2);
         assert_eq!(artifact.truth_k(), 2);
         assert_eq!(artifact.selected_k_rmse(), 0.0);
-        assert_eq!(artifact.inference_status(), PARETO_CANDIDATE_K_INFERENCE_STATUS);
+        assert_eq!(
+            artifact.inference_status(),
+            PARETO_CANDIDATE_K_INFERENCE_STATUS
+        );
         assert_eq!(
             ParetoCandidateKArtifact::from_json("{}"),
             Err(AnalysisEngineError::InvalidParetoCandidateKArtifact)
@@ -453,6 +461,22 @@ mod tests {
             ),
             Err(AnalysisEngineError::LimitExceeded)
         );
+    }
+
+    #[test]
+    fn maximal_valid_artifact_is_structurally_below_the_input_wire_limit() {
+        let mut maximal = artifact();
+        maximal.run_id = "\\".repeat(256);
+        maximal.snapshot_id = "\\".repeat(256);
+        maximal.selected_k = u64::MAX;
+        maximal.candidate_count = MAX_PARETO_CANDIDATES as u64;
+        maximal.statistical_count = MAX_PARETO_CANDIDATES as u64;
+        maximal.truth_k = u64::MAX;
+        maximal.selected_k_rmse = f64::MAX;
+
+        let payload = maximal.to_json().expect("maximal valid json");
+        assert!(payload.len() < PARETO_CANDIDATE_K_ARTIFACT_BYTE_LIMIT);
+        assert_eq!(ParetoCandidateKArtifact::from_json(&payload), Ok(maximal));
     }
 
     #[test]
