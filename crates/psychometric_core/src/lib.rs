@@ -411,6 +411,8 @@ pub use event_time::recover_standardised_discrete_continuous_intercept;
 pub use event_time::recover_standardised_initial_latent_mean;
 /// Exact scalar p. 16 `T0VARstd` `p_0 / p_0 = 1` after strictly positive free `T0VAR`.
 pub use event_time::recover_standardised_initial_latent_variance;
+/// Exact scalar 2017-era `T0TOTALVARstd` `(extra + p_0) / (extra + p_0) = 1`.
+pub use event_time::recover_standardised_initial_total_variance;
 /// Exact scalar p. 16 `MANIFESTMEANSstd` `τ / √θ`.
 pub use event_time::recover_standardised_manifest_mean;
 /// Exact scalar p. 16 `MANIFESTTRAITVARstd` `ψ / ψ = 1` after strictly positive `MANIFESTTRAITVAR`.
@@ -630,12 +632,20 @@ pub use event_time::refuse_standardised_initial_latent_mean_as_standardised_init
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `T0VARstd` as `T0MEANSstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean;
+/// Refuse treating p. 16 `T0VARstd` as 2017-era `T0TOTALVARstd`.
+pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_initial_total_variance;
 /// Refuse treating p. 16 `T0VARstd` as `TRAITVARstd`.
 pub use event_time::refuse_standardised_initial_latent_variance_as_standardised_trait_variance;
+/// Refuse treating 2017-era `T0TRAITVARstd` as 2017-era `T0TOTALVARstd`.
+pub use event_time::refuse_standardised_initial_trait_variance_as_standardised_initial_total_variance;
 /// Refuse treating p. 16 `MANIFESTTRAITVARstd` as `MANIFESTVARstd`.
 pub use event_time::refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance;
 /// Refuse treating `MANIFESTVARstd` as `MANIFESTMEANSstd`.
 pub use event_time::refuse_standardised_manifest_variance_as_standardised_manifest_mean;
+/// Refuse treating p. 16 `TRAITVARstd` as 2017-era `T0TOTALVARstd`.
+pub use event_time::refuse_standardised_trait_variance_as_standardised_initial_total_variance;
+/// Refuse treating unstandardised `T0TOTALVAR` as 2017-era `T0TOTALVARstd`.
+pub use event_time::refuse_unstandardised_initial_total_variance_as_standardised_initial_total_variance;
 
 /// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
