@@ -9656,7 +9656,7 @@ mod tests {
     }
 
     #[test]
-    fn nonfinite_short_circuit_operands_of_fail_closed_guards_execute() {
+    fn nonfinite_operands_of_intercept_and_level_change_guards_execute() {
         let event = LagClock::EventTime;
         assert_eq!(
             recover_manifest_lagged_observed_covariance(2.0, f64::NAN, 0.0),
@@ -9710,6 +9710,11 @@ mod tests {
             recover_discrete_time_independent_predictor_effect(0.2, f64::NAN, -0.5, 2.0, event),
             Err(PsychometricError::InvalidNumericInput)
         );
+    }
+
+    #[test]
+    fn nonfinite_operands_of_asymptotic_and_carry_guards_execute() {
+        let event = LagClock::EventTime;
         assert_eq!(
             recover_asymptotic_time_independent_predictor_effect(0.2, f64::NAN, -0.5, event),
             Err(PsychometricError::InvalidNumericInput)
