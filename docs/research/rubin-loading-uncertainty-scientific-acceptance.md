@@ -16,7 +16,7 @@ Each replication generates factor scores `f_i ~ N(0, 1)` and a base indicator
 
 Every fourth observation also receives draw-specific zero-mean Gaussian uncertainty with standard deviation `0.5 * sigma`. Other observations are held fixed across draws. This deliberately makes `B > 0` without replacing the profile with a second estimator. The deterministic SplitMix64 seed and Box-Muller transform are implemented in the Rust test; no external RNG or generated fixture is required.
 
-Eight predeclared scenarios cross two observation counts (`48`, `160`), two draw counts (`8`, `32`), two true loadings (`0.4`, `1.2`), and two residual scales (`0.5`, `1.2`). Each scenario uses 512 attempted replications. A replication is recovered only when the public Analysis Run executor succeeds; failures remain in the attempted/recovered/failed accounting.
+Eight predeclared scenarios vary two observation counts (`48`, `160`), two draw counts (`8`, `32`), and two paired loading/residual-scale settings (`0.4`/`0.5` and `1.2`/`1.2`). Each scenario uses 512 attempted replications. A replication is recovered only when the public Analysis Run executor succeeds; failures remain in the attempted/recovered/failed accounting.
 
 Every generated population has its own immutable snapshot identity and its own accepted Analysis Run identity. This matters because a Monte Carlo replication changes the underlying population; reusing one `snapshot_id` or one run receipt across different generated datasets would contradict the same provenance semantics this acceptance test is intended to exercise. The rolling-origin comparison is different: the early-full, early-prefix, and later-cutoff executions inside one replication share that replication's snapshot because they are alternative historical views of one generated population, but they use distinct run/idempotency identities. RED `16e3c151d6cadd79c1ec8e32d74a8401333be42c` exposed the original snapshot aliasing; repair `ed2ac416ac42cb15909cefde0581af408de652e7` binds the corrected identities.
 
@@ -35,7 +35,7 @@ Here `Qbar` is the Rubin-combination artifact field `mean_loading`, so the uncer
 | small_m8_low | 48 | 8 | 0.4 | 0.5 | 512 / 512 / 0 | 0.002108 | 0.003402 | 0.076943 | 0.002491 | 0.951172 | 0.009534 | 0.005945 | 0.000344 | 0.006333 |
 | small_m32_low | 48 | 32 | 0.4 | 0.5 | 512 / 512 / 0 | 0.000426 | 0.003284 | 0.074239 | 0.002370 | 0.964844 | 0.008147 | 0.005974 | 0.000343 | 0.006327 |
 | small_m8_high | 48 | 8 | 1.2 | 1.2 | 512 / 512 / 0 | -0.015361 | 0.007998 | 0.181450 | 0.005577 | 0.953125 | 0.009351 | 0.034424 | 0.001921 | 0.036585 |
-| small_m32_high | 48 | 32 | 1.2 | 1.2 | 512 / 512 / 0 | 0.003076 | 0.007818 | 0.176754 | 0.005550 | 0.957031 | 0.008971 | 0.034184 | 0.002005 | 0.036252 |
+| small_m32_high | 48 | 32 | 1.2 | 1.2 | 512 / 512 / 0 | 0.003076 | 0.007818 | 0.176754 | 0.005550 | 512 / 512 / 0 | 0.003076 | 0.007818 | 0.176754 | 0.005550 |
 | large_m8_low | 160 | 8 | 0.4 | 0.5 | 512 / 512 / 0 | 0.001179 | 0.001769 | 0.040007 | 0.001279 | 0.957031 | 0.008971 | 0.001694 | 0.000100 | 0.001807 |
 | large_m32_low | 160 | 32 | 0.4 | 0.5 | 512 / 512 / 0 | 0.000850 | 0.001835 | 0.041498 | 0.001359 | 0.951172 | 0.009534 | 0.001719 | 0.000100 | 0.001822 |
 | large_m8_high | 160 | 8 | 1.2 | 1.2 | 512 / 512 / 0 | -0.007944 | 0.004270 | 0.096856 | 0.003125 | 0.953125 | 0.009351 | 0.009633 | 0.000583 | 0.010289 |
