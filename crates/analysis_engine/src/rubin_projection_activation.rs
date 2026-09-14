@@ -35,29 +35,33 @@ pub struct RubinProjectionActivationReceiptV1 {
     validation_evidence_sha256: String,
     validation_evidence_available_at: String,
     source_snapshot_id: String,
+    source_snapshot_sha256: String,
     knowledge_cutoff: String,
     design_envelope_id: String,
 }
 
 impl RubinProjectionActivationReceiptV1 {
-    /// Construct one canonical activation receipt from immutable contract and
-    /// Validation Evidence references plus typed temporal clocks.
+    /// Construct one canonical activation receipt from immutable contract,
+    /// source-snapshot, and Validation Evidence references plus typed clocks.
     ///
     /// `generator_contract` and `analysis_contract` are `(id, version)` pairs.
-    /// `validation_evidence` is `(id, sha256, available_time)`. Construction
-    /// validates identity and digest syntax but does not grant authority. Late
-    /// Validation Evidence remains a valid wire object that the projection
-    /// decision rejects by cutoff.
+    /// `validation_evidence` is `(id, sha256, available_time)`. The source
+    /// snapshot is bound by both a stable identity and its canonical SHA-256 so
+    /// a logical snapshot name cannot authorize different bytes later.
+    /// Construction validates identity and digest syntax but does not grant
+    /// authority. Late Validation Evidence remains a valid wire object that the
+    /// projection decision rejects by cutoff.
     ///
     /// # Errors
     ///
     /// Returns a fail-closed validation error when an identifier, immutable
-    /// authority reference, or digest is malformed.
+    /// authority reference, source snapshot digest, or evidence digest is malformed.
     pub fn new(
         generator_contract: (&str, &str),
         analysis_contract: (&str, &str),
         validation_evidence: (&str, &str, AvailableTime),
         source_snapshot_id: impl Into<String>,
+        source_snapshot_sha256: impl Into<String>,
         knowledge_cutoff: KnowledgeCutoff,
         design_envelope_id: impl Into<String>,
     ) -> Result<Self, AnalysisEngineError> {
@@ -71,6 +75,7 @@ impl RubinProjectionActivationReceiptV1 {
             validation_evidence_sha256: validation_evidence.1.into(),
             validation_evidence_available_at: validation_evidence.2.to_rfc3339(),
             source_snapshot_id: source_snapshot_id.into(),
+            source_snapshot_sha256: source_snapshot_sha256.into(),
             knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
             design_envelope_id: design_envelope_id.into(),
         };
@@ -116,10 +121,16 @@ impl RubinProjectionActivationReceiptV1 {
             .map(|json| format_digest(Sha256::digest(json.into_bytes())))
     }
 
-    /// Return the immutable source snapshot bound into the receipt.
+    /// Return the immutable source snapshot identity bound into the receipt.
     #[must_use]
     pub fn source_snapshot_id(&self) -> &str {
         &self.source_snapshot_id
+    }
+
+    /// Return the canonical source snapshot SHA-256 bound into the receipt.
+    #[must_use]
+    pub fn source_snapshot_sha256(&self) -> &str {
+        &self.source_snapshot_sha256
     }
 
     /// Return the canonical knowledge-cutoff wire value.
@@ -150,6 +161,7 @@ impl RubinProjectionActivationReceiptV1 {
                 .iter()
                 .any(|value| !valid_identifier(value) || is_mutable_authority_locator(value))
             || !valid_sha256(&self.validation_evidence_sha256)
+            || !valid_sha256(&self.source_snapshot_sha256)
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
@@ -191,6 +203,7 @@ struct ApprovedRubinProjectionPairing {
     validation_evidence_sha256: &'static str,
     validation_evidence_available_at: &'static str,
     source_snapshot_id: &'static str,
+    source_snapshot_sha256: &'static str,
     design_envelope_id: &'static str,
     indicator_kind: &'static str,
 }
@@ -205,17 +218,20 @@ const PRODUCTION_APPROVED_PAIRINGS: &[ApprovedRubinProjectionPairing] = &[];
 /// Production approval data are deliberately not caller-supplied. The registry
 /// remains empty until an independently accepted Validation Evidence package is
 /// promoted through the owner path, so a syntactically valid candidate receipt
-/// cannot self-authorize.
+/// cannot self-authorize. Snapshot identity and content digest are independent
+/// runtime inputs and both must match the receipt and owner authority.
 #[must_use]
 pub fn decide_rubin_projection_activation(
     receipt: Option<&RubinProjectionActivationReceiptV1>,
     expected_snapshot_id: &str,
+    expected_snapshot_sha256: &str,
     expected_knowledge_cutoff: KnowledgeCutoff,
     indicator_kind: IndicatorKind,
 ) -> RubinProjectionActivationDecision {
     decide_with_registry(
         receipt,
         expected_snapshot_id,
+        expected_snapshot_sha256,
         expected_knowledge_cutoff,
         indicator_kind,
         PRODUCTION_APPROVED_PAIRINGS,
@@ -225,6 +241,7 @@ pub fn decide_rubin_projection_activation(
 fn decide_with_registry(
     receipt: Option<&RubinProjectionActivationReceiptV1>,
     expected_snapshot_id: &str,
+    expected_snapshot_sha256: &str,
     expected_knowledge_cutoff: KnowledgeCutoff,
     indicator_kind: IndicatorKind,
     approved_pairings: &[ApprovedRubinProjectionPairing],
@@ -235,6 +252,7 @@ fn decide_with_registry(
     if receipt.validate_authority_fields().is_err()
         || !valid_identifier(expected_snapshot_id)
         || is_mutable_authority_locator(expected_snapshot_id)
+        || !valid_sha256(expected_snapshot_sha256)
     {
         return RubinProjectionActivationDecision::Rejected;
     }
@@ -242,6 +260,7 @@ fn decide_with_registry(
         return RubinProjectionActivationDecision::Rejected;
     };
     if receipt.source_snapshot_id != expected_snapshot_id
+        || receipt.source_snapshot_sha256 != expected_snapshot_sha256
         || receipt_cutoff.instant() != expected_knowledge_cutoff.instant()
         || evidence_available_at.instant() > expected_knowledge_cutoff.instant()
     {
@@ -256,6 +275,7 @@ fn decide_with_registry(
         };
         if !valid_identifier(pairing.source_snapshot_id)
             || is_mutable_authority_locator(pairing.source_snapshot_id)
+            || !valid_sha256(pairing.source_snapshot_sha256)
             || authoritative_available_at.to_rfc3339() != pairing.validation_evidence_available_at
             || authoritative_available_at.instant() != evidence_available_at.instant()
             || authoritative_available_at.instant() > expected_knowledge_cutoff.instant()
@@ -269,6 +289,7 @@ fn decide_with_registry(
             && receipt.validation_evidence_id == pairing.validation_evidence_id
             && receipt.validation_evidence_sha256 == pairing.validation_evidence_sha256
             && receipt.source_snapshot_id == pairing.source_snapshot_id
+            && receipt.source_snapshot_sha256 == pairing.source_snapshot_sha256
             && receipt.design_envelope_id == pairing.design_envelope_id
             && indicator_kind.as_str() == pairing.indicator_kind
     });
@@ -332,6 +353,8 @@ mod tests {
     use temporal_core::{AvailableTime, KnowledgeCutoff};
 
     const SNAPSHOT_ID: &str = "snapshot-rubin-activation";
+    const SNAPSHOT_DIGEST: &str =
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const EVIDENCE_ID: &str = "validation-evidence-rubin-approved-v1";
     const EVIDENCE_DIGEST: &str =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -347,6 +370,7 @@ mod tests {
         validation_evidence_sha256: EVIDENCE_DIGEST,
         validation_evidence_available_at: EVIDENCE_AVAILABLE_AT,
         source_snapshot_id: SNAPSHOT_ID,
+        source_snapshot_sha256: SNAPSHOT_DIGEST,
         design_envelope_id: DESIGN_ENVELOPE,
         indicator_kind: "alr",
     };
@@ -374,6 +398,7 @@ mod tests {
                 AvailableTime::parse_rfc3339(available_at).expect("availability"),
             ),
             SNAPSHOT_ID,
+            SNAPSHOT_DIGEST,
             cutoff(receipt_cutoff),
             APPROVED.design_envelope_id,
         )
@@ -387,11 +412,62 @@ mod tests {
             decide_with_registry(
                 Some(&receipt),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
             ),
             RubinProjectionActivationDecision::Eligible
+        );
+    }
+
+    #[test]
+    fn source_snapshot_digest_must_match_runtime_receipt_and_owner_authority() {
+        let valid = receipt(EVIDENCE_AVAILABLE_AT, "2026-08-01T00:00:00Z");
+        let other_digest =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        assert_eq!(
+            decide_with_registry(
+                Some(&valid),
+                SNAPSHOT_ID,
+                other_digest,
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[APPROVED],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
+
+        let wrong_owner_digest = ApprovedRubinProjectionPairing {
+            source_snapshot_sha256: other_digest,
+            ..APPROVED
+        };
+        assert_eq!(
+            decide_with_registry(
+                Some(&valid),
+                SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[wrong_owner_digest],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
+
+        let malformed_owner_digest = ApprovedRubinProjectionPairing {
+            source_snapshot_sha256: "not-a-digest",
+            ..APPROVED
+        };
+        assert_eq!(
+            decide_with_registry(
+                Some(&valid),
+                SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[malformed_owner_digest],
+            ),
+            RubinProjectionActivationDecision::Rejected
         );
     }
 
@@ -406,6 +482,7 @@ mod tests {
             decide_with_registry(
                 Some(&backdated),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[late_authority],
@@ -425,6 +502,7 @@ mod tests {
             decide_with_registry(
                 Some(&receipt),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[noncanonical_authority],
@@ -440,6 +518,7 @@ mod tests {
             decide_with_registry(
                 Some(&valid),
                 "",
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
@@ -450,6 +529,7 @@ mod tests {
             decide_with_registry(
                 Some(&valid),
                 "different-snapshot",
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
@@ -460,6 +540,18 @@ mod tests {
             decide_with_registry(
                 Some(&valid),
                 SNAPSHOT_ID,
+                "bad-digest",
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[APPROVED],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
+        assert_eq!(
+            decide_with_registry(
+                Some(&valid),
+                SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-02T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
@@ -471,6 +563,7 @@ mod tests {
             decide_with_registry(
                 Some(&late),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
@@ -481,6 +574,7 @@ mod tests {
             decide_with_registry(
                 Some(&valid),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::IsometricLogRatio,
                 &[APPROVED],
@@ -528,6 +622,7 @@ mod tests {
                 decide_with_registry(
                     Some(&valid),
                     SNAPSHOT_ID,
+                    SNAPSHOT_DIGEST,
                     cutoff("2026-08-01T00:00:00Z"),
                     IndicatorKind::AdditiveLogRatio,
                     &[mismatch],
@@ -548,6 +643,7 @@ mod tests {
             decide_with_registry(
                 Some(&valid),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[cross_snapshot_authority],
@@ -563,6 +659,7 @@ mod tests {
             decide_with_registry(
                 Some(&valid),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[mutable_snapshot_authority],
@@ -608,6 +705,14 @@ mod tests {
             RubinProjectionActivationReceiptV1::from_json(&mutable.to_string()),
             Err(AnalysisEngineError::InvalidEvidence)
         );
+
+        let mut forged_snapshot_digest: serde_json::Value =
+            serde_json::from_str(&canonical).expect("json");
+        forged_snapshot_digest["source_snapshot_sha256"] = serde_json::json!("not-a-digest");
+        assert_eq!(
+            RubinProjectionActivationReceiptV1::from_json(&forged_snapshot_digest.to_string()),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 
     #[test]
@@ -626,6 +731,7 @@ mod tests {
                         .expect("availability"),
                 ),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 APPROVED.design_envelope_id,
             ),
@@ -648,6 +754,30 @@ mod tests {
                         .expect("availability"),
                 ),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
+                cutoff("2026-08-01T00:00:00Z"),
+                APPROVED.design_envelope_id,
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            RubinProjectionActivationReceiptV1::new(
+                (
+                    APPROVED.generator_contract_id,
+                    APPROVED.generator_contract_version,
+                ),
+                (
+                    APPROVED.analysis_contract_id,
+                    APPROVED.analysis_contract_version,
+                ),
+                (
+                    APPROVED.validation_evidence_id,
+                    APPROVED.validation_evidence_sha256,
+                    AvailableTime::parse_rfc3339(EVIDENCE_AVAILABLE_AT)
+                        .expect("availability"),
+                ),
+                SNAPSHOT_ID,
+                "ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
                 cutoff("2026-08-01T00:00:00Z"),
                 APPROVED.design_envelope_id,
             ),
@@ -660,6 +790,7 @@ mod tests {
             decide_with_registry(
                 Some(&malformed),
                 SNAPSHOT_ID,
+                SNAPSHOT_DIGEST,
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[APPROVED],
