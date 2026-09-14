@@ -215,6 +215,10 @@ fn admit_scores_at_cutoff(
     })
 }
 
+#[expect(
+    clippy::missing_panics_doc,
+    reason = "bounded summary constants cannot fail"
+)]
 /// Execute cutoff-safe CWC within/between composition as one analysis-run profile.
 ///
 /// The caller supplies already-mapped clustered coordinates. This executor does
@@ -225,10 +229,6 @@ fn admit_scores_at_cutoff(
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, psychometric
 /// recovery failure, or invalid artifact error.
-#[expect(
-    clippy::missing_panics_doc,
-    reason = "bounded summary constants cannot fail"
-)]
 pub fn execute_longitudinal_cwc_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
