@@ -28,6 +28,8 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | HTTP analysis-run create | `tepp_api` `naruon_analysis_run_exchange` → `POST /v1/analysis-runs` | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
+| Live loopback export retrieval | `tepp_api` `AnalysisRunLiveService` → `POST /v1/exports` then `GET /v1/exports/{export_id}` | naruon → TEPP |
+| Live loopback export retrieval CLI | `tepp_api` `tepp-export-get get` → typed `naruon_export_retrieval_exchange` on `tepp-loopback` | naruon → TEPP |
 
 Committed examples live under `examples/`. Schemas for analysis-run requests and corpus-split manifests live under `schemas/`.
 
@@ -48,6 +50,7 @@ When naruon requests an export, TEPP evaluates `AnalyticalPurpose::ModularServic
 - redefinition of reserved headers (`content-type`, `tepp-consumer`,
   `tepp-contract-version`, `idempotency-key`) via extra headers → reject;
 - export interchange without a nonempty per-export idempotency key → reject;
+- export retrieval without the server-minted UUID v7 bearer capability → reject;
 - lexical method codes (`tfidf`, `bm25`, `keyword`) claiming TEPP inference → reject.
 
 ## Authority sources

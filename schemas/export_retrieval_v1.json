@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tepp.local/schemas/export_retrieval_v1.json",
+  "title": "ExportRetrievalV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "export_id",
+    "artifact_id",
+    "decision_code",
+    "purpose",
+    "idempotency_key"
+  ],
+  "properties": {
+    "contract_version": { "type": "integer", "const": 1 },
+    "export_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" },
+    "artifact_id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" },
+    "decision_code": { "type": "string", "const": "purpose_bound_export_allowed" },
+    "purpose": {
+      "type": "string",
+      "enum": [
+        "scientific_validation",
+        "operational_monitoring",
+        "partner_disclosure",
+        "modular_service_consumer"
+      ]
+    },
+    "idempotency_key": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": ".*\\S.*" }
+  }
+}
