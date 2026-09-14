@@ -41,6 +41,13 @@ owner-controlled availability instant for the approved Validation Evidence
 identity/digest; otherwise a later evidence package could be backdated into an
 older `KnowledgeCutoff`.
 
+A fourth provenance constraint applies to the snapshot name itself. A field
+called `source_snapshot_id` is not immutable merely because it is syntactically
+valid. Branch names, pull-request aliases, repository locators, and latest-style
+refs can move after an artifact is produced. They therefore cannot serve as
+historical projection authority even when caller and executor currently resolve
+the same alias.
+
 ## Decision
 
 Add `rubin_loading_uncertainty_v1` to `analysis_engine` as an application
@@ -79,6 +86,10 @@ composition over the protected-main scientific owners. The executor:
   contract ID/version, exact Rubin analysis contract ID/version, Validation
   Evidence ID/SHA-256/availability, source snapshot, knowledge cutoff, and
   design envelope;
+- treats the receipt snapshot and the expected Analysis Run snapshot as
+  immutable authority fields. Activation rejects mutable branch/PR/issue/
+  repository/latest locator shapes before identity comparison; matching the
+  same mutable alias on both sides is not sufficient provenance;
 - evaluates that receipt through a pure fail-closed activation decision.
   Snapshot and cutoff binding precede registry matching, generator/analysis/
   evidence/design/indicator matching is exact rather than heuristic, and the
@@ -121,6 +132,11 @@ earlier receipt timestamp fails closed. Equivalent RFC 3339 spellings of the
 same instant compare equal only after typed parsing; persisted receipt and
 registry timestamps remain canonical.
 
+Snapshot identity is part of replay authority. `main`, `refs/heads/main`, PR
+numbers, repository tree URLs, and equivalent mutable locators cannot identify
+the historical source population of an authoritative projection. The receipt
+and expected execution snapshot must both carry a stable snapshot identity.
+
 ## Alternatives considered
 
 1. Use `combine_draw_level_ols_loadings.mean_loading` for both fields — rejected
@@ -156,6 +172,10 @@ registry timestamps remain canonical.
     rejected because immutable content identity does not establish when that
     evidence became available. The owner-controlled pairing binds the
     authoritative availability clock and historical eligibility uses that clock.
+12. Accept a mutable snapshot alias when receipt and executor strings match —
+    rejected because string equality does not establish immutable source
+    identity. A branch or PR ref can later resolve to different evidence while
+    preserving the same text, breaking historical replay and auditability.
 
 ## Scientific acceptance boundary
 
@@ -222,12 +242,16 @@ The activation receipt now has an executable bounded representation and pure
 decision algorithm, including the positive algorithmic branch under a private
 test pairing. Positive eligibility also requires the receipt's evidence
 availability to match the owner-controlled approved availability, so immutable
-evidence content cannot be backdated into an older cutoff. That does not make
-#504 or #506 scientific authority: the production approved-pairing registry is
-empty, the artifact remains descriptive-only, and exact-head scientific/review/
-release gates still control promotion. The profile remains Draft/Proposed and
-not implemented-main while #503, #505, and the normal exact-head merge gates
-remain unresolved.
+evidence content cannot be backdated into an older cutoff. Issue #509 further
+closes the same mutability class for source snapshots: mutable refs cannot be
+used as the historical snapshot authority merely because receipt and executor
+agree on the same string.
+
+That does not make #504 or #506 scientific authority: the production approved-
+pairing registry is empty, the artifact remains descriptive-only, and exact-head
+scientific/review/release gates still control promotion. The profile remains
+Draft/Proposed and not implemented-main while #503, #505, and the normal exact-
+head merge gates remain unresolved.
 
 ## Verification
 
@@ -246,10 +270,10 @@ exceeded draw/resource bounds, inconsistent Rubin totals, artifact count
 bounds, terminal provider/domain-status separation, Monte Carlo snapshot/run-
 identity non-aliasing, digest-bound descriptive-only projection, bounded receipt
 round-trip/digest validation, missing receipt, late Validation Evidence,
-snapshot/cutoff mismatch, unknown or mismatched generator/analysis/evidence/
-design/indicator authority, caller backdating versus owner-controlled evidence
-availability, noncanonical registry availability, and a private exact approved-
-pairing positive branch.
+snapshot/cutoff mismatch, mutable snapshot aliases, unknown or mismatched
+generator/analysis/evidence/design/indicator authority, caller backdating versus
+owner-controlled evidence availability, noncanonical registry availability, and
+a private exact approved-pairing positive branch.
 
 A future positive artifact state still requires an independently promoted
 production pairing and must digest-bind the activation receipt. Predecessor
@@ -260,6 +284,6 @@ claim authority.
 
 Rollback removes the `rubin_loading_uncertainty_v1` profile and its activation
 policy. No persisted schema migration is introduced. Supersede only with an ADR
-that preserves the scientific owner split, temporal provenance, resource
-admission, claim-specific validation evidence, and the Rubin-versus-Mislevy /
-draw-generation activation boundaries.
+that preserves the scientific owner split, temporal provenance, immutable
+snapshot authority, resource admission, claim-specific validation evidence, and
+the Rubin-versus-Mislevy / draw-generation activation boundaries.
