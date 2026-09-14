@@ -174,8 +174,25 @@ fn mismatched_replications_record_positive_rmse() {
 }
 
 #[test]
-fn provenance_rejects_future_evidence_and_resource_exhaustion_before_selection() {
+fn provenance_constructor_checks_each_admission_boundary() {
     let candidate = ModelCandidate::statistical(2, -30.0, 8.0).expect("candidate");
+    let visible = available("2026-01-10T00:00:00Z");
+
+    assert_eq!(
+        ParetoCandidateKInput::new("", cutoff(), vec![visible], vec![candidate], vec![2], 2),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        ParetoCandidateKInput::new(
+            "snapshot-pareto-candidate-k",
+            cutoff(),
+            Vec::new(),
+            vec![candidate],
+            vec![2],
+            2,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
     assert_eq!(
         ParetoCandidateKInput::new(
             "snapshot-pareto-candidate-k",
@@ -191,7 +208,18 @@ fn provenance_rejects_future_evidence_and_resource_exhaustion_before_selection()
         ParetoCandidateKInput::new(
             "snapshot-pareto-candidate-k",
             cutoff(),
-            vec![available("2026-01-10T00:00:00Z")],
+            vec![visible; MAX_EVIDENCE_UNITS + 1],
+            vec![candidate],
+            vec![2],
+            2,
+        ),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+    assert_eq!(
+        ParetoCandidateKInput::new(
+            "snapshot-pareto-candidate-k",
+            cutoff(),
+            vec![visible],
             vec![candidate; 257],
             vec![2],
             2,
@@ -202,17 +230,29 @@ fn provenance_rejects_future_evidence_and_resource_exhaustion_before_selection()
         ParetoCandidateKInput::new(
             "snapshot-pareto-candidate-k",
             cutoff(),
-            vec![available("2026-01-10T00:00:00Z")],
+            vec![visible],
             vec![candidate],
             vec![2; MAX_EVIDENCE_UNITS + 1],
             2,
         ),
         Err(AnalysisEngineError::LimitExceeded)
     );
+
+    assert!(
+        ParetoCandidateKInput::new(
+            "snapshot-pareto-candidate-k",
+            cutoff(),
+            vec![visible; MAX_EVIDENCE_UNITS],
+            vec![candidate; 256],
+            vec![2; MAX_EVIDENCE_UNITS],
+            2,
+        )
+        .is_ok()
+    );
 }
 
 #[test]
-fn equivalent_cutoff_instants_bind_and_provenance_snapshot_is_enforced() {
+fn equivalent_cutoff_instants_bind_and_input_provenance_is_rechecked() {
     let mut equivalent = request();
     equivalent.knowledge_cutoff = "2026-01-31T19:00:00-05:00".into();
     assert!(execute(&equivalent, &statistical_front()).is_ok());
@@ -229,6 +269,21 @@ fn equivalent_cutoff_instants_bind_and_provenance_snapshot_is_enforced() {
     assert_eq!(
         execute(&request(), &wrong_snapshot),
         Err(AnalysisEngineError::SnapshotMismatch)
+    );
+
+    let earlier_cutoff = KnowledgeCutoff::parse_rfc3339("2026-01-31T23:59:59Z").expect("earlier");
+    let wrong_cutoff = ParetoCandidateKInput::new(
+        "snapshot-pareto-candidate-k",
+        earlier_cutoff,
+        vec![available("2026-01-10T00:00:00Z")],
+        vec![ModelCandidate::statistical(2, -30.0, 8.0).expect("candidate")],
+        vec![2],
+        2,
+    )
+    .expect("input");
+    assert_eq!(
+        execute(&request(), &wrong_cutoff),
+        Err(AnalysisEngineError::InvalidEvidence)
     );
 }
 
