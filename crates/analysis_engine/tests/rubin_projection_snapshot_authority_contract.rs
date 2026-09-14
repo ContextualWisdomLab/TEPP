@@ -13,10 +13,15 @@ use temporal_core::{AvailableTime, KnowledgeCutoff};
 const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 
-fn receipt_with_snapshot(snapshot_id: &str) -> Result<RubinProjectionActivationReceiptV1, AnalysisEngineError> {
+fn receipt_with_snapshot(
+    snapshot_id: &str,
+) -> Result<RubinProjectionActivationReceiptV1, AnalysisEngineError> {
     RubinProjectionActivationReceiptV1::new(
         ("gaussian_complete_data_draws", "candidate-v1"),
-        ("rubin_loading_uncertainty", RUBIN_LOADING_MODEL_CONTRACT_VERSION),
+        (
+            "rubin_loading_uncertainty",
+            RUBIN_LOADING_MODEL_CONTRACT_VERSION,
+        ),
         (
             "validation-evidence-rubin-candidate-v1",
             EVIDENCE_DIGEST,
