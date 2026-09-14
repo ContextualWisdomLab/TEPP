@@ -28,12 +28,11 @@ components, and terminal provider validation reused the scientific inference
 label.
 
 A second scientific boundary remains after those application repairs. The
-current input can carry any finite complete-data draw matrix; it does not yet
-identify the generator/imputer contract or validation evidence for the exact
-generator/analysis pairing. Rubin-style variance validity is therefore not
-implied by the algebra alone. The profile may calculate the bounded component
-arithmetic, but broader inferential activation must remain scoped to a
-validated draw-generation design until that provenance contract exists.
+current input can carry any finite complete-data draw matrix; formula correctness
+does not identify the generator/imputer contract or establish that its pairing
+with this analysis has accepted recovery/coverage evidence. Broader inferential
+activation must therefore remain scoped to an immutable, validated
+generator/analysis/evidence pairing.
 
 ## Decision
 
@@ -68,20 +67,30 @@ composition over the protected-main scientific owners. The executor:
 - emits the digest-bound, read-only projection status
   `descriptive_only_unbound_draw_generation_provenance` whenever the draw
   generator is not bound to claim-specific Validation Evidence. Callers cannot
-  mutate that status through the public artifact API.
+  mutate that status through the public artifact API;
+- defines a bounded `RubinProjectionActivationReceiptV1` that binds generator
+  contract ID/version, exact Rubin analysis contract ID/version, Validation
+  Evidence ID/SHA-256/availability, source snapshot, knowledge cutoff, and
+  design envelope;
+- evaluates that receipt through a pure fail-closed activation decision.
+  Snapshot and cutoff binding precede registry matching, Validation Evidence
+  availability must not exceed the run cutoff, and generator/analysis/evidence/
+  design/indicator matching is exact rather than heuristic;
+- keeps the production approved-pairing registry empty on this Draft branch.
+  A test-private fake pairing exercises the `Eligible` branch without creating
+  production claim authority.
 
 This remains draw-level OLS combination. It is not person-level plausible-value
 pooling, an ESEM/DSEM sampler, CWC, persistence, or a causal estimator.
 
-The current profile does not authorize arbitrary supplied draw sets as
-generally valid multiple-imputation inference. Issue #505 owns the remaining
-positive activation contract: a versioned generator/analysis pairing, exact
-Validation Evidence identity/digest, and historical availability/cutoff binding.
-Draft #506 implements the fail-closed negative projection rule now, rather than
-waiting for a future approved pairing and leaving provenance-free artifacts
-semantically ambiguous. Until an approved pairing exists, `Q̄/Ū/B/T` may be
-computed descriptively but cannot be projected as validated interval/variance
-inference.
+The profile does not authorize arbitrary supplied draw sets as generally valid
+multiple-imputation inference. Issue #505 owns claim-specific positive
+activation. Draft #506 now owns both the negative projection rule and the
+bounded activation authority contract, but it deliberately emits no positive
+artifact projection because no production pairing has crossed ADR 0014's
+scientific/review/release gates. Until an approved pairing exists, `Q̄/Ū/B/T`
+may be computed descriptively but cannot be projected as validated
+interval/variance inference.
 
 ## Historical replay invariant
 
@@ -91,6 +100,11 @@ factor-score/draw matrix or its scientific result. Such rows may change only
 the excluded-after-cutoff count. A row from another immutable snapshot is not
 historical censoring; it is a provenance violation and fails closed even when
 its availability is later than the cutoff.
+
+Activation authority follows the same temporal rule. Validation Evidence that
+was unavailable at the historical cutoff cannot retroactively authorize an
+older run. Equivalent RFC 3339 spellings of the same instant compare equal only
+after typed parsing; persisted receipt timestamps remain canonical.
 
 ## Alternatives considered
 
@@ -119,6 +133,10 @@ its availability is later than the cutoff.
    rejected because its exact-head workflows and independent approval are not
    complete. Activation evidence cannot be promoted by the same branch that is
    still establishing it.
+10. Accept a caller-supplied approval registry — rejected because a consumer
+    could self-authorize arbitrary draw generators. Production approval data
+    remain an owner-controlled immutable registry, while tests use a private
+    fake registry only to exercise the pure decision algorithm.
 
 ## Scientific acceptance boundary
 
@@ -140,14 +158,15 @@ views still use distinct run/idempotency identities. Reusing one snapshot or
 accepted-run receipt across different generated populations is invalid
 evidence even when the resulting numerical summaries are deterministic.
 
-Issue #505 separately owns positive inferential activation. The Analysis Run
-must not project #504's design-specific coverage as universal authorization for
-an unknown or arbitrary draw generator. Promotion requires a versioned approved
-generator/analysis pairing and the Validation Evidence that supports that
-pairing, consistent with ADR 0014's separation of implementation authority from
-scientific/product claim authority. Until those conditions are met, the
-artifact's read-only projection status remains descriptive-only and is included
-in the canonical digest.
+Issue #505 separately owns inferential activation. The Analysis Run must not
+project #504's design-specific coverage as universal authorization for an
+unknown or arbitrary draw generator. Promotion requires a versioned approved
+generator/analysis pairing and the exact Validation Evidence identity/digest,
+snapshot, cutoff, availability, and design envelope that support that pairing,
+consistent with ADR 0014's separation of implementation authority from
+scientific/product claim authority. Draft #506 can represent and reject this
+authority boundary but cannot populate the production registry from its own
+candidate evidence.
 
 Primary authorities for the current combining-rule and activation boundary are:
 
@@ -164,25 +183,29 @@ https://doi.org/10.1214/ss/1177010269
 
 Xie, X., & Meng, X.-L. (2017). Dissecting multiple imputation from a multi-phase
 inference perspective: What happens when God's, imputer's and analyst's models
-are uncongenial? *Statistica Sinica, 27*(4), 1485–1545.
+are uncongenial? *Statistica Sinica, 27*(4), 1485–1594.
 https://doi.org/10.5705/ss.2014.067
 
 Repository research authority is `docs/research/rubin-total-variance.md` plus
-`docs/research/rubin-loading-uncertainty-scientific-acceptance.md` for the
-current profile-level repeated-sampling evidence.
+`docs/research/rubin-loading-uncertainty-scientific-acceptance.md` and
+`docs/research/rubin-loading-projection-activation-contract.md` for the current
+profile-level evidence and authority boundary.
 
 ## Consequences
 
 The profile has a narrower, auditable temporal and resource boundary, and its
 artifact can no longer claim a Rubin total inconsistent with its serialized
 components. Consumers can distinguish provider validation from the scientific
-claim boundary, distinguish the robust point estimate from Rubin `Q̄`, and now
-also distinguish descriptive combination arithmetic from an authoritative
-projection backed by draw-generation Validation Evidence. The checked-in #504
-evidence can support only its declared generator/design after its own gates are
-satisfied; #506 does not silently promote it. The profile remains
-Draft/Proposed and not implemented-main while #503, #505, and the normal
-exact-head merge gates remain unresolved.
+claim boundary, distinguish the robust point estimate from Rubin `Q̄`, and
+distinguish descriptive combination arithmetic from projection authority.
+
+The activation receipt now has an executable bounded representation and pure
+decision algorithm, including the positive algorithmic branch under a private
+test pairing. That does not make #504 or #506 scientific authority: the
+production approved-pairing registry is empty, the artifact remains
+descriptive-only, and exact-head scientific/review/release gates still control
+promotion. The profile remains Draft/Proposed and not implemented-main while
+#503, #505, and the normal exact-head merge gates remain unresolved.
 
 ## Verification
 
@@ -199,16 +222,20 @@ Regression contracts cover equivalent cutoff instants, future-evidence replay,
 cross-snapshot refusal, robust-point versus naive-mean cancellation, exact and
 exceeded draw/resource bounds, inconsistent Rubin totals, artifact count
 bounds, terminal provider/domain-status separation, Monte Carlo snapshot/run-
-identity non-aliasing, and the digest-bound descriptive-only projection state
-for provenance-free draw matrices. #505 still requires the positive executable
-activation contract for missing/unknown/mismatched/stale versus explicitly
-approved versioned generator/analysis evidence; that step must not duplicate the
-Rubin arithmetic or promote Draft #504 prematurely.
+identity non-aliasing, digest-bound descriptive-only projection, bounded receipt
+round-trip/digest validation, missing receipt, late Validation Evidence,
+snapshot/cutoff mismatch, unknown or mismatched generator/analysis/evidence/
+design/indicator authority, and a private exact approved-pairing positive branch.
+
+A future positive artifact state still requires an independently promoted
+production pairing and must digest-bind the activation receipt. Predecessor
+checks, Draft review state, or mutable PR/branch locators do not transfer as
+claim authority.
 
 ## Rollback and supersession
 
-Rollback removes the `rubin_loading_uncertainty_v1` profile. No persisted
-schema migration is introduced. Supersede only with an ADR that preserves the
-scientific owner split, temporal provenance, resource admission, claim-specific
-validation evidence, and the Rubin-versus-Mislevy / draw-generation activation
-boundaries.
+Rollback removes the `rubin_loading_uncertainty_v1` profile and its activation
+policy. No persisted schema migration is introduced. Supersede only with an ADR
+that preserves the scientific owner split, temporal provenance, resource
+admission, claim-specific validation evidence, and the Rubin-versus-Mislevy /
+draw-generation activation boundaries.
