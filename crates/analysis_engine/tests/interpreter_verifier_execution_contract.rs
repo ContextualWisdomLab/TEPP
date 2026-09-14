@@ -6,12 +6,16 @@ use analysis_engine::{
     InterpreterVerifierExecution, InterpreterVerifierInput, execute_interpreter_verifier_run,
 };
 use interpretation_gateway::{ClaimSupport, InterpretationError, InterpretationId};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 use uuid::Uuid;
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff")
+}
+
+fn available(value: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(value).expect("available time")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -36,37 +40,81 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
 }
 
 fn cited_input() -> InterpreterVerifierInput {
+    let interpretation_id = InterpretationId::from_uuid(Uuid::from_u128(2));
     InterpreterVerifierInput::new(
-        InterpretationId::from_uuid(Uuid::from_u128(2)),
-        vec![Uuid::from_u128(7)],
+        interpretation_id,
+        vec![(
+            Uuid::from_u128(7),
+            "snapshot-interpreter-verifier".into(),
+            available("2026-01-15T00:00:00Z"),
+        )],
         vec![
-            ClaimSupport::Unsupported,
-            ClaimSupport::Unsupported,
-            ClaimSupport::Supported,
-        ],
-        vec![
-            ClaimSupport::Unsupported,
-            ClaimSupport::Unsupported,
-            ClaimSupport::Supported,
+            (
+                Uuid::from_u128(101),
+                interpretation_id,
+                "snapshot-interpreter-verifier".into(),
+                available("2026-01-15T00:00:00Z"),
+                ClaimSupport::Unsupported,
+                ClaimSupport::Unsupported,
+            ),
+            (
+                Uuid::from_u128(102),
+                interpretation_id,
+                "snapshot-interpreter-verifier".into(),
+                available("2026-01-15T00:00:00Z"),
+                ClaimSupport::Unsupported,
+                ClaimSupport::Unsupported,
+            ),
+            (
+                Uuid::from_u128(103),
+                interpretation_id,
+                "snapshot-interpreter-verifier".into(),
+                available("2026-01-15T00:00:00Z"),
+                ClaimSupport::Supported,
+                ClaimSupport::Supported,
+            ),
         ],
     )
+    .expect("input")
 }
 
 fn uncited_promotion_input() -> InterpreterVerifierInput {
+    let interpretation_id = InterpretationId::from_uuid(Uuid::from_u128(2));
     InterpreterVerifierInput::new(
-        InterpretationId::from_uuid(Uuid::from_u128(2)),
-        vec![Uuid::from_u128(7)],
+        interpretation_id,
+        vec![(
+            Uuid::from_u128(7),
+            "snapshot-interpreter-verifier".into(),
+            available("2026-01-15T00:00:00Z"),
+        )],
         vec![
-            ClaimSupport::Unsupported,
-            ClaimSupport::Unsupported,
-            ClaimSupport::Supported,
-        ],
-        vec![
-            ClaimSupport::Supported,
-            ClaimSupport::Supported,
-            ClaimSupport::Supported,
+            (
+                Uuid::from_u128(101),
+                interpretation_id,
+                "snapshot-interpreter-verifier".into(),
+                available("2026-01-15T00:00:00Z"),
+                ClaimSupport::Unsupported,
+                ClaimSupport::Supported,
+            ),
+            (
+                Uuid::from_u128(102),
+                interpretation_id,
+                "snapshot-interpreter-verifier".into(),
+                available("2026-01-15T00:00:00Z"),
+                ClaimSupport::Unsupported,
+                ClaimSupport::Supported,
+            ),
+            (
+                Uuid::from_u128(103),
+                interpretation_id,
+                "snapshot-interpreter-verifier".into(),
+                available("2026-01-15T00:00:00Z"),
+                ClaimSupport::Supported,
+                ClaimSupport::Supported,
+            ),
         ],
     )
+    .expect("input")
 }
 
 fn execute(
@@ -114,10 +162,7 @@ fn cited_interpretation_stays_hypothetical_and_records_zero_unsupported_rate() {
     );
     let summary = execution.terminal_result.summary.as_ref().expect("summary");
     assert_eq!(summary.analysis_family, "interpreter_verifier");
-    assert_eq!(
-        summary.validation_status,
-        "hypothetical_interpretation_not_scientific_authority"
-    );
+    assert_eq!(summary.validation_status, "validated");
 }
 
 #[test]
@@ -134,14 +179,113 @@ fn uncited_promotion_records_unit_rate_and_cannot_become_scientific_authority() 
 }
 
 #[test]
+fn equivalent_cutoff_spelling_binds_to_the_same_instant() {
+    let mut request = request();
+    request.knowledge_cutoff = "2026-02-01T01:00:00+01:00".into();
+    let execution = execute(&request, &cited_input()).expect("equivalent cutoff");
+    assert_eq!(execution.artifact.knowledge_cutoff, "2026-02-01T00:00:00Z");
+}
+
+#[test]
+fn future_duplicate_records_cannot_change_a_historical_result() {
+    let request = request();
+    let baseline_input = cited_input();
+    let baseline = execute(&request, &baseline_input).expect("baseline");
+    let interpretation_id = baseline_input.interpretation_id();
+    let mut evidence_spans = baseline_input.evidence_spans().to_vec();
+    evidence_spans.insert(
+        0,
+        (
+            Uuid::from_u128(7),
+            "snapshot-interpreter-verifier".into(),
+            available("2026-02-02T00:00:00Z"),
+        ),
+    );
+    let mut claims = baseline_input.claims().to_vec();
+    claims.insert(
+        0,
+        (
+            Uuid::from_u128(101),
+            interpretation_id,
+            "snapshot-interpreter-verifier".into(),
+            available("2026-02-02T00:00:00Z"),
+            ClaimSupport::Unsupported,
+            ClaimSupport::Supported,
+        ),
+    );
+    let replay_input = InterpreterVerifierInput::new(interpretation_id, evidence_spans, claims)
+        .expect("replay input");
+    let replay = execute(&request, &replay_input).expect("replay");
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
+}
+
+#[test]
+fn unrelated_snapshot_and_interpretation_claims_fail_closed() {
+    let interpretation_id = InterpretationId::from_uuid(Uuid::from_u128(2));
+    let other_interpretation_id = InterpretationId::from_uuid(Uuid::from_u128(3));
+    let wrong_snapshot = InterpreterVerifierInput::new(
+        interpretation_id,
+        vec![(
+            Uuid::from_u128(7),
+            "other-snapshot".into(),
+            available("2026-01-15T00:00:00Z"),
+        )],
+        vec![(
+            Uuid::from_u128(101),
+            interpretation_id,
+            "snapshot-interpreter-verifier".into(),
+            available("2026-01-15T00:00:00Z"),
+            ClaimSupport::Unsupported,
+            ClaimSupport::Unsupported,
+        )],
+    )
+    .expect("wrong snapshot input");
+    assert_eq!(
+        execute(&request(), &wrong_snapshot),
+        Err(AnalysisEngineError::SnapshotMismatch)
+    );
+
+    let wrong_interpretation = InterpreterVerifierInput::new(
+        interpretation_id,
+        vec![(
+            Uuid::from_u128(7),
+            "snapshot-interpreter-verifier".into(),
+            available("2026-01-15T00:00:00Z"),
+        )],
+        vec![(
+            Uuid::from_u128(101),
+            other_interpretation_id,
+            "snapshot-interpreter-verifier".into(),
+            available("2026-01-15T00:00:00Z"),
+            ClaimSupport::Unsupported,
+            ClaimSupport::Unsupported,
+        )],
+    )
+    .expect("wrong interpretation input");
+    assert_eq!(
+        execute(&request(), &wrong_interpretation),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
 fn missing_spans_and_invalid_support_payloads_fail_closed() {
     let request = request();
+    let interpretation_id = InterpretationId::from_uuid(Uuid::from_u128(2));
     let missing_spans = InterpreterVerifierInput::new(
-        InterpretationId::from_uuid(Uuid::from_u128(2)),
+        interpretation_id,
         Vec::new(),
-        vec![ClaimSupport::Unsupported],
-        vec![ClaimSupport::Unsupported],
-    );
+        vec![(
+            Uuid::from_u128(101),
+            interpretation_id,
+            "snapshot-interpreter-verifier".into(),
+            available("2026-01-15T00:00:00Z"),
+            ClaimSupport::Unsupported,
+            ClaimSupport::Unsupported,
+        )],
+    )
+    .expect("missing spans input");
     assert_eq!(
         execute(&request, &missing_spans),
         Err(AnalysisEngineError::Interpretation(
@@ -149,11 +293,22 @@ fn missing_spans_and_invalid_support_payloads_fail_closed() {
         ))
     );
     let invalid_support = InterpreterVerifierInput::new(
-        InterpretationId::from_uuid(Uuid::from_u128(2)),
-        vec![Uuid::from_u128(7)],
-        vec![ClaimSupport::Supported],
-        vec![ClaimSupport::Supported],
-    );
+        interpretation_id,
+        vec![(
+            Uuid::from_u128(7),
+            "snapshot-interpreter-verifier".into(),
+            available("2026-01-15T00:00:00Z"),
+        )],
+        vec![(
+            Uuid::from_u128(101),
+            interpretation_id,
+            "snapshot-interpreter-verifier".into(),
+            available("2026-01-15T00:00:00Z"),
+            ClaimSupport::Supported,
+            ClaimSupport::Supported,
+        )],
+    )
+    .expect("invalid support input");
     assert_eq!(
         execute(&request, &invalid_support),
         Err(AnalysisEngineError::Interpretation(
