@@ -12,6 +12,8 @@ use temporal_core::{AvailableTime, KnowledgeCutoff};
 
 const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const SNAPSHOT_DIGEST: &str =
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 fn canonical_receipt_json() -> String {
     RubinProjectionActivationReceiptV1::new(
@@ -23,6 +25,7 @@ fn canonical_receipt_json() -> String {
             AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability"),
         ),
         "snapshot-rubin-activation",
+        SNAPSHOT_DIGEST,
         KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
         "rubin-gaussian-single-level-candidate-v1",
     )
