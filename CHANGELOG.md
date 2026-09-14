@@ -2,6 +2,12 @@
 
 All notable changes to TEPP are documented here. The format follows Keep a Changelog and semantic versioning once the first implementation release is cut.
 
+## [Unreleased]
+
+### Security
+
+- `rustls` moves from the pinned `=0.23.43` to `=0.23.45`, clearing RUSTSEC-2026-0285 (GHSA-2mjx-qc3c-rqvc, CVE-2025-61730), in which TLS 1.3 handshake messages were accepted across encryption level boundaries. The pin reached the workspace through `service_tls` directly and through `sqlx-core`, so `cargo deny check advisories` failed on every branch until the pin moved.
+
 ## [0.2.0] - 2026-08-25
 
 ### Fixed
