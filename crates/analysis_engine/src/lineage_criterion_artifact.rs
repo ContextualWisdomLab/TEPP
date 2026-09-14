@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{EventTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
@@ -166,11 +166,22 @@ pub fn execute_lineage_criterion_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != LINEAGE_CRITERION_MODEL_CONTRACT_VERSION
         || request.output_profile != LINEAGE_CRITERION_OUTPUT_PROFILE
         || input.draw_count() == 0
     {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    if input.observations().iter().any(|observation| {
+        observation
+            .predecessor_event_time_draws
+            .iter()
+            .chain(&observation.successor_event_time_draws)
+            .any(|value| EventTime::parse_rfc3339(value).is_err())
+    }) {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
 
@@ -200,12 +211,7 @@ pub fn execute_lineage_criterion_run(
         inference_status: LINEAGE_CRITERION_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "lineage_criterion",
-        pair_count,
-        2,
-        LINEAGE_CRITERION_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("lineage_criterion", pair_count, 2, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
