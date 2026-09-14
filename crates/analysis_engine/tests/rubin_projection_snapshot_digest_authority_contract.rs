@@ -13,6 +13,8 @@ const SNAPSHOT_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const OTHER_SNAPSHOT_DIGEST: &str =
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const DRAW_PAYLOAD_DIGEST: &str =
+    "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const OBSERVATION_COUNT: u64 = 48;
@@ -36,6 +38,7 @@ fn receipt() -> RubinProjectionActivationReceiptV1 {
         ),
         SNAPSHOT_ID,
         SNAPSHOT_DIGEST,
+        DRAW_PAYLOAD_DIGEST,
         cutoff(),
         "rubin-gaussian-single-level-approved-v1",
     )
@@ -47,9 +50,11 @@ fn receipt_binds_canonical_source_snapshot_digest_into_wire_and_digest() {
     let receipt = receipt();
     assert_eq!(receipt.source_snapshot_id(), SNAPSHOT_ID);
     assert_eq!(receipt.source_snapshot_sha256(), SNAPSHOT_DIGEST);
+    assert_eq!(receipt.complete_data_draws_sha256(), DRAW_PAYLOAD_DIGEST);
 
     let json = receipt.to_json().expect("json");
     assert!(json.contains(SNAPSHOT_DIGEST));
+    assert!(json.contains(DRAW_PAYLOAD_DIGEST));
     assert_eq!(
         RubinProjectionActivationReceiptV1::from_json(&json),
         Ok(receipt)
@@ -72,6 +77,7 @@ fn receipt_refuses_noncanonical_source_snapshot_digest() {
             ),
             SNAPSHOT_ID,
             "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            DRAW_PAYLOAD_DIGEST,
             cutoff(),
             "rubin-gaussian-single-level-approved-v1",
         ),
@@ -87,6 +93,7 @@ fn runtime_snapshot_digest_is_an_independent_activation_input() {
             None,
             SNAPSHOT_ID,
             OTHER_SNAPSHOT_DIGEST,
+            DRAW_PAYLOAD_DIGEST,
             cutoff(),
             OBSERVATION_COUNT,
             DRAW_COUNT,
@@ -99,6 +106,7 @@ fn runtime_snapshot_digest_is_an_independent_activation_input() {
             Some(&receipt),
             SNAPSHOT_ID,
             OTHER_SNAPSHOT_DIGEST,
+            DRAW_PAYLOAD_DIGEST,
             cutoff(),
             OBSERVATION_COUNT,
             DRAW_COUNT,
