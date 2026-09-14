@@ -710,6 +710,30 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// 2017-era commented `asymTOTALVAR` after `addedTIPREDVAR` was
+    /// requested for a non-stable drift while a contribution was
+    /// nonzero. Lasting `asymDIFFUSION`, `asymTRAITVAR` `trait / a²`,
+    /// and `addedTIPREDVAR` require `a < 0`.
+    AsymptoticTotalObservedVarianceAfterAddedPredictorRequiresStableDrift,
+    /// 2017-era unstandardised commented `asymTOTALVAR` after
+    /// `addedTIPREDVAR` was treated as Eq. 5 of that total. The
+    /// latent three-term total is not `λ²` of that total.
+    UnstandardisedAsymptoticTotalVarianceAfterAddedPredictorIsNotObserved,
+    /// Eq. 5 of §7.2 `addedTIPREDVAR` `λ² (B / a)² v` was treated as
+    /// Eq. 5 of three-term `asymTOTALVAR` after `addedTIPREDVAR`.
+    /// The extra-only observed map omits `asymDIFFUSION` and
+    /// `trait / a²`.
+    AddedTimeIndependentObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded,
+    /// Eq. 5 of §4.3 stationary `T0VAR`
+    /// `λ²(trait + −q / (2 a) + (B / a)² v) + θ + ψ` was treated as
+    /// Eq. 5 of commented `asymTOTALVAR` after `addedTIPREDVAR`.
+    /// Stationary `T0VAR` uses process-level `TRAITVAR`, not
+    /// `trait / a²`.
+    StationaryInitialObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded,
+    /// Driver Table 2 `MANIFESTVAR` `θ` was treated as Eq. 5 of
+    /// 2017-era commented `asymTOTALVAR` after `addedTIPREDVAR`.
+    /// Measurement error is not `λ²` of the three-term total.
+    MeasurementErrorIsNotAsymptoticTotalObservedVarianceAfterAdded,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1258,21 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptoticTotalObservedVarianceAfterAddedPredictorRequiresStableDrift => {
+                "asymptotic total observed variance after added predictor requires stable negative drift"
+            }
+            Self::UnstandardisedAsymptoticTotalVarianceAfterAddedPredictorIsNotObserved => {
+                "unstandardised three-term asymptotic total variance after added predictor is not the observed extra"
+            }
+            Self::AddedTimeIndependentObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded => {
+                "equation 5 of added time-independent predictor variance is not equation 5 of three-term asymptotic total variance after added predictor"
+            }
+            Self::StationaryInitialObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded => {
+                "stationary first-occasion observed variance is not equation 5 of three-term asymptotic total variance after added predictor"
+            }
+            Self::MeasurementErrorIsNotAsymptoticTotalObservedVarianceAfterAdded => {
+                "measurement-error variance is not equation 5 of three-term asymptotic total variance after added predictor"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2110,35 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotic_total_observed_variance_after_added_predictor_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptoticTotalObservedVarianceAfterAddedPredictorRequiresStableDrift
+                .to_string(),
+            "asymptotic total observed variance after added predictor requires stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedAsymptoticTotalVarianceAfterAddedPredictorIsNotObserved
+                .to_string(),
+            "unstandardised three-term asymptotic total variance after added predictor is not the observed extra"
+        );
+        assert_eq!(
+            PsychometricError::AddedTimeIndependentObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded
+                .to_string(),
+            "equation 5 of added time-independent predictor variance is not equation 5 of three-term asymptotic total variance after added predictor"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded
+                .to_string(),
+            "stationary first-occasion observed variance is not equation 5 of three-term asymptotic total variance after added predictor"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotAsymptoticTotalObservedVarianceAfterAdded
+                .to_string(),
+            "measurement-error variance is not equation 5 of three-term asymptotic total variance after added predictor"
         );
     }
 }

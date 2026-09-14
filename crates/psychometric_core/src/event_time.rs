@@ -190,6 +190,10 @@
 //! mean when `u ≠ t0`; `e^{a(t−u)} m x` is a Dirac on the original
 //! process, not this `DRIFT` drive). The JSS article
 //! has no numbered §2.2 (2.1 is Continuous time and SEM; §3 follows).
+//! Equation 5 of 2017-era commented `asymTOTALVAR` after
+//! `addedTIPREDVAR` is `λ²(-q / (2 a) + trait / a² + (B / a)² v)`
+//! with `θ = 0` (cran/ctsem 2.5.0 `summary.ctsemFit.R`; JSS PDF
+//! re-opened 2026-08-31T05:20Z). Form the three-term total inline.
 //! The difference quotient `(x(t+Δt) − x(t)) / Δt` (their
 //! Eqs. 3–4) is refused. This is not DSEM and not a matrix `expm`.
 
@@ -4158,6 +4162,197 @@ pub fn refuse_asymptotic_time_independent_variance_as_asymptotic_effect(
 ) -> Result<f64, PsychometricError> {
     let _ = (added_predictor_variance, asymptotic_effect);
     Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect)
+}
+
+/// Exact scalar Eq. 5 of 2017-era commented `asymTOTALVAR` after
+/// `addedTIPREDVAR`.
+///
+/// 2017-era ctsem `summary.ctsemFit.R` (cran/ctsem 2.5.0; JSS PDF
+/// re-opened 2026-08-31T05:20Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// comments `asymTOTALVAR <- asymDIFFUSION + asymTRAITVAR` with
+/// `asymTRAITVAR <- solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))`,
+/// then later comments `asymTOTALVAR <- asymTOTALVAR + addedTIPREDVAR`
+/// immediately after forming `addedTIPREDVAR <- asymTIPREDEFFECT
+/// %*% TIPREDVAR %*% t(asymTIPREDEFFECT)`. Driver, Oud, and Voelkle
+/// (2017, Eq. 5, p. 5; Eq. 1, p. 4; Eq. 4, p. 5; Table 2, p. 12;
+/// §4.3, p. 9; §7.2, pp. 20–21) write `y_i(t) = Γ + Λ η_i(t) +
+/// ζ_i(t)` with `ζ ~ N(0, Θ)`. The scalar three-term total is
+/// `-q / (2 a) + trait / a² + (B / a)² v`. Equation 5 of that total,
+/// with `θ = 0` and `ψ = 0`, is `λ²(-q / (2 a) + trait / a² +
+/// (B / a)² v)`. Form the two-term total first (`1 / a`, then
+/// square, then multiply by `trait`, then add `asymDIFFUSION`). Then
+/// include `addedTIPREDVAR` (unit asymptotic effect, then square,
+/// then multiply by `v`). Then add. Then `(λ total) λ`. Do not form
+/// `λ²` first. This crate does not currently export
+/// `recover_asymptotic_total_variance_after_added_time_independent_predictor`;
+/// form those terms inline. A zero loading or zero total is exactly
+/// zero even if `a ≥ 0`. `a ≥ 0` with a nonzero contribution fails
+/// closed. Unstandardised three-term total is the latent extra, not
+/// this observed extra. `λ² (B / a)² v` is Eq. 5 of `addedTIPREDVAR`
+/// and is not this extra. `λ²(trait + −q / (2 a) + (B / a)² v) +
+/// θ + ψ` uses process-level `TRAITVAR` and is not this extra.
+/// `MANIFESTVAR` `θ` is not this extra. This is not a Kalman filter,
+/// not a matrix `expm`, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for a non-event
+/// clock,
+/// [`PsychometricError::AsymptoticTotalObservedVarianceAfterAddedPredictorRequiresStableDrift`]
+/// when the drift is not strictly negative and a contribution is
+/// nonzero, and [`PsychometricError::InvalidNumericInput`] when an
+/// input is non-finite, a variance is negative, or a product or
+/// sum overflows.
+#[allow(clippy::too_many_arguments)]
+pub fn recover_asymptotic_total_observed_variance_after_added_time_independent_predictor(
+    loading: f64,
+    trait_variance: f64,
+    continuous_diffusion: f64,
+    time_independent_effect: f64,
+    predictor_variance: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !loading.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !trait_variance.is_finite() || trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !continuous_diffusion.is_finite() || continuous_diffusion < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !time_independent_effect.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !predictor_variance.is_finite() || predictor_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    let ti_extra_is_zero = time_independent_effect == 0.0 || predictor_variance == 0.0;
+    if trait_variance == 0.0 && continuous_diffusion == 0.0 && ti_extra_is_zero {
+        return recover_manifest_observed_variance(loading, 0.0, 0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(
+            PsychometricError::AsymptoticTotalObservedVarianceAfterAddedPredictorRequiresStableDrift,
+        );
+    }
+    let stationary = if continuous_diffusion == 0.0 {
+        0.0
+    } else {
+        recover_stationary_latent_variance(continuous_diffusion, log_rate, clock)?
+    };
+    let asymptotic_trait = if trait_variance == 0.0 {
+        0.0
+    } else {
+        let inverse_rate = require_finite(1.0 / log_rate)?;
+        let inverse_rate_squared = require_finite(inverse_rate * inverse_rate)?;
+        require_finite(inverse_rate_squared * trait_variance)?
+    };
+    let two_term = if stationary == 0.0 {
+        asymptotic_trait
+    } else if asymptotic_trait == 0.0 {
+        stationary
+    } else {
+        require_finite(stationary + asymptotic_trait)?
+    };
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        clock,
+    )?;
+    let total = if added == 0.0 {
+        two_term
+    } else if two_term == 0.0 {
+        added
+    } else {
+        require_finite(two_term + added)?
+    };
+    recover_manifest_observed_variance(loading, total, 0.0)
+}
+
+/// Refuse treating unstandardised 2017-era commented
+/// `asymTOTALVAR` after `addedTIPREDVAR` as Eq. 5 of that total.
+///
+/// `-q / (2 a) + trait / a² + (B / a)² v` is the latent three-term
+/// total. Equation 5 maps `λ²` of that total with `θ = 0`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedAsymptoticTotalVarianceAfterAddedPredictorIsNotObserved`].
+pub fn refuse_unstandardised_asymptotic_total_variance_after_added_predictor_as_observed(
+    unstandardised_total: f64,
+    observed_extra: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_total, observed_extra);
+    Err(PsychometricError::UnstandardisedAsymptoticTotalVarianceAfterAddedPredictorIsNotObserved)
+}
+
+/// Refuse treating Eq. 5 of §7.2 `addedTIPREDVAR` as Eq. 5 of
+/// three-term `asymTOTALVAR` after `addedTIPREDVAR`.
+///
+/// `λ² (B / a)² v` is the extra-only observed map. Three-term Eq. 5
+/// also includes `asymDIFFUSION` and `trait / a²`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AddedTimeIndependentObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded`].
+pub fn refuse_added_time_independent_observed_variance_as_asymptotic_total_observed_variance_after_added(
+    added_observed: f64,
+    three_term_observed: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (added_observed, three_term_observed);
+    Err(
+        PsychometricError::AddedTimeIndependentObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded,
+    )
+}
+
+/// Refuse treating Eq. 5 of §4.3 stationary `T0VAR` as Eq. 5 of
+/// three-term `asymTOTALVAR` after `addedTIPREDVAR`.
+///
+/// Stationary `T0VAR` uses process-level `TRAITVAR`. Commented
+/// `asymTRAITVAR` is `trait / a²`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StationaryInitialObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded`].
+pub fn refuse_stationary_initial_observed_variance_as_asymptotic_total_observed_variance_after_added(
+    stationary_observed: f64,
+    three_term_observed: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (stationary_observed, three_term_observed);
+    Err(
+        PsychometricError::StationaryInitialObservedVarianceIsNotAsymptoticTotalObservedVarianceAfterAdded,
+    )
+}
+
+/// Refuse treating `MANIFESTVAR` as Eq. 5 of 2017-era commented
+/// `asymTOTALVAR` after `addedTIPREDVAR`.
+///
+/// Table 2 names `θ` `MANIFESTVAR`. Equation 5 of the three-term
+/// total with `θ = 0` is `λ²` of that total.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::MeasurementErrorIsNotAsymptoticTotalObservedVarianceAfterAdded`].
+pub fn refuse_measurement_error_as_asymptotic_total_observed_variance_after_added(
+    measurement_error: f64,
+    three_term_observed: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (measurement_error, three_term_observed);
+    Err(PsychometricError::MeasurementErrorIsNotAsymptoticTotalObservedVarianceAfterAdded)
 }
 
 /// Exact scalar Table 2 `asymCINT`.
