@@ -22,7 +22,9 @@ pub const CASE_DELETION_REFIT_MODEL_CONTRACT_VERSION: &str = "case_deletion_refi
 pub const CASE_DELETION_REFIT_OUTPUT_PROFILE: &str = "case_deletion_refit_v1";
 /// Maximum accepted case-deletion artifact JSON size.
 pub const CASE_DELETION_REFIT_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
-const MAX_CASE_DELETION_RETAINED_IDENTITIES: usize = 256 * 255;
+const MAX_CASE_DELETION_DOCUMENTS: usize = 256;
+const MAX_CASE_DELETION_RETAINED_IDENTITIES: usize =
+    MAX_CASE_DELETION_DOCUMENTS * (MAX_CASE_DELETION_DOCUMENTS - 1);
 const CASE_DELETION_REFIT_INFERENCE_STATUS: &str =
     "exhaustive_actual_deletion_not_reweighting_approx";
 
@@ -196,9 +198,11 @@ pub struct CaseDeletionRefitExecution {
 /// reimplement leave-one-out fitting, reweighting, or a diagonal
 /// approximation. Evidence availability is admitted before duplicate/scientific
 /// fitting, so evidence not yet available at the cutoff cannot alter a
-/// historical replay. Raw posteriors stay with the scientific fitter; the
-/// operator artifact carries only bounded counts and seed-domain identity.
-/// This is not a Bayesian sampler and not GPU execution.
+/// historical replay. Visible document identities are bounded before they can
+/// enter the runner's quadratic retained-identity representation. Raw
+/// posteriors stay with the scientific fitter; the operator artifact carries
+/// only bounded counts and seed-domain identity. This is not a Bayesian sampler
+/// and not GPU execution.
 ///
 /// # Errors
 ///
@@ -230,7 +234,7 @@ where
         || request.output_profile != CASE_DELETION_REFIT_OUTPUT_PROFILE
         || input.documents().len() != input.snapshot_ids().len()
         || input.documents().len() != input.available_times().len()
-        || !valid_identifier(input.seed_domain_base())
+        || !valid_seed_domain_base(input.seed_domain_base())
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
@@ -238,7 +242,8 @@ where
         return Err(AnalysisEngineError::LimitExceeded);
     }
 
-    let mut admitted_documents = Vec::with_capacity(input.documents().len().min(256));
+    let mut admitted_documents =
+        Vec::with_capacity(input.documents().len().min(MAX_CASE_DELETION_DOCUMENTS));
     for ((document, document_snapshot_id), available_time) in input
         .documents()
         .iter()
@@ -250,6 +255,9 @@ where
         }
         if !cutoff_eligible(available_time, &knowledge_cutoff) {
             continue;
+        }
+        if !valid_identifier(&document.document_id) {
+            return Err(AnalysisEngineError::InvalidEvidence);
         }
         let next_document_count = admitted_documents
             .len()
@@ -305,6 +313,10 @@ where
     })
 }
 
+fn valid_seed_domain_base(seed_domain_base: &str) -> bool {
+    valid_identifier(seed_domain_base) && valid_identifier(&format!("{seed_domain_base}:full"))
+}
+
 fn within_case_deletion_resource_budget(document_count: usize) -> bool {
     document_count
         .checked_mul(document_count.saturating_sub(1))
@@ -318,7 +330,7 @@ mod tests {
     use super::{
         CASE_DELETION_REFIT_ARTIFACT_BYTE_LIMIT, CASE_DELETION_REFIT_ARTIFACT_SCHEMA_VERSION,
         CASE_DELETION_REFIT_INFERENCE_STATUS, CaseDeletionRefitArtifact, CaseDeletionRefitInput,
-        within_case_deletion_resource_budget,
+        valid_seed_domain_base, within_case_deletion_resource_budget,
     };
     use crate::{AnalysisEngineError, CaseDeletionDocument};
     use temporal_core::AvailableTime;
@@ -451,6 +463,12 @@ mod tests {
     fn resource_budget_matches_quadratic_retained_identity_storage() {
         assert!(within_case_deletion_resource_budget(256));
         assert!(!within_case_deletion_resource_budget(257));
+    }
+
+    #[test]
+    fn seed_domain_base_is_valid_only_when_derived_full_domain_is_bounded() {
+        assert!(valid_seed_domain_base("topic-model-run"));
+        assert!(!valid_seed_domain_base(&"s".repeat(256)));
     }
 
     #[test]
