@@ -60,7 +60,24 @@ fn mutable_authority_aliases_fail_closed_on_public_wire() {
 }
 
 #[test]
-fn immutable_scientific_identifiers_remain_admissible() {
+fn immutable_scientific_identifiers_remain_admissible_without_keyword_heuristics() {
     let canonical = canonical_receipt_json();
-    assert!(RubinProjectionActivationReceiptV1::from_json(&canonical).is_ok());
+    let immutable_identifiers = [
+        "validation-evidence-rubin-candidate-v1",
+        "validation-evidence-latest-model-v1",
+        "main-effect-loading-model-v1",
+        "pr-",
+        "pr-model-v1",
+        "issue-analysis-v1",
+    ];
+
+    for immutable_identifier in immutable_identifiers {
+        let mut payload: serde_json::Value =
+            serde_json::from_str(&canonical).expect("canonical json");
+        payload["validation_evidence_id"] = serde_json::json!(immutable_identifier);
+        assert!(
+            RubinProjectionActivationReceiptV1::from_json(&payload.to_string()).is_ok(),
+            "non-locator scientific identifier must remain admissible: {immutable_identifier}"
+        );
+    }
 }
