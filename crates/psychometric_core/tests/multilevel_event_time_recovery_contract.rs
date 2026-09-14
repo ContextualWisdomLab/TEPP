@@ -7,6 +7,7 @@ use psychometric_core::{
     ordinary_least_squares_slope, recover_asymptotic_continuous_intercept,
     recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
+    recover_asymptotic_total_variance_after_added_time_independent_predictor,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lag_from_log_rate,
     recover_discrete_lagged_latent_covariance, recover_discrete_latent_mean,
@@ -59,6 +60,7 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
     refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
+    refuse_asymptotic_time_independent_variance_as_asymptotic_total_variance_after_added_predictor,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
     refuse_continuous_intercept_as_discrete_mean_increment,
@@ -129,6 +131,7 @@ use psychometric_core::{
     refuse_stationary_initial_latent_mean_as_initial_latent_mean,
     refuse_stationary_initial_latent_mean_as_observed_mean,
     refuse_stationary_initial_latent_variance_as_asymptotic_time_independent_variance,
+    refuse_stationary_initial_latent_variance_as_asymptotic_total_variance_after_added_predictor,
     refuse_stationary_initial_latent_variance_as_discrete_variance,
     refuse_stationary_initial_latent_variance_as_initial_latent_variance,
     refuse_stationary_initial_latent_variance_as_observed_variance,
@@ -161,6 +164,7 @@ use psychometric_core::{
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
+    refuse_two_term_asymptotic_total_variance_as_asymptotic_total_variance_after_added_predictor,
     refuse_unmatched_time_varying_predictor_interval,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
@@ -6539,4 +6543,310 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
         recover_standardised_manifest_variance(0.4, non_event),
         Err(PsychometricError::EventTimeRequired)
     );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn asymptotic_total_variance_after_added_predictor_recovers_three_term_commented_map() {
+    let trait_variance = 1.0_f64;
+    let diffusion = 0.4_f64;
+    let time_independent_effect = 0.5_f64;
+    let predictor_variance = 1.0_f64;
+    let log_rate = -0.5_f64;
+    let recovered = recover_asymptotic_total_variance_after_added_time_independent_predictor(
+        trait_variance,
+        diffusion,
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTOTALVAR + addedTIPREDVAR");
+    let expected = 5.4_f64;
+    let recovered_error = rmse(&[expected], &[recovered]);
+    assert!(
+        recovered_error < 1e-15,
+        "2017-era summary.ctsemFit.R: three-term RMSE {recovered_error}: got {recovered}"
+    );
+    let stationary = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let inverse_rate = 1.0 / log_rate;
+    let two_term = stationary + inverse_rate * inverse_rate * trait_variance;
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let stationary_t0 = recover_stationary_initial_latent_variance(
+        trait_variance,
+        diffusion,
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("stationary T0VAR");
+    assert!(
+        rmse(&[recovered], &[two_term]) > recovered_error,
+        "2017-era summary.ctsemFit.R: two-term RMSE must exceed three-term RMSE"
+    );
+    assert!(
+        rmse(&[recovered], &[stationary_t0]) > recovered_error,
+        "Driver et al. (2017, §4.3): stationary T0VAR RMSE must exceed three-term RMSE"
+    );
+    assert!(
+        rmse(&[recovered], &[added]) > recovered_error,
+        "Driver et al. (2017, §7.2): addedTIPREDVAR RMSE must exceed three-term RMSE"
+    );
+    let no_added = recover_asymptotic_total_variance_after_added_time_independent_predictor(
+        trait_variance,
+        diffusion,
+        0.0,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("zero TI extra");
+    assert!(
+        (no_added - two_term).abs() < 1e-15,
+        "a zero TI extra keeps the two-term total"
+    );
+    let added_only = recover_asymptotic_total_variance_after_added_time_independent_predictor(
+        0.0,
+        0.0,
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("added-only");
+    assert!(
+        (added_only - added).abs() < 1e-15,
+        "a zero trait and a zero diffusion keep addedTIPREDVAR"
+    );
+    let trait_and_added = recover_asymptotic_total_variance_after_added_time_independent_predictor(
+        trait_variance,
+        0.0,
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("trait+added");
+    let expected_trait_and_added = inverse_rate * inverse_rate * trait_variance + added;
+    assert!(
+        (trait_and_added - expected_trait_and_added).abs() < 1e-15,
+        "a zero diffusion keeps trait/a² + addedTIPREDVAR"
+    );
+    let diffusion_and_added =
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            0.0,
+            diffusion,
+            time_independent_effect,
+            predictor_variance,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("p+added");
+    assert!(
+        (diffusion_and_added - (stationary + added)).abs() < 1e-15,
+        "a zero trait keeps asymDIFFUSION + addedTIPREDVAR"
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            0.0,
+            0.0,
+            0.0,
+            1.0,
+            0.5,
+            LagClock::EventTime,
+        )
+        .expect("zero total")
+        .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        refuse_two_term_asymptotic_total_variance_as_asymptotic_total_variance_after_added_predictor(
+            two_term, recovered
+        ),
+        Err(
+            PsychometricError::TwoTermAsymptoticTotalVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_asymptotic_total_variance_after_added_predictor(
+            stationary_t0,
+            recovered
+        ),
+        Err(
+            PsychometricError::StationaryInitialLatentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_variance_as_asymptotic_total_variance_after_added_predictor(
+            added, recovered
+        ),
+        Err(
+            PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
+        )
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn asymptotic_total_variance_after_added_predictor_refuses_unstable_drift_and_non_event_clocks() {
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::SystemTime,
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::DocumentTime,
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::AssertionTime,
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::AvailabilityTime,
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::KnowledgeCutoff,
+        ),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            0.5,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::AsymptoticTotalVarianceAfterAddedPredictorRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            0.0,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::AsymptoticTotalVarianceAfterAddedPredictorRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            -1.0,
+            0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            -0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            -1.0,
+            -0.5,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            f64::NAN,
+            0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            f64::INFINITY,
+            1.0,
+            -0.5,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            f64::NAN,
+            LagClock::EventTime,
+        ),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    let overflowing = recover_asymptotic_total_variance_after_added_time_independent_predictor(
+        f64::MAX,
+        0.4,
+        0.5,
+        1.0,
+        -1e-200,
+        LagClock::EventTime,
+    );
+    assert_eq!(overflowing, Err(PsychometricError::InvalidNumericInput));
 }

@@ -5,6 +5,7 @@ use psychometric_core::{
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
     recover_asymptotic_time_independent_predictor_variance,
+    recover_asymptotic_total_variance_after_added_time_independent_predictor,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
@@ -56,6 +57,7 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_effect_as_discrete_effect,
     refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
+    refuse_asymptotic_time_independent_variance_as_asymptotic_total_variance_after_added_predictor,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
     refuse_continuous_intercept_as_discrete_mean_increment,
@@ -137,6 +139,7 @@ use psychometric_core::{
     refuse_stationary_initial_latent_mean_as_initial_latent_mean,
     refuse_stationary_initial_latent_mean_as_observed_mean,
     refuse_stationary_initial_latent_variance_as_asymptotic_time_independent_variance,
+    refuse_stationary_initial_latent_variance_as_asymptotic_total_variance_after_added_predictor,
     refuse_stationary_initial_latent_variance_as_discrete_variance,
     refuse_stationary_initial_latent_variance_as_initial_latent_variance,
     refuse_stationary_initial_latent_variance_as_observed_variance,
@@ -170,6 +173,7 @@ use psychometric_core::{
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
+    refuse_two_term_asymptotic_total_variance_as_asymptotic_total_variance_after_added_predictor,
     refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
     refuse_unstandardised_continuous_intercept_as_standardised_continuous_intercept,
@@ -3779,6 +3783,109 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
+        )
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn asymptotic_total_variance_after_added_predictor_is_not_two_term_stationary_or_added() {
+    let trait_variance = 1.0_f64;
+    let diffusion = 0.4_f64;
+    let time_independent_effect = 0.5_f64;
+    let predictor_variance = 1.0_f64;
+    let log_rate = -0.5_f64;
+    let recovered = recover_asymptotic_total_variance_after_added_time_independent_predictor(
+        trait_variance,
+        diffusion,
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("asymTOTALVAR + addedTIPREDVAR");
+    assert!(
+        (recovered - 5.4).abs() < 1e-15,
+        "2017-era summary.ctsemFit.R: three-term total is -q/(2a) + trait/a² + (B/a)² v"
+    );
+    let stationary = recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let two_term = stationary + (1.0 / log_rate) * (1.0 / log_rate) * trait_variance;
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let stationary_t0 = recover_stationary_initial_latent_variance(
+        trait_variance,
+        diffusion,
+        time_independent_effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("stationary T0VAR");
+    assert!(
+        (two_term - recovered).abs() > 1e-3,
+        "2017-era summary.ctsemFit.R: two-term total is not the later three-term total"
+    );
+    assert!(
+        (stationary_t0 - recovered).abs() > 1e-3,
+        "Driver et al. (2017, §4.3): trait+p+added is not p + trait/a² + added"
+    );
+    assert!(
+        (added - recovered).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): addedTIPREDVAR is not the three-term total"
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            -0.5,
+            LagClock::DocumentTime,
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_asymptotic_total_variance_after_added_time_independent_predictor(
+            1.0,
+            0.4,
+            0.5,
+            1.0,
+            0.5,
+            LagClock::EventTime,
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTotalVarianceAfterAddedPredictorRequiresStableDrift
+        )
+    );
+    assert_eq!(
+        refuse_two_term_asymptotic_total_variance_as_asymptotic_total_variance_after_added_predictor(
+            two_term, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::TwoTermAsymptoticTotalVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
+        )
+    );
+    assert_eq!(
+        refuse_stationary_initial_latent_variance_as_asymptotic_total_variance_after_added_predictor(
+            stationary_t0,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StationaryInitialLatentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_time_independent_variance_as_asymptotic_total_variance_after_added_predictor(
+            added, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticTotalVarianceAfterAddedPredictor
         )
     );
 }
