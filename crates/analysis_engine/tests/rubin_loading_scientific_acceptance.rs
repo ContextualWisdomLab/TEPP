@@ -1,6 +1,6 @@
 //! Repeated-sampling acceptance evidence for `rubin_loading_uncertainty_v1`.
 //!
-//! This test exercises the public Analysis Run profile end-to-end. It does not
+//! This test exercises the public Analysis Run profile end to end. It does not
 //! implement a second loading estimator or treat complete-data indicator draws
 //! as Mislevy person-level plausible values.
 
@@ -11,6 +11,10 @@ use analysis_engine::{
 use psychometric_core::IndicatorKind;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest};
+use validation_core::{
+    bias_standard_error, interval_coverage, mean_bias, rmse_standard_error,
+    root_mean_square_error, summarize_replications,
+};
 
 const SNAPSHOT_ID: &str = "snapshot-rubin-scientific-acceptance";
 const EARLY_AVAILABLE_AT: &str = "2026-07-01T00:00:00Z";
@@ -19,6 +23,8 @@ const EARLY_CUTOFF: &str = "2026-08-01T00:00:00Z";
 const LATE_CUTOFF: &str = "2026-09-01T00:00:00Z";
 const REPLICATIONS: usize = 512;
 const NORMAL_975: f64 = 1.959_963_984_540_054;
+const U32_RADIX: f64 = 4_294_967_296.0;
+const F64_MANTISSA_CARDINALITY: f64 = 9_007_199_254_740_992.0;
 
 #[derive(Clone, Copy)]
 struct Scenario {
@@ -80,8 +86,7 @@ impl SplitMix64 {
 
     fn open_unit_interval(&mut self) -> f64 {
         let mantissa = self.next_u64() >> 11;
-        let numerator = mantissa as f64 + 0.5;
-        numerator / 9_007_199_254_740_992.0
+        (exact_u64_to_f64(mantissa) + 0.5) / F64_MANTISSA_CARDINALITY
     }
 
     fn standard_normal(&mut self) -> f64 {
@@ -89,6 +94,13 @@ impl SplitMix64 {
         let second = self.open_unit_interval();
         (-2.0 * first.ln()).sqrt() * (std::f64::consts::TAU * second).cos()
     }
+}
+
+fn exact_u64_to_f64(value: u64) -> f64 {
+    assert!(value <= (1_u64 << 53));
+    let upper = u32::try_from(value >> 32).expect("upper 21 bits fit u32");
+    let lower = u32::try_from(value & u64::from(u32::MAX)).expect("lower 32 bits fit u32");
+    f64::from(upper) * U32_RADIX + f64::from(lower)
 }
 
 fn available(stamp: &str) -> AvailableTime {
@@ -112,12 +124,8 @@ fn request(cutoff_stamp: &str, idempotency_key: &str) -> AnalysisRunRequest {
 }
 
 fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
-    AnalysisRunAccepted::new(
-        format!("run-{}", request.idempotency_key),
-        "accepted",
-        &request.idempotency_key,
-    )
-    .expect("accepted receipt")
+    let key = &request.idempotency_key;
+    AnalysisRunAccepted::new(format!("run-{key}"), "accepted", key).expect("accepted receipt")
 }
 
 fn make_rows(
@@ -129,21 +137,16 @@ fn make_rows(
     draw_noise_sd: f64,
     early_observation_count: usize,
 ) -> Vec<RubinLoadingObservation> {
-    let mut factor_scores = Vec::with_capacity(observations);
-    for _ in 0..observations {
-        factor_scores.push(rng.standard_normal());
-    }
-
-    let mut base_outcomes = Vec::with_capacity(observations);
-    for factor_score in &factor_scores {
-        let residual = residual_sd * rng.standard_normal();
-        base_outcomes.push(loading * factor_score + residual);
-    }
-
+    let factor_scores: Vec<f64> = (0..observations).map(|_| rng.standard_normal()).collect();
+    let base_outcomes: Vec<f64> = factor_scores
+        .iter()
+        .map(|factor_score| loading * factor_score + residual_sd * rng.standard_normal())
+        .collect();
     let mut row_draws = vec![Vec::with_capacity(draws); observations];
+
     for _ in 0..draws {
         for row_index in 0..observations {
-            let draw_noise = if row_index % 4 == 0 {
+            let draw_noise = if row_index.is_multiple_of(4) {
                 draw_noise_sd * rng.standard_normal()
             } else {
                 0.0
@@ -173,46 +176,39 @@ fn make_rows(
         .collect()
 }
 
-fn sample_standard_deviation(values: &[f64], mean: f64) -> f64 {
-    let count = values.len() as f64;
-    let sum_squares = values
-        .iter()
-        .map(|value| {
-            let deviation = value - mean;
-            deviation * deviation
-        })
-        .sum::<f64>();
-    (sum_squares / (count - 1.0)).sqrt()
-}
-
 fn summarize(
-    errors: &[f64],
+    truth: &[f64],
+    recovered: &[f64],
+    lower: &[f64],
+    upper: &[f64],
+    coverage_samples: &[f64],
     total_variances: &[f64],
     within_variances: &[f64],
     between_variances: &[f64],
-    covered: usize,
     attempted: usize,
     failed: usize,
 ) -> RecoverySummary {
-    let recovered = errors.len();
-    let recovered_f64 = recovered as f64;
-    let bias = errors.iter().sum::<f64>() / recovered_f64;
-    let mean_squared_error = errors.iter().map(|error| error * error).sum::<f64>() / recovered_f64;
-    let rmse = mean_squared_error.sqrt();
-    let error_sd = sample_standard_deviation(errors, bias);
-    let bias_mcse = error_sd / recovered_f64.sqrt();
-    let squared_errors: Vec<f64> = errors.iter().map(|error| error * error).collect();
-    let squared_error_sd = sample_standard_deviation(&squared_errors, mean_squared_error);
-    let rmse_mcse = squared_error_sd / (2.0 * rmse * recovered_f64.sqrt());
-    let coverage = covered as f64 / recovered_f64;
-    let coverage_mcse = (coverage * (1.0 - coverage) / recovered_f64).sqrt();
-    let mean_total_variance = total_variances.iter().sum::<f64>() / recovered_f64;
-    let mean_within_variance = within_variances.iter().sum::<f64>() / recovered_f64;
-    let mean_between_variance = between_variances.iter().sum::<f64>() / recovered_f64;
+    let bias = mean_bias(truth, recovered).expect("bias");
+    let rmse = root_mean_square_error(truth, recovered).expect("rmse");
+    let bias_mcse = bias_standard_error(truth, recovered).expect("bias MCSE");
+    let rmse_mcse = rmse_standard_error(truth, recovered).expect("RMSE MCSE");
+    let coverage = interval_coverage(truth, lower, upper).expect("coverage");
+    let coverage_mcse = summarize_replications(coverage_samples, 0.0, 1.0)
+        .expect("coverage Monte Carlo summary")
+        .standard_error;
+    let mean_total_variance = summarize_replications(total_variances, 0.0, 1.0)
+        .expect("total variance summary")
+        .mean;
+    let mean_within_variance = summarize_replications(within_variances, 0.0, 1.0)
+        .expect("within variance summary")
+        .mean;
+    let mean_between_variance = summarize_replications(between_variances, 0.0, 1.0)
+        .expect("between variance summary")
+        .mean;
 
     RecoverySummary {
         attempted,
-        recovered,
+        recovered: recovered.len(),
         failed,
         bias,
         rmse,
@@ -226,16 +222,19 @@ fn summarize(
     }
 }
 
-fn run_scenario(scenario: Scenario) -> RecoverySummary {
-    let request = request(EARLY_CUTOFF, scenario.name);
-    let accepted = accepted(&request);
+fn run_scenario(scenario: &Scenario) -> RecoverySummary {
+    let run_request = request(EARLY_CUTOFF, scenario.name);
+    let run_accepted = accepted(&run_request);
     let knowledge_cutoff = cutoff(EARLY_CUTOFF);
     let mut rng = SplitMix64::new(scenario.seed);
-    let mut errors = Vec::with_capacity(REPLICATIONS);
+    let mut truth = Vec::with_capacity(REPLICATIONS);
+    let mut recovered = Vec::with_capacity(REPLICATIONS);
+    let mut lower = Vec::with_capacity(REPLICATIONS);
+    let mut upper = Vec::with_capacity(REPLICATIONS);
+    let mut coverage_samples = Vec::with_capacity(REPLICATIONS);
     let mut total_variances = Vec::with_capacity(REPLICATIONS);
     let mut within_variances = Vec::with_capacity(REPLICATIONS);
     let mut between_variances = Vec::with_capacity(REPLICATIONS);
-    let mut covered = 0_usize;
     let mut failed = 0_usize;
 
     for _ in 0..REPLICATIONS {
@@ -249,8 +248,8 @@ fn run_scenario(scenario: Scenario) -> RecoverySummary {
             scenario.observations,
         );
         match execute_rubin_loading_uncertainty_run(
-            &request,
-            &accepted,
+            &run_request,
+            &run_accepted,
             SNAPSHOT_ID,
             knowledge_cutoff,
             IndicatorKind::AdditiveLogRatio,
@@ -258,13 +257,20 @@ fn run_scenario(scenario: Scenario) -> RecoverySummary {
             "2026-09-14T00:00:00Z",
         ) {
             Ok(execution) => {
-                let error = execution.artifact.point_estimate_mean - scenario.loading;
-                if error.abs()
-                    <= NORMAL_975 * execution.artifact.total_variance.sqrt()
+                let estimate = execution.artifact.point_estimate_mean;
+                let half_width = NORMAL_975 * execution.artifact.total_variance.sqrt();
+                let interval_lower = estimate - half_width;
+                let interval_upper = estimate + half_width;
+                truth.push(scenario.loading);
+                recovered.push(estimate);
+                lower.push(interval_lower);
+                upper.push(interval_upper);
+                coverage_samples.push(if (interval_lower..=interval_upper).contains(&scenario.loading)
                 {
-                    covered += 1;
-                }
-                errors.push(error);
+                    1.0
+                } else {
+                    0.0
+                });
                 total_variances.push(execution.artifact.total_variance);
                 within_variances.push(execution.artifact.within_variance);
                 between_variances.push(execution.artifact.between_variance);
@@ -274,11 +280,14 @@ fn run_scenario(scenario: Scenario) -> RecoverySummary {
     }
 
     summarize(
-        &errors,
+        &truth,
+        &recovered,
+        &lower,
+        &upper,
+        &coverage_samples,
         &total_variances,
         &within_variances,
         &between_variances,
-        covered,
         REPLICATIONS,
         failed,
     )
@@ -307,7 +316,7 @@ fn scenarios() -> [Scenario; 8] {
                 bias_mcse: 0.003_402,
                 rmse_mcse: 0.002_491,
                 coverage: 0.951_172,
-                coverage_mcse: 0.009_524,
+                coverage_mcse: 0.009_534,
                 mean_total_variance: 0.006_333,
                 mean_within_variance: 0.005_945,
                 mean_between_variance: 0.000_344,
@@ -327,7 +336,7 @@ fn scenarios() -> [Scenario; 8] {
                 bias_mcse: 0.003_284,
                 rmse_mcse: 0.002_370,
                 coverage: 0.964_844,
-                coverage_mcse: 0.008_139,
+                coverage_mcse: 0.008_147,
                 mean_total_variance: 0.006_327,
                 mean_within_variance: 0.005_974,
                 mean_between_variance: 0.000_343,
@@ -347,7 +356,7 @@ fn scenarios() -> [Scenario; 8] {
                 bias_mcse: 0.007_998,
                 rmse_mcse: 0.005_577,
                 coverage: 0.953_125,
-                coverage_mcse: 0.009_341,
+                coverage_mcse: 0.009_351,
                 mean_total_variance: 0.036_585,
                 mean_within_variance: 0.034_424,
                 mean_between_variance: 0.001_921,
@@ -367,7 +376,7 @@ fn scenarios() -> [Scenario; 8] {
                 bias_mcse: 0.007_818,
                 rmse_mcse: 0.005_550,
                 coverage: 0.957_031,
-                coverage_mcse: 0.008_962,
+                coverage_mcse: 0.008_971,
                 mean_total_variance: 0.036_252,
                 mean_within_variance: 0.034_184,
                 mean_between_variance: 0.002_005,
@@ -387,7 +396,7 @@ fn scenarios() -> [Scenario; 8] {
                 bias_mcse: 0.001_769,
                 rmse_mcse: 0.001_279,
                 coverage: 0.957_031,
-                coverage_mcse: 0.008_962,
+                coverage_mcse: 0.008_971,
                 mean_total_variance: 0.001_807,
                 mean_within_variance: 0.001_694,
                 mean_between_variance: 0.000_100,
@@ -407,7 +416,7 @@ fn scenarios() -> [Scenario; 8] {
                 bias_mcse: 0.001_835,
                 rmse_mcse: 0.001_359,
                 coverage: 0.951_172,
-                coverage_mcse: 0.009_524,
+                coverage_mcse: 0.009_534,
                 mean_total_variance: 0.001_822,
                 mean_within_variance: 0.001_719,
                 mean_between_variance: 0.000_100,
@@ -427,7 +436,7 @@ fn scenarios() -> [Scenario; 8] {
                 bias_mcse: 0.004_270,
                 rmse_mcse: 0.003_125,
                 coverage: 0.953_125,
-                coverage_mcse: 0.009_341,
+                coverage_mcse: 0.009_351,
                 mean_total_variance: 0.010_289,
                 mean_within_variance: 0.009_633,
                 mean_between_variance: 0.000_583,
@@ -447,7 +456,7 @@ fn scenarios() -> [Scenario; 8] {
                 bias_mcse: 0.004_269,
                 rmse_mcse: 0.002_863,
                 coverage: 0.960_938,
-                coverage_mcse: 0.008_562,
+                coverage_mcse: 0.008_571,
                 mean_total_variance: 0.010_320,
                 mean_within_variance: 0.009_718,
                 mean_between_variance: 0.000_584,
@@ -459,7 +468,7 @@ fn scenarios() -> [Scenario; 8] {
 #[test]
 fn repeated_sampling_recovery_and_interval_coverage_match_checked_in_evidence() {
     for scenario in scenarios() {
-        let summary = run_scenario(scenario);
+        let summary = run_scenario(&scenario);
         assert_eq!(summary.attempted, REPLICATIONS, "{} attempted", scenario.name);
         assert_eq!(summary.recovered, REPLICATIONS, "{} recovered", scenario.name);
         assert_eq!(summary.failed, 0, "{} failed", scenario.name);
@@ -548,8 +557,9 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
     let late_request = request(LATE_CUTOFF, "rolling-origin-late");
     let late_accepted = accepted(&late_request);
     let mut rng = SplitMix64::new(0x5001);
-    let mut early_errors = Vec::with_capacity(REPLICATIONS);
-    let mut late_errors = Vec::with_capacity(REPLICATIONS);
+    let mut truth = Vec::with_capacity(REPLICATIONS);
+    let mut early_recovered = Vec::with_capacity(REPLICATIONS);
+    let mut late_recovered = Vec::with_capacity(REPLICATIONS);
     let mut early_total_variances = Vec::with_capacity(REPLICATIONS);
     let mut late_total_variances = Vec::with_capacity(REPLICATIONS);
 
@@ -613,52 +623,44 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
         assert_eq!(late_full.artifact.observation_count, 64);
         assert_eq!(late_full.artifact.excluded_after_cutoff_count, 0);
 
-        early_errors.push(early_full.artifact.point_estimate_mean - LOADING);
-        late_errors.push(late_full.artifact.point_estimate_mean - LOADING);
+        truth.push(LOADING);
+        early_recovered.push(early_full.artifact.point_estimate_mean);
+        late_recovered.push(late_full.artifact.point_estimate_mean);
         early_total_variances.push(early_full.artifact.total_variance);
         late_total_variances.push(late_full.artifact.total_variance);
     }
 
-    let empty = vec![0.0; REPLICATIONS];
-    let early_summary = summarize(
-        &early_errors,
-        &early_total_variances,
-        &empty,
-        &empty,
-        0,
-        REPLICATIONS,
-        0,
-    );
-    let late_summary = summarize(
-        &late_errors,
-        &late_total_variances,
-        &empty,
-        &empty,
-        0,
-        REPLICATIONS,
-        0,
-    );
+    let early_bias = mean_bias(&truth, &early_recovered).expect("early bias");
+    let early_rmse = root_mean_square_error(&truth, &early_recovered).expect("early RMSE");
+    let early_mean_total = summarize_replications(&early_total_variances, 0.0, 1.0)
+        .expect("early T summary")
+        .mean;
+    let late_bias = mean_bias(&truth, &late_recovered).expect("late bias");
+    let late_rmse = root_mean_square_error(&truth, &late_recovered).expect("late RMSE");
+    let late_mean_total = summarize_replications(&late_total_variances, 0.0, 1.0)
+        .expect("late T summary")
+        .mean;
 
-    assert_near(early_summary.bias, 0.018_218, 5e-6, "early bias", "rolling-origin");
-    assert_near(early_summary.rmse, 0.155_489, 5e-6, "early rmse", "rolling-origin");
+    assert_near(early_bias, 0.018_218, 5e-6, "early bias", "rolling-origin");
+    assert_near(early_rmse, 0.155_489, 5e-6, "early rmse", "rolling-origin");
     assert_near(
-        early_summary.mean_total_variance,
+        early_mean_total,
         0.025_215,
         5e-6,
         "early mean T",
         "rolling-origin",
     );
-    assert_near(late_summary.bias, 0.012_167, 5e-6, "late bias", "rolling-origin");
-    assert_near(late_summary.rmse, 0.131_383, 5e-6, "late rmse", "rolling-origin");
+    assert_near(late_bias, 0.012_167, 5e-6, "late bias", "rolling-origin");
+    assert_near(late_rmse, 0.131_383, 5e-6, "late rmse", "rolling-origin");
     assert_near(
-        late_summary.mean_total_variance,
+        late_mean_total,
         0.018_653,
         5e-6,
         "late mean T",
         "rolling-origin",
     );
     assert!(
-        late_summary.rmse < early_summary.rmse,
+        late_rmse < early_rmse,
         "later availability should improve this predeclared design in aggregate"
     );
 }
