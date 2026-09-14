@@ -6,9 +6,9 @@ use temporal_core::{AvailableTime, KnowledgeCutoff};
 
 const SNAPSHOT_DIGEST: &str =
     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const DRAW_PAYLOAD_DIGEST: &str =
+const ESTIMATOR_PAYLOAD_DIGEST: &str =
     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const OTHER_DRAW_PAYLOAD_DIGEST: &str =
+const OTHER_ESTIMATOR_PAYLOAD_DIGEST: &str =
     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -29,7 +29,7 @@ fn receipt() -> RubinProjectionActivationReceiptV1 {
         ),
         "snapshot-rubin-activation",
         SNAPSHOT_DIGEST,
-        DRAW_PAYLOAD_DIGEST,
+        ESTIMATOR_PAYLOAD_DIGEST,
         KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
         "rubin-gaussian-single-level-candidate-v1",
     )
@@ -45,13 +45,13 @@ fn inject_duplicate_member(canonical: &str, field: &str, first: &str, second: &s
 }
 
 #[test]
-fn duplicate_draw_digest_member_is_rejected_before_authority_interpretation() {
+fn duplicate_estimator_payload_digest_member_is_rejected_before_authority_interpretation() {
     let canonical = receipt().to_json().expect("canonical receipt");
     let ambiguous = inject_duplicate_member(
         &canonical,
-        "complete_data_draws_sha256",
-        OTHER_DRAW_PAYLOAD_DIGEST,
-        DRAW_PAYLOAD_DIGEST,
+        "estimator_payload_sha256",
+        OTHER_ESTIMATOR_PAYLOAD_DIGEST,
+        ESTIMATOR_PAYLOAD_DIGEST,
     );
 
     assert_eq!(
