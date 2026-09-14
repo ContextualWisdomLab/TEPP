@@ -36,7 +36,9 @@ design_envelope_id
 
 The receipt is limited to 16 KiB before parsing. Identifiers use the Analysis Run identifier bound. Validation Evidence SHA-256 is exactly 64 lowercase hexadecimal characters. `validation_evidence_available_at` and `knowledge_cutoff` are stored canonically after typed parsing. Receipt SHA-256 is computed from the validated canonical JSON.
 
-`source_snapshot_id` must equal the Analysis Run snapshot. The activation receipt does not replace row-level `AvailableTime`; both the source observations and the Validation Evidence itself must have been available at or before the run's `KnowledgeCutoff`.
+`source_snapshot_id` must equal the Analysis Run snapshot and must itself be immutable authority. Activation-specific validation rejects branch, pull-request, issue, repository, and latest-release locator shapes for the snapshot exactly as it does for generator/analysis/evidence/design authority. A caller cannot make `main` or `refs/heads/main` scientific provenance merely by supplying the same alias as `expected_snapshot_id`.
+
+The activation receipt does not replace row-level `AvailableTime`; both the source observations and the Validation Evidence itself must have been available at or before the run's `KnowledgeCutoff`.
 
 The receipt's `validation_evidence_available_at` is transport metadata, not self-authenticating authority. Positive eligibility also requires the owner-controlled approved pairing to carry the canonical availability instant for that exact Validation Evidence ID/digest. The decision rejects a receipt that attempts to backdate or otherwise change that authoritative clock.
 
@@ -47,8 +49,8 @@ The receipt's `validation_evidence_available_at` is transport metadata, not self
 The decision order is:
 
 1. no receipt -> `DescriptiveOnly`;
-2. validate the bounded receipt contract;
-3. require exact Analysis Run snapshot identity;
+2. validate the bounded receipt contract and require immutable locator-safe authority fields, including the source snapshot;
+3. require the expected Analysis Run snapshot to be an immutable locator-safe identifier and require exact snapshot identity;
 4. compare receipt/run knowledge cutoffs by instant, not RFC 3339 spelling;
 5. parse the owner-controlled approved Validation Evidence availability, require canonical form, and require the receipt availability to equal that authoritative instant;
 6. require the authoritative Validation Evidence availability to be at or before the Analysis Run cutoff;
@@ -74,6 +76,7 @@ A positive artifact state is not emitted by #506. The current production registr
 | approved-registry Validation Evidence availability is noncanonical | fail closed |
 | authoritative evidence availability is after the run cutoff | fail closed |
 | receipt snapshot different from the Analysis Run snapshot | fail closed |
+| receipt or expected snapshot is a mutable branch/PR/issue/repository/latest locator | fail closed |
 | mutable branch/PR identity presented as approval | fail closed because it has no approved immutable pairing |
 | design envelope or indicator-kind mismatch | fail closed |
 | exact approved pairing + exact evidence digest + authoritative cutoff-safe availability | eligible in the pure decision algorithm |
@@ -96,9 +99,11 @@ A future evidence package can widen the envelope only by adding relevant known-t
 
 ## Leakage and replay invariants
 
-For a fixed snapshot and cutoff, later-available source rows cannot change the historical result. The same rule applies to activation authority: Validation Evidence unavailable at the historical cutoff cannot retroactively authorize the older run. A later evidence package may authorize a later run under a later cutoff, but the earlier artifact remains descriptive-only unless a new artifact is produced under the corresponding authority and product policy.
+For a fixed immutable snapshot and cutoff, later-available source rows cannot change the historical result. The same rule applies to activation authority: Validation Evidence unavailable at the historical cutoff cannot retroactively authorize the older run. A later evidence package may authorize a later run under a later cutoff, but the earlier artifact remains descriptive-only unless a new artifact is produced under the corresponding authority and product policy.
 
 The availability clock is owner-controlled approval metadata, not a caller assertion. Matching an approved Validation Evidence ID and digest while supplying an earlier receipt timestamp is insufficient and fails closed. Equivalent RFC 3339 spellings of the same instant compare equal only after typed parsing; persisted receipt and registry timestamps remain canonical. Cross-snapshot evidence is a provenance violation, not a censorable future row.
+
+Snapshot identity is also authority, not presentation text. Mutable refs such as `main`, `refs/heads/main`, PR numbers, repository tree URLs, or latest aliases cannot identify the source population of an authoritative projection even if they currently resolve to the intended commit. Historical replay must name a stable snapshot identity.
 
 ## Evidence identity and mutability
 
@@ -110,7 +115,7 @@ If an approved evidence artifact is superseded, the replacement receives a new i
 
 ## Remaining implementation sequence
 
-1. Keep #506's negative projection policy, bounded activation receipt, public-wire refusal, and owner-controlled evidence-availability matching intact.
+1. Keep #506's negative projection policy, bounded activation receipt, immutable snapshot/authority validation, public-wire refusal, and owner-controlled evidence-availability matching intact.
 2. Keep the production approved-pairing registry empty while #504 is Draft or lacks exact-head scientific/review gates.
 3. Once candidate evidence is independently accepted, publish its immutable Validation Evidence identity/digest and authoritative `AvailableTime`, then add only that exact pairing through the owner path.
 4. Bind any future positive artifact projection state to the activation-receipt digest and reacquire exact-head tests, authored line/branch coverage, documentation, security, CodeQL, and independent review.
