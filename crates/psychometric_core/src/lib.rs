@@ -649,6 +649,12 @@ pub use event_time::refuse_standardised_manifest_variance_as_standardised_manife
 
 /// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
+/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as the free discrete evolution of `trait + p_0 + (B / a)² v`.
+pub use event_time::refuse_predetermined_later_latent_variance_as_discrete_variance;
+/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as free first-occasion `T0VAR`.
+pub use event_time::refuse_predetermined_later_latent_variance_as_initial_variance;
+/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as later-occasion stationary variance.
+pub use event_time::refuse_predetermined_later_latent_variance_as_stationary_later_variance;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
@@ -689,12 +695,6 @@ pub use event_time::refuse_stationary_lagged_latent_covariance_as_observed_covar
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance;
 /// Refuse treating Eq. 5 of lagged §4.3 stationary `T0VAR` as later-occasion observed variance.
 pub use event_time::refuse_stationary_lagged_observed_covariance_as_stationary_later_observed_variance;
-/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as the free discrete evolution of `trait + p_0 + (B / a)² v`.
-pub use event_time::refuse_predetermined_later_latent_variance_as_discrete_variance;
-/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as free first-occasion `T0VAR`.
-pub use event_time::refuse_predetermined_later_latent_variance_as_initial_variance;
-/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as later-occasion stationary variance.
-pub use event_time::refuse_predetermined_later_latent_variance_as_stationary_later_variance;
 /// Refuse treating later-occasion §4.3 stationary `T0VAR` as the free discrete evolution of the constrained total.
 pub use event_time::refuse_stationary_later_latent_variance_as_discrete_variance;
 /// Refuse treating later-occasion §4.3 stationary `T0VAR` as lagged covariance.
