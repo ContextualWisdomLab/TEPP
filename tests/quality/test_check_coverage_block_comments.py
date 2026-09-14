@@ -1,4 +1,4 @@
-"""Regression contracts for coverage match-arm bodies after Rust block comments."""
+"""Regression contracts for coverage match-arm bodies around Rust comments."""
 
 from __future__ import annotations
 
@@ -50,6 +50,41 @@ class CoverageBlockCommentRegressionTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(str(source), 6)
             )
 
+    def test_match_arm_literal_after_inline_line_comment_is_executable(self) -> None:
+        """A trailing line comment on the arm label cannot hide its body."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "inline_line_comment.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Commented => { // why this arm exists\n'
+                '        "arm body after inline comment"\n'
+                '    }\n'
+                '};\n',
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 3)
+            )
+
+    def test_inline_comment_detection_preserves_double_slash_inside_string_pattern(self) -> None:
+        """A URL in a string pattern is not mistaken for the trailing comment."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "string_pattern_inline_comment.rs"
+            source.write_text(
+                'let message = match uri {\n'
+                '    "https://example.test" => { // audited URL arm\n'
+                '        "url arm body"\n'
+                '    }\n'
+                '    _ => "other",\n'
+                '};\n',
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                coverage_contract.is_executable_source_line(str(source), 3)
+            )
+
     def test_lcov_retains_match_arm_literal_after_block_comment(self) -> None:
         """LCOV denominator keeps the literal even when LLVM reports zero hits."""
 
@@ -69,6 +104,31 @@ class CoverageBlockCommentRegressionTests(unittest.TestCase):
             report = root / "coverage.lcov"
             report.write_text(
                 f"SF:{source}\nDA:4,0\nDA:7,1\nend_of_record\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                coverage_contract.load_lcov_line_totals(report, repository_root=root),
+                {"lines": {"count": 2, "covered": 1}},
+            )
+
+    def test_lcov_retains_match_arm_literal_after_inline_line_comment(self) -> None:
+        """LCOV denominator retains zero-hit bodies after trailing line comments."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "lcov_inline_comment.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Commented => { // audited branch\n'
+                '        "uncovered arm body"\n'
+                '    }\n'
+                '};\n'
+                'consume(message);\n',
+                encoding="utf-8",
+            )
+            report = root / "coverage.lcov"
+            report.write_text(
+                f"SF:{source}\nDA:3,0\nDA:6,1\nend_of_record\n",
                 encoding="utf-8",
             )
             self.assertEqual(
