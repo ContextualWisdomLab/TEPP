@@ -16,7 +16,7 @@ use temporal_core::{
     AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
     TemporalPrecision,
 };
-use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
+use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 use topic_measurement::{
     JOINT_POSTERIOR_DRAW_ALGORITHM_VERSION, ReferenceTopicInput, ReferenceTopicModelConfig,
     SparseMatrix, TopicMeasurementError,
@@ -280,4 +280,23 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
             Err(AnalysisEngineError::InvalidEvidence)
         );
     }
+}
+
+#[test]
+fn invalid_completed_at_fails_terminal_result_construction() {
+    let request = request();
+    assert_eq!(
+        execute_joint_posterior_draws_run(
+            &request,
+            &accepted(&request),
+            "snapshot-joint-posterior-draws",
+            cutoff(),
+            &separated_input(),
+            &recovery_config(),
+            topic_ids(),
+            4,
+            "not-a-timestamp",
+        ),
+        Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
+    );
 }
