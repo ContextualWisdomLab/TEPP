@@ -504,6 +504,18 @@ pub enum PsychometricError {
     /// later-occasion stationary observed variance. Lagged covariance
     /// omits `Q_Δt` and `θ`.
     StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance,
+    /// Driver §4.3 predetermined lagged covariance was treated as
+    /// stationary lagged covariance. Stationary lagged uses
+    /// `−q / (2 a)` in place of free `p_0`.
+    StationaryLaggedLatentCovarianceIsNotPredeterminedLaggedLatentCovariance,
+    /// Driver §4.3 predetermined later-occasion variance was treated
+    /// as predetermined lagged covariance. Later-occasion variance
+    /// includes `Q_Δt`; lagged covariance omits it.
+    PredeterminedLaterLatentVarianceIsNotPredeterminedLaggedLatentCovariance,
+    /// Driver §4.3 predetermined lagged covariance was treated as
+    /// `e^{a Δt}` of `trait + p_0 + (B / a)² v`. Trait variance and
+    /// `addedTIPREDVAR` do not decay.
+    DecayedPredeterminedTotalIsNotPredeterminedLaggedLatentCovariance,
     /// Driver p. 16 `CINTstd` was requested without a strictly positive
     /// `asymDIFFUSION`. Footnote 4 standardises using only the
     /// relevant variance; zero `q` has no positive process SD.
@@ -1104,6 +1116,15 @@ impl fmt::Display for PsychometricError {
             }
             Self::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance => {
                 "stationary lagged observed covariance is not the stationary later-occasion observed variance"
+            }
+            Self::StationaryLaggedLatentCovarianceIsNotPredeterminedLaggedLatentCovariance => {
+                "stationary lagged latent covariance is not the predetermined lagged latent covariance"
+            }
+            Self::PredeterminedLaterLatentVarianceIsNotPredeterminedLaggedLatentCovariance => {
+                "predetermined later-occasion latent variance is not the predetermined lagged latent covariance"
+            }
+            Self::DecayedPredeterminedTotalIsNotPredeterminedLaggedLatentCovariance => {
+                "decayed predetermined total is not the predetermined lagged latent covariance"
             }
             Self::StandardisedContinuousInterceptRequiresPositiveStationaryVariance => {
                 "standardised continuous intercept requires strictly positive stationary within-subject variance"
@@ -1849,6 +1870,21 @@ mod tests {
             PsychometricError::StationaryLaggedObservedCovarianceIsNotStationaryLaterObservedVariance
                 .to_string(),
             "stationary lagged observed covariance is not the stationary later-occasion observed variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryLaggedLatentCovarianceIsNotPredeterminedLaggedLatentCovariance
+                .to_string(),
+            "stationary lagged latent covariance is not the predetermined lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::PredeterminedLaterLatentVarianceIsNotPredeterminedLaggedLatentCovariance
+                .to_string(),
+            "predetermined later-occasion latent variance is not the predetermined lagged latent covariance"
+        );
+        assert_eq!(
+            PsychometricError::DecayedPredeterminedTotalIsNotPredeterminedLaggedLatentCovariance
+                .to_string(),
+            "decayed predetermined total is not the predetermined lagged latent covariance"
         );
     }
 

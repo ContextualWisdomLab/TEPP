@@ -399,6 +399,8 @@ pub use event_time::recover_manifest_observed_mean;
 pub use event_time::recover_manifest_observed_variance;
 /// Exact scalar observed-indicator variance `λ² Var(η) + θ + ψ`.
 pub use event_time::recover_manifest_trait_plus_state_observed_variance;
+/// Exact scalar lagged covariance of §4.3 predetermined `T0VAR` `trait + e^{a Δt} p_0 + (B / a)² v`.
+pub use event_time::recover_predetermined_lagged_latent_covariance;
 /// Exact scalar p. 16 `asymCINTstd` `(-κ / a) / √p` after strictly positive `asymDIFFUSION`.
 pub use event_time::recover_standardised_asymptotic_continuous_intercept;
 /// Exact scalar p. 16 `asymDIFFUSIONstd` `p / p = 1` after strictly positive `asymDIFFUSION`.
@@ -486,6 +488,8 @@ pub use event_time::refuse_continuous_intercept_as_discrete_mean_increment;
 pub use event_time::refuse_continuous_intercept_as_initial_latent_mean;
 /// Refuse treating Driver Table 2 `CINT` as `MANIFESTMEANS`.
 pub use event_time::refuse_continuous_intercept_as_manifest_means;
+/// Refuse treating `e^{a Δt}` of `trait + p_0 + (B / a)² v` as predetermined lagged covariance.
+pub use event_time::refuse_decayed_predetermined_total_as_predetermined_lagged_latent_covariance;
 /// Refuse the difference quotient as a continuous-time rate.
 pub use event_time::refuse_difference_quotient_as_local_rate;
 /// Refuse treating p. 16 `discreteCINTstd` as `asymCINTstd`.
@@ -614,6 +618,8 @@ pub use event_time::refuse_measurement_error_as_stationary_later_observed_varian
 pub use event_time::refuse_observed_scaled_manifest_mean_as_standardised_manifest_mean;
 /// Refuse pooling discrete lags from unequal event intervals.
 pub use event_time::refuse_pooled_discrete_lag_across_unequal_intervals;
+/// Refuse treating later-occasion §4.3 predetermined `T0VAR` as predetermined lagged covariance.
+pub use event_time::refuse_predetermined_later_latent_variance_as_predetermined_lagged_latent_covariance;
 /// Refuse treating Driver Eq. 3 process noise as the unconditional variance.
 pub use event_time::refuse_process_noise_as_unconditional_variance;
 /// Refuse treating p. 16 `asymDIFFUSIONstd` as `T0VARstd`.
@@ -675,6 +681,8 @@ pub use event_time::refuse_stationary_initial_observed_variance_as_stationary_la
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_decayed_stationary_variance;
 /// Refuse treating lagged §4.3 stationary `T0VAR` as lagged observed covariance.
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_observed_covariance;
+/// Refuse treating lagged §4.3 stationary `T0VAR` as predetermined lagged covariance.
+pub use event_time::refuse_stationary_lagged_latent_covariance_as_predetermined_lagged_latent_covariance;
 /// Refuse treating lagged §4.3 stationary `T0VAR` as contemporaneous stationary `T0VAR`.
 pub use event_time::refuse_stationary_lagged_latent_covariance_as_stationary_initial_latent_variance;
 /// Refuse treating Eq. 5 of lagged §4.3 stationary `T0VAR` as later-occasion observed variance.
