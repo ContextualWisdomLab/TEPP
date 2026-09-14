@@ -26,9 +26,11 @@ The adapter:
 - rejects provenance-length mismatch and cross-snapshot evidence before scientific fitting;
 - compares parsed `KnowledgeCutoff::instant()` values, so equivalent RFC 3339 spellings of one instant bind identically;
 - excludes same-snapshot evidence with `AvailableTime > KnowledgeCutoff` before duplicate/scientific admission, preserving historical replay invariance;
+- bounds each cutoff-visible document identity with the Analysis Run identifier contract before it can be cloned into the exhaustive runner;
 - keeps duplicate identities among evidence actually visible at the cutoff fail-closed through the existing runner;
 - bounds raw candidate evidence by `MAX_EVIDENCE_UNITS` before adapter allocation;
 - bounds exhaustive materialization by at most `256 * 255 = 65,280` retained document identities, which implies at most 256 admitted documents and 257 fitter invocations including the full fit;
+- prevalidates the derived `:full` seed-domain identity so an oversized seed base cannot trigger all refits and only then fail artifact validation;
 - rejects an oversized admitted census before calling the fitter;
 - invokes `fit_exhaustive_case_deletion` without reimplementing leave-one-out fitting;
 - emits a canonical SHA-256-digested `tepp.case_deletion_refit.v1` artifact with admitted document count, deletion-refit count, independent seed-domain count, full-fit seed domain, and inference status `exhaustive_actual_deletion_not_reweighting_approx`;
@@ -51,9 +53,9 @@ Historical replay invariant: within the raw operational input bound, adding same
 
 ## Consequences
 
-Operators can request historically reproducible exhaustive actual case deletion as a digest-bound terminal result without making future evidence visible to an earlier cutoff. The profile now has an explicit resource denominator tied to the runner's quadratic retained-identity representation. Larger corpora fail before any scientific fit instead of monopolizing a worker.
+Operators can request historically reproducible exhaustive actual case deletion as a digest-bound terminal result without making future evidence visible to an earlier cutoff. The profile now has an explicit resource denominator tied to the runner's quadratic retained-identity representation. Visible document identities are bounded before entering that representation, so the retained-identity component has both a count and per-identity byte ceiling. Larger admitted corpora fail before any scientific fit instead of monopolizing a worker.
 
-The 256-document ceiling is an application-path safety contract for the current representation, not a claim that case-deletion science is intrinsically limited to 256 documents. Raising it requires changing or re-proving the retained representation and fitter/posterior resource envelope.
+The 256-document ceiling is an application-path safety contract for the current representation, not a claim that case-deletion science is intrinsically limited to 256 documents. It caps the number of fitter-owned posteriors retained by the current runner, but it does not assert a generic byte size for arbitrary fitter-owned evidence or posterior type `P`; those remain scientific-fitter owner contracts. Raising the ceiling or claiming a complete worker-memory envelope requires changing or re-proving the retained representation and concrete fitter/posterior resource contract.
 
 This branch is still unmerged. `Proposed` remains the correct ADR status until protected-main integration and release gates are satisfied.
 
@@ -63,6 +65,7 @@ This branch is still unmerged. `Proposed` remains the correct ADR status until p
 - Causal source repair `eff6eafcec5d644d3414332bd6ce750c344652bd` adds explicit snapshot/availability provenance, instant-based cutoff binding, historical censoring before scientific admission, the quadratic retained-identity resource budget, terminal `validated`, and bounded canonical serialization.
 - Runtime dependency repair `6d0fb9081334e30dbe062aa11bc594eed801f3e7` promotes canonical `corpus_split::cutoff_eligible` from dev-only to production dependency.
 - Contract migration `4a85e41519bf806334d2d4f41cde9938d9cd8d6c` proves historical replay invariance, cross-snapshot/misaligned-provenance refusal, visible-duplicate refusal, equivalent cutoff instants, and zero fitter calls for a 257-document census.
+- Resource-hardening repair `7705111516eda65b38e4cf7d8d3069f786bab65d` additionally bounds every visible retained identity and prevalidates the derived full-fit seed domain before expensive fitting.
 
 ## Verification
 
