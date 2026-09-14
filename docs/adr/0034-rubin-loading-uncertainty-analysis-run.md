@@ -122,6 +122,15 @@ denominators, design sensitivity, and leakage-safe historical evaluation. Draft
 generator only. Neither LLM judgment nor synthetic unit fixtures may promote a
 broader scientific claim.
 
+Repeated-sampling evidence must preserve the same identity semantics as the
+product path it exercises. Each newly generated Monte Carlo population is a
+new immutable snapshot and each executor call is a distinct Analysis Run. A
+rolling-origin comparison may reuse one replication-specific snapshot because
+the early and late views refer to the same generated population, but those
+views still use distinct run/idempotency identities. Reusing one snapshot or
+accepted-run receipt across different generated populations is invalid
+evidence even when the resulting numerical summaries are deterministic.
+
 Issue #505 separately owns inferential activation. The Analysis Run must not
 project #504's design-specific coverage as universal authorization for an
 unknown or arbitrary draw generator. Promotion requires a versioned approved
@@ -176,10 +185,11 @@ python3 scripts/validate_documentation.py
 Regression contracts cover equivalent cutoff instants, future-evidence replay,
 cross-snapshot refusal, robust-point versus naive-mean cancellation, exact and
 exceeded draw/resource bounds, inconsistent Rubin totals, artifact count
-bounds, and terminal provider/domain-status separation. #505 must add an
-executable activation contract distinguishing missing/unknown draw-generation
-provenance from an explicitly approved versioned generator/analysis pairing;
-that RED must not duplicate the Rubin arithmetic.
+bounds, terminal provider/domain-status separation, and Monte Carlo
+snapshot/run-identity non-aliasing. #505 must add an executable activation
+contract distinguishing missing/unknown draw-generation provenance from an
+explicitly approved versioned generator/analysis pairing; that RED must not
+duplicate the Rubin arithmetic.
 
 ## Rollback and supersession
 
