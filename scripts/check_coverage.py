@@ -241,7 +241,6 @@ def is_executable_source_line(
         "();",
         "};",
         "});",
-        "Ok(())",
     }:
         return False
     if (
