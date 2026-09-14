@@ -513,6 +513,7 @@ dependencies = [
  "evidence_core",
  "serde",
  "serde_json",
+ "sha2",
  "temporal_core",
  "uuid",
 ]
@@ -1194,6 +1195,7 @@ name = "persistence_postgres"
 version = "0.2.0"
 dependencies = [
  "analysis_engine",
+ "event_core",
  "operational_log",
  "sha2",
  "sqlx",
@@ -1811,6 +1813,7 @@ name = "tepp_api"
 version = "0.2.0"
 dependencies = [
  "corpus_split",
+ "event_core",
  "jiff",
  "serde",
  "serde_json",

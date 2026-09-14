@@ -83,6 +83,10 @@ pub use corpus_split_manifest::CorpusSplitPartitions;
 pub use envelope::ErrorEnvelope;
 /// Fail-closed API errors.
 pub use error::ApiError;
+/// TDT/CHRONOS model-artifact type for immutable persistence.
+pub use event_core::INTERVAL_CONSISTENCY_ARTIFACT_TYPE;
+/// Durable typed JSON and `GraphML` bounded-consistency artifact.
+pub use event_core::{IntervalConsistencyArtifact, IntervalConsistencyArtifactRelation};
 /// Export contract version constant.
 pub use export::EXPORT_CONTRACT_VERSION;
 /// Minimal `GraphML` export builder.
