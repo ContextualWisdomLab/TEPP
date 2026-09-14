@@ -40,17 +40,16 @@ pub const RUBIN_PROJECTION_ACTIVATION_RECEIPT_BYTE_LIMIT: usize = INNER_RECEIPT_
 ///
 /// The nested activation authority remains owned by the existing projection
 /// policy. This type adds a canonical SHA-256 commitment to the concrete
-/// cutoff-admitted numeric estimator payload. The Draft v1 wire member is still
-/// named `complete_data_draws_sha256`; issue #522 owns its pre-release semantic
-/// rename. Its value commits both the factor-score design vector and the draw
-/// matrix produced by the executor. The digest prevents a receipt issued for one
-/// payload from being replayed for different factor scores or draw values with
-/// the same dimensions. It does not, by itself, attest that a caller executed an
-/// approved generator or factor-mapping implementation.
+/// cutoff-admitted numeric estimator payload. The digest commits both the
+/// factor-score design vector and the draw matrix produced by the executor. It
+/// prevents a receipt issued for one payload from being replayed for different
+/// factor scores or draw values with the same dimensions. It does not, by
+/// itself, attest that a caller executed an approved generator or factor-mapping
+/// implementation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RubinProjectionActivationReceiptV1 {
     inner: InnerRubinProjectionActivationReceiptV1,
-    complete_data_draws_sha256: String,
+    estimator_payload_sha256: String,
 }
 
 impl RubinProjectionActivationReceiptV1 {
@@ -59,8 +58,7 @@ impl RubinProjectionActivationReceiptV1 {
     /// `generator_contract` and `analysis_contract` are `(id, version)` pairs.
     /// `validation_evidence` is `(id, sha256, available_time)`. Snapshot and
     /// estimator-payload digests are independent commitments and must both be
-    /// lowercase canonical SHA-256 values. The payload parameter retains the
-    /// Draft draw-only name until issue #522's pre-release wire rename.
+    /// lowercase canonical SHA-256 values.
     ///
     /// # Errors
     ///
@@ -72,12 +70,12 @@ impl RubinProjectionActivationReceiptV1 {
         validation_evidence: (&str, &str, AvailableTime),
         source_snapshot_id: impl Into<String>,
         source_snapshot_sha256: impl Into<String>,
-        complete_data_draws_sha256: impl Into<String>,
+        estimator_payload_sha256: impl Into<String>,
         knowledge_cutoff: KnowledgeCutoff,
         design_envelope_id: impl Into<String>,
     ) -> Result<Self, AnalysisEngineError> {
-        let complete_data_draws_sha256 = complete_data_draws_sha256.into();
-        if !valid_sha256(&complete_data_draws_sha256) {
+        let estimator_payload_sha256 = estimator_payload_sha256.into();
+        if !valid_sha256(&estimator_payload_sha256) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         let inner = InnerRubinProjectionActivationReceiptV1::new(
@@ -91,7 +89,7 @@ impl RubinProjectionActivationReceiptV1 {
         )?;
         Ok(Self {
             inner,
-            complete_data_draws_sha256,
+            estimator_payload_sha256,
         })
     }
 
@@ -116,11 +114,11 @@ impl RubinProjectionActivationReceiptV1 {
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        let complete_data_draws_sha256 = object
-            .remove("complete_data_draws_sha256")
+        let estimator_payload_sha256 = object
+            .remove("estimator_payload_sha256")
             .and_then(|value| value.as_str().map(ToOwned::to_owned))
             .ok_or(AnalysisEngineError::InvalidEvidence)?;
-        if !valid_sha256(&complete_data_draws_sha256) {
+        if !valid_sha256(&estimator_payload_sha256) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         let inner_json =
@@ -128,7 +126,7 @@ impl RubinProjectionActivationReceiptV1 {
         let inner = InnerRubinProjectionActivationReceiptV1::from_json(&inner_json)?;
         Ok(Self {
             inner,
-            complete_data_draws_sha256,
+            estimator_payload_sha256,
         })
     }
 
@@ -138,7 +136,7 @@ impl RubinProjectionActivationReceiptV1 {
     ///
     /// Returns a validation, size, or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
-        if !valid_sha256(&self.complete_data_draws_sha256) {
+        if !valid_sha256(&self.estimator_payload_sha256) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         let inner_json = self.inner.to_json()?;
@@ -148,8 +146,8 @@ impl RubinProjectionActivationReceiptV1 {
             .as_object_mut()
             .ok_or(AnalysisEngineError::SerializationFailure)?
             .insert(
-                "complete_data_draws_sha256".into(),
-                Value::String(self.complete_data_draws_sha256.clone()),
+                "estimator_payload_sha256".into(),
+                Value::String(self.estimator_payload_sha256.clone()),
             );
         let payload =
             serde_json::to_string(&value).map_err(|_| AnalysisEngineError::SerializationFailure)?;
@@ -180,13 +178,9 @@ impl RubinProjectionActivationReceiptV1 {
     }
 
     /// Return the canonical SHA-256 of the exact numeric estimator payload.
-    ///
-    /// The Draft accessor name predates issue #522 and will be renamed before
-    /// protected-main publication. The returned digest commits both admitted
-    /// factor scores and complete-data draw values.
     #[must_use]
-    pub fn complete_data_draws_sha256(&self) -> &str {
-        &self.complete_data_draws_sha256
+    pub fn estimator_payload_sha256(&self) -> &str {
+        &self.estimator_payload_sha256
     }
 
     /// Return the canonical knowledge-cutoff wire value.
@@ -207,7 +201,7 @@ pub fn decide_rubin_projection_activation(
     receipt: Option<&RubinProjectionActivationReceiptV1>,
     expected_snapshot_id: &str,
     expected_snapshot_sha256: &str,
-    expected_complete_data_draws_sha256: &str,
+    expected_estimator_payload_sha256: &str,
     expected_knowledge_cutoff: KnowledgeCutoff,
     observation_count: u64,
     draw_count: u64,
@@ -224,7 +218,7 @@ pub fn decide_rubin_projection_activation(
             indicator_kind,
         );
     };
-    if validated_inner_for_runtime_draws(receipt, expected_complete_data_draws_sha256).is_err() {
+    if validated_inner_for_runtime_payload(receipt, expected_estimator_payload_sha256).is_err() {
         return RubinProjectionActivationDecision::Rejected;
     }
     decide_inner_rubin_projection_activation(
@@ -238,12 +232,12 @@ pub fn decide_rubin_projection_activation(
     )
 }
 
-fn validated_inner_for_runtime_draws<'a>(
+fn validated_inner_for_runtime_payload<'a>(
     receipt: &'a RubinProjectionActivationReceiptV1,
-    expected_complete_data_draws_sha256: &str,
+    expected_estimator_payload_sha256: &str,
 ) -> Result<&'a InnerRubinProjectionActivationReceiptV1, RubinProjectionActivationDecision> {
-    if !valid_sha256(expected_complete_data_draws_sha256)
-        || receipt.complete_data_draws_sha256 != expected_complete_data_draws_sha256
+    if !valid_sha256(expected_estimator_payload_sha256)
+        || receipt.estimator_payload_sha256 != expected_estimator_payload_sha256
     {
         return Err(RubinProjectionActivationDecision::Rejected);
     }
@@ -312,16 +306,16 @@ fn require_receipt_byte_limit(payload_len: usize) -> Result<(), AnalysisEngineEr
 mod tests {
     use super::{
         RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION, RubinProjectionActivationReceiptV1,
-        validated_inner_for_runtime_draws,
+        validated_inner_for_runtime_payload,
     };
     use crate::RUBIN_LOADING_MODEL_CONTRACT_VERSION;
     use temporal_core::{AvailableTime, KnowledgeCutoff};
 
     const SNAPSHOT_DIGEST: &str =
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const DRAW_PAYLOAD_DIGEST: &str =
+    const ESTIMATOR_PAYLOAD_DIGEST: &str =
         "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const OTHER_DRAW_PAYLOAD_DIGEST: &str =
+    const OTHER_ESTIMATOR_PAYLOAD_DIGEST: &str =
         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const EVIDENCE_DIGEST: &str =
         "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -340,7 +334,7 @@ mod tests {
             ),
             "snapshot-rubin-activation",
             SNAPSHOT_DIGEST,
-            DRAW_PAYLOAD_DIGEST,
+            ESTIMATOR_PAYLOAD_DIGEST,
             KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
             "rubin-gaussian-single-level-candidate-v1",
         )
@@ -348,15 +342,17 @@ mod tests {
     }
 
     #[test]
-    fn concrete_draw_payload_gate_rejects_substitution_before_authority_decision() {
+    fn estimator_payload_gate_rejects_substitution_before_authority_decision() {
         let receipt = receipt();
-        assert!(validated_inner_for_runtime_draws(&receipt, DRAW_PAYLOAD_DIGEST).is_ok());
-        assert!(validated_inner_for_runtime_draws(&receipt, OTHER_DRAW_PAYLOAD_DIGEST).is_err());
-        assert!(validated_inner_for_runtime_draws(&receipt, "not-a-digest").is_err());
+        assert!(validated_inner_for_runtime_payload(&receipt, ESTIMATOR_PAYLOAD_DIGEST).is_ok());
+        assert!(
+            validated_inner_for_runtime_payload(&receipt, OTHER_ESTIMATOR_PAYLOAD_DIGEST).is_err()
+        );
+        assert!(validated_inner_for_runtime_payload(&receipt, "not-a-digest").is_err());
     }
 
     #[test]
-    fn draw_digest_is_part_of_canonical_receipt_and_receipt_digest() {
+    fn estimator_payload_digest_is_part_of_canonical_receipt_and_receipt_digest() {
         let receipt = receipt();
         let canonical = receipt.to_json().expect("json");
         let wire: serde_json::Value = serde_json::from_str(&canonical).expect("json");
@@ -364,12 +360,12 @@ mod tests {
             wire.get("schema_version").and_then(serde_json::Value::as_str),
             Some(RUBIN_PROJECTION_ACTIVATION_RECEIPT_SCHEMA_VERSION)
         );
-        assert!(canonical.contains(DRAW_PAYLOAD_DIGEST));
+        assert!(canonical.contains(ESTIMATOR_PAYLOAD_DIGEST));
         let reparsed = RubinProjectionActivationReceiptV1::from_json(&canonical).expect("receipt");
         assert_eq!(reparsed, receipt);
 
         let mut changed = wire;
-        changed["complete_data_draws_sha256"] = serde_json::json!(OTHER_DRAW_PAYLOAD_DIGEST);
+        changed["estimator_payload_sha256"] = serde_json::json!(OTHER_ESTIMATOR_PAYLOAD_DIGEST);
         let changed = RubinProjectionActivationReceiptV1::from_json(&changed.to_string())
             .expect("alternate valid digest");
         assert_ne!(receipt.sha256().expect("digest"), changed.sha256().expect("digest"));
