@@ -12,7 +12,7 @@ use psychometric_core::IndicatorKind;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest};
 
-const SNAPSHOT_ID: &str = "snapshot-rubin-scientific-acceptance";
+const SNAPSHOT_PREFIX: &str = "snapshot-rubin-scientific-acceptance";
 const EARLY_AVAILABLE_AT: &str = "2026-07-01T00:00:00Z";
 const LATE_AVAILABLE_AT: &str = "2026-08-15T00:00:00Z";
 const EARLY_CUTOFF: &str = "2026-08-01T00:00:00Z";
@@ -144,12 +144,16 @@ fn cutoff(stamp: &str) -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339(stamp).expect("valid cutoff")
 }
 
-fn request(cutoff_stamp: &str, idempotency_key: &str) -> AnalysisRunRequest {
+fn snapshot_id(scope: &str, replication: usize) -> String {
+    format!("{SNAPSHOT_PREFIX}-{scope}-{replication}")
+}
+
+fn request(cutoff_stamp: &str, idempotency_key: &str, snapshot_id: &str) -> AnalysisRunRequest {
     AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: idempotency_key.into(),
         tenant_workspace_id: "tenant-rubin-scientific-acceptance".into(),
-        snapshot_id: SNAPSHOT_ID.into(),
+        snapshot_id: snapshot_id.into(),
         knowledge_cutoff: cutoff_stamp.into(),
         model_contract_version: RUBIN_LOADING_MODEL_CONTRACT_VERSION.into(),
         output_profile: RUBIN_LOADING_OUTPUT_PROFILE.into(),
@@ -169,6 +173,7 @@ fn make_rows(
     residual_sd: f64,
     draw_noise_sd: f64,
     early_observation_count: usize,
+    snapshot_id: &str,
 ) -> Vec<RubinLoadingObservation> {
     let factor_scores: Vec<f64> = (0..observations).map(|_| rng.standard_normal()).collect();
     let base_outcomes: Vec<f64> = factor_scores
@@ -201,7 +206,7 @@ fn make_rows(
                 LATE_AVAILABLE_AT
             };
             RubinLoadingObservation::new(
-                SNAPSHOT_ID,
+                snapshot_id,
                 factor_score,
                 indicator_draws,
                 available(available_at),
@@ -254,8 +259,6 @@ fn summarize(series: &MetricSeries<'_>, attempted: usize, failed: usize) -> Reco
 }
 
 fn run_scenario(scenario: &Scenario) -> RecoverySummary {
-    let run_request = request(EARLY_CUTOFF, scenario.name);
-    let run_accepted = accepted(&run_request);
     let knowledge_cutoff = cutoff(EARLY_CUTOFF);
     let mut rng = SplitMix64::new(scenario.seed);
     let mut truth = Vec::with_capacity(REPLICATIONS);
@@ -266,7 +269,11 @@ fn run_scenario(scenario: &Scenario) -> RecoverySummary {
     let mut between_variances = Vec::with_capacity(REPLICATIONS);
     let mut failed = 0_usize;
 
-    for _ in 0..REPLICATIONS {
+    for replication in 0..REPLICATIONS {
+        let idempotency_key = format!("{}-{replication}", scenario.name);
+        let replication_snapshot_id = snapshot_id(scenario.name, replication);
+        let run_request = request(EARLY_CUTOFF, &idempotency_key, &replication_snapshot_id);
+        let run_accepted = accepted(&run_request);
         let rows = make_rows(
             &mut rng,
             scenario.observations,
@@ -275,11 +282,12 @@ fn run_scenario(scenario: &Scenario) -> RecoverySummary {
             scenario.residual_sd,
             scenario.draw_noise_sd,
             scenario.observations,
+            &replication_snapshot_id,
         );
         match execute_rubin_loading_uncertainty_run(
             &run_request,
             &run_accepted,
-            SNAPSHOT_ID,
+            &replication_snapshot_id,
             knowledge_cutoff,
             IndicatorKind::AdditiveLogRatio,
             &rows,
@@ -562,17 +570,26 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
     const RESIDUAL_SD: f64 = 1.0;
     const DRAW_NOISE_SD: f64 = 0.5;
 
-    let early_request = request(EARLY_CUTOFF, "rolling-origin-early");
-    let early_accepted = accepted(&early_request);
-    let late_request = request(LATE_CUTOFF, "rolling-origin-late");
-    let late_accepted = accepted(&late_request);
     let mut rng = SplitMix64::new(0x5001);
     let mut early_errors = Vec::with_capacity(REPLICATIONS);
     let mut late_errors = Vec::with_capacity(REPLICATIONS);
     let mut early_total_variances = Vec::with_capacity(REPLICATIONS);
     let mut late_total_variances = Vec::with_capacity(REPLICATIONS);
 
-    for _ in 0..REPLICATIONS {
+    for replication in 0..REPLICATIONS {
+        let replication_snapshot_id = snapshot_id("rolling-origin", replication);
+        let early_full_key = format!("rolling-origin-early-full-{replication}");
+        let early_prefix_key = format!("rolling-origin-early-prefix-{replication}");
+        let late_key = format!("rolling-origin-late-full-{replication}");
+        let early_full_request = request(EARLY_CUTOFF, &early_full_key, &replication_snapshot_id);
+        let early_prefix_request = request(EARLY_CUTOFF, &early_prefix_key, &replication_snapshot_id);
+        let late_request = request(LATE_CUTOFF, &late_key, &replication_snapshot_id);
+        let early_full_accepted = accepted(&early_full_request);
+        let early_prefix_accepted = accepted(&early_prefix_request);
+        let late_accepted = accepted(&late_request);
+        assert_ne!(early_full_accepted.run_id, early_prefix_accepted.run_id);
+        assert_ne!(early_full_accepted.run_id, late_accepted.run_id);
+
         let rows = make_rows(
             &mut rng,
             OBSERVATIONS,
@@ -581,11 +598,12 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
             RESIDUAL_SD,
             DRAW_NOISE_SD,
             EARLY_OBSERVATIONS,
+            &replication_snapshot_id,
         );
         let early_full = execute_rubin_loading_uncertainty_run(
-            &early_request,
-            &early_accepted,
-            SNAPSHOT_ID,
+            &early_full_request,
+            &early_full_accepted,
+            &replication_snapshot_id,
             cutoff(EARLY_CUTOFF),
             IndicatorKind::AdditiveLogRatio,
             &rows,
@@ -593,9 +611,9 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
         )
         .expect("early full replay");
         let early_prefix = execute_rubin_loading_uncertainty_run(
-            &early_request,
-            &early_accepted,
-            SNAPSHOT_ID,
+            &early_prefix_request,
+            &early_prefix_accepted,
+            &replication_snapshot_id,
             cutoff(EARLY_CUTOFF),
             IndicatorKind::AdditiveLogRatio,
             &rows[..EARLY_OBSERVATIONS],
@@ -605,7 +623,7 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
         let late_full = execute_rubin_loading_uncertainty_run(
             &late_request,
             &late_accepted,
-            SNAPSHOT_ID,
+            &replication_snapshot_id,
             cutoff(LATE_CUTOFF),
             IndicatorKind::AdditiveLogRatio,
             &rows,
@@ -613,6 +631,9 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
         )
         .expect("late replay");
 
+        assert_eq!(early_full.artifact.snapshot_id, replication_snapshot_id);
+        assert_eq!(early_prefix.artifact.snapshot_id, replication_snapshot_id);
+        assert_eq!(late_full.artifact.snapshot_id, replication_snapshot_id);
         assert_eq!(early_full.artifact.observation_count, 48);
         assert_eq!(early_full.artifact.excluded_after_cutoff_count, 16);
         assert_eq!(early_prefix.artifact.observation_count, 48);
@@ -671,7 +692,10 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
 
 #[test]
 fn monte_carlo_request_helpers_do_not_alias_immutable_snapshot_identity() {
-    let first = request(EARLY_CUTOFF, "identity-red-0");
-    let second = request(EARLY_CUTOFF, "identity-red-1");
+    let first_snapshot = snapshot_id("identity-red", 0);
+    let second_snapshot = snapshot_id("identity-red", 1);
+    let first = request(EARLY_CUTOFF, "identity-red-0", &first_snapshot);
+    let second = request(EARLY_CUTOFF, "identity-red-1", &second_snapshot);
     assert_ne!(first.snapshot_id, second.snapshot_id);
+    assert_ne!(accepted(&first).run_id, accepted(&second).run_id);
 }
