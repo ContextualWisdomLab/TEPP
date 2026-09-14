@@ -6,8 +6,10 @@
 Euclidean coordinates and scores recovered cluster assignments with
 label-invariant pair precision and recall against known truth.
 
-This slice does not fit a graphical lasso, run Leiden clustering, or claim
-that a topic cluster is a causal construct.
+This slice does not fit a graphical lasso or claim that a topic cluster is
+a causal construct. Repeated Leiden partitions now live in
+`docs/research/leiden-consensus.md`; they do **not** authorize Euclidean
+distances on raw topic proportions.
 
 ## Authority
 

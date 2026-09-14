@@ -1,12 +1,13 @@
-//! Co-assignment consensus clustering from repeated label-invariant partitions.
+//! Co-assignment consensus clustering from repeated Leiden partitions.
 //!
-//! Runs multiple rounds of deterministic greedy partitioning over
-//! randomly perturbed admitted positive edges, builds a co-assignment
-//! matrix across replicates, and derives consensus clusters by
-//! thresholding that matrix. The resampling-based consensus view and the
-//! stability rationale follow Monti (2003) and Hennig (2007); the edge
+//! Runs multiple rounds of Traag, Waltman, and van Eck (2019) Leiden
+//! modularity on randomly perturbed admitted positive edges, builds a
+//! co-assignment matrix across replicates, and derives consensus clusters
+//! by thresholding that matrix. The resampling-based consensus view and
+//! the stability rationale follow Monti, Tamayo, Mesirov, and Golub (2003)
+//! and Hennig (2007); the edge
 //! perturbation probability is an explicit parameter with provenance,
-//! never an implicit constant.
+//! never an implicit constant. Union-find is not used.
 
 #![forbid(unsafe_code)]
 #![allow(
@@ -21,6 +22,7 @@
 
 use crate::edges::NetworkEdge;
 use crate::error::NetworkEstimatorError;
+use crate::leiden::leiden_partition;
 use std::collections::HashMap;
 
 /// Consensus clustering output.
@@ -35,13 +37,13 @@ pub struct ConsensusClusterOutput {
     pub co_assignment: Vec<Vec<f64>>,
 }
 
-/// Derive consensus clusters from repeatedly perturbed partitions.
+/// Derive consensus clusters from repeatedly perturbed Leiden partitions.
 ///
 /// Each replicate independently drops every admitted positive edge with
-/// probability `edge_drop_probability`, repartitions the surviving edges,
-/// and accumulates label-invariant co-assignment counts. The final
-/// assignment thresholds the co-assignment frequency at
-/// `consensus_threshold`.
+/// probability `edge_drop_probability`, repartitions the surviving edges
+/// with Leiden modularity (Traag et al., 2019), and accumulates
+/// label-invariant co-assignment counts. The final assignment thresholds
+/// the co-assignment frequency at `consensus_threshold`.
 ///
 /// # Arguments
 ///
@@ -52,8 +54,8 @@ pub struct ConsensusClusterOutput {
 ///   same-cluster; must lie inside [0, 1].
 /// * `edge_drop_probability` – per-edge independent drop probability in
 ///   each replicate; must be finite and inside [0, 1). The value is an
-///   explicit design parameter of the resampling scheme (Monti, 2003;
-///   Hennig, 2007), not an internal constant.
+///   explicit design parameter of the resampling scheme (Monti, Tamayo,
+///   Mesirov, & Golub, 2003; Hennig, 2007), not an internal constant.
 /// * `seed` – deterministic seed.
 ///
 /// # Errors
@@ -81,39 +83,51 @@ pub fn consensus_clusters(
         return Err(NetworkEstimatorError::InvalidProbability);
     }
 
-    // Build adjacency from positive edges only.
+    // Admitted positive in-range edges only, sorted so input permutation
+    // cannot change the drop stream. Out-of-range and self-loop endpoints
+    // never enter adjacency or Leiden (they are not topics in this k).
+    let mut admitted: Vec<&NetworkEdge> = edges
+        .iter()
+        .filter(|edge| {
+            edge.effect > 0.0
+                && edge.source < k_topics
+                && edge.target < k_topics
+                && edge.source != edge.target
+        })
+        .collect();
+    admitted.sort_by_key(|edge| (edge.source, edge.target));
+
     let mut adjacency: HashMap<usize, Vec<usize>> = HashMap::new();
-    for edge in edges {
-        if edge.effect > 0.0 {
-            adjacency.entry(edge.source).or_default().push(edge.target);
-            adjacency.entry(edge.target).or_default().push(edge.source);
-        }
+    for edge in &admitted {
+        adjacency.entry(edge.source).or_default().push(edge.target);
+        adjacency.entry(edge.target).or_default().push(edge.source);
     }
 
-    // Deterministic LCG shared across the crate.
-    let mut state = seed ^ 0x9E37_79B9_7F4A_7C15;
+    // Drop-stream LCG is independent of Leiden's per-replicate stream so
+    // graph-size RNG consumption cannot shift later replicates' samples.
+    let mut drop_state = seed ^ 0x9E37_79B9_7F4A_7C15;
 
     // Accumulate co-assignment counts.
     let mut co_count = vec![vec![0_u64; k_topics]; k_topics];
 
-    for _ in 0..n_replicates {
+    for replicate in 0..n_replicates {
         // Perturb: drop each surviving positive edge independently with
         // the caller-supplied probability so cluster recovery is
         // stress-tested by resampling. Negative-effect edges are not
         // part of the partition graph at all, matching the adjacency.
-        let perturbed: Vec<&NetworkEdge> = edges
+        let perturbed: Vec<&NetworkEdge> = admitted
             .iter()
-            .filter(|edge| edge.effect > 0.0)
+            .copied()
             .filter(|_| {
-                state = state
-                    .wrapping_mul(6_364_136_223_846_793_005)
-                    .wrapping_add(1_442_695_040_888_963_407);
-                let draw = ((state >> 33) as f64 / (u64::MAX >> 33) as f64).min(1.0);
+                let draw_bits = crate::leiden::step_rng(&mut drop_state);
+                let draw = ((draw_bits >> 33) as f64 / (u64::MAX >> 33) as f64).min(1.0);
                 draw >= edge_drop_probability
             })
             .collect();
 
-        let partition = greedy_union_partition(&perturbed, k_topics);
+        let mut leiden_state =
+            seed ^ 0xD1B5_4A32_D192_ED03 ^ (replicate as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15);
+        let partition = leiden_partition(&perturbed, k_topics, &mut leiden_state);
 
         for i in 0..k_topics {
             for j in 0..k_topics {
@@ -170,48 +184,6 @@ pub fn consensus_clusters(
         assignments,
         co_assignment: co_freq,
     })
-}
-
-/// Greedy union-find partition over edges sorted by descending effect.
-///
-/// This is a deterministic single-pass stand-in for Leiden until a vetted
-/// implementation is adopted; it makes no modularity-optimization claim.
-fn greedy_union_partition(edges: &[&NetworkEdge], k: usize) -> Vec<usize> {
-    let mut parent: Vec<usize> = (0..k).collect();
-
-    fn find(parent: &mut [usize], mut x: usize) -> usize {
-        while parent[x] != x {
-            parent[x] = parent[parent[x]];
-            x = parent[x];
-        }
-        x
-    }
-
-    fn union(parent: &mut [usize], a: usize, b: usize) {
-        let root_a = find(parent, a);
-        let root_b = find(parent, b);
-        if root_a != root_b {
-            parent[root_b] = root_a;
-        }
-    }
-
-    // Sort edges by descending effect.
-    let mut sorted: Vec<&NetworkEdge> = edges.to_vec();
-    sorted.sort_by(|a, b| b.effect.total_cmp(&a.effect));
-
-    for edge in &sorted {
-        union(&mut parent, edge.source, edge.target);
-    }
-
-    // Normalise labels to 0..n_clusters.
-    let mut label_map: HashMap<usize, usize> = HashMap::new();
-    parent
-        .iter()
-        .map(|&root| {
-            let len = label_map.len();
-            *label_map.entry(root).or_insert(len)
-        })
-        .collect()
 }
 
 #[cfg(test)]
@@ -278,8 +250,8 @@ mod tests {
 
     #[test]
     fn redundant_edges_between_clustered_topics_are_harmless() {
-        // A duplicate edge forces the union step onto an already-merged
-        // pair; output must stay identical to the simple-chain case.
+        // A duplicate edge must not change the Leiden partition of a
+        // strongly connected triple.
         let chain = vec![edge(0, 1, 0.95), edge(1, 2, 0.9)];
         let duplicated = vec![edge(0, 1, 0.95), edge(1, 2, 0.9), edge(0, 2, 0.8)];
         let plain = consensus_clusters(&chain, 3, 20, 0.99, 0.0, 31).unwrap();
@@ -365,6 +337,52 @@ mod tests {
         let chain = vec![edge(0, 1, 0.9), edge(1, 2, 0.8)];
         let first = consensus_clusters(&chain, 3, 15, 0.6, 0.1, 7).unwrap();
         let second = consensus_clusters(&chain, 3, 15, 0.6, 0.1, 7).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn two_cliques_with_a_weak_bridge_stay_two_consensus_clusters() {
+        // Operator-visible GAP-009 remainder: union-find glued both
+        // triangles; Leiden modularity plus co-assignment keeps them
+        // apart under a high consensus threshold and no drop noise.
+        let planted = vec![
+            edge(0, 1, 1.0),
+            edge(1, 2, 1.0),
+            edge(0, 2, 1.0),
+            edge(3, 4, 1.0),
+            edge(4, 5, 1.0),
+            edge(3, 5, 1.0),
+            edge(2, 3, 0.01),
+        ];
+        let output = consensus_clusters(&planted, 6, 20, 0.8, 0.0, 17).unwrap();
+        assert_eq!(output.assignments[0], output.assignments[1]);
+        assert_eq!(output.assignments[1], output.assignments[2]);
+        assert_eq!(output.assignments[3], output.assignments[4]);
+        assert_eq!(output.assignments[4], output.assignments[5]);
+        assert_ne!(output.assignments[0], output.assignments[3]);
+        assert!(output.assignments[0].is_some());
+        assert!(output.assignments[3].is_some());
+        assert!(output.co_assignment[0][2] > 0.8);
+        assert!(output.co_assignment[0][3] < 0.8);
+    }
+
+    #[test]
+    fn out_of_range_endpoints_do_not_create_singleton_clusters() {
+        // An edge whose target is outside k_topics is not a topic–topic
+        // association. Topic 0 must stay unclustered rather than gaining
+        // a singleton from that stray adjacency.
+        let stray = vec![edge(0, 2, 0.99), edge(1, 1, 0.8)];
+        let output = consensus_clusters(&stray, 2, 12, 0.5, 0.0, 3).unwrap();
+        assert_eq!(output.assignments[0], None);
+        assert_eq!(output.assignments[1], None);
+    }
+
+    #[test]
+    fn permuting_equal_edges_does_not_change_consensus() {
+        let ordered = vec![edge(0, 1, 0.9), edge(1, 2, 0.8), edge(2, 3, 0.85)];
+        let shuffled = vec![edge(2, 3, 0.85), edge(0, 1, 0.9), edge(1, 2, 0.8)];
+        let first = consensus_clusters(&ordered, 4, 30, 0.6, 0.2, 99).unwrap();
+        let second = consensus_clusters(&shuffled, 4, 30, 0.6, 0.2, 99).unwrap();
         assert_eq!(first, second);
     }
 }
