@@ -67,7 +67,7 @@ impl<'a> LineageCriterionInput<'a> {
         self.snapshot_ids
     }
 
-    /// Borrow evidence availability times aligned to observations.
+    /// Borrow pair-observation availability times aligned to observations.
     #[must_use]
     pub const fn available_times(&self) -> &'a [AvailableTime] {
         self.available_times
@@ -213,7 +213,9 @@ pub fn execute_lineage_criterion_run(
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
-    if input.observations().len() > MAX_EVIDENCE_UNITS {
+    if input.observations().len() > MAX_EVIDENCE_UNITS
+        || input.draw_count() > MAX_LINEAGE_CRITERION_DRAW_VALUES
+    {
         return Err(AnalysisEngineError::LimitExceeded);
     }
 
@@ -230,17 +232,14 @@ pub fn execute_lineage_criterion_run(
         if !cutoff_eligible(available_time, &knowledge_cutoff) {
             continue;
         }
-        if observation
-            .predecessor_event_time_draws
-            .iter()
-            .chain(&observation.successor_event_time_draws)
-            .any(|value| EventTime::parse_rfc3339(value).is_err())
-        {
-            return Err(AnalysisEngineError::InvalidEvidence);
-        }
+        let next_pair_count = admitted_observations
+            .len()
+            .checked_add(1)
+            .ok_or(AnalysisEngineError::LimitExceeded)?;
+        validate_resource_budget(next_pair_count, input.draw_count())?;
+        validate_event_time_draws(observation, input.draw_count())?;
         admitted_observations.push(observation.clone());
     }
-    validate_resource_budget(admitted_observations.len(), input.draw_count())?;
 
     let fits = fit_lineage_criterion_posteriors(&admitted_observations, input.draw_count()).map_err(
         |error| match error {
@@ -284,6 +283,31 @@ pub fn execute_lineage_criterion_run(
     })
 }
 
+fn validate_event_time_draws(
+    observation: &LineageCriterionObservation,
+    draw_count: usize,
+) -> Result<(), AnalysisEngineError> {
+    if observation.predecessor_event_time_draws.len() != draw_count
+        || observation.successor_event_time_draws.len() != draw_count
+    {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    for (predecessor, successor) in observation
+        .predecessor_event_time_draws
+        .iter()
+        .zip(&observation.successor_event_time_draws)
+    {
+        let predecessor = EventTime::parse_rfc3339(predecessor)
+            .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+        let successor = EventTime::parse_rfc3339(successor)
+            .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+        if predecessor > successor {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+    }
+    Ok(())
+}
+
 fn validate_resource_budget(
     pair_count: usize,
     draw_count: usize,
@@ -308,7 +332,7 @@ mod tests {
     use super::{
         LINEAGE_CRITERION_ARTIFACT_BYTE_LIMIT, LINEAGE_CRITERION_ARTIFACT_SCHEMA_VERSION,
         LINEAGE_CRITERION_INFERENCE_STATUS, LineageCriterionArtifact, LineageCriterionInput,
-        MAX_LINEAGE_CRITERION_DRAW_VALUES, validate_resource_budget,
+        MAX_LINEAGE_CRITERION_DRAW_VALUES, validate_event_time_draws, validate_resource_budget,
     };
     use crate::{AnalysisEngineError, LineageCriterionObservation, MAX_EVIDENCE_UNITS};
     use temporal_core::AvailableTime;
@@ -322,6 +346,16 @@ mod tests {
             pair_count: 2,
             draw_count: 32,
             inference_status: LINEAGE_CRITERION_INFERENCE_STATUS.into(),
+        }
+    }
+
+    fn observation() -> LineageCriterionObservation {
+        LineageCriterionObservation {
+            pair_id: "pair-a".into(),
+            successes: 1,
+            trials: 2,
+            predecessor_event_time_draws: vec!["2026-01-01T00:00:00Z".into(); 2],
+            successor_event_time_draws: vec!["2026-01-02T00:00:00Z".into(); 2],
         }
     }
 
@@ -412,6 +446,33 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn event_time_draw_shape_rejects_mismatch_malformed_and_reverse_order() {
+        let valid = observation();
+        assert_eq!(validate_event_time_draws(&valid, 2), Ok(()));
+
+        let mut mismatched = valid.clone();
+        mismatched.successor_event_time_draws.pop();
+        assert_eq!(
+            validate_event_time_draws(&mismatched, 2),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+
+        let mut malformed = valid.clone();
+        malformed.predecessor_event_time_draws[0] = "not-a-time".into();
+        assert_eq!(
+            validate_event_time_draws(&malformed, 2),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+
+        let mut reversed = valid;
+        reversed.predecessor_event_time_draws[0] = "2026-01-03T00:00:00Z".into();
+        assert_eq!(
+            validate_event_time_draws(&reversed, 2),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 
     #[test]
