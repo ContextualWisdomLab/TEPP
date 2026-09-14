@@ -45,6 +45,8 @@ class WorkflowQueueHygieneTests(unittest.TestCase):
                 self.assertEqual(workflow.count(guard), job_count)
                 # Marking a draft ready must re-run the gates it skipped.
                 self.assertIn("      - ready_for_review\n", workflow)
+                # Returning a ready PR to draft must cancel its in-flight local run.
+                self.assertIn("      - converted_to_draft\n", workflow)
 
     def test_central_scheduler_replaces_local_hourly_caller(self) -> None:
         """A local timer must not duplicate central PR scheduling."""
