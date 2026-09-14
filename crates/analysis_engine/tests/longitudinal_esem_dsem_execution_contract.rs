@@ -456,9 +456,7 @@ fn composition_gates_refuse_clock_collapse_ols_and_causal() {
 }
 
 #[test]
-fn execution_refuses_point_estimates_empty_cutoff_receipt_mismatch_and_limits() {
-    let request = request();
-    let accepted = accepted(&request);
+fn observation_and_design_constructors_refuse_point_estimates_and_empty_labels() {
     assert_eq!(
         LongitudinalEsemDsemObservation::new(available("2026-07-01T00:00:00Z"), vec![0.5]),
         Err(AnalysisEngineError::Psychometric(
@@ -504,7 +502,12 @@ fn execution_refuses_point_estimates_empty_cutoff_receipt_mismatch_and_limits() 
         ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
+}
 
+#[test]
+fn execution_refuses_cutoff_receipt_mismatch_and_limits() {
+    let request = request();
+    let accepted = accepted(&request);
     let nested_collapse = design(
         ConstructClass::Reflective,
         MembershipDesign::Nested,
