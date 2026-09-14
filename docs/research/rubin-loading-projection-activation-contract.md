@@ -1,21 +1,21 @@
 # Rubin loading projection activation contract
 
-Status: branch-local scientific design and implementation evidence for issue #505, including source-snapshot authority repairs #511/#512, exact runtime-design work on the current #506 head, concrete draw-payload authority #515, and executor-owned canonical draw hashing #516. This document does not authorize inferential activation and does not promote Draft #504 to scientific/product claim authority.
+Status: branch-local scientific design and implementation evidence for issue #505, including source-snapshot authority repairs #511/#512, exact runtime-design work on the current #506 head, concrete draw-payload authority #515, executor-owned canonical hashing #516, and factor-score design-payload repair #522. This document does not authorize inferential activation and does not promote Draft #504 to scientific/product claim authority.
 
 ## Problem
 
 `rubin_loading_uncertainty_v1` can correctly compute the bounded descriptive quantities `Qbar`, `Ubar`, `B`, and `T` for finite complete-data indicator draws. The arithmetic does not identify how those draws were generated, whether the draw generator is compatible with the estimand/analysis procedure, or which claim-specific Validation Evidence supports an inferential projection.
 
-Rubin-style variance validity is therefore not inferred from the combining formula alone. Rubin (1996) ties multiple-imputation inference to the imputation procedure, while Meng (1994) and Xie and Meng (2017) show that imputer/analyst uncongeniality can change variance and coverage behavior. The supported unit of activation in TEPP is a specific generator/analysis/evidence pairing applied to a specific immutable source population and concrete draw payload, not an arbitrary finite matrix that merely has an approved shape.
+Rubin-style variance validity is therefore not inferred from the combining formula alone. Rubin (1996) ties multiple-imputation inference to the imputation procedure, while Meng (1994) and Xie and Meng (2017) show that imputer/analyst uncongeniality can change variance and coverage behavior. The supported unit of activation in TEPP is a specific generator/analysis/evidence pairing applied to a specific immutable source population and concrete estimator payload, not an arbitrary finite matrix that merely has an approved shape. For the current loading profile that estimator payload contains both the cutoff-admitted factor-score design vector and the complete-data indicator-draw matrix.
 
 ## Owner boundary
 
 - `psychometric_core` owns reusable `Qbar/Ubar/B/T` and robust loading-point arithmetic.
-- `analysis_engine` owns request admission, snapshot/cutoff composition, Validation Evidence binding, canonical complete-data draw-payload hashing, and projection policy.
+- `analysis_engine` owns request admission, snapshot/cutoff composition, Validation Evidence binding, canonical estimator-payload hashing, and projection policy.
 - Validation Evidence supplies claim-specific recovery/coverage evidence for one declared design envelope and one immutable source snapshot. It does not become estimator code.
 - LLM output is not numerical, scientific-acceptance, or activation authority.
 - No external generator source is copied into TEPP. A generator is consumed only through an immutable versioned contract identity plus evidence provenance.
-- A draw-payload SHA-256 is a content commitment, not generator-execution attestation. It prevents receipt reuse against different values after issuance. If the trusted generator boundary cannot issue or attest the digest-bound payload, execution attestation remains a separate owner gap rather than an inferred property of the digest.
+- A payload SHA-256 is a content commitment, not generator-execution or factor-mapping attestation. It prevents receipt reuse against different admitted numeric inputs after issuance. If the trusted generator/mapping boundary cannot issue or attest the digest-bound payload, execution attestation remains a separate owner gap rather than an inferred property of the digest.
 
 ## Implemented receipt and executor payload identity
 
@@ -37,11 +37,13 @@ knowledge_cutoff
 design_envelope_id
 ```
 
-The public draw-bound boundary wraps the internal class-level activation receipt. The internal class-level decision is not re-exported as the product boundary; public callers receive the draw-bound receipt and draw-bound decision. The receipt is limited to 16 KiB before parsing. Identifiers use the Analysis Run identifier bound. Validation Evidence SHA-256, source-snapshot SHA-256, and complete-data-draw SHA-256 are exactly 64 lowercase hexadecimal characters. `validation_evidence_available_at` and `knowledge_cutoff` are stored canonically after typed parsing. Receipt SHA-256 is computed from the validated canonical JSON, so all three content commitments participate in the public receipt digest.
+The public draw-bound boundary wraps the internal class-level activation receipt. The internal class-level decision is not re-exported as the product boundary; public callers receive the draw-bound receipt and draw-bound decision. The receipt is limited to 16 KiB before parsing. Identifiers use the Analysis Run identifier bound. Validation Evidence SHA-256, source-snapshot SHA-256, and estimator-payload SHA-256 are exactly 64 lowercase hexadecimal characters. `validation_evidence_available_at` and `knowledge_cutoff` are stored canonically after typed parsing. Receipt SHA-256 is computed from the validated canonical JSON, so all three content commitments participate in the public receipt digest.
 
-Issue #516 makes the Rubin executor the canonical owner of `complete_data_draws_sha256`. The digest is computed **after snapshot/cutoff admission and transposition, before numerical combination**, over exactly the draw-major matrix passed to `psychometric_core`. The byte contract is versioned by the domain separator `tepp.rubin_loading.complete_data_draws.v1\0`, then binds admitted observation count and draw count as fixed big-endian `u64`, followed by each finite `f64` draw value as its exact IEEE-754 bit pattern in big-endian order. This avoids locale/JSON formatting ambiguity, preserves draw and admitted observation order, and makes a one-bit admitted value change visible. Rows excluded because `AvailableTime > KnowledgeCutoff` do not enter the digest. The resulting lowercase SHA-256 is stored read-only in the digest-bound Rubin artifact and is the runtime value intended for the activation decision.
+The Draft v1 wire member is still named `complete_data_draws_sha256`; #522 tracks the semantic pre-release rename so the public name describes the full committed payload before protected-main publication. The value itself is no longer draw-only. Issue #516 made the Rubin executor the canonical hash owner, and #522 corrected the committed bytes after finding that both loading estimators consume `factor_scores` as well as `indicator_draws`.
 
-The receipt schema is still `tepp.rubin_projection_activation_receipt.v1`. This is not a mutation of a released wire contract: the receipt remains Draft, has never shipped from protected `main`, and TEPP has no immutable release containing it. The concrete draw commitment is therefore part of the eventual v1 definition rather than a post-release compatibility change. The Rubin artifact schema likewise remains Draft/not released; its executor-owned draw digest is part of the branch-local eventual v1 contract rather than a mutation of an immutable release.
+The digest is computed **after snapshot/cutoff admission and transposition, before numerical combination**, over every cutoff-admitted numeric input passed to `psychometric_core`. The byte contract is versioned by the domain separator `tepp.rubin_loading.analysis_payload.v1\0`, then binds admitted observation count and draw count as fixed big-endian `u64`; each admitted factor score follows as its exact IEEE-754 `f64` bit pattern in admitted observation order; then each finite indicator-draw value follows as its exact IEEE-754 bit pattern in big-endian draw-major/admitted-observation order. This avoids locale/JSON formatting ambiguity, preserves estimator input order, makes a one-bit factor-score or draw-value change visible, and keeps rows excluded because `AvailableTime > KnowledgeCutoff` out of the commitment. The resulting lowercase SHA-256 is stored read-only in the digest-bound Rubin artifact and is the runtime value intended for the activation decision.
+
+The receipt schema is still `tepp.rubin_projection_activation_receipt.v1`. This is not a mutation of a released wire contract: the receipt remains Draft, has never shipped from protected `main`, and TEPP has no immutable release containing it. The estimator-payload commitment is therefore part of the eventual v1 definition rather than a post-release compatibility change. The Rubin artifact schema likewise remains Draft/not released.
 
 Because this receipt type is specifically the Rubin loading projection authority, its validation boundary requires `analysis_contract_id == rubin_loading_uncertainty` and the exact current `RUBIN_LOADING_MODEL_CONTRACT_VERSION`. A future approved-pairing registry can select generator/evidence/design combinations, but it cannot redefine which analysis semantics the receipt authorizes.
 
@@ -49,7 +51,7 @@ Because this receipt type is specifically the Rubin loading projection authority
 
 Snapshot identity is not a content commitment. The receipt therefore also binds `source_snapshot_sha256`, and runtime activation requires an independently supplied expected source-snapshot SHA-256. Positive eligibility requires exact equality among the runtime digest, receipt digest, and owner-controlled approved pairing digest. Reusing the same logical snapshot ID for different bytes is a provenance failure.
 
-Likewise, an approved design-envelope label plus `observation_count`/`draw_count` is not the identity of the actual matrix. The receipt binds `complete_data_draws_sha256`, and the public activation decision receives the executor-produced runtime draw-payload digest independently. A mismatch or malformed runtime digest is rejected before class-level generator/analysis/evidence approval is evaluated. This closes payload substitution in which two matrices share the same snapshot, cutoff, dimensions, indicator, and approved generator class but differ in values.
+Likewise, an approved design-envelope label plus `observation_count`/`draw_count` is not the identity of the actual estimator input. The receipt binds the executor-produced payload digest (currently carried by the Draft field name `complete_data_draws_sha256`), and the public activation decision receives that runtime digest independently. A mismatch or malformed runtime digest is rejected before class-level generator/analysis/evidence approval is evaluated. This closes payload substitution in which two runs share the same snapshot, cutoff, dimensions, indicator, and approved generator class but differ either in already-mapped factor scores or complete-data draw values.
 
 The activation receipt does not replace row-level `AvailableTime`; both the source observations and the Validation Evidence itself must have been available at or before the run's `KnowledgeCutoff`.
 
@@ -57,12 +59,12 @@ The receipt's `validation_evidence_available_at`, `source_snapshot_id`, and `sou
 
 ## Activation decision
 
-The public `decide_rubin_projection_activation` is a fail-closed composition over the draw-bound receipt, expected snapshot identity/digest, independently supplied expected complete-data-draw digest, cutoff, actual observation/draw counts, and indicator kind. The production approval registry is not caller-supplied and is intentionally empty on this Draft branch.
+The public `decide_rubin_projection_activation` is a fail-closed composition over the payload-bound receipt, expected snapshot identity/digest, independently supplied expected estimator-payload digest, cutoff, actual observation/draw counts, and indicator kind. The production approval registry is not caller-supplied and is intentionally empty on this Draft branch.
 
 The decision order is:
 
 1. no receipt -> `DescriptiveOnly`;
-2. require a canonical runtime `complete_data_draws_sha256` and exact equality with the receipt draw-payload digest; a mismatch rejects before class-level approval;
+2. require a canonical runtime payload SHA-256 and exact equality with the receipt payload digest; a mismatch rejects before class-level approval;
 3. validate the bounded class-level receipt contract, require the canonical Rubin analysis ID/version, and require immutable locator-safe authority fields, including the source snapshot identity and canonical source snapshot SHA-256;
 4. require the expected Analysis Run snapshot to be an immutable locator-safe identifier, require a canonical expected source snapshot SHA-256, and require exact receipt/runtime snapshot identity and digest equality;
 5. compare receipt/run knowledge cutoffs by instant, not RFC 3339 spelling;
@@ -74,7 +76,7 @@ The decision order is:
 11. require exact Validation Evidence identity and SHA-256;
 12. require the actual runtime observation count and draw count to be exact owner-approved design points; a design-envelope label never interpolates between points;
 13. require exact design envelope and indicator-kind coverage;
-14. only an exact approved class-level pairing reached through the draw-payload gate can return `Eligible`; otherwise return `Rejected`.
+14. only an exact approved class-level pairing reached through the estimator-payload gate can return `Eligible`; otherwise return `Rejected`.
 
 A positive artifact state is not emitted by #506. The current production registry contains no approved pairing, so a valid candidate receipt cannot self-authorize. A bare string such as `validated_rubin_inference` remains insufficient.
 
@@ -83,8 +85,11 @@ A positive artifact state is not emitted by #506. The current production registr
 | Case | Required result |
 | --- | --- |
 | no activation receipt | descriptive-only |
-| malformed receipt/evidence digest/snapshot digest/draw-payload digest/time | fail closed |
-| runtime complete-data-draw digest differs from receipt digest | fail closed before class-level approval |
+| malformed receipt/evidence digest/snapshot digest/payload digest/time | fail closed |
+| runtime estimator-payload digest differs from receipt digest | fail closed before class-level approval |
+| admitted factor-score vector changes while all draw values/dimensions remain equal | payload digest changes; old receipt cannot authorize |
+| admitted draw value changes while factor scores/dimensions remain equal | payload digest changes; old receipt cannot authorize |
+| future-unavailable factor-score/draw row is added | historical payload digest unchanged |
 | syntactically valid but noncanonical Rubin analysis ID/version | fail closed at receipt admission |
 | unknown generator ID/version | fail closed |
 | known generator with wrong analysis contract/version | fail closed |
@@ -102,9 +107,9 @@ A positive artifact state is not emitted by #506. The current production registr
 | mutable branch/PR identity presented as approval | fail closed because it has no approved immutable pairing |
 | actual runtime observation/draw counts are not exact approved points | fail closed |
 | design envelope or indicator-kind mismatch | fail closed |
-| exact draw digest + exact approved pairing + exact evidence digest + authoritative cutoff-safe availability + exact immutable evidence snapshot identity/SHA-256 | eligible in the composed pure decision algorithm |
+| exact estimator-payload digest + exact approved pairing + exact evidence digest + authoritative cutoff-safe availability + exact immutable evidence snapshot identity/SHA-256 | eligible in the composed pure decision algorithm |
 
-The class-level executable unit contract includes a test-only approved pairing to prove its positive branch without inserting production approval data. The draw-authority boundary separately proves that an exact runtime digest passes to the class-level decision while a substituted or malformed digest is rejected first. The executor contract proves that the runtime digest is derived from the exact admitted draw matrix rather than an ad hoc consumer serialization. Test fixtures are private and cannot populate the production registry.
+The class-level executable unit contract includes a test-only approved pairing to prove its positive branch without inserting production approval data. The public payload-authority boundary separately proves that an exact runtime digest passes to the class-level decision while a substituted or malformed digest is rejected first. The executor contract proves that the runtime digest is derived from the exact admitted factor-score/design vector and draw matrix rather than an ad hoc consumer serialization. Test fixtures are private and cannot populate the production registry.
 
 "Eligible" is narrower than release-ready. ADR 0014 still requires implementation authority, claim-specific scientific evidence, exact-head quality/security evidence, and qualifying review before a protected-main product claim.
 
@@ -112,7 +117,7 @@ The class-level executable unit contract includes a test-only approved pairing t
 
 There is intentionally no approved production Rubin generator/analysis pairing on this branch. Draft #504 is candidate repeated-sampling evidence for its declared synthetic Gaussian generator and rolling-origin design. Its branch-local results must not be inserted into a production allow-list while its exact head lacks terminal required checks and qualifying independent current-head approval.
 
-Any future production pairing must bind the authoritative Validation Evidence availability and the immutable evidence source snapshot identity **and canonical source snapshot SHA-256** alongside the immutable evidence ID/digest. A caller-provided receipt cannot introduce, override, backdate, retarget, or re-content any owner-controlled provenance field. The registry also cannot substitute another analysis ID/version for the canonical Rubin loading analysis contract baked into the receipt type. Separately, each concrete activation receipt must bind the exact executor-produced complete-data draw payload used by that run.
+Any future production pairing must bind the authoritative Validation Evidence availability and the immutable evidence source snapshot identity **and canonical source snapshot SHA-256** alongside the immutable evidence ID/digest. A caller-provided receipt cannot introduce, override, backdate, retarget, or re-content any owner-controlled provenance field. The registry also cannot substitute another analysis ID/version for the canonical Rubin loading analysis contract baked into the receipt type. Separately, each concrete activation receipt must bind the exact executor-produced estimator payload used by that run.
 
 ## Design envelope for the current candidate evidence
 
@@ -128,24 +133,25 @@ The availability clock is owner-controlled approval metadata, not a caller asser
 
 Snapshot provenance is owner-controlled authority, not presentation text. Mutable refs such as `main`, `refs/heads/main`, PR numbers, repository tree URLs, or latest aliases cannot identify the source population of an authoritative projection even if they currently resolve to the intended commit. A stable logical snapshot ID is still insufficient by itself: historical replay must also bind the exact source bytes with a canonical SHA-256. The receipt/runtime identity and digest must match the identity and digest recorded by the approved Validation Evidence pairing.
 
-Concrete draw content is a third content boundary. The same snapshot and the same matrix dimensions can carry different values. The executor hashes only the cutoff-eligible, snapshot-admitted draw-major matrix that it actually passes to `psychometric_core`; late rows do not enter that hash. The domain separator, admitted dimensions, fixed byte order, and exact IEEE-754 bits make the representation deterministic. An activation receipt issued for one such payload cannot be replayed against another payload with the same observation count and draw count. `complete_data_draws_sha256` participates in both the Rubin artifact digest and activation receipt SHA-256 and is independently rechecked against runtime input before approval. This prevents substitution; it does not certify how the matching bytes were generated.
+Concrete estimator content is a third content boundary. The same snapshot and the same matrix dimensions can carry different factor scores or draw values. The executor hashes only the cutoff-eligible, snapshot-admitted factor-score vector and draw-major matrix that it actually passes to `psychometric_core`; late rows do not enter that hash. The versioned domain separator, admitted dimensions, fixed byte order, and exact IEEE-754 bits make the representation deterministic. An activation receipt issued for one such payload cannot be replayed against another payload with the same observation count and draw count. The digest currently travels in the Draft wire member `complete_data_draws_sha256`, participates in both the Rubin artifact digest and activation receipt SHA-256, and is independently rechecked against runtime input before approval. This prevents numeric-input substitution; it does not certify how the matching bytes were generated or mapped.
 
 ## Evidence identity and mutability
 
 A Validation Evidence digest is content identity, not a review badge. The receipt binds the evidence artifact containing the scientific design, attempted/recovered/failed population, recovery/coverage summaries, Monte Carlo uncertainty, implementation/source identity, and applicable design envelope. Git branch names, PR numbers, check URLs, comments, or latest-release aliases are mutable locators and cannot substitute for the digest-bound evidence identity.
 
-Content identity, availability provenance, source-population identity, source-population content identity, and concrete draw-payload identity are separate invariants. The approved pairing therefore binds the exact evidence digest, authoritative availability instant, immutable source snapshot ID, and canonical source snapshot SHA-256; the per-run executor/artifact/receipt chain separately binds the exact admitted draw payload. Reusing an evidence digest while changing only a caller-supplied timestamp, snapshot name, snapshot content, or draw content cannot change historical eligibility.
+Content identity, availability provenance, source-population identity, source-population content identity, and concrete estimator-payload identity are separate invariants. The approved pairing therefore binds the exact evidence digest, authoritative availability instant, immutable source snapshot ID, and canonical source snapshot SHA-256; the per-run executor/artifact/receipt chain separately binds the exact admitted estimator payload. Reusing an evidence digest while changing only a caller-supplied timestamp, snapshot name, snapshot content, factor scores, or draw content cannot change historical eligibility.
 
-If an approved evidence artifact or source snapshot is superseded, the replacement receives a new identity/digest as applicable. Existing historical receipts continue to name the evidence, source bytes, and draw bytes under which they were evaluated; they are not silently rewritten to the newest package.
+If an approved evidence artifact or source snapshot is superseded, the replacement receives a new identity/digest as applicable. Existing historical receipts continue to name the evidence, source bytes, and estimator-input bytes under which they were evaluated; they are not silently rewritten to the newest package.
 
 ## Remaining implementation sequence
 
-1. Keep #506's negative projection policy, bounded activation receipt, canonical Rubin analysis identity, immutable snapshot identity/digest validation, exact runtime design-point validation, public-wire refusal, owner-controlled evidence-availability matching, owner-controlled evidence snapshot identity/digest matching, #515 draw-payload binding, and #516 executor-owned canonical payload digest intact.
-2. Keep the production approved-pairing registry empty while #504 is Draft or lacks exact-head scientific/review gates.
-3. Resolve trusted generator/artifact issuance if positive activation requires proof that the approved generator actually produced the executor-hashed bytes. A matching content hash must not be silently promoted into execution attestation.
-4. Once candidate evidence is independently accepted, publish its immutable Validation Evidence identity/digest, authoritative `AvailableTime`, immutable source snapshot ID, and canonical source snapshot SHA-256, then add only that exact pairing through the owner path.
-5. Bind any future positive artifact projection state to the full activation-receipt digest and reacquire exact-head tests, authored line/branch coverage, documentation, security, CodeQL, and independent review.
-6. Fold the complete source/test/evidence delta into the surviving Analysis Run vehicle by ordinary non-force conflict resolution; predecessor checks and approvals do not transfer.
+1. Keep #506's negative projection policy, bounded activation receipt, canonical Rubin analysis identity, immutable snapshot identity/digest validation, exact runtime design-point validation, public-wire refusal, owner-controlled evidence-availability matching, owner-controlled evidence snapshot identity/digest matching, #515 payload binding, #516 executor ownership, and #522 factor-score design commitment intact.
+2. Before protected-main/release, rename the Draft wire/accessor member `complete_data_draws_sha256` so its public name accurately denotes the full estimator payload; do not preserve a misleading released alias merely for branch-local compatibility.
+3. Keep the production approved-pairing registry empty while #504 is Draft or lacks exact-head scientific/review gates.
+4. Resolve trusted generator/mapping artifact issuance if positive activation requires proof that the approved generator and mapping implementation actually produced the executor-hashed bytes. A matching content hash must not be silently promoted into execution attestation.
+5. Once candidate evidence is independently accepted, publish its immutable Validation Evidence identity/digest, authoritative `AvailableTime`, immutable source snapshot ID, and canonical source snapshot SHA-256, then add only that exact pairing through the owner path.
+6. Bind any future positive artifact projection state to the full activation-receipt digest and reacquire exact-head tests, authored line/branch coverage, documentation, security, CodeQL, and independent review.
+7. Fold the complete source/test/evidence delta into the surviving Analysis Run vehicle by ordinary non-force conflict resolution; predecessor checks and approvals do not transfer.
 
 ## Primary evidence
 
