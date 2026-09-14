@@ -261,6 +261,22 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era commented `asymTOTALVARstd` as
+//! `total / total = 1` after strictly positive three-term
+//! `asymTOTALVAR` `-q / (2 a) + trait / a² + (B / a)² v`
+//! (cran/ctsem 2.5.0 `summary.ctsemFit.R` comments
+//! `asymTOTALVAR <- asymDIFFUSION + asymTRAITVAR`, then
+//! `asymTOTALVAR <- asymTOTALVAR + addedTIPREDVAR`, then
+//! `asymTOTALVARstd <- solve(sqrt(diag(asymTOTALVAR)+ridging)) %&%
+//! asymTOTALVAR`; `OpenMx` `%&%` is `t(A) %*% B %*% A`; default ridge
+//! is 0; form the three-term total inline; this crate does not
+//! currently export the unpublished three-term map; unstandardised
+//! three-term total is defined for a zero total and is not that
+//! map; `extra / extra = 1` is `addedTIPREDVARstd` and is not that
+//! map even when both equal 1; `p / p = 1` is `asymDIFFUSIONstd`
+//! and is not that map even when both equal 1; zero total fails
+//! closed; a non-event clock fails closed; `a ≥ 0` with a nonzero
+//! contribution fails closed; JSS PDF re-opened 2026-08-31T05:05Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -418,6 +434,8 @@ pub use event_time::recover_standardised_manifest_trait_variance;
 /// Exact scalar p. 16 `MANIFESTVARstd` `θ/...` after strictly positive `MANIFESTVAR`.
 pub use event_time::recover_standardised_manifest_variance;
 
+/// Exact scalar 2017-era commented `asymTOTALVARstd` `total / total = 1` after strictly positive three-term `asymTOTALVAR`.
+pub use event_time::recover_standardised_asymptotic_total_variance;
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
@@ -744,6 +762,12 @@ pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardise
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
 
+/// Refuse treating p. 16 `asymDIFFUSIONstd` as 2017-era `asymTOTALVARstd`.
+pub use event_time::refuse_standardised_asymptotic_diffusion_as_standardised_asymptotic_total_variance;
+/// Refuse treating p. 16 `addedTIPREDVARstd` as 2017-era `asymTOTALVARstd`.
+pub use event_time::refuse_standardised_asymptotic_time_independent_variance_as_standardised_asymptotic_total_variance;
+/// Refuse treating unstandardised three-term `asymTOTALVAR` as 2017-era `asymTOTALVARstd`.
+pub use event_time::refuse_unstandardised_asymptotic_total_variance_as_standardised_asymptotic_total_variance;
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
