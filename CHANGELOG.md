@@ -39,6 +39,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ## [Unreleased]
 
 - `analysis_engine` jointly binds two-group OLS invariance classification (`classify_two_group_ols_invariance`) and the strong/strict-gated latent-mean difference (`recover_strong_gated_latent_mean_difference`) to the `two_group_ols_invariance_v1` analysis-run output profile. Observations unavailable at the request cutoff are excluded; the digest-bound `tepp.two_group_ols_invariance.v1` artifact records local status, `#84` wire name (`scalar` or `null`), OLS intercepts/loadings/residuals, and the gated mean difference, and refuses metric-only means. This is not MGCFA, not CWC, not Rubin `T`, not a Driver p.16 `std` restore, and not persistence.
+- Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 
