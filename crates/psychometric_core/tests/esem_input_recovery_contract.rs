@@ -308,6 +308,10 @@ fn finite_alr_correlation_and_error_messages_are_stable() {
         "within/between recovery requires at least two clusters"
     );
     assert_eq!(
+        PsychometricError::GrandMeanPooledSlopeIsNotWithinClusterEffect.to_string(),
+        "grand-mean pooled OLS slope is not the within-cluster effect"
+    );
+    assert_eq!(
         PsychometricError::InvalidWeight.to_string(),
         "invalid non-negative finite psychometric weight"
     );

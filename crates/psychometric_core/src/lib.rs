@@ -9,6 +9,9 @@
 //! estimates across posterior draws on a CPU `f64` path without claiming Rubin
 //! uncertainty pooling, combines draw-level OLS loadings with Rubin `T`,
 //! decomposes cluster-mean within/between OLS and the CWC contextual effect,
+//! names the grand-mean pooled OLS slope as the uninterpretable blend of
+//! those two (Enders & Tofighi, 2007, p. 125) and refuses it as a
+//! within-cluster effect,
 //! maps event-time discrete lags through the exact scalar exponential, maps
 //! already-centered irregular residuals without re-centering, remaps discrete
 //! lags across unequal event intervals through that log-rate, recovers the
@@ -287,8 +290,12 @@ pub use cluster_mean::WithinBetweenSlopes;
 pub use cluster_mean::kish_effective_sample_size;
 /// Cluster-mean within/between OLS after CWC, plus the contextual effect.
 pub use cluster_mean::recover_cluster_mean_within_between_slopes;
+/// Grand-mean pooled OLS slope that ignores cluster membership.
+pub use cluster_mean::recover_grand_mean_pooled_slope;
 /// Kish-weighted least-squares slope.
 pub use cluster_mean::recover_kish_weighted_slope;
+/// Refuse treating that pooled slope as a within-cluster effect.
+pub use cluster_mean::refuse_grand_mean_pooled_slope_as_within_cluster_effect;
 /// Higher-order construct class.
 pub use construct::ConstructClass;
 /// Typed invariance evidence required before a latent-mean comparison.
