@@ -11,10 +11,6 @@ use analysis_engine::{
 use psychometric_core::IndicatorKind;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest};
-use validation_core::{
-    bias_standard_error, interval_coverage, mean_bias, rmse_standard_error,
-    root_mean_square_error, summarize_replications,
-};
 
 const SNAPSHOT_ID: &str = "snapshot-rubin-scientific-acceptance";
 const EARLY_AVAILABLE_AT: &str = "2026-07-01T00:00:00Z";
@@ -114,6 +110,27 @@ fn exact_u64_to_f64(value: u64) -> f64 {
     f64::from(upper) * U32_RADIX + f64::from(lower)
 }
 
+fn bounded_count(value: usize) -> f64 {
+    f64::from(u32::try_from(value).expect("acceptance count fits u32"))
+}
+
+fn finite_mean(values: &[f64]) -> f64 {
+    assert!(!values.is_empty());
+    values.iter().sum::<f64>() / bounded_count(values.len())
+}
+
+fn sample_standard_deviation(values: &[f64], mean: f64) -> f64 {
+    assert!(values.len() >= 2);
+    let squared_deviations = values
+        .iter()
+        .map(|value| {
+            let deviation = value - mean;
+            deviation * deviation
+        })
+        .sum::<f64>();
+    (squared_deviations / (bounded_count(values.len()) - 1.0)).sqrt()
+}
+
 fn available(stamp: &str) -> AvailableTime {
     AvailableTime::parse_rfc3339(stamp).expect("valid availability")
 }
@@ -190,23 +207,31 @@ fn make_rows(
 }
 
 fn summarize(series: &MetricSeries<'_>, attempted: usize, failed: usize) -> RecoverySummary {
-    let bias = mean_bias(series.truth, series.recovered).expect("bias");
-    let rmse = root_mean_square_error(series.truth, series.recovered).expect("rmse");
-    let bias_mcse = bias_standard_error(series.truth, series.recovered).expect("bias MCSE");
-    let rmse_mcse = rmse_standard_error(series.truth, series.recovered).expect("RMSE MCSE");
-    let coverage = interval_coverage(series.truth, series.lower, series.upper).expect("coverage");
-    let coverage_mcse = summarize_replications(series.coverage_samples, 0.0, 1.0)
-        .expect("coverage Monte Carlo summary")
-        .standard_error;
-    let mean_total_variance = summarize_replications(series.total_variances, 0.0, 1.0)
-        .expect("total variance summary")
-        .mean;
-    let mean_within_variance = summarize_replications(series.within_variances, 0.0, 1.0)
-        .expect("within variance summary")
-        .mean;
-    let mean_between_variance = summarize_replications(series.between_variances, 0.0, 1.0)
-        .expect("between variance summary")
-        .mean;
+    assert_eq!(series.truth.len(), series.recovered.len());
+    assert_eq!(series.truth.len(), series.lower.len());
+    assert_eq!(series.truth.len(), series.upper.len());
+    assert_eq!(series.truth.len(), series.coverage_samples.len());
+    assert_eq!(series.truth.len(), series.total_variances.len());
+    assert_eq!(series.truth.len(), series.within_variances.len());
+    assert_eq!(series.truth.len(), series.between_variances.len());
+
+    let errors: Vec<f64> = series
+        .recovered
+        .iter()
+        .zip(series.truth)
+        .map(|(estimate, truth)| estimate - truth)
+        .collect();
+    let squared_errors: Vec<f64> = errors.iter().map(|error| error * error).collect();
+    let bias = finite_mean(&errors);
+    let mean_squared_error = finite_mean(&squared_errors);
+    let rmse = mean_squared_error.sqrt();
+    let replication_count = bounded_count(series.recovered.len());
+    let bias_mcse = sample_standard_deviation(&errors, bias) / replication_count.sqrt();
+    let rmse_mcse = sample_standard_deviation(&squared_errors, mean_squared_error)
+        / (2.0 * rmse * replication_count.sqrt());
+    let coverage = finite_mean(series.coverage_samples);
+    let coverage_mcse = sample_standard_deviation(series.coverage_samples, coverage)
+        / replication_count.sqrt();
 
     RecoverySummary {
         attempted,
@@ -218,9 +243,9 @@ fn summarize(series: &MetricSeries<'_>, attempted: usize, failed: usize) -> Reco
         rmse_mcse,
         coverage,
         coverage_mcse,
-        mean_total_variance,
-        mean_within_variance,
-        mean_between_variance,
+        mean_total_variance: finite_mean(series.total_variances),
+        mean_within_variance: finite_mean(series.within_variances),
+        mean_between_variance: finite_mean(series.between_variances),
     }
 }
 
@@ -544,9 +569,8 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
     let late_request = request(LATE_CUTOFF, "rolling-origin-late");
     let late_accepted = accepted(&late_request);
     let mut rng = SplitMix64::new(0x5001);
-    let mut truth = Vec::with_capacity(REPLICATIONS);
-    let mut early_recovered = Vec::with_capacity(REPLICATIONS);
-    let mut late_recovered = Vec::with_capacity(REPLICATIONS);
+    let mut early_errors = Vec::with_capacity(REPLICATIONS);
+    let mut late_errors = Vec::with_capacity(REPLICATIONS);
     let mut early_total_variances = Vec::with_capacity(REPLICATIONS);
     let mut late_total_variances = Vec::with_capacity(REPLICATIONS);
 
@@ -610,23 +634,30 @@ fn rolling_origin_replay_excludes_late_rows_without_changing_the_earlier_result(
         assert_eq!(late_full.artifact.observation_count, 64);
         assert_eq!(late_full.artifact.excluded_after_cutoff_count, 0);
 
-        truth.push(LOADING);
-        early_recovered.push(early_full.artifact.point_estimate_mean);
-        late_recovered.push(late_full.artifact.point_estimate_mean);
+        early_errors.push(early_full.artifact.point_estimate_mean - LOADING);
+        late_errors.push(late_full.artifact.point_estimate_mean - LOADING);
         early_total_variances.push(early_full.artifact.total_variance);
         late_total_variances.push(late_full.artifact.total_variance);
     }
 
-    let early_bias = mean_bias(&truth, &early_recovered).expect("early bias");
-    let early_rmse = root_mean_square_error(&truth, &early_recovered).expect("early RMSE");
-    let early_mean_total = summarize_replications(&early_total_variances, 0.0, 1.0)
-        .expect("early T summary")
-        .mean;
-    let late_bias = mean_bias(&truth, &late_recovered).expect("late bias");
-    let late_rmse = root_mean_square_error(&truth, &late_recovered).expect("late RMSE");
-    let late_mean_total = summarize_replications(&late_total_variances, 0.0, 1.0)
-        .expect("late T summary")
-        .mean;
+    let early_bias = finite_mean(&early_errors);
+    let early_rmse = finite_mean(
+        &early_errors
+            .iter()
+            .map(|error| error * error)
+            .collect::<Vec<_>>(),
+    )
+    .sqrt();
+    let late_bias = finite_mean(&late_errors);
+    let late_rmse = finite_mean(
+        &late_errors
+            .iter()
+            .map(|error| error * error)
+            .collect::<Vec<_>>(),
+    )
+    .sqrt();
+    let early_mean_total = finite_mean(&early_total_variances);
+    let late_mean_total = finite_mean(&late_total_variances);
 
     assert_near(early_bias, 0.018_218, 5e-6, "early bias", "rolling-origin");
     assert_near(early_rmse, 0.155_489, 5e-6, "early rmse", "rolling-origin");
