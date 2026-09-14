@@ -2,14 +2,18 @@
 
 use analysis_engine::{
     AnalysisEngineError, COPIED_TEXT_ARTIFACT_SCHEMA_VERSION, COPIED_TEXT_MODEL_CONTRACT_VERSION,
-    COPIED_TEXT_OUTPUT_PROFILE, CopiedTextDocument, execute_copied_text_run,
+    COPIED_TEXT_OUTPUT_PROFILE, CopiedTextDocument, MAX_EVIDENCE_UNITS, execute_copied_text_run,
 };
 use copied_text::CopiedKind;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
+}
+
+fn available(stamp: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(stamp).expect("available")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -29,11 +33,33 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
         .expect("accepted")
 }
 
+fn document(document_id: &str, kind: CopiedKind, available_time: &str) -> CopiedTextDocument {
+    CopiedTextDocument::new(
+        document_id,
+        kind,
+        "snapshot-copied-text",
+        available(available_time),
+    )
+    .expect("document")
+}
+
 fn mixed_documents() -> Vec<CopiedTextDocument> {
     vec![
-        CopiedTextDocument::new("unique-a", CopiedKind::UniqueContent).expect("unique"),
-        CopiedTextDocument::new("copied-b", CopiedKind::CopiedText).expect("copied"),
-        CopiedTextDocument::new("copied-c", CopiedKind::CopiedText).expect("copied"),
+        document(
+            "unique-a",
+            CopiedKind::UniqueContent,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "copied-b",
+            CopiedKind::CopiedText,
+            "2026-07-31T23:00:00Z",
+        ),
+        document(
+            "copied-c",
+            CopiedKind::CopiedText,
+            "2026-08-01T00:00:00Z",
+        ),
     ]
 }
 
@@ -86,6 +112,89 @@ fn mixed_copied_kinds_emit_digest_bound_refusals_without_recovery_metric() {
 }
 
 #[test]
+fn equivalent_rfc3339_cutoff_spellings_bind_the_same_instant() {
+    let mut equivalent = request();
+    equivalent.knowledge_cutoff = "2026-08-01T01:00:00+01:00".into();
+    let execution = execute_copied_text_run(
+        &equivalent,
+        &accepted(&equivalent),
+        "snapshot-copied-text",
+        cutoff(),
+        &mixed_documents(),
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("equivalent cutoff instant");
+    assert_eq!(execution.artifact.knowledge_cutoff, cutoff().to_rfc3339());
+}
+
+#[test]
+fn terminal_summary_keeps_validation_status_separate_from_domain_inference() {
+    let request = request();
+    let execution = execute(&request, &mixed_documents()).expect("execution");
+    let summary = execution
+        .terminal_result
+        .summary
+        .as_ref()
+        .expect("succeeded summary");
+    assert_eq!(summary.validation_status, "validated");
+    assert_ne!(summary.validation_status, execution.artifact.inference_status);
+}
+
+#[test]
+fn future_unavailable_duplicate_cannot_change_historical_replay() {
+    let request = request();
+    let baseline = execute(&request, &mixed_documents()).expect("baseline");
+    let mut with_future = vec![document(
+        "unique-a",
+        CopiedKind::UniqueContent,
+        "2026-08-01T00:00:01Z",
+    )];
+    with_future.extend(mixed_documents());
+    let replay = execute(&request, &with_future).expect("historical replay");
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
+}
+
+#[test]
+fn cross_snapshot_document_fails_before_aggregation() {
+    let request = request();
+    let mut documents = mixed_documents();
+    documents.push(
+        CopiedTextDocument::new(
+            "other-snapshot",
+            CopiedKind::UniqueContent,
+            "snapshot-other",
+            available("2026-07-31T23:30:00Z"),
+        )
+        .expect("cross-snapshot document"),
+    );
+    assert_eq!(
+        execute(&request, &documents),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn raw_corpus_limit_is_checked_before_identity_allocation() {
+    let request = request();
+    let repeated = document(
+        "same",
+        CopiedKind::UniqueContent,
+        "2026-07-31T23:00:00Z",
+    );
+    let exact_limit = vec![repeated.clone(); MAX_EVIDENCE_UNITS];
+    assert_eq!(
+        execute(&request, &exact_limit),
+        Err(AnalysisEngineError::DuplicateEvidence)
+    );
+    let over_limit = vec![repeated; MAX_EVIDENCE_UNITS + 1];
+    assert_eq!(
+        execute(&request, &over_limit),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
 fn empty_unique_only_copied_only_and_duplicate_identities_fail_closed() {
     let request = request();
     assert_eq!(
@@ -93,31 +202,60 @@ fn empty_unique_only_copied_only_and_duplicate_identities_fail_closed() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let unique_only = vec![
-        CopiedTextDocument::new("unique-a", CopiedKind::UniqueContent).expect("unique"),
-        CopiedTextDocument::new("unique-b", CopiedKind::UniqueContent).expect("unique"),
+        document(
+            "unique-a",
+            CopiedKind::UniqueContent,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "unique-b",
+            CopiedKind::UniqueContent,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &unique_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let copied_only = vec![
-        CopiedTextDocument::new("copied-a", CopiedKind::CopiedText).expect("copied"),
-        CopiedTextDocument::new("copied-b", CopiedKind::CopiedText).expect("copied"),
+        document(
+            "copied-a",
+            CopiedKind::CopiedText,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "copied-b",
+            CopiedKind::CopiedText,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &copied_only),
         Err(AnalysisEngineError::InvalidEvidence)
     );
     let duplicates = vec![
-        CopiedTextDocument::new("same", CopiedKind::UniqueContent).expect("unique"),
-        CopiedTextDocument::new("same", CopiedKind::CopiedText).expect("copied"),
+        document(
+            "same",
+            CopiedKind::UniqueContent,
+            "2026-07-31T22:00:00Z",
+        ),
+        document(
+            "same",
+            CopiedKind::CopiedText,
+            "2026-07-31T23:00:00Z",
+        ),
     ];
     assert_eq!(
         execute(&request, &duplicates),
         Err(AnalysisEngineError::DuplicateEvidence)
     );
     assert_eq!(
-        CopiedTextDocument::new("", CopiedKind::UniqueContent),
+        CopiedTextDocument::new(
+            "",
+            CopiedKind::UniqueContent,
+            "snapshot-copied-text",
+            available("2026-07-31T23:00:00Z"),
+        ),
         Err(AnalysisEngineError::InvalidEvidence)
     );
 }
