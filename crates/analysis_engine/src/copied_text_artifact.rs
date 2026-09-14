@@ -4,14 +4,18 @@ use copied_text::{
     CopiedKind, CopiedTextError, refuse_copied_text_as_stopword_deletion,
     refuse_copied_text_as_unique_content,
 };
+use corpus_split::cutoff_eligible;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
 };
 
-use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
+use crate::{
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, format_digest, require_receipt_identity,
+    valid_identifier,
+};
 
 /// Versioned schema for a completed copied-text artifact.
 pub const COPIED_TEXT_ARTIFACT_SCHEMA_VERSION: &str = "tepp.copied_text.v1";
@@ -19,34 +23,44 @@ pub const COPIED_TEXT_ARTIFACT_SCHEMA_VERSION: &str = "tepp.copied_text.v1";
 pub const COPIED_TEXT_MODEL_CONTRACT_VERSION: &str = "copied_text_v1";
 /// Analysis-run output profile required for a copied-text artifact.
 pub const COPIED_TEXT_OUTPUT_PROFILE: &str = "copied_text_v1";
-/// Maximum canonical artifact JSON size.
+/// Maximum accepted copied-text artifact JSON size.
 pub const COPIED_TEXT_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const COPIED_TEXT_INFERENCE_STATUS: &str =
     "copied_text_is_not_unique_content_not_stopword_deletion";
 
-/// One cutoff-admitted token treatment with a closed copied-text kind.
+/// One copied-text treatment with immutable snapshot and availability provenance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CopiedTextDocument {
     document_id: String,
     kind: CopiedKind,
+    snapshot_id: String,
+    available_time: AvailableTime,
 }
 
 impl CopiedTextDocument {
-    /// Construct a bounded copied-text document.
+    /// Construct a bounded copied-text document with explicit provenance.
     ///
     /// # Errors
     ///
-    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document
-    /// identity is empty or oversized.
+    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the document or
+    /// snapshot identity is empty or oversized.
     pub fn new(
         document_id: impl Into<String>,
         kind: CopiedKind,
+        snapshot_id: impl Into<String>,
+        available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
         let document_id = document_id.into();
-        if !valid_identifier(&document_id) {
+        let snapshot_id = snapshot_id.into();
+        if !valid_identifier(&document_id) || !valid_identifier(&snapshot_id) {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
-        Ok(Self { document_id, kind })
+        Ok(Self {
+            document_id,
+            kind,
+            snapshot_id,
+            available_time,
+        })
     }
 
     /// Return the opaque document identity.
@@ -59,6 +73,18 @@ impl CopiedTextDocument {
     #[must_use]
     pub const fn kind(&self) -> CopiedKind {
         self.kind
+    }
+
+    /// Return the immutable source snapshot identity.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
+    /// Return when this treatment became available for historical analysis.
+    #[must_use]
+    pub const fn available_time(&self) -> &AvailableTime {
+        &self.available_time
     }
 }
 
@@ -107,17 +133,17 @@ impl CopiedTextArtifact {
 
     /// Serialize canonical validated artifact JSON.
     ///
+    /// The validated identifier, strict timestamp syntax, and census bounds
+    /// make canonical output strictly smaller than
+    /// [`COPIED_TEXT_ARTIFACT_BYTE_LIMIT`]. The input cap remains enforced by
+    /// [`Self::from_json`].
+    ///
     /// # Errors
     ///
-    /// Returns a typed validation, serialization, or size failure.
+    /// Returns a typed validation or serialization failure.
     pub fn to_json(&self) -> Result<String, AnalysisEngineError> {
         self.validate()?;
-        let payload =
-            serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)?;
-        if payload.len() > COPIED_TEXT_ARTIFACT_BYTE_LIMIT {
-            return Err(AnalysisEngineError::LimitExceeded);
-        }
-        Ok(payload)
+        serde_json::to_string(self).map_err(|_| AnalysisEngineError::SerializationFailure)
     }
 
     /// Return the lowercase SHA-256 digest of canonical artifact JSON.
@@ -139,6 +165,7 @@ impl CopiedTextArtifact {
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.document_count < 2
+            || self.document_count > MAX_EVIDENCE_UNITS as u64
             || self.unique_content_count == 0
             || self.copied_text_count == 0
             || kind_sum != Some(self.document_count)
@@ -171,7 +198,8 @@ pub struct CopiedTextExecution {
 /// # Errors
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, empty or
-/// single-kind corpus, duplicate document identity, or invalid artifact error.
+/// single-kind admitted corpus, duplicate admitted document identity,
+/// oversized raw corpus, or invalid artifact error.
 pub fn execute_copied_text_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -186,11 +214,16 @@ pub fn execute_copied_text_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != COPIED_TEXT_MODEL_CONTRACT_VERSION
         || request.output_profile != COPIED_TEXT_OUTPUT_PROFILE
     {
         return Err(AnalysisEngineError::InvalidEvidence);
+    }
+    if documents.len() > MAX_EVIDENCE_UNITS {
+        return Err(AnalysisEngineError::LimitExceeded);
     }
 
     let mut seen = std::collections::BTreeSet::new();
@@ -199,35 +232,32 @@ pub fn execute_copied_text_run(
     let mut refused_as_unique_content_count = 0_u64;
     let mut refused_as_stopword_deletion_count = 0_u64;
     for document in documents {
+        if document.snapshot_id() != snapshot_id {
+            return Err(AnalysisEngineError::InvalidEvidence);
+        }
+        if !cutoff_eligible(document.available_time(), &knowledge_cutoff) {
+            continue;
+        }
         if !seen.insert(document.document_id()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
         match document.kind() {
             CopiedKind::UniqueContent => {
-                refuse_copied_text_as_unique_content(document.kind()).map_err(map_copied_error)?;
-                refuse_copied_text_as_stopword_deletion(document.kind())
-                    .map_err(map_copied_error)?;
+                require_unique_content_result(refuse_copied_text_as_unique_content(document.kind()))?;
+                require_unique_content_result(refuse_copied_text_as_stopword_deletion(document.kind()))?;
                 unique_content_count = unique_content_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
             }
             CopiedKind::CopiedText => {
-                match refuse_copied_text_as_unique_content(document.kind()) {
-                    Err(CopiedTextError::CopiedTextIsNotUniqueContent) => {
-                        refused_as_unique_content_count = refused_as_unique_content_count
-                            .checked_add(1)
-                            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
-                match refuse_copied_text_as_stopword_deletion(document.kind()) {
-                    Err(CopiedTextError::CopiedTextIsNotStopwordDeletion) => {
-                        refused_as_stopword_deletion_count = refused_as_stopword_deletion_count
-                            .checked_add(1)
-                            .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
-                    }
-                    Ok(()) | Err(_) => return Err(AnalysisEngineError::InvalidEvidence),
-                }
+                require_unique_content_refusal(refuse_copied_text_as_unique_content(document.kind()))?;
+                refused_as_unique_content_count = refused_as_unique_content_count
+                    .checked_add(1)
+                    .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
+                require_stopword_refusal(refuse_copied_text_as_stopword_deletion(document.kind()))?;
+                refused_as_stopword_deletion_count = refused_as_stopword_deletion_count
+                    .checked_add(1)
+                    .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
                 copied_text_count = copied_text_count
                     .checked_add(1)
                     .ok_or(AnalysisEngineError::ArithmeticOverflow)?;
@@ -235,7 +265,7 @@ pub fn execute_copied_text_run(
         }
     }
     let document_count =
-        u64::try_from(documents.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+        u64::try_from(seen.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     if document_count < 2 || unique_content_count == 0 || copied_text_count == 0 {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
@@ -253,12 +283,7 @@ pub fn execute_copied_text_run(
         inference_status: COPIED_TEXT_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "copied_text",
-        document_count,
-        4,
-        COPIED_TEXT_INFERENCE_STATUS,
-    )?;
+    let summary = AnalysisResultSummary::new("copied_text", document_count, 4, "validated")?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
@@ -274,12 +299,30 @@ pub fn execute_copied_text_run(
     })
 }
 
-fn map_copied_error(error: CopiedTextError) -> AnalysisEngineError {
-    match error {
-        CopiedTextError::CopiedTextIsNotUniqueContent
-        | CopiedTextError::CopiedTextIsNotStopwordDeletion
-        | CopiedTextError::InvalidCopiedPayload
-        | _ => AnalysisEngineError::InvalidEvidence,
+fn require_unique_content_result(
+    result: Result<(), CopiedTextError>,
+) -> Result<(), AnalysisEngineError> {
+    match result {
+        Ok(()) => Ok(()),
+        Err(_) => Err(AnalysisEngineError::InvalidEvidence),
+    }
+}
+
+fn require_unique_content_refusal(
+    result: Result<(), CopiedTextError>,
+) -> Result<(), AnalysisEngineError> {
+    match result {
+        Err(CopiedTextError::CopiedTextIsNotUniqueContent) => Ok(()),
+        Ok(()) | Err(_) => Err(AnalysisEngineError::InvalidEvidence),
+    }
+}
+
+fn require_stopword_refusal(
+    result: Result<(), CopiedTextError>,
+) -> Result<(), AnalysisEngineError> {
+    match result {
+        Err(CopiedTextError::CopiedTextIsNotStopwordDeletion) => Ok(()),
+        Ok(()) | Err(_) => Err(AnalysisEngineError::InvalidEvidence),
     }
 }
 
@@ -287,9 +330,13 @@ fn map_copied_error(error: CopiedTextError) -> AnalysisEngineError {
 mod tests {
     use super::{
         COPIED_TEXT_ARTIFACT_BYTE_LIMIT, COPIED_TEXT_ARTIFACT_SCHEMA_VERSION,
-        COPIED_TEXT_INFERENCE_STATUS, CopiedTextArtifact,
+        COPIED_TEXT_INFERENCE_STATUS, CopiedTextArtifact, require_stopword_refusal,
+        require_unique_content_refusal, require_unique_content_result,
     };
-    use crate::AnalysisEngineError;
+    use crate::{
+        AnalysisEngineError, MAX_ANALYSIS_IDENTIFIER_BYTES, MAX_EVIDENCE_UNITS,
+    };
+    use copied_text::CopiedTextError;
 
     fn artifact() -> CopiedTextArtifact {
         CopiedTextArtifact {
@@ -314,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    fn artifact_round_trip_and_size_bounds_fail_closed() {
+    fn artifact_round_trip_and_input_size_bounds_fail_closed() {
         let artifact = artifact();
         let payload = artifact.to_json().expect("json");
         assert_eq!(
@@ -330,6 +377,26 @@ mod tests {
             CopiedTextArtifact::from_json(&"x".repeat(COPIED_TEXT_ARTIFACT_BYTE_LIMIT + 1)),
             Err(AnalysisEngineError::LimitExceeded)
         );
+    }
+
+    #[test]
+    fn maximal_valid_artifact_stays_below_input_wire_limit() {
+        let maximum_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("bounded census");
+        let maximal = CopiedTextArtifact {
+            schema_version: COPIED_TEXT_ARTIFACT_SCHEMA_VERSION.into(),
+            run_id: "\\".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES),
+            snapshot_id: "\\".repeat(MAX_ANALYSIS_IDENTIFIER_BYTES),
+            knowledge_cutoff: "2026-08-01T00:00:00.123456789+14:00".into(),
+            document_count: maximum_count,
+            unique_content_count: maximum_count - 1,
+            copied_text_count: 1,
+            refused_as_unique_content_count: 1,
+            refused_as_stopword_deletion_count: 1,
+            inference_status: COPIED_TEXT_INFERENCE_STATUS.into(),
+        };
+        let payload = maximal.to_json().expect("maximal valid artifact");
+        assert!(payload.len() < COPIED_TEXT_ARTIFACT_BYTE_LIMIT);
+        assert_eq!(CopiedTextArtifact::from_json(&payload), Ok(maximal));
     }
 
     #[test]
@@ -363,6 +430,11 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.document_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("bound") + 1;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.unique_content_count = 0;
                 value
             },
@@ -378,6 +450,11 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.refused_as_stopword_deletion_count = 1;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.inference_status.clear();
                 value
             },
@@ -385,5 +462,38 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn provider_result_guards_fail_closed_on_contract_drift() {
+        assert_eq!(require_unique_content_result(Ok(())), Ok(()));
+        assert_eq!(
+            require_unique_content_result(Err(CopiedTextError::InvalidCopiedPayload)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_unique_content_refusal(Err(CopiedTextError::CopiedTextIsNotUniqueContent)),
+            Ok(())
+        );
+        assert_eq!(
+            require_unique_content_refusal(Ok(())),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_unique_content_refusal(Err(CopiedTextError::InvalidCopiedPayload)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_stopword_refusal(Err(CopiedTextError::CopiedTextIsNotStopwordDeletion)),
+            Ok(())
+        );
+        assert_eq!(
+            require_stopword_refusal(Ok(())),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_stopword_refusal(Err(CopiedTextError::InvalidCopiedPayload)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }
