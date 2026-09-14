@@ -3570,6 +3570,30 @@ fn standardised_added_time_independent_variance_is_not_unstandardised_or_traitva
     );
     assert!((extra - recovered).abs() > 1e-3);
     assert!((2.838_f64 - recovered).abs() > 1e-3);
+}
+
+#[test]
+fn standardised_added_time_independent_variance_rejects_invalid_operands_and_named_quantities() {
+    let effect = 0.4_f64;
+    let predictor_variance = 1.6_f64;
+    let log_rate = -0.5_f64;
+    let extra = recover_asymptotic_time_independent_predictor_variance(
+        effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let recovered = recover_standardised_asymptotic_time_independent_predictor_variance(
+        effect,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVARstd");
+    let trait_std =
+        recover_standardised_trait_variance(extra, LagClock::EventTime).expect("TRAITVARstd");
+    let first_occasion_extra = 0.3_f64 * 0.3_f64 * 4.0_f64;
     assert_eq!(
         recover_standardised_asymptotic_time_independent_predictor_variance(
             0.0,

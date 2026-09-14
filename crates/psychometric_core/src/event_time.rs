@@ -16415,6 +16415,10 @@ mod tests {
             ),
             Err(PsychometricError::AsymptoticTimeIndependentEffectRequiresStableDrift)
         );
+    }
+
+    #[test]
+    fn standardised_added_time_independent_variance_rejects_nonpositive_operands() {
         assert_eq!(
             recover_standardised_asymptotic_time_independent_predictor_variance(
                 0.4,
