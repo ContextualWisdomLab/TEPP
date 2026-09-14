@@ -190,6 +190,7 @@ struct ApprovedRubinProjectionPairing {
     validation_evidence_id: &'static str,
     validation_evidence_sha256: &'static str,
     validation_evidence_available_at: &'static str,
+    source_snapshot_id: &'static str,
     design_envelope_id: &'static str,
     indicator_kind: &'static str,
 }
@@ -253,7 +254,9 @@ fn decide_with_registry(
         else {
             return false;
         };
-        if authoritative_available_at.to_rfc3339() != pairing.validation_evidence_available_at
+        if !valid_identifier(pairing.source_snapshot_id)
+            || is_mutable_authority_locator(pairing.source_snapshot_id)
+            || authoritative_available_at.to_rfc3339() != pairing.validation_evidence_available_at
             || authoritative_available_at.instant() != evidence_available_at.instant()
             || authoritative_available_at.instant() > expected_knowledge_cutoff.instant()
         {
@@ -265,6 +268,7 @@ fn decide_with_registry(
             && receipt.analysis_contract_version == pairing.analysis_contract_version
             && receipt.validation_evidence_id == pairing.validation_evidence_id
             && receipt.validation_evidence_sha256 == pairing.validation_evidence_sha256
+            && receipt.source_snapshot_id == pairing.source_snapshot_id
             && receipt.design_envelope_id == pairing.design_envelope_id
             && indicator_kind.as_str() == pairing.indicator_kind
     });
@@ -342,6 +346,7 @@ mod tests {
         validation_evidence_id: EVIDENCE_ID,
         validation_evidence_sha256: EVIDENCE_DIGEST,
         validation_evidence_available_at: EVIDENCE_AVAILABLE_AT,
+        source_snapshot_id: SNAPSHOT_ID,
         design_envelope_id: DESIGN_ENVELOPE,
         indicator_kind: "alr",
     };
@@ -546,6 +551,21 @@ mod tests {
                 cutoff("2026-08-01T00:00:00Z"),
                 IndicatorKind::AdditiveLogRatio,
                 &[cross_snapshot_authority],
+            ),
+            RubinProjectionActivationDecision::Rejected
+        );
+
+        let mutable_snapshot_authority = ApprovedRubinProjectionPairing {
+            source_snapshot_id: "main",
+            ..APPROVED
+        };
+        assert_eq!(
+            decide_with_registry(
+                Some(&valid),
+                SNAPSHOT_ID,
+                cutoff("2026-08-01T00:00:00Z"),
+                IndicatorKind::AdditiveLogRatio,
+                &[mutable_snapshot_authority],
             ),
             RubinProjectionActivationDecision::Rejected
         );
