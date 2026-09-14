@@ -246,6 +246,221 @@ fn kish_weighted_slope_recovers_known_loading() {
 }
 
 #[test]
+fn kish_weighted_cwc_recovers_known_within_between_and_differs_from_unweighted() {
+    use psychometric_core::{
+        recover_kish_weighted_cluster_mean_within_between_slopes, recover_kish_weighted_slope,
+        refuse_kish_effective_sample_size_as_slope,
+        refuse_pooled_kish_slope_as_weighted_within_slope,
+        refuse_unweighted_between_slope_as_kish_weighted_between_slope,
+    };
+    let true_within = 0.5_f64;
+    let mut rows = Vec::new();
+    for &(cluster, mean_x, mean_y, within) in &[
+        (1_u64, 0.0_f64, 0.0_f64, -1.0_f64),
+        (1, 0.0, 0.0, 1.0),
+        (2, 1.0, 0.0, -1.0),
+        (2, 1.0, 0.0, 1.0),
+    ] {
+        rows.push(ClusteredScore {
+            cluster_key: cluster,
+            predictor: mean_x + within,
+            outcome: mean_y + true_within * within,
+        });
+    }
+    for deviation in [-2.5_f64, -1.5, -0.5, 0.5, 1.5, 2.5] {
+        rows.push(ClusteredScore {
+            cluster_key: 3,
+            predictor: 2.0 + deviation,
+            outcome: 4.0 + true_within * deviation,
+        });
+    }
+    let weights = vec![1.0_f64; rows.len()];
+    let unweighted = recover_cluster_mean_within_between_slopes(&rows).expect("ols");
+    let weighted =
+        recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &weights).expect("wls");
+    let within_error = rmse(&[true_within], &[weighted.within_slope]);
+    let between_error = rmse(&[2.25], &[weighted.between_slope]);
+    let contextual_error = rmse(&[1.75], &[weighted.contextual_effect]);
+    assert!(within_error < 1e-12, "Kish CWC within RMSE {within_error}");
+    assert!(
+        between_error < 1e-12,
+        "Kish CWC between RMSE {between_error}"
+    );
+    assert!(
+        contextual_error < 1e-12,
+        "Kish CWC contextual RMSE {contextual_error}"
+    );
+    assert!(
+        (weighted.between_slope - unweighted.between_slope).abs() > 1e-9,
+        "n_j-weighted between must differ from Enders-Tofighi unweighted between"
+    );
+    let predictors: Vec<f64> = rows.iter().map(|row| row.predictor).collect();
+    let outcomes: Vec<f64> = rows.iter().map(|row| row.outcome).collect();
+    let pooled = recover_kish_weighted_slope(&predictors, &outcomes, &weights).expect("pooled");
+    let pooled_within_error = rmse(&[true_within], &[pooled]);
+    assert!(
+        pooled_within_error > within_error,
+        "pooled Kish RMSE {pooled_within_error} should exceed weighted CWC within {within_error}"
+    );
+    assert_eq!(
+        refuse_pooled_kish_slope_as_weighted_within_slope(pooled, weighted.within_slope),
+        Err(PsychometricError::PooledKishSlopeIsNotWeightedWithinSlope)
+    );
+    assert_eq!(
+        refuse_unweighted_between_slope_as_kish_weighted_between_slope(
+            unweighted.between_slope,
+            weighted.between_slope,
+        ),
+        Err(PsychometricError::UnweightedBetweenSlopeIsNotKishWeightedBetweenSlope)
+    );
+    assert_eq!(
+        refuse_kish_effective_sample_size_as_slope(weighted.observation_effective_sample_size),
+        Err(PsychometricError::KishEffectiveSampleSizeIsNotASlope)
+    );
+    for scale in [f64::MAX, f64::MIN_POSITIVE] {
+        let scaled_weights = vec![scale; rows.len()];
+        let scaled =
+            recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &scaled_weights)
+                .expect("scaled wls");
+        assert!((scaled.within_slope - weighted.within_slope).abs() < 1e-12);
+        assert!((scaled.between_slope - weighted.between_slope).abs() < 1e-12);
+        assert!((scaled.contextual_effect - weighted.contextual_effect).abs() < 1e-12);
+        assert!(
+            (scaled.observation_effective_sample_size - weighted.observation_effective_sample_size)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (scaled.cluster_effective_sample_size - weighted.cluster_effective_sample_size).abs()
+                < 1e-12
+        );
+        let n = rows.len() as f64;
+        assert!((1.0 - 1e-12..=n + 1e-12).contains(&scaled.observation_effective_sample_size));
+    }
+}
+
+#[test]
+fn kish_weighted_cwc_noisy_truth_reports_bias_and_rmse() {
+    use psychometric_core::recover_kish_weighted_cluster_mean_within_between_slopes;
+    let true_within = 0.5_f64;
+    let true_between = 2.0_f64;
+    let true_contextual = true_between - true_within;
+    let mut recovered_within = Vec::new();
+    let mut recovered_between = Vec::new();
+    let mut recovered_contextual = Vec::new();
+    for replicate in 0..40 {
+        let mut rows = Vec::new();
+        let mut weights = Vec::new();
+        let phase = f64::from(replicate) * 0.37;
+        for cluster in 0..16_u64 {
+            let cluster_mean = f64::from(u32::try_from(cluster).expect("tiny"));
+            for occasion in 0..6 {
+                let within = f64::from(occasion) - 2.5;
+                let position = cluster_mean * 0.73 + f64::from(occasion) * 1.1 + phase;
+                let noise = 0.15 * position.sin() + 0.08 * (1.7 * position).cos();
+                rows.push(ClusteredScore {
+                    cluster_key: cluster,
+                    predictor: cluster_mean + within,
+                    outcome: true_between * cluster_mean + true_within * within + noise,
+                });
+                let cycle = occasion % 4;
+                weights.push(0.5 + f64::from(cycle) * 0.5);
+            }
+        }
+        let recovered = recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &weights)
+            .expect("noisy Kish CWC");
+        recovered_within.push(recovered.within_slope);
+        recovered_between.push(recovered.between_slope);
+        recovered_contextual.push(recovered.contextual_effect);
+    }
+    let n = recovered_within.len() as f64;
+    let within_mean = recovered_within.iter().sum::<f64>() / n;
+    let between_mean = recovered_between.iter().sum::<f64>() / n;
+    let contextual_mean = recovered_contextual.iter().sum::<f64>() / n;
+    let within_bias = within_mean - true_within;
+    let between_bias = between_mean - true_between;
+    let contextual_bias = contextual_mean - true_contextual;
+    let within_rmse = rmse(
+        &vec![true_within; recovered_within.len()],
+        &recovered_within,
+    );
+    let between_rmse = rmse(
+        &vec![true_between; recovered_between.len()],
+        &recovered_between,
+    );
+    let contextual_rmse = rmse(
+        &vec![true_contextual; recovered_contextual.len()],
+        &recovered_contextual,
+    );
+    assert!(
+        within_bias.abs() < 0.05,
+        "Kish CWC within bias {within_bias}"
+    );
+    assert!(
+        between_bias.abs() < 0.05,
+        "Kish CWC between bias {between_bias}"
+    );
+    assert!(
+        contextual_bias.abs() < 0.05,
+        "Kish CWC contextual bias {contextual_bias}"
+    );
+    assert!(within_rmse < 0.08, "Kish CWC within RMSE {within_rmse}");
+    assert!(between_rmse < 0.08, "Kish CWC between RMSE {between_rmse}");
+    assert!(
+        contextual_rmse < 0.08,
+        "Kish CWC contextual RMSE {contextual_rmse}"
+    );
+}
+
+#[test]
+fn kish_weighted_cwc_equal_weight_noisy_truth_reports_interval_coverage() {
+    use psychometric_core::recover_kish_weighted_cluster_mean_within_between_slopes;
+    let true_within = 0.5_f64;
+    let true_between = 2.0_f64;
+    let mut within_covered = 0_usize;
+    let mut between_covered = 0_usize;
+    for replicate in 0..40 {
+        let mut rows = Vec::new();
+        let mut weights = Vec::new();
+        let phase = f64::from(replicate) * 0.37;
+        for cluster in 0..16_u64 {
+            let cluster_mean = f64::from(u32::try_from(cluster).expect("tiny"));
+            for occasion in 0..6 {
+                let within = f64::from(occasion) - 2.5;
+                let position = cluster_mean * 0.73 + f64::from(occasion) * 1.1 + phase;
+                let noise = 0.15 * position.sin() + 0.08 * (1.7 * position).cos();
+                rows.push(ClusteredScore {
+                    cluster_key: cluster,
+                    predictor: cluster_mean + within,
+                    outcome: true_between * cluster_mean + true_within * within + noise,
+                });
+                weights.push(1.0);
+            }
+        }
+        let recovered = recover_kish_weighted_cluster_mean_within_between_slopes(&rows, &weights)
+            .expect("equal-weight Kish CWC");
+        let within_half = 1.96 * recovered.within_slope_sampling_variance.sqrt();
+        let between_half = 1.96 * recovered.between_slope_sampling_variance.sqrt();
+        if (recovered.within_slope - true_within).abs() <= within_half {
+            within_covered += 1;
+        }
+        if (recovered.between_slope - true_between).abs() <= between_half {
+            between_covered += 1;
+        }
+    }
+    let within_coverage = within_covered as f64 / 40.0;
+    let between_coverage = between_covered as f64 / 40.0;
+    assert!(
+        within_coverage >= 0.95,
+        "Kish CWC within coverage {within_coverage}"
+    );
+    assert!(
+        between_coverage >= 0.95,
+        "Kish CWC between coverage {between_coverage}"
+    );
+}
+
+#[test]
 fn event_time_log_rate_recovers_known_drift_and_refuses_quotient() {
     let true_drift = -0.4_f64;
     let earlier = 1.25_f64;
