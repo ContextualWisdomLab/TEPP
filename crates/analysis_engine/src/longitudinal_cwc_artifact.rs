@@ -152,16 +152,27 @@ impl LongitudinalCwcArtifact {
     }
 
     fn validate(&self) -> Result<(), AnalysisEngineError> {
+        let max_rows = u64::try_from(MAX_EVIDENCE_UNITS)
+            .map_err(|_| AnalysisEngineError::InvalidLongitudinalCwcArtifact)?;
+        let total_rows = self
+            .row_count
+            .checked_add(self.excluded_after_cutoff_count)
+            .ok_or(AnalysisEngineError::InvalidLongitudinalCwcArtifact)?;
+        let expected_contextual_effect = self.between_slope - self.within_slope;
         if self.schema_version != LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION
             || !valid_identifier(&self.run_id)
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
             || self.row_count < 2
+            || self.row_count > max_rows
             || self.cluster_count < 2
             || self.cluster_count > self.row_count
+            || total_rows > max_rows
             || !self.within_slope.is_finite()
             || !self.between_slope.is_finite()
             || !self.contextual_effect.is_finite()
+            || !expected_contextual_effect.is_finite()
+            || self.contextual_effect.to_bits() != expected_contextual_effect.to_bits()
             || self.inference_status != LONGITUDINAL_CWC_INFERENCE_STATUS
         {
             return Err(AnalysisEngineError::InvalidLongitudinalCwcArtifact);
@@ -215,6 +226,15 @@ fn admit_scores_at_cutoff(
     })
 }
 
+fn require_causal_refusal(
+    result: Result<(), PsychometricError>,
+) -> Result<(), AnalysisEngineError> {
+    match result {
+        Err(PsychometricError::CausalUnderidentified) => Ok(()),
+        Ok(()) | Err(_) => Err(AnalysisEngineError::InvalidEvidence),
+    }
+}
+
 #[expect(
     clippy::missing_panics_doc,
     reason = "bounded summary constants cannot fail"
@@ -243,7 +263,9 @@ pub fn execute_longitudinal_cwc_run(
     if request.snapshot_id != snapshot_id {
         return Err(AnalysisEngineError::SnapshotMismatch);
     }
-    if request.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+    let request_cutoff = KnowledgeCutoff::parse_rfc3339(&request.knowledge_cutoff)
+        .map_err(|_| AnalysisEngineError::InvalidEvidence)?;
+    if request_cutoff.instant() != knowledge_cutoff.instant()
         || request.model_contract_version != LONGITUDINAL_CWC_MODEL_CONTRACT_VERSION
         || request.output_profile != LONGITUDINAL_CWC_OUTPUT_PROFILE
     {
@@ -252,7 +274,7 @@ pub fn execute_longitudinal_cwc_run(
 
     let eligible = admit_scores_at_cutoff(scores, knowledge_cutoff)?;
     let slopes = recover_cluster_mean_within_between_slopes(&eligible.scores)?;
-    let _ = claim_causal_effect(CausalHeuristic::TemporalPrecedence);
+    require_causal_refusal(claim_causal_effect(CausalHeuristic::TemporalPrecedence))?;
 
     let mut clusters = std::collections::BTreeSet::new();
     for score in &eligible.scores {
@@ -276,13 +298,8 @@ pub fn execute_longitudinal_cwc_run(
         inference_status: LONGITUDINAL_CWC_INFERENCE_STATUS.into(),
     };
     let digest = artifact.sha256()?;
-    let summary = AnalysisResultSummary::new(
-        "longitudinal_cwc",
-        row_count,
-        3,
-        LONGITUDINAL_CWC_INFERENCE_STATUS,
-    )
-    .expect("bounded longitudinal CWC summary constants are valid");
+    let summary = AnalysisResultSummary::new("longitudinal_cwc", row_count, 3, "validated")
+        .expect("bounded longitudinal CWC summary constants are valid");
     let terminal_result = AnalysisRunTerminalResult::succeeded(
         request,
         accepted,
@@ -302,9 +319,10 @@ pub fn execute_longitudinal_cwc_run(
 mod tests {
     use super::{
         LONGITUDINAL_CWC_ARTIFACT_BYTE_LIMIT, LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION,
-        LONGITUDINAL_CWC_INFERENCE_STATUS, LongitudinalCwcArtifact,
+        LONGITUDINAL_CWC_INFERENCE_STATUS, LongitudinalCwcArtifact, require_causal_refusal,
     };
     use crate::AnalysisEngineError;
+    use psychometric_core::PsychometricError;
 
     fn artifact() -> LongitudinalCwcArtifact {
         LongitudinalCwcArtifact {
@@ -406,6 +424,11 @@ mod tests {
             },
             {
                 let mut value = artifact.clone();
+                value.contextual_effect = 0.0;
+                value
+            },
+            {
+                let mut value = artifact.clone();
                 value.inference_status.clear();
                 value
             },
@@ -413,5 +436,21 @@ mod tests {
         for invalid in invalid_artifacts {
             assert_invalid(&invalid);
         }
+    }
+
+    #[test]
+    fn causal_refusal_contract_fails_closed_on_provider_drift() {
+        assert_eq!(
+            require_causal_refusal(Err(PsychometricError::CausalUnderidentified)),
+            Ok(())
+        );
+        assert_eq!(
+            require_causal_refusal(Ok(())),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+        assert_eq!(
+            require_causal_refusal(Err(PsychometricError::InvalidNumericInput)),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
     }
 }
