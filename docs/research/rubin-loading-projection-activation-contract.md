@@ -1,6 +1,6 @@
 # Rubin loading projection activation contract
 
-Status: branch-local scientific design and implementation evidence for issue #505. This document does not authorize inferential activation and does not promote Draft #504 to scientific/product claim authority.
+Status: branch-local scientific design and implementation evidence for issue #505, including the source-snapshot authority repair tracked by #511. This document does not authorize inferential activation and does not promote Draft #504 to scientific/product claim authority.
 
 ## Problem
 
@@ -12,7 +12,7 @@ Rubin-style variance validity is therefore not inferred from the combining formu
 
 - `psychometric_core` owns reusable `Qbar/Ubar/B/T` and robust loading-point arithmetic.
 - `analysis_engine` owns request admission, snapshot/cutoff composition, Validation Evidence binding, and projection policy.
-- Validation Evidence supplies claim-specific recovery/coverage evidence for one declared design envelope. It does not become estimator code.
+- Validation Evidence supplies claim-specific recovery/coverage evidence for one declared design envelope and one immutable source snapshot. It does not become estimator code.
 - LLM output is not numerical, scientific-acceptance, or activation authority.
 - No external generator source is copied into TEPP. A generator is consumed only through an immutable versioned contract identity plus evidence provenance.
 
@@ -42,7 +42,7 @@ Because this receipt type is specifically the Rubin loading projection authority
 
 The activation receipt does not replace row-level `AvailableTime`; both the source observations and the Validation Evidence itself must have been available at or before the run's `KnowledgeCutoff`.
 
-The receipt's `validation_evidence_available_at` is transport metadata, not self-authenticating authority. Positive eligibility also requires the owner-controlled approved pairing to carry the canonical availability instant for that exact Validation Evidence ID/digest. The decision rejects a receipt that attempts to backdate or otherwise change that authoritative clock.
+The receipt's `validation_evidence_available_at` and `source_snapshot_id` are transport metadata, not self-authenticating authority. Positive eligibility requires the owner-controlled approved pairing to carry both the canonical availability instant and the immutable source snapshot covered by that exact Validation Evidence ID/digest. The decision rejects a receipt that attempts to backdate the evidence clock or reuse the same approved evidence package against another snapshot.
 
 ## Activation decision
 
@@ -52,15 +52,16 @@ The decision order is:
 
 1. no receipt -> `DescriptiveOnly`;
 2. validate the bounded receipt contract, require the canonical Rubin analysis ID/version, and require immutable locator-safe authority fields, including the source snapshot;
-3. require the expected Analysis Run snapshot to be an immutable locator-safe identifier and require exact snapshot identity;
+3. require the expected Analysis Run snapshot to be an immutable locator-safe identifier and require exact receipt/run snapshot identity;
 4. compare receipt/run knowledge cutoffs by instant, not RFC 3339 spelling;
 5. parse the owner-controlled approved Validation Evidence availability, require canonical form, and require the receipt availability to equal that authoritative instant;
 6. require the authoritative Validation Evidence availability to be at or before the Analysis Run cutoff;
-7. require an exact immutable generator contract ID/version;
-8. require the exact Rubin analysis contract ID/version again at registry pairing rather than allowing registry metadata to alter receipt semantics;
-9. require exact Validation Evidence identity and SHA-256;
-10. require exact design envelope and indicator-kind coverage;
-11. only an exact approved pairing can return `Eligible`; otherwise return `Rejected`.
+7. require the owner-controlled approved source snapshot itself to be an immutable locator-safe identifier and require exact receipt/authority snapshot identity;
+8. require an exact immutable generator contract ID/version;
+9. require the exact Rubin analysis contract ID/version again at registry pairing rather than allowing registry metadata to alter receipt semantics;
+10. require exact Validation Evidence identity and SHA-256;
+11. require exact design envelope and indicator-kind coverage;
+12. only an exact approved pairing can return `Eligible`; otherwise return `Rejected`.
 
 A positive artifact state is not emitted by #506. The current production registry contains no approved pairing, so a valid candidate receipt cannot self-authorize. A bare string such as `validated_rubin_inference` remains insufficient.
 
@@ -79,10 +80,12 @@ A positive artifact state is not emitted by #506. The current production registr
 | approved-registry Validation Evidence availability is noncanonical | fail closed |
 | authoritative evidence availability is after the run cutoff | fail closed |
 | receipt snapshot different from the Analysis Run snapshot | fail closed |
+| approved Validation Evidence snapshot different from the receipt/runtime snapshot | fail closed |
+| approved-registry snapshot is a mutable branch/PR/issue/repository/latest locator | fail closed |
 | receipt or expected snapshot is a mutable branch/PR/issue/repository/latest locator | fail closed |
 | mutable branch/PR identity presented as approval | fail closed because it has no approved immutable pairing |
 | design envelope or indicator-kind mismatch | fail closed |
-| exact approved pairing + exact evidence digest + authoritative cutoff-safe availability | eligible in the pure decision algorithm |
+| exact approved pairing + exact evidence digest + authoritative cutoff-safe availability + exact immutable evidence snapshot | eligible in the pure decision algorithm |
 
 The executable unit contract includes a test-only approved pairing to prove the positive branch without inserting any production approval data. Test fixtures are private to the decision module and cannot populate the production registry.
 
@@ -92,7 +95,7 @@ The executable unit contract includes a test-only approved pairing to prove the 
 
 There is intentionally no approved production Rubin generator/analysis pairing on this branch. Draft #504 is candidate repeated-sampling evidence for its declared synthetic Gaussian generator and rolling-origin design. Its branch-local results must not be inserted into a production allow-list while its exact head lacks terminal required checks and qualifying independent current-head approval.
 
-Any future production pairing must bind the authoritative Validation Evidence availability alongside the immutable evidence ID/digest. A caller-provided receipt cannot introduce, override, or backdate that owner-controlled clock. The registry also cannot substitute another analysis ID/version for the canonical Rubin loading analysis contract baked into the receipt type.
+Any future production pairing must bind the authoritative Validation Evidence availability and the immutable evidence source snapshot alongside the immutable evidence ID/digest. A caller-provided receipt cannot introduce, override, backdate, or retarget either owner-controlled provenance field. The registry also cannot substitute another analysis ID/version for the canonical Rubin loading analysis contract baked into the receipt type.
 
 ## Design envelope for the current candidate evidence
 
@@ -106,21 +109,21 @@ For a fixed immutable snapshot and cutoff, later-available source rows cannot ch
 
 The availability clock is owner-controlled approval metadata, not a caller assertion. Matching an approved Validation Evidence ID and digest while supplying an earlier receipt timestamp is insufficient and fails closed. Equivalent RFC 3339 spellings of the same instant compare equal only after typed parsing; persisted receipt and registry timestamps remain canonical. Cross-snapshot evidence is a provenance violation, not a censorable future row.
 
-Snapshot identity is also authority, not presentation text. Mutable refs such as `main`, `refs/heads/main`, PR numbers, repository tree URLs, or latest aliases cannot identify the source population of an authoritative projection even if they currently resolve to the intended commit. Historical replay must name a stable snapshot identity.
+Snapshot identity is also owner-controlled authority, not presentation text. Mutable refs such as `main`, `refs/heads/main`, PR numbers, repository tree URLs, or latest aliases cannot identify the source population of an authoritative projection even if they currently resolve to the intended commit. Historical replay must name one stable snapshot identity, and the receipt/run snapshot must match the snapshot recorded by the approved Validation Evidence pairing.
 
 ## Evidence identity and mutability
 
 A Validation Evidence digest is content identity, not a review badge. The receipt binds the evidence artifact containing the scientific design, attempted/recovered/failed population, recovery/coverage summaries, Monte Carlo uncertainty, implementation/source identity, and applicable design envelope. Git branch names, PR numbers, check URLs, comments, or latest-release aliases are mutable locators and cannot substitute for the digest-bound evidence identity.
 
-Content identity and availability provenance are separate invariants. The approved pairing therefore binds both the exact evidence digest and the authoritative availability instant. Reusing the digest while changing only a caller-supplied availability timestamp cannot change historical eligibility.
+Content identity, availability provenance, and source-population identity are separate invariants. The approved pairing therefore binds the exact evidence digest, the authoritative availability instant, and the immutable source snapshot. Reusing the digest while changing only a caller-supplied timestamp or snapshot cannot change historical eligibility.
 
 If an approved evidence artifact is superseded, the replacement receives a new identity/digest. Existing historical receipts continue to name the evidence under which they were evaluated; they are not silently rewritten to the newest package.
 
 ## Remaining implementation sequence
 
-1. Keep #506's negative projection policy, bounded activation receipt, canonical Rubin analysis identity, immutable snapshot/authority validation, public-wire refusal, and owner-controlled evidence-availability matching intact.
+1. Keep #506's negative projection policy, bounded activation receipt, canonical Rubin analysis identity, immutable snapshot/authority validation, public-wire refusal, owner-controlled evidence-availability matching, and owner-controlled evidence-snapshot matching intact.
 2. Keep the production approved-pairing registry empty while #504 is Draft or lacks exact-head scientific/review gates.
-3. Once candidate evidence is independently accepted, publish its immutable Validation Evidence identity/digest and authoritative `AvailableTime`, then add only that exact pairing through the owner path.
+3. Once candidate evidence is independently accepted, publish its immutable Validation Evidence identity/digest, authoritative `AvailableTime`, and immutable source snapshot, then add only that exact pairing through the owner path.
 4. Bind any future positive artifact projection state to the activation-receipt digest and reacquire exact-head tests, authored line/branch coverage, documentation, security, CodeQL, and independent review.
 5. Fold the complete source/test/evidence delta into the surviving Analysis Run vehicle by ordinary non-force conflict resolution; predecessor checks and approvals do not transfer.
 
