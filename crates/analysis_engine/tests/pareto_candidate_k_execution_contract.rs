@@ -1,16 +1,20 @@
 //! End-to-end contract for cutoff-safe Pareto candidate-`K` selection.
 
 use analysis_engine::{
-    AnalysisEngineError, PARETO_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION,
+    AnalysisEngineError, MAX_EVIDENCE_UNITS, PARETO_CANDIDATE_K_ARTIFACT_SCHEMA_VERSION,
     PARETO_CANDIDATE_K_MODEL_CONTRACT_VERSION, PARETO_CANDIDATE_K_OUTPUT_PROFILE,
     ParetoCandidateKInput, execute_pareto_candidate_k_run,
 };
 use model_selection::{ModelCandidate, ModelSelectionError};
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
 
 fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-02-01T00:00:00Z").expect("cutoff")
+}
+
+fn available(stamp: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(stamp).expect("available")
 }
 
 fn request() -> AnalysisRunRequest {
@@ -36,6 +40,15 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
 
 fn statistical_front() -> ParetoCandidateKInput {
     ParetoCandidateKInput::new(
+        "snapshot-pareto-candidate-k",
+        cutoff(),
+        vec![
+            available("2026-01-10T00:00:00Z"),
+            available("2026-01-11T00:00:00Z"),
+            available("2026-01-12T00:00:00Z"),
+            available("2026-01-13T00:00:00Z"),
+            available("2026-01-14T00:00:00Z"),
+        ],
         vec![
             ModelCandidate::statistical(2, -30.0, 8.0).expect("k2"),
             ModelCandidate::statistical(4, -30.0, 8.0).expect("k4"),
@@ -44,6 +57,23 @@ fn statistical_front() -> ParetoCandidateKInput {
         vec![2, 2, 2],
         2,
     )
+    .expect("front")
+}
+
+fn input(
+    candidates: Vec<ModelCandidate>,
+    selected_replications: Vec<u32>,
+    truth_k: u32,
+) -> ParetoCandidateKInput {
+    ParetoCandidateKInput::new(
+        "snapshot-pareto-candidate-k",
+        cutoff(),
+        vec![available("2026-01-10T00:00:00Z")],
+        candidates,
+        selected_replications,
+        truth_k,
+    )
+    .expect("input")
 }
 
 fn execute(
@@ -61,7 +91,7 @@ fn execute(
 }
 
 #[test]
-fn pareto_front_selects_smaller_k_and_refuses_llm_vote_as_authority() {
+fn pareto_front_selects_smaller_k_and_reports_source_evidence_count() {
     let request = request();
     let execution = execute(&request, &statistical_front()).expect("execution");
     assert_eq!(
@@ -81,6 +111,10 @@ fn pareto_front_selects_smaller_k_and_refuses_llm_vote_as_authority() {
         execution.terminal_result.run_state,
         AnalysisRunTerminalState::Succeeded
     );
+    let summary = execution.terminal_result.summary.as_ref().expect("summary");
+    assert_eq!(summary.evidence_count, 5);
+    assert_ne!(summary.evidence_count, execution.artifact.candidate_count);
+    assert_eq!(summary.validation_status, "validated");
     assert_eq!(
         execution.terminal_result.result_sha256.as_deref(),
         Some(execution.artifact.sha256().expect("digest").as_str())
@@ -94,7 +128,7 @@ fn pareto_front_selects_smaller_k_and_refuses_llm_vote_as_authority() {
 #[test]
 fn higher_likelihood_wins_and_llm_only_sets_fail_closed() {
     let request = request();
-    let higher = ParetoCandidateKInput::new(
+    let higher = input(
         vec![
             ModelCandidate::statistical(2, -30.0, 8.0).expect("k2"),
             ModelCandidate::statistical(8, -20.0, 9.0).expect("k8"),
@@ -106,7 +140,7 @@ fn higher_likelihood_wins_and_llm_only_sets_fail_closed() {
     assert_eq!(execution.artifact.selected_k, 8);
     assert!((execution.artifact.selected_k_rmse - 0.0).abs() < f64::EPSILON);
 
-    let llm_only = ParetoCandidateKInput::new(
+    let llm_only = input(
         vec![ModelCandidate::llm_vote_only(3).expect("llm")],
         vec![3],
         3,
@@ -117,7 +151,7 @@ fn higher_likelihood_wins_and_llm_only_sets_fail_closed() {
             ModelSelectionError::LlmVoteIsNotStatisticalAuthority
         ))
     );
-    let empty = ParetoCandidateKInput::new(Vec::new(), vec![2], 2);
+    let empty = input(Vec::new(), vec![2], 2);
     assert_eq!(
         execute(&request, &empty),
         Err(AnalysisEngineError::ModelSelection(
@@ -129,7 +163,7 @@ fn higher_likelihood_wins_and_llm_only_sets_fail_closed() {
 #[test]
 fn mismatched_replications_record_positive_rmse() {
     let request = request();
-    let mismatched = ParetoCandidateKInput::new(
+    let mismatched = input(
         vec![ModelCandidate::statistical(2, -30.0, 8.0).expect("k2")],
         vec![4, 4, 4],
         2,
@@ -137,6 +171,65 @@ fn mismatched_replications_record_positive_rmse() {
     let execution = execute(&request, &mismatched).expect("rmse");
     assert_eq!(execution.artifact.selected_k, 2);
     assert!((execution.artifact.selected_k_rmse - 2.0).abs() < f64::EPSILON);
+}
+
+#[test]
+fn provenance_rejects_future_evidence_and_resource_exhaustion_before_selection() {
+    let candidate = ModelCandidate::statistical(2, -30.0, 8.0).expect("candidate");
+    assert_eq!(
+        ParetoCandidateKInput::new(
+            "snapshot-pareto-candidate-k",
+            cutoff(),
+            vec![available("2026-02-01T00:00:01Z")],
+            vec![candidate],
+            vec![2],
+            2,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+    assert_eq!(
+        ParetoCandidateKInput::new(
+            "snapshot-pareto-candidate-k",
+            cutoff(),
+            vec![available("2026-01-10T00:00:00Z")],
+            vec![candidate; 257],
+            vec![2],
+            2,
+        ),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+    assert_eq!(
+        ParetoCandidateKInput::new(
+            "snapshot-pareto-candidate-k",
+            cutoff(),
+            vec![available("2026-01-10T00:00:00Z")],
+            vec![candidate],
+            vec![2; MAX_EVIDENCE_UNITS + 1],
+            2,
+        ),
+        Err(AnalysisEngineError::LimitExceeded)
+    );
+}
+
+#[test]
+fn equivalent_cutoff_instants_bind_and_provenance_snapshot_is_enforced() {
+    let mut equivalent = request();
+    equivalent.knowledge_cutoff = "2026-01-31T19:00:00-05:00".into();
+    assert!(execute(&equivalent, &statistical_front()).is_ok());
+
+    let wrong_snapshot = ParetoCandidateKInput::new(
+        "other-snapshot",
+        cutoff(),
+        vec![available("2026-01-10T00:00:00Z")],
+        vec![ModelCandidate::statistical(2, -30.0, 8.0).expect("candidate")],
+        vec![2],
+        2,
+    )
+    .expect("input");
+    assert_eq!(
+        execute(&request(), &wrong_snapshot),
+        Err(AnalysisEngineError::SnapshotMismatch)
+    );
 }
 
 #[test]
