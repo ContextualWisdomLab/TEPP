@@ -39,6 +39,7 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 ## [Unreleased]
 
 - `psychometric_core` recovers Driver Eq. 5 of 2017-era `T0TOTALVAR` after `addedT0TIPREDVAR` with nonzero `MANIFESTTRAITVAR` as `λ² (t0_trait² · trait + p_0 + t0_b² v) + θ + ψ` on event time (`recover_initial_total_observed_variance_with_time_independent_predictor_and_manifest_trait`), refusing the latent total, Eq. 5 of that total without `ψ`, `MANIFESTVAR` `θ`, `MANIFESTTRAITVAR` `ψ`, and `T0TOTALVARstd`.
+- Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.
 
