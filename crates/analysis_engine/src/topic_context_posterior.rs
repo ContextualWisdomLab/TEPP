@@ -62,6 +62,8 @@ pub struct TopicContextPosteriorSnapshotManifest {
     pub artifact_sha256: String,
     /// Availability instant for every document represented by the artifact.
     pub document_available_at: BTreeMap<String, String>,
+    /// Availability instant for every lineage, relation, or membership evidence resource used.
+    pub support_evidence_available_at: BTreeMap<String, String>,
 }
 
 impl TopicContextPosteriorSnapshotManifest {
@@ -71,10 +73,18 @@ impl TopicContextPosteriorSnapshotManifest {
             || !digest(&self.artifact_sha256)
             || canonical_cutoff(&self.knowledge_cutoff).is_none()
             || self.document_available_at.len() > MANIFEST_ENTRY_LIMIT
+            || self.support_evidence_available_at.len() > MANIFEST_ENTRY_LIMIT
             || self.document_available_at.iter().any(|(document_id, available_at)| {
                 !valid_identifier(document_id)
                     || canonical_available_time(available_at).is_none()
             })
+            || self
+                .support_evidence_available_at
+                .iter()
+                .any(|(evidence_resource_id, available_at)| {
+                    !valid_identifier(evidence_resource_id)
+                        || canonical_available_time(available_at).is_none()
+                })
         {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
@@ -173,6 +183,35 @@ pub fn execute_topic_context_posterior_run(
             manifest
                 .document_available_at
                 .get(*document_id)
+                .and_then(|available_at| canonical_available_time(available_at))
+                .is_none_or(|available_at| available_at.instant() > manifest_cutoff.instant())
+        })
+    {
+        return Err(AnalysisEngineError::InvalidEvidence);
+    }
+
+    let support_evidence_ids: BTreeSet<&str> = artifact
+        .lineage_events
+        .iter()
+        .map(|event| event.evidence_resource_id.as_str())
+        .chain(
+            artifact
+                .document_relations
+                .iter()
+                .map(|relation| relation.evidence_resource_id.as_str()),
+        )
+        .chain(
+            artifact
+                .memberships
+                .iter()
+                .map(|membership| membership.evidence_resource_id.as_str()),
+        )
+        .collect();
+    if support_evidence_ids.len() != manifest.support_evidence_available_at.len()
+        || support_evidence_ids.iter().any(|evidence_resource_id| {
+            manifest
+                .support_evidence_available_at
+                .get(*evidence_resource_id)
                 .and_then(|available_at| canonical_available_time(available_at))
                 .is_none_or(|available_at| available_at.instant() > manifest_cutoff.instant())
         })
