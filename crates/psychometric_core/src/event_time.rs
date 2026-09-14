@@ -4052,6 +4052,153 @@ pub fn refuse_asymptotic_time_independent_effect_as_time_dependent_impulse(
     Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotTimeDependentImpulse)
 }
 
+/// Exact scalar 2017-era active `asymptotes=TRUE` `TIPREDEFFECT` rewrite.
+///
+/// cran/ctsem 2.5.0 `summary.ctsemFit.R` forms
+/// `if(asymptotes==TRUE) TIPREDEFFECT <- -DRIFT %*% TIPREDEFFECT`
+/// immediately after reading `mxobj$TIPREDEFFECT$values` and puts
+/// that rewrite in the active `outlist`. Driver, Oud, and Voelkle
+/// (2017, Table 2, p. 12; Eq. 1, p. 4; Eq. 3, p. 5; p. 16; JSS PDF
+/// re-opened 2026-08-31T15:26Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `B` `TIPREDEFFECT`. The scalar map is `−a · B`. Form `a`
+/// first, then negate, then multiply by `B`. When `asymptotes=TRUE`
+/// the stored `TIPREDEFFECT` is the asymptotic parameterization
+/// Table 2 / §7.2 names `asymTIPREDEFFECT` `-B / a`; multiplying by
+/// `-DRIFT` converts that stored value back to original `B`.
+/// `-a · (-B / a) = B`. A zero coefficient is exactly zero even if
+/// `a ≥ 0`. `a ≥ 0` with a nonzero coefficient fails closed. A
+/// non-event clock fails closed. Unstandardised `TIPREDEFFECT` `B`
+/// is not `−a · B` when `a ≠ −1`. `asymTIPREDEFFECT` `-B / a` is
+/// not that rewrite. The finite-interval increment
+/// `A^{-1}[e^{A Δt} − I] B` is not that rewrite. `TIPREDEFFECTstd`
+/// `B · √v / √p` is not that rewrite. The companion active rewrite
+/// `CINT <- -DRIFT %*% CINT` uses the same operator on a different
+/// matrix and is not this coefficient map. Distinct from the 2020-era
+/// `ctsemOMX:::summary.ctsemFit` rewrite and from
+/// `ctsem:::verboseSummary` (2026-era), which computes
+/// `asymTIPREDEFFECT` without rewriting `TIPREDEFFECT`. This is not
+/// a Kalman filter, not a matrix `expm`, not ESEM estimation, not
+/// DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock,
+/// [`PsychometricError::AsymptotesTrueTimeIndependentEffectRequiresStableDrift`]
+/// when the drift is not strictly negative and the coefficient is
+/// nonzero, and [`PsychometricError::InvalidNumericInput`] when an
+/// input is non-finite or the product overflows.
+pub fn recover_asymptotes_true_time_independent_effect(
+    time_independent_effect: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !time_independent_effect.is_finite() || !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if time_independent_effect == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::AsymptotesTrueTimeIndependentEffectRequiresStableDrift);
+    }
+    let negated_log_rate = -log_rate;
+    require_finite(negated_log_rate * time_independent_effect)
+}
+
+/// Refuse treating unstandardised `TIPREDEFFECT` as the 2017-era
+/// active `asymptotes=TRUE` rewrite.
+///
+/// `B` is not `−a · B` when `a ≠ −1`. Equal numbers when `a = −1`
+/// remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect`].
+pub fn refuse_unstandardised_time_independent_effect_as_asymptotes_true_time_independent_effect(
+    unstandardised_time_independent_effect: f64,
+    asymptotes_true_time_independent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_time_independent_effect,
+        asymptotes_true_time_independent_effect,
+    );
+    Err(
+        PsychometricError::UnstandardisedTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect,
+    )
+}
+
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as the 2017-era active
+/// `asymptotes=TRUE` `TIPREDEFFECT` rewrite.
+///
+/// `-B / a` is the stored asymptotic parameterization. The rewrite
+/// `−a · B` converts that stored value back to original `B`. Those
+/// are inverse maps, not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect`].
+pub fn refuse_asymptotic_time_independent_effect_as_asymptotes_true_time_independent_effect(
+    asymptotic_time_independent_effect: f64,
+    asymptotes_true_time_independent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        asymptotic_time_independent_effect,
+        asymptotes_true_time_independent_effect,
+    );
+    Err(PsychometricError::AsymptoticTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect)
+}
+
+/// Refuse treating the finite-interval discrete increment as the
+/// 2017-era active `asymptotes=TRUE` `TIPREDEFFECT` rewrite.
+///
+/// `A^{-1}[e^{A Δt} − I] B` depends on the event interval. `−a · B`
+/// does not.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::DiscreteTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect`].
+pub fn refuse_discrete_time_independent_effect_as_asymptotes_true_time_independent_effect(
+    discrete_time_independent_effect: f64,
+    asymptotes_true_time_independent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        discrete_time_independent_effect,
+        asymptotes_true_time_independent_effect,
+    );
+    Err(PsychometricError::DiscreteTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect)
+}
+
+/// Refuse treating p. 16 `TIPREDEFFECTstd` as the 2017-era active
+/// `asymptotes=TRUE` `TIPREDEFFECT` rewrite.
+///
+/// `B · √v / √p` is the footnote 4 standardisation of the continuous
+/// coefficient. The rewrite `−a · B` is not that standardisation.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect`].
+pub fn refuse_standardised_time_independent_effect_as_asymptotes_true_time_independent_effect(
+    standardised_time_independent_effect: f64,
+    asymptotes_true_time_independent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_time_independent_effect,
+        asymptotes_true_time_independent_effect,
+    );
+    Err(
+        PsychometricError::StandardisedTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect,
+    )
+}
+
 /// Exact scalar §7.2 `addedTIPREDVAR`.
 ///
 /// Driver, Oud, and Voelkle (2017, §7.2, pp. 20–21; Eq. 3, p. 5;
@@ -6854,7 +7001,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 mod tests {
     use super::{
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
+        map_discrete_lag_across_event_intervals, recover_asymptotes_true_time_independent_effect,
+        recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -6908,6 +7056,7 @@ mod tests {
         refuse_asymptotic_continuous_intercept_observed_mean_as_stationary_initial_observed_mean,
         refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_asymptotic_time_independent_effect_as_asymptotes_true_time_independent_effect,
         refuse_asymptotic_time_independent_effect_as_coefficient,
         refuse_asymptotic_time_independent_effect_as_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_discrete_effect,
@@ -6920,6 +7069,7 @@ mod tests {
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
         refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
+        refuse_discrete_time_independent_effect_as_asymptotes_true_time_independent_effect,
         refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
         refuse_evolved_observed_mean_as_extra_process_observed_mean,
         refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -6988,6 +7138,7 @@ mod tests {
         refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
         refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
+        refuse_standardised_time_independent_effect_as_asymptotes_true_time_independent_effect,
         refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
         refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
@@ -7038,6 +7189,7 @@ mod tests {
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
+        refuse_unstandardised_time_independent_effect_as_asymptotes_true_time_independent_effect,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
     };
@@ -16351,6 +16503,200 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_time_independent_effect_recovers_negated_drift_times_coefficient() {
+        let recovered =
+            recover_asymptotes_true_time_independent_effect(0.4, -0.5, LagClock::EventTime)
+                .expect("asymptotes-true TIPREDEFFECT");
+        assert_eq!(recovered.to_bits(), 0.2_f64.to_bits());
+        let stored_asym = 0.8_f64;
+        let inverted =
+            recover_asymptotes_true_time_independent_effect(stored_asym, -0.5, LagClock::EventTime)
+                .expect("stored -B/a recovers B");
+        assert_eq!(inverted.to_bits(), 0.4_f64.to_bits());
+    }
+
+    #[test]
+    fn asymptotes_true_time_independent_effect_reconstructs_driver_leisure_and_happiness() {
+        // Driver et al. (2017, §7.2, p. 21) print LeisureTime
+        // TIPREDEFFECT = −0.225 and asymTIPREDEFFECT = −1.673.
+        // Reconstruct a = −B / printed_asym, then the rewrite
+        // −a · stored recovers original B.
+        let leisure_effect = -0.225_f64;
+        let leisure_printed_asym = -1.673_f64;
+        let leisure_log_rate = -leisure_effect / leisure_printed_asym;
+        let leisure = recover_asymptotes_true_time_independent_effect(
+            leisure_printed_asym,
+            leisure_log_rate,
+            LagClock::EventTime,
+        )
+        .expect("LeisureTime rewrite");
+        assert!((leisure - leisure_effect).abs() < 1e-12);
+        let happiness_effect = 0.549_f64;
+        let happiness_printed_asym = 0.219_f64;
+        let happiness_log_rate = -happiness_effect / happiness_printed_asym;
+        let happiness = recover_asymptotes_true_time_independent_effect(
+            happiness_printed_asym,
+            happiness_log_rate,
+            LagClock::EventTime,
+        )
+        .expect("Happiness rewrite");
+        assert!((happiness - happiness_effect).abs() < 1e-12);
+    }
+
+    #[test]
+    fn asymptotes_true_time_independent_effect_keeps_zero_when_drift_is_not_stable() {
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(0.0, 0.0, LagClock::EventTime)
+                .expect("zero a=0")
+                .to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(0.0, 0.5, LagClock::EventTime)
+                .expect("zero a>0")
+                .to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(-0.0, -0.0, LagClock::EventTime)
+                .expect("signed zero")
+                .to_bits(),
+            0.0_f64.to_bits()
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_time_independent_effect_fails_closed_on_non_stable_nonzero() {
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(0.4, 0.0, LagClock::EventTime),
+            Err(PsychometricError::AsymptotesTrueTimeIndependentEffectRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(0.4, 0.5, LagClock::EventTime),
+            Err(PsychometricError::AsymptotesTrueTimeIndependentEffectRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(-0.4, 0.0, LagClock::EventTime),
+            Err(PsychometricError::AsymptotesTrueTimeIndependentEffectRequiresStableDrift)
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_time_independent_effect_requires_event_clock() {
+        for clock in [
+            LagClock::SystemTime,
+            LagClock::AssertionTime,
+            LagClock::DocumentTime,
+            LagClock::AvailabilityTime,
+            LagClock::KnowledgeCutoff,
+        ] {
+            assert_eq!(
+                recover_asymptotes_true_time_independent_effect(0.4, -0.5, clock),
+                Err(PsychometricError::EventTimeRequired)
+            );
+        }
+    }
+
+    #[test]
+    fn asymptotes_true_time_independent_effect_fails_closed_on_non_finite_operands() {
+        let event = LagClock::EventTime;
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(f64::NAN, -0.5, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(0.4, f64::NAN, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(f64::INFINITY, -0.5, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(0.4, f64::INFINITY, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(f64::NEG_INFINITY, -0.5, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(0.4, f64::NEG_INFINITY, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_time_independent_effect(f64::MAX, -2.0, event),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_time_independent_effect_is_not_unstd_asym_discrete_or_std() {
+        let effect = 0.4_f64;
+        let log_rate = -0.5_f64;
+        let recovered =
+            recover_asymptotes_true_time_independent_effect(effect, log_rate, LagClock::EventTime)
+                .expect("rewrite");
+        let asymptotic = recover_asymptotic_time_independent_predictor_effect(
+            effect,
+            1.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("asymTIPREDEFFECT");
+        let discrete = recover_discrete_time_independent_predictor_effect(
+            effect,
+            1.0,
+            log_rate,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("discreteTIPREDEFFECT");
+        let process_sd = (-0.4_f64 / (2.0 * log_rate)).sqrt();
+        let standardised = effect * 1.0_f64.sqrt() / process_sd;
+        assert!((recovered - effect).abs() > 1e-3);
+        assert!((recovered - asymptotic).abs() > 1e-3);
+        assert!((recovered - discrete).abs() > 1e-3);
+        assert!((recovered - standardised).abs() > 1e-3);
+        assert!((recovered - 0.2).abs() < 1e-15);
+        assert!((asymptotic - 0.8).abs() < 1e-15);
+        assert!((discrete - 0.314_775_472).abs() < 1e-9);
+        assert!((standardised - 0.632_455_532).abs() < 1e-9);
+        assert_eq!(
+            refuse_unstandardised_time_independent_effect_as_asymptotes_true_time_independent_effect(
+                effect, recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_asymptotic_time_independent_effect_as_asymptotes_true_time_independent_effect(
+                asymptotic, recovered
+            ),
+            Err(
+                PsychometricError::AsymptoticTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_discrete_time_independent_effect_as_asymptotes_true_time_independent_effect(
+                discrete, recovered
+            ),
+            Err(
+                PsychometricError::DiscreteTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_standardised_time_independent_effect_as_asymptotes_true_time_independent_effect(
+                standardised, recovered
+            ),
+            Err(
+                PsychometricError::StandardisedTimeIndependentEffectIsNotAsymptotesTrueTimeIndependentEffect
+            )
         );
     }
 }

@@ -261,6 +261,16 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the 2017-era active `asymptotes=TRUE` `TIPREDEFFECT`
+//! rewrite as `−a · B` (`summary.ctsemFit.R` forms
+//! `if(asymptotes==TRUE) TIPREDEFFECT <- -DRIFT %*% TIPREDEFFECT`
+//! immediately after `mxobj$TIPREDEFFECT$values`; form `a` first,
+//! then negate, then multiply by `B`; a zero coefficient is exactly
+//! zero even if `a ≥ 0`; `a ≥ 0` with a nonzero coefficient fails
+//! closed; unstandardised `TIPREDEFFECT` is not that rewrite;
+//! `asymTIPREDEFFECT` `-B / a` is not that rewrite; the finite-
+//! interval increment is not that rewrite; `TIPREDEFFECTstd` is not
+//! that rewrite; JSS PDF re-opened 2026-08-31T15:26Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -311,6 +321,8 @@ pub use event_time::LagClock;
 pub use event_time::LaggedWithinResidual;
 /// Map a discrete lag onto another event interval through the exact log-rate.
 pub use event_time::map_discrete_lag_across_event_intervals;
+/// Exact scalar 2017-era active `asymptotes=TRUE` `TIPREDEFFECT` rewrite `−a · B`.
+pub use event_time::recover_asymptotes_true_time_independent_effect;
 /// Exact scalar Table 2 `asymCINT` `-κ / a`.
 pub use event_time::recover_asymptotic_continuous_intercept;
 /// Exact scalar §7.2 `asymTIPREDEFFECT` `-B z / a`.
@@ -466,6 +478,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stat
 pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `asymCINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating §7.2 `asymTIPREDEFFECT` as the 2017-era active `asymptotes=TRUE` rewrite.
+pub use event_time::refuse_asymptotic_time_independent_effect_as_asymptotes_true_time_independent_effect;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT` `B`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_coefficient;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.
@@ -492,6 +506,8 @@ pub use event_time::refuse_difference_quotient_as_local_rate;
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating the finite-interval increment as the 2017-era active `asymptotes=TRUE` rewrite.
+pub use event_time::refuse_discrete_time_independent_effect_as_asymptotes_true_time_independent_effect;
 /// Refuse treating evolved `τ + λ μ_t` as the after-t0 extra-process observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the extra-process observed mean.
@@ -639,6 +655,8 @@ pub use event_time::refuse_standardised_manifest_variance_as_standardised_manife
 
 /// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
+/// Refuse treating p. 16 `TIPREDEFFECTstd` as the 2017-era active `asymptotes=TRUE` rewrite.
+pub use event_time::refuse_standardised_time_independent_effect_as_asymptotes_true_time_independent_effect;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
@@ -743,7 +761,8 @@ pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest
 pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
-
+/// Refuse treating unstandardised `TIPREDEFFECT` as the 2017-era active `asymptotes=TRUE` rewrite.
+pub use event_time::refuse_unstandardised_time_independent_effect_as_asymptotes_true_time_independent_effect;
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
