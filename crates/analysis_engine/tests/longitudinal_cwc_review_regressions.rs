@@ -9,6 +9,8 @@ use analysis_engine::{
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest};
 
+const SNAPSHOT_ID: &str = "snapshot-longitudinal-cwc";
+
 fn available(stamp: &str) -> AvailableTime {
     AvailableTime::parse_rfc3339(stamp).expect("available")
 }
@@ -22,19 +24,36 @@ fn request(cutoff: &str) -> AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: "longitudinal-cwc-review-regression".into(),
         tenant_workspace_id: "tenant-workspace".into(),
-        snapshot_id: "snapshot-longitudinal-cwc".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: cutoff.into(),
         model_contract_version: LONGITUDINAL_CWC_MODEL_CONTRACT_VERSION.into(),
         output_profile: LONGITUDINAL_CWC_OUTPUT_PROFILE.into(),
     }
 }
 
+fn row(
+    snapshot_id: &str,
+    cluster_key: u64,
+    predictor: f64,
+    outcome: f64,
+    available_time: &str,
+) -> LongitudinalClusterScore {
+    LongitudinalClusterScore::new(
+        snapshot_id,
+        cluster_key,
+        predictor,
+        outcome,
+        available(available_time),
+    )
+    .expect("row")
+}
+
 fn rows() -> Vec<LongitudinalClusterScore> {
     vec![
-        LongitudinalClusterScore::new(1, 0.0, 2.0, available("2026-07-01T00:00:00Z")).expect("r1"),
-        LongitudinalClusterScore::new(1, 2.0, 3.0, available("2026-07-01T00:00:00Z")).expect("r2"),
-        LongitudinalClusterScore::new(2, 4.0, 10.0, available("2026-07-01T00:00:00Z")).expect("r3"),
-        LongitudinalClusterScore::new(2, 6.0, 11.0, available("2026-07-01T00:00:00Z")).expect("r4"),
+        row(SNAPSHOT_ID, 1, 0.0, 2.0, "2026-07-01T00:00:00Z"),
+        row(SNAPSHOT_ID, 1, 2.0, 3.0, "2026-07-01T00:00:00Z"),
+        row(SNAPSHOT_ID, 2, 4.0, 10.0, "2026-07-01T00:00:00Z"),
+        row(SNAPSHOT_ID, 2, 6.0, 11.0, "2026-07-01T00:00:00Z"),
     ]
 }
 
@@ -42,7 +61,7 @@ fn artifact() -> LongitudinalCwcArtifact {
     LongitudinalCwcArtifact {
         schema_version: LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION.into(),
         run_id: "run-longitudinal-cwc".into(),
-        snapshot_id: "snapshot-longitudinal-cwc".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
         row_count: 4,
         cluster_count: 2,
@@ -67,7 +86,7 @@ fn equivalent_cutoff_instants_bind_and_provider_status_stays_separate() {
     let execution = execute_longitudinal_cwc_run(
         &request,
         &accepted,
-        "snapshot-longitudinal-cwc",
+        SNAPSHOT_ID,
         cutoff(),
         &rows(),
         "2026-08-02T00:00:00Z",
@@ -86,6 +105,37 @@ fn equivalent_cutoff_instants_bind_and_provider_status_stays_separate() {
     assert_eq!(
         execution.artifact.inference_status,
         "composed_cwc_slopes_not_causal"
+    );
+}
+
+#[test]
+fn cross_snapshot_rows_fail_closed_before_scientific_composition() {
+    let request = request("2026-08-01T00:00:00Z");
+    let accepted = AnalysisRunAccepted::new(
+        "run-longitudinal-cwc",
+        "accepted",
+        &request.idempotency_key,
+    )
+    .expect("accepted");
+    let mut mixed = rows();
+    mixed.push(row(
+        "snapshot-other",
+        3,
+        8.0,
+        20.0,
+        "2026-08-15T00:00:00Z",
+    ));
+
+    assert_eq!(
+        execute_longitudinal_cwc_run(
+            &request,
+            &accepted,
+            SNAPSHOT_ID,
+            cutoff(),
+            &mixed,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::SnapshotMismatch)
     );
 }
 
