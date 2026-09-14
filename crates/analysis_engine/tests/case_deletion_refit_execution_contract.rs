@@ -8,8 +8,10 @@ use analysis_engine::{
     CaseDeletionDocument, CaseDeletionFitContext, CaseDeletionRefitInput, CaseDeletionRefitter,
     execute_case_deletion_refit_run,
 };
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState, ApiError};
+
+const SNAPSHOT_ID: &str = "snapshot-case-deletion-refit";
 
 struct MeanFitter;
 
@@ -66,6 +68,10 @@ fn cutoff() -> KnowledgeCutoff {
     KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff")
 }
 
+fn available_time(value: &str) -> AvailableTime {
+    AvailableTime::parse_rfc3339(value).expect("available time")
+}
+
 fn documents() -> Vec<CaseDeletionDocument<f64>> {
     vec![
         CaseDeletionDocument {
@@ -83,12 +89,20 @@ fn documents() -> Vec<CaseDeletionDocument<f64>> {
     ]
 }
 
+fn visible_snapshot_ids(len: usize) -> Vec<String> {
+    vec![SNAPSHOT_ID.to_owned(); len]
+}
+
+fn visible_available_times(len: usize) -> Vec<AvailableTime> {
+    vec![available_time("2026-07-01T00:00:00Z"); len]
+}
+
 fn request() -> AnalysisRunRequest {
     AnalysisRunRequest {
         contract_version: 1,
         idempotency_key: "case-deletion-refit-idem".into(),
         tenant_workspace_id: "tenant-workspace".into(),
-        snapshot_id: "snapshot-case-deletion-refit".into(),
+        snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
         model_contract_version: CASE_DELETION_REFIT_MODEL_CONTRACT_VERSION.into(),
         output_profile: CASE_DELETION_REFIT_OUTPUT_PROFILE.into(),
@@ -104,19 +118,52 @@ fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
     .expect("accepted")
 }
 
-fn execute(
+fn execute_with_provenance<D, P, F>(
     request: &AnalysisRunRequest,
-) -> Result<analysis_engine::CaseDeletionRefitExecution, AnalysisEngineError> {
-    let documents = documents();
-    let fitter = MeanFitter;
+    documents: &[CaseDeletionDocument<D>],
+    snapshot_ids: &[String],
+    available_times: &[AvailableTime],
+    fitter: &F,
+) -> Result<analysis_engine::CaseDeletionRefitExecution, AnalysisEngineError>
+where
+    D: Clone,
+    F: CaseDeletionRefitter<D, P>,
+{
     execute_case_deletion_refit_run(
         request,
         &accepted(request),
-        "snapshot-case-deletion-refit",
+        SNAPSHOT_ID,
         cutoff(),
-        &CaseDeletionRefitInput::new(&documents, "topic-model-run", &fitter),
+        &CaseDeletionRefitInput::new(
+            documents,
+            snapshot_ids,
+            available_times,
+            "topic-model-run",
+            fitter,
+        ),
         "2026-08-02T00:00:00Z",
     )
+}
+
+fn execute_with_documents(
+    request: &AnalysisRunRequest,
+    documents: &[CaseDeletionDocument<f64>],
+) -> Result<analysis_engine::CaseDeletionRefitExecution, AnalysisEngineError> {
+    let snapshot_ids = visible_snapshot_ids(documents.len());
+    let available_times = visible_available_times(documents.len());
+    execute_with_provenance(
+        request,
+        documents,
+        &snapshot_ids,
+        &available_times,
+        &MeanFitter,
+    )
+}
+
+fn execute(
+    request: &AnalysisRunRequest,
+) -> Result<analysis_engine::CaseDeletionRefitExecution, AnalysisEngineError> {
+    execute_with_documents(request, &documents())
 }
 
 #[test]
@@ -170,23 +217,96 @@ fn equivalent_cutoff_spellings_bind_the_same_instant() {
 }
 
 #[test]
+fn future_duplicate_evidence_cannot_change_historical_replay() {
+    let request = request();
+    let baseline_documents = documents();
+    let baseline = execute_with_documents(&request, &baseline_documents).expect("baseline");
+
+    let mut replay_documents = baseline_documents;
+    replay_documents.push(CaseDeletionDocument {
+        document_id: "document-a".into(),
+        evidence: 10_000.0,
+    });
+    let replay_snapshot_ids = visible_snapshot_ids(replay_documents.len());
+    let mut replay_available_times = visible_available_times(replay_documents.len());
+    *replay_available_times.last_mut().expect("future availability") =
+        available_time("2026-08-02T00:00:00Z");
+    let replay = execute_with_provenance(
+        &request,
+        &replay_documents,
+        &replay_snapshot_ids,
+        &replay_available_times,
+        &MeanFitter,
+    )
+    .expect("future evidence must be censored before duplicate/scientific admission");
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result.summary, baseline.terminal_result.summary);
+}
+
+#[test]
+fn cross_snapshot_and_misaligned_provenance_fail_closed() {
+    let request = request();
+    let documents = documents();
+    let available_times = visible_available_times(documents.len());
+    let mut wrong_snapshot_ids = visible_snapshot_ids(documents.len());
+    wrong_snapshot_ids[1] = "snapshot-other".into();
+    assert_eq!(
+        execute_with_provenance(
+            &request,
+            &documents,
+            &wrong_snapshot_ids,
+            &available_times,
+            &MeanFitter,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let short_snapshot_ids = vec![SNAPSHOT_ID.to_owned(); documents.len() - 1];
+    assert_eq!(
+        execute_with_provenance(
+            &request,
+            &documents,
+            &short_snapshot_ids,
+            &available_times,
+            &MeanFitter,
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn visible_duplicate_identity_still_fails_closed() {
+    let request = request();
+    let mut duplicate_documents = documents();
+    duplicate_documents.push(CaseDeletionDocument {
+        document_id: "document-a".into(),
+        evidence: 13.0,
+    });
+    assert_eq!(
+        execute_with_documents(&request, &duplicate_documents),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
 fn oversized_case_deletion_census_fails_before_any_fitter_call() {
     let request = request();
     let documents = (0..257)
         .map(|index| CaseDeletionDocument {
             document_id: format!("document-{index}"),
-            evidence: f64::from(index),
+            evidence: f64::from(u32::try_from(index).expect("small test index")),
         })
         .collect::<Vec<_>>();
+    let snapshot_ids = visible_snapshot_ids(documents.len());
+    let available_times = visible_available_times(documents.len());
     let fitter = CountingFitter::default();
     assert_eq!(
-        execute_case_deletion_refit_run(
+        execute_with_provenance(
             &request,
-            &accepted(&request),
-            "snapshot-case-deletion-refit",
-            cutoff(),
-            &CaseDeletionRefitInput::new(&documents, "topic-model-run", &fitter),
-            "2026-08-02T00:00:00Z",
+            &documents,
+            &snapshot_ids,
+            &available_times,
+            &fitter,
         ),
         Err(AnalysisEngineError::LimitExceeded)
     );
@@ -200,28 +320,21 @@ fn invalid_corpus_and_fitter_refusal_fail_closed() {
         document_id: "document-a".into(),
         evidence: 1.0,
     }];
-    let fitter = MeanFitter;
     assert_eq!(
-        execute_case_deletion_refit_run(
-            &request,
-            &accepted(&request),
-            "snapshot-case-deletion-refit",
-            cutoff(),
-            &CaseDeletionRefitInput::new(&one, "topic-model-run", &fitter),
-            "2026-08-02T00:00:00Z",
-        ),
+        execute_with_documents(&request, &one),
         Err(AnalysisEngineError::InvalidEvidence)
     );
+
     let documents = documents();
-    let refusing = RefusingFitter;
+    let snapshot_ids = visible_snapshot_ids(documents.len());
+    let available_times = visible_available_times(documents.len());
     assert_eq!(
-        execute_case_deletion_refit_run(
+        execute_with_provenance(
             &request,
-            &accepted(&request),
-            "snapshot-case-deletion-refit",
-            cutoff(),
-            &CaseDeletionRefitInput::new(&documents, "topic-model-run", &refusing),
-            "2026-08-02T00:00:00Z",
+            &documents,
+            &snapshot_ids,
+            &available_times,
+            &RefusingFitter,
         ),
         Err(AnalysisEngineError::CaseDeletionFitFailure)
     );
@@ -231,14 +344,21 @@ fn invalid_corpus_and_fitter_refusal_fail_closed() {
 fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
     let request = request();
     let documents = documents();
-    let fitter = MeanFitter;
+    let snapshot_ids = visible_snapshot_ids(documents.len());
+    let available_times = visible_available_times(documents.len());
     assert_eq!(
         execute_case_deletion_refit_run(
             &request,
             &accepted(&request),
             "other-snapshot",
             cutoff(),
-            &CaseDeletionRefitInput::new(&documents, "topic-model-run", &fitter),
+            &CaseDeletionRefitInput::new(
+                &documents,
+                &snapshot_ids,
+                &available_times,
+                "topic-model-run",
+                &MeanFitter,
+            ),
             "2026-08-02T00:00:00Z",
         ),
         Err(AnalysisEngineError::SnapshotMismatch)
@@ -286,14 +406,21 @@ fn execution_refuses_snapshot_profile_and_cutoff_mismatch() {
 fn invalid_completed_at_fails_terminal_result_construction() {
     let request = request();
     let documents = documents();
-    let fitter = MeanFitter;
+    let snapshot_ids = visible_snapshot_ids(documents.len());
+    let available_times = visible_available_times(documents.len());
     assert_eq!(
         execute_case_deletion_refit_run(
             &request,
             &accepted(&request),
-            "snapshot-case-deletion-refit",
+            SNAPSHOT_ID,
             cutoff(),
-            &CaseDeletionRefitInput::new(&documents, "topic-model-run", &fitter),
+            &CaseDeletionRefitInput::new(
+                &documents,
+                &snapshot_ids,
+                &available_times,
+                "topic-model-run",
+                &MeanFitter,
+            ),
             "not-a-timestamp",
         ),
         Err(AnalysisEngineError::Api(ApiError::InvalidWirePayload))
