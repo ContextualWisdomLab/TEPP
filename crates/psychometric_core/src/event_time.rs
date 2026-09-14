@@ -2038,6 +2038,146 @@ pub fn recover_standardised_trait_variance(
     require_finite(scaled * inverse_sd)
 }
 
+/// Exact scalar 2017-era commented `TRAITVAR` rewrite when
+/// `asymptotes=TRUE`.
+///
+/// Driver, Oud, and Voelkle (2017, Table 2, p. 12; §4.3, p. 9;
+/// §7.1, pp. 18–19; Eq. 1, p. 4; p. 16; 2017-era ctsem
+/// `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-31T05:20Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `TRAITVAR` `φ_ξ` the latent trait variance/covariance of a
+/// stable extra process with `DRIFT` and `DIFFUSION` fixed to zero.
+/// cran/ctsem 2.5.0 `summary.ctsemFit.R` comments
+/// `if(asymptotes==TRUE) TRAITVAR <- DRIFT %&% TRAITVAR` immediately
+/// after `TRAITVAR <- mxEval(TRAITVAR, mxobj, compute=TRUE)`. That
+/// rewrite is commented and is not in the active `outlist`. `OpenMx`
+/// `%&%` is the quadratic form `t(A) %*% B %*% A`. The scalar map
+/// is `a² · trait`. Form `a` first, then square, then multiply by
+/// `trait`. Active companion rewrites convert asymptotic
+/// parameterization back to original continuous-time parameters:
+/// `CINT <- -DRIFT %*% CINT` and
+/// `TIPREDEFFECT <- -DRIFT %*% TIPREDEFFECT`. The same conversion
+/// for `TRAITVAR` multiplies the stored value by `a²`. A zero trait
+/// is exactly zero even if `a ≥ 0`. `a ≥ 0` with a nonzero trait
+/// fails closed because the `asymptotes=TRUE` parameterization
+/// requires a lasting equilibrium. Unstandardised `TRAITVAR` is
+/// `trait` and is not this rewrite. `TRAITVARstd` is
+/// `trait / trait = 1` and is not this rewrite. `asymDIFFUSION`
+/// `-q / (2 a)` is not this rewrite. `addedTIPREDVAR`
+/// `(B / a)² v` divides by `a` and is not this rewrite. Do not
+/// import unpublished `#330` `trait / a²` helpers. A non-event
+/// clock fails closed. This is not a Kalman filter, not a matrix
+/// `expm`, not ESEM estimation, not DSEM, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::AsymptotesTrueTraitVarianceRequiresStableDrift`]
+/// when `TRAITVAR` is nonzero and the drift is not strictly
+/// negative, and [`PsychometricError::InvalidNumericInput`] when an
+/// input is non-finite, `TRAITVAR` is negative, or the product
+/// overflows.
+pub fn recover_asymptotes_true_trait_variance(
+    trait_variance: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !trait_variance.is_finite() || trait_variance < 0.0 || !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if trait_variance == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::AsymptotesTrueTraitVarianceRequiresStableDrift);
+    }
+    // Form a first, then square, then multiply by trait.
+    let squared_rate = require_finite(log_rate * log_rate)?;
+    require_finite(squared_rate * trait_variance)
+}
+
+/// Refuse treating unstandardised `TRAITVAR` as the 2017-era
+/// commented `asymptotes=TRUE` rewrite.
+///
+/// `trait` is defined for a zero trait and for growing `a ≥ 0`.
+/// `a² · trait` is not `trait` when `a ≠ ±1`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance`].
+pub fn refuse_unstandardised_trait_variance_as_asymptotes_true_trait_variance(
+    unstandardised_trait_variance: f64,
+    asymptotes_true_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        unstandardised_trait_variance,
+        asymptotes_true_trait_variance,
+    );
+    Err(PsychometricError::UnstandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance)
+}
+
+/// Refuse treating p. 16 `TRAITVARstd` as the 2017-era commented
+/// `asymptotes=TRUE` `TRAITVAR` rewrite.
+///
+/// `trait / trait = 1` is the correlation form of untransformed
+/// `TRAITVAR`. `a² · trait` is not that correlation.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance`].
+pub fn refuse_standardised_trait_variance_as_asymptotes_true_trait_variance(
+    standardised_trait_variance: f64,
+    asymptotes_true_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_trait_variance, asymptotes_true_trait_variance);
+    Err(PsychometricError::StandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance)
+}
+
+/// Refuse treating p. 16 `asymDIFFUSION` as the 2017-era commented
+/// `asymptotes=TRUE` `TRAITVAR` rewrite.
+///
+/// `-q / (2 a)` is stationary within-subject variance. `a² · trait`
+/// is not that map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StationaryVarianceIsNotAsymptotesTrueTraitVariance`].
+pub fn refuse_stationary_variance_as_asymptotes_true_trait_variance(
+    stationary_variance: f64,
+    asymptotes_true_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (stationary_variance, asymptotes_true_trait_variance);
+    Err(PsychometricError::StationaryVarianceIsNotAsymptotesTrueTraitVariance)
+}
+
+/// Refuse treating §7.2 `addedTIPREDVAR` as the 2017-era commented
+/// `asymptotes=TRUE` `TRAITVAR` rewrite.
+///
+/// `(B / a)² v` divides by `a`. `a² · trait` multiplies by `a²`.
+/// Equal numbers when `B = 0.5`, `v = 1`, `a = −0.5`, `trait = 4`
+/// remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotAsymptotesTrueTraitVariance`].
+pub fn refuse_asymptotic_time_independent_predictor_variance_as_asymptotes_true_trait_variance(
+    added_tipred_variance: f64,
+    asymptotes_true_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (added_tipred_variance, asymptotes_true_trait_variance);
+    Err(
+        PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotAsymptotesTrueTraitVariance,
+    )
+}
+
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 ///
 /// Unstandardised `TRAITVAR` is defined for a zero trait. Footnote
@@ -6854,7 +6994,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 mod tests {
     use super::{
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
+        map_discrete_lag_across_event_intervals, recover_asymptotes_true_trait_variance,
+        recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -6912,6 +7053,7 @@ mod tests {
         refuse_asymptotic_time_independent_effect_as_continuous_intercept,
         refuse_asymptotic_time_independent_effect_as_discrete_effect,
         refuse_asymptotic_time_independent_effect_as_time_dependent_impulse,
+        refuse_asymptotic_time_independent_predictor_variance_as_asymptotes_true_trait_variance,
         refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
         refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
         refuse_asymptotic_time_independent_variance_as_trait_variance,
@@ -6989,6 +7131,7 @@ mod tests {
         refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
         refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
+        refuse_standardised_trait_variance_as_asymptotes_true_trait_variance,
         refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
         refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
         refuse_stationary_initial_latent_mean_as_asymptotic_time_independent_effect,
@@ -7012,6 +7155,7 @@ mod tests {
         refuse_stationary_later_latent_variance_as_lagged_covariance,
         refuse_stationary_later_latent_variance_as_observed_variance,
         refuse_stationary_later_latent_variance_as_process_noise,
+        refuse_stationary_variance_as_asymptotes_true_trait_variance,
         refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance,
         refuse_time_dependent_impulse_as_continuous_intercept,
         refuse_time_dependent_impulse_as_time_independent_effect,
@@ -7038,6 +7182,7 @@ mod tests {
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
+        refuse_unstandardised_trait_variance_as_asymptotes_true_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
     };
@@ -16350,6 +16495,113 @@ mod tests {
                 -1.0,
                 LagClock::EventTime
             ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_trait_variance_recovers_a_squared_times_trait() {
+        // 2017-era summary.ctsemFit.R comments
+        // if(asymptotes==TRUE) TRAITVAR <- DRIFT %&% TRAITVAR.
+        // OpenMx %&% is t(A) %*% B %*% A. Scalar: a² · trait.
+        // Form a first, then square, then * trait.
+        // a = -0.5, trait = 1 → 0.25.
+        let trait_variance = 1.0_f64;
+        let log_rate = -0.5_f64;
+        let recovered =
+            recover_asymptotes_true_trait_variance(trait_variance, log_rate, LagClock::EventTime)
+                .expect("asymptotes=TRUE TRAITVAR");
+        assert!((recovered - 0.25).abs() < 1e-15);
+        let unit_rate =
+            recover_asymptotes_true_trait_variance(trait_variance, -1.0, LagClock::EventTime)
+                .expect("a=-1");
+        assert!((unit_rate - 1.0).abs() < 1e-15);
+        // Stored asymptotic parameterization trait/a² = 4 recovers
+        // original TRAITVAR = 1. Do not import unpublished #330.
+        let from_stored =
+            recover_asymptotes_true_trait_variance(4.0, log_rate, LagClock::EventTime)
+                .expect("stored 4");
+        assert!((from_stored - 1.0).abs() < 1e-15);
+        let zero = recover_asymptotes_true_trait_variance(0.0, log_rate, LagClock::EventTime)
+            .expect("zero trait");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let zero_growing = recover_asymptotes_true_trait_variance(0.0, 0.5, LagClock::EventTime)
+            .expect("zero trait growing");
+        assert_eq!(zero_growing.to_bits(), 0.0_f64.to_bits());
+        let standardised = recover_standardised_trait_variance(trait_variance, LagClock::EventTime)
+            .expect("TRAITVARstd");
+        assert!((standardised - recovered).abs() > 1e-3);
+        let stationary = recover_stationary_latent_variance(0.4, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        assert!((stationary - recovered).abs() > 1e-3);
+        let added = recover_asymptotic_time_independent_predictor_variance(
+            0.5,
+            1.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("addedTIPREDVAR");
+        assert!((added - recovered).abs() > 1e-3);
+        assert_eq!(
+            refuse_unstandardised_trait_variance_as_asymptotes_true_trait_variance(
+                trait_variance,
+                recovered
+            ),
+            Err(PsychometricError::UnstandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance)
+        );
+        assert_eq!(
+            refuse_standardised_trait_variance_as_asymptotes_true_trait_variance(
+                standardised,
+                recovered
+            ),
+            Err(PsychometricError::StandardisedTraitVarianceIsNotAsymptotesTrueTraitVariance)
+        );
+        assert_eq!(
+            refuse_stationary_variance_as_asymptotes_true_trait_variance(stationary, recovered),
+            Err(PsychometricError::StationaryVarianceIsNotAsymptotesTrueTraitVariance)
+        );
+        assert_eq!(
+            refuse_asymptotic_time_independent_predictor_variance_as_asymptotes_true_trait_variance(
+                added, recovered
+            ),
+            Err(
+                PsychometricError::AsymptoticTimeIndependentPredictorVarianceIsNotAsymptotesTrueTraitVariance
+            )
+        );
+    }
+
+    #[test]
+    fn asymptotes_true_trait_variance_fails_closed_when_untransformed_is_defined() {
+        assert_eq!(
+            recover_asymptotes_true_trait_variance(1.0, 0.5, LagClock::EventTime),
+            Err(PsychometricError::AsymptotesTrueTraitVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotes_true_trait_variance(1.0, 0.0, LagClock::EventTime),
+            Err(PsychometricError::AsymptotesTrueTraitVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotes_true_trait_variance(1.0, -0.5, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_asymptotes_true_trait_variance(-1.0, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_trait_variance(f64::NAN, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_trait_variance(1.0, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_trait_variance(f64::INFINITY, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotes_true_trait_variance(2.0, -1e200, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
