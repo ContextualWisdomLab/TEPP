@@ -241,10 +241,12 @@ def is_executable_source_line(
         "();",
         "};",
         "});",
-        "Ok(())",
     }:
         return False
-    if _is_standalone_string_literal(text) or text.startswith("} else"):
+    if (
+        _is_standalone_string_literal(text)
+        and not _is_match_arm_body(lines, line_number)
+    ) or text.startswith("} else"):
         return False
     if text.endswith(" {"):
         type_name = text[:-2]
@@ -679,6 +681,22 @@ def _character_literal_end(line: str, cursor: int) -> int | None:
     if candidate < len(line) and line[candidate] == "'":
         return candidate + 1
     return None
+
+
+def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
+    """Return whether *line_number* is the whole body of a ``match`` arm.
+
+    A match arm whose body is one string literal is executable production
+    behavior: a zero count means the arm was never taken. Without this the
+    standalone-literal exclusion would hide every such arm from the gate.
+    """
+
+    for index in range(line_number - 2, -1, -1):
+        previous = lines[index].strip()
+        if not previous or previous.startswith("//"):
+            continue
+        return previous.endswith("=>") or previous.endswith("=> {")
+    return False
 
 
 def _is_standalone_string_literal(text: str) -> bool:
