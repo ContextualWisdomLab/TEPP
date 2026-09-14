@@ -352,6 +352,23 @@ pub enum PsychometricError {
     /// `(B / a)² v` is a variance, not the expected total change in
     /// process means.
     AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect,
+    /// 2017-era commented `discreteTRAITVAR` was requested for a
+    /// non-stable drift. Process-mean trait variance is `trait / a²`
+    /// and requires `a < 0`.
+    DiscreteTraitVarianceRequiresStableDrift,
+    /// 2017-era commented `discreteTRAITVAR` was treated as `TRAITVAR`.
+    /// `(1 − e^{a Δt})² · (trait / a²)` is process-mean variance after
+    /// `(I − e^{A Δt})`. Table 2 `TRAITVAR` `φ_ξ` is `Var(ξ)`, not
+    /// that map.
+    DiscreteTraitVarianceIsNotTraitVariance,
+    /// 2017-era commented `discreteTRAITVAR` was treated as unpublished
+    /// `asymTRAITVAR`. `(1 − e^{a Δt})² · (trait / a²)` still depends
+    /// on the event interval. `trait / a²` is the `Δt → ∞` limit.
+    DiscreteTraitVarianceIsNotAsymptoticTraitVariance,
+    /// 2017-era commented `discreteTRAITVAR` was treated as Driver
+    /// Eq. 3 `Q_Δt`. Between-subject random-intercept variance after
+    /// `(I − e^{A Δt})` is not finite-interval process noise.
+    DiscreteTraitVarianceIsNotDiscreteProcessNoise,
     /// Driver Table 2 `asymCINT` was requested for a non-stable drift.
     /// The expected change in process means for a change in intercept
     /// is `-κ / a` and requires `a < 0`.
@@ -996,6 +1013,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect => {
                 "asymptotic time-independent predictor variance is not the expected total change in process means"
+            }
+            Self::DiscreteTraitVarianceRequiresStableDrift => {
+                "discrete trait variance requires a stable negative drift"
+            }
+            Self::DiscreteTraitVarianceIsNotTraitVariance => {
+                "discrete trait variance is not trait variance"
+            }
+            Self::DiscreteTraitVarianceIsNotAsymptoticTraitVariance => {
+                "discrete trait variance is not the unpublished asymptotic trait variance"
+            }
+            Self::DiscreteTraitVarianceIsNotDiscreteProcessNoise => {
+                "discrete trait variance is not discrete process noise"
             }
             Self::AsymptoticContinuousInterceptRequiresStableDrift => {
                 "asymptotic continuous intercept requires a stable negative drift"
@@ -1734,6 +1763,26 @@ mod tests {
         assert_eq!(
             PsychometricError::InitialObservedMeanIsNotStationaryInitialObservedMean.to_string(),
             "free first-occasion observed mean is not the stationary first-occasion observed mean"
+        );
+    }
+
+    #[test]
+    fn discrete_trait_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::DiscreteTraitVarianceRequiresStableDrift.to_string(),
+            "discrete trait variance requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteTraitVarianceIsNotTraitVariance.to_string(),
+            "discrete trait variance is not trait variance"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteTraitVarianceIsNotAsymptoticTraitVariance.to_string(),
+            "discrete trait variance is not the unpublished asymptotic trait variance"
+        );
+        assert_eq!(
+            PsychometricError::DiscreteTraitVarianceIsNotDiscreteProcessNoise.to_string(),
+            "discrete trait variance is not discrete process noise"
         );
     }
 

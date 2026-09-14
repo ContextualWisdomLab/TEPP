@@ -2328,6 +2328,142 @@ pub fn refuse_initial_time_independent_variance_as_standardised_trait_variance(
     Err(PsychometricError::InitialTimeIndependentVarianceIsNotStandardisedTraitVariance)
 }
 
+/// Exact scalar 2017-era commented `discreteTRAITVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 1, p. 4; Table 2, p. 12
+/// `TRAITVAR` `φ_ξ`; §4.3, p. 9; JSS PDF re-opened 2026-08-31T05:15Z
+/// from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `dη = (Aη + ξ + Bz + Mx) dt + G dW`. At a stable
+/// equilibrium `η_∞ = −A^{-1} ξ`, so process-mean variance from that
+/// random intercept is `trait / a²`. cran/ctsem 2.5.0
+/// `summary.ctsemFit.R` comments
+/// `asymTRAITVAR <- solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))`
+/// and then the commented discrete map
+/// `(I − expm(DRIFT * timeInterval)) %*% asymTRAITVAR %*% t(...)`
+/// using `OpenMx` `expm` (not in the active `outlist`). The scalar
+/// map is `(1 − e^{a Δt})² · (trait / a²)`. Form `1 / a` first, then
+/// square, then multiply by `trait` (do not import unpublished #330
+/// `recover_asymptotic_trait_variance`). Then form `expm1(a Δt)` and
+/// square, then multiply. Do not call
+/// [`recover_discrete_lag_from_log_rate`]: binary64 underflow of
+/// `e^{a Δt}` to `+0` is a vanishing lag and is not a discrete φ,
+/// but the `Δt → ∞` limit of this map is `trait / a²` and is kept.
+/// A zero trait is exactly zero even if `a ≥ 0`. `trait < 0` fails
+/// closed. `a ≥ 0` with a nonzero trait cannot hold a finite
+/// `solve(DRIFT)` process-mean variance and fails closed. A
+/// non-event clock fails closed. A non-positive event interval fails
+/// closed. `(1 − e^{a Δt})² · (trait / a²)` is not Table 2 `TRAITVAR`
+/// `φ_ξ`, not the unpublished 2017-era `asymTRAITVAR` `trait / a²`,
+/// and not Driver Eq. 3 `Q_Δt`. Equal numbers when `e^{a Δt}`
+/// underflows (this map then equals `trait / a²`) remain distinct
+/// named quantities. This is not a Kalman filter, not a matrix
+/// `expm`, and not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::NonPositiveInterval`] when
+/// `event_delta` is not strictly positive,
+/// [`PsychometricError::DiscreteTraitVarianceRequiresStableDrift`]
+/// when the drift is not strictly negative and the trait is nonzero,
+/// and [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, the trait variance is negative, or `1 / a` or the
+/// product overflows.
+pub fn recover_discrete_trait_variance(
+    trait_variance: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !trait_variance.is_finite() || !log_rate.is_finite() || trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if trait_variance == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::DiscreteTraitVarianceRequiresStableDrift);
+    }
+    let inverse = require_finite(1.0 / log_rate)?;
+    let squared = require_finite(inverse * inverse)?;
+    let asymptotic_trait = require_finite(squared * trait_variance)?;
+    let increment_argument = log_rate * event_delta;
+    if !increment_argument.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    // (1 − e^{a Δt})² = expm1(a Δt)². Underflow of e^{a Δt} to +0
+    // yields expm1 = −1, so the product keeps trait / a².
+    let increment = increment_argument.exp_m1();
+    let scale = require_finite(increment * increment)?;
+    require_finite(scale * asymptotic_trait)
+}
+
+/// Refuse treating Table 2 `TRAITVAR` as 2017-era `discreteTRAITVAR`.
+///
+/// `φ_ξ` is process-unit between-subject variance. The commented
+/// discrete map converts that random intercept through
+/// `(I − e^{A Δt}) A^{-1}`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::DiscreteTraitVarianceIsNotTraitVariance`].
+pub fn refuse_trait_variance_as_discrete_trait_variance(
+    trait_variance: f64,
+    discrete_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (trait_variance, discrete_trait_variance);
+    Err(PsychometricError::DiscreteTraitVarianceIsNotTraitVariance)
+}
+
+/// Refuse treating unpublished 2017-era `asymTRAITVAR` as
+/// `discreteTRAITVAR`.
+///
+/// `trait / a²` is the `Δt → ∞` process-mean variance. The
+/// commented discrete map still depends on the event interval.
+/// Equal numbers when `e^{a Δt}` underflows remain distinct named
+/// quantities. This crate does not currently export unpublished
+/// `recover_asymptotic_trait_variance` (#330).
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::DiscreteTraitVarianceIsNotAsymptoticTraitVariance`].
+pub fn refuse_asymptotic_trait_variance_as_discrete_trait_variance(
+    asymptotic_trait_variance: f64,
+    discrete_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_trait_variance, discrete_trait_variance);
+    Err(PsychometricError::DiscreteTraitVarianceIsNotAsymptoticTraitVariance)
+}
+
+/// Refuse treating Driver Eq. 3 `Q_Δt` as 2017-era
+/// `discreteTRAITVAR`.
+///
+/// `Q_Δt` is finite-interval process noise
+/// `cov(η_t | η_{t-1})`. The commented discrete trait map is
+/// between-subject random-intercept variance after
+/// `(I − e^{A Δt})`. Those are not the same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::DiscreteTraitVarianceIsNotDiscreteProcessNoise`].
+pub fn refuse_discrete_process_noise_as_discrete_trait_variance(
+    discrete_process_noise: f64,
+    discrete_trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (discrete_process_noise, discrete_trait_variance);
+    Err(PsychometricError::DiscreteTraitVarianceIsNotDiscreteProcessNoise)
+}
+
 /// Exact scalar discrete intercept increment from Driver Equation 3.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
@@ -6875,8 +7011,8 @@ mod tests {
         recover_discrete_observed_mean_with_initial_time_independent_predictor,
         recover_discrete_observed_mean_with_time_independent_predictor,
         recover_discrete_process_noise, recover_discrete_time_independent_predictor_effect,
-        recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
-        recover_event_time_discrete_lag_and_log_rate,
+        recover_discrete_time_varying_predictor_effect, recover_discrete_trait_variance,
+        recover_event_series_mean_log_rate, recover_event_time_discrete_lag_and_log_rate,
         recover_initial_time_dependent_predictor_carry,
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_predictor_carry,
@@ -6915,9 +7051,11 @@ mod tests {
         refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
         refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
         refuse_asymptotic_time_independent_variance_as_trait_variance,
+        refuse_asymptotic_trait_variance_as_discrete_trait_variance,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
+        refuse_discrete_process_noise_as_discrete_trait_variance,
         refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
         refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
@@ -7028,7 +7166,8 @@ mod tests {
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
         refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
-        refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
+        refuse_trait_variance_as_discrete_trait_variance, refuse_trait_variance_as_process_noise,
+        refuse_trait_variance_as_stationary_within_subject,
         refuse_unmatched_time_varying_predictor_interval,
         refuse_unstandardised_asymptotic_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_unstandardised_asymptotic_diffusion_as_standardised_asymptotic_diffusion,
@@ -16126,6 +16265,133 @@ mod tests {
         );
         assert_eq!(
             recover_standardised_trait_variance(f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn discrete_trait_variance_recovers_driver_commented_map() {
+        // cran/ctsem 2.5.0 comments
+        // (I − expm(DRIFT Δt)) %*% asymTRAITVAR %*% t(...) with
+        // asymTRAITVAR = solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT)).
+        // Scalar: (1 − e^{a Δt})² · (trait / a²).
+        let log_rate = -0.5_f64;
+        let trait_variance = 1.0_f64;
+        let event_delta = 1.0_f64;
+        let recovered = recover_discrete_trait_variance(
+            trait_variance,
+            log_rate,
+            event_delta,
+            LagClock::EventTime,
+        )
+        .expect("discreteTRAITVAR");
+        let paper = (1.0 - (log_rate * event_delta).exp()).powi(2)
+            * (trait_variance / (log_rate * log_rate));
+        assert!(
+            (recovered - paper).abs() < 1e-12,
+            "2017-era commented discreteTRAITVAR is (1 − e^{{a Δt}})² · (trait / a²)"
+        );
+        let later =
+            recover_discrete_trait_variance(trait_variance, log_rate, 2.0, LagClock::EventTime)
+                .expect("later Δt");
+        assert!(
+            later > recovered,
+            "a later event interval increases (1 − e^{{a Δt}})² toward 1"
+        );
+        let inverse = 1.0 / log_rate;
+        let asymptotic = inverse * inverse * trait_variance;
+        assert!(
+            (recovered - asymptotic).abs() > 1e-3,
+            "finite-interval discreteTRAITVAR is not unpublished asymTRAITVAR"
+        );
+        assert!(
+            (recovered - trait_variance).abs() > 1e-3,
+            "discreteTRAITVAR is not Table 2 TRAITVAR φ_ξ"
+        );
+        let process_noise =
+            recover_discrete_process_noise(0.4, log_rate, event_delta, LagClock::EventTime)
+                .expect("Q_Δt");
+        assert!(
+            (recovered - process_noise).abs() > 1e-3,
+            "discreteTRAITVAR is not Driver Eq. 3 Q_Δt"
+        );
+        assert_eq!(
+            refuse_trait_variance_as_discrete_trait_variance(trait_variance, recovered),
+            Err(PsychometricError::DiscreteTraitVarianceIsNotTraitVariance)
+        );
+        assert_eq!(
+            refuse_asymptotic_trait_variance_as_discrete_trait_variance(asymptotic, recovered),
+            Err(PsychometricError::DiscreteTraitVarianceIsNotAsymptoticTraitVariance)
+        );
+        assert_eq!(
+            refuse_discrete_process_noise_as_discrete_trait_variance(process_noise, recovered),
+            Err(PsychometricError::DiscreteTraitVarianceIsNotDiscreteProcessNoise)
+        );
+        // Underflow of e^{a Δt} to +0 keeps trait / a² and is not a
+        // discrete lag (recover_discrete_lag_from_log_rate fails).
+        let underflow =
+            recover_discrete_trait_variance(trait_variance, -800.0, 1.0, LagClock::EventTime)
+                .expect("underflow keeps trait/a²");
+        let underflow_limit = trait_variance / ((-800.0) * (-800.0));
+        assert!((underflow - underflow_limit).abs() < 1e-18);
+        assert_eq!(
+            recover_discrete_lag_from_log_rate(-800.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            refuse_asymptotic_trait_variance_as_discrete_trait_variance(underflow_limit, underflow),
+            Err(PsychometricError::DiscreteTraitVarianceIsNotAsymptoticTraitVariance)
+        );
+    }
+
+    #[test]
+    fn discrete_trait_variance_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_discrete_trait_variance(0.0, 0.0, 1.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(0.0, 0.5, 1.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(1.0, 0.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::DiscreteTraitVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(1.0, 0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::DiscreteTraitVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(1.0, -0.5, 1.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(1.0, -0.5, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(1.0, -0.5, -1.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(-1.0, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(f64::NAN, -0.5, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(1.0, f64::NAN, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(1.0, -0.5, f64::NAN, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_trait_variance(1.0, -f64::from_bits(1), 1.0, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }
