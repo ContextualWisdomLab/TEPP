@@ -97,6 +97,29 @@ fn request() -> AnalysisRunRequest {
     }
 }
 
+fn support_evidence_available_at(
+    artifact: &TopicContextPosteriorArtifact,
+) -> BTreeMap<String, String> {
+    artifact
+        .lineage_events
+        .iter()
+        .map(|event| event.evidence_resource_id.clone())
+        .chain(
+            artifact
+                .document_relations
+                .iter()
+                .map(|relation| relation.evidence_resource_id.clone()),
+        )
+        .chain(
+            artifact
+                .memberships
+                .iter()
+                .map(|membership| membership.evidence_resource_id.clone()),
+        )
+        .map(|evidence_resource_id| (evidence_resource_id, "2026-08-01T00:00:00Z".into()))
+        .collect()
+}
+
 fn manifest(artifact: &TopicContextPosteriorArtifact) -> TopicContextPosteriorSnapshotManifest {
     TopicContextPosteriorSnapshotManifest {
         snapshot_id: artifact.snapshot_id.clone(),
@@ -113,6 +136,7 @@ fn manifest(artifact: &TopicContextPosteriorArtifact) -> TopicContextPosteriorSn
                 "2026-08-01T00:00:00Z".into(),
             ),
         ]),
+        support_evidence_available_at: support_evidence_available_at(artifact),
     }
 }
 
@@ -303,8 +327,8 @@ fn execution_binds_snapshot_digest_availability_and_producer_contract() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
 
-    let mut future_evidence = manifest(&artifact);
-    future_evidence.document_available_at.insert(
+    let mut future_document = manifest(&artifact);
+    future_document.document_available_at.insert(
         "018f3f7a-7b7c-7d00-8000-000000000001".into(),
         "2026-08-01T00:00:01Z".into(),
     );
@@ -312,7 +336,23 @@ fn execution_binds_snapshot_digest_availability_and_producer_contract() {
         execute_topic_context_posterior_run(
             &request,
             &accepted(&request),
-            &future_evidence,
+            &future_document,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut future_support = manifest(&artifact);
+    future_support.support_evidence_available_at.insert(
+        "evidence-relation-1".into(),
+        "2026-08-01T00:00:01Z".into(),
+    );
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &future_support,
             &artifact,
             "2026-08-02T00:00:00Z",
         ),
@@ -388,6 +428,19 @@ fn execution_rejects_unbound_artifact_and_availability_manifests() {
         Err(AnalysisEngineError::InvalidEvidence)
     );
 
+    let mut incomplete_support = manifest(&artifact);
+    incomplete_support.support_evidence_available_at.pop_first();
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &incomplete_support,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
     let mut malformed_availability = manifest(&artifact);
     *malformed_availability
         .document_available_at
@@ -399,6 +452,23 @@ fn execution_rejects_unbound_artifact_and_availability_manifests() {
             &request,
             &accepted(&request),
             &malformed_availability,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut malformed_support = manifest(&artifact);
+    *malformed_support
+        .support_evidence_available_at
+        .first_entry()
+        .expect("support evidence")
+        .get_mut() = "not-a-time".into();
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &malformed_support,
             &artifact,
             "2026-08-02T00:00:00Z",
         ),
@@ -444,6 +514,23 @@ fn execution_rejects_unbound_artifact_and_availability_manifests() {
             &request,
             &accepted(&request),
             &substituted_availability,
+            &artifact,
+            "2026-08-02T00:00:00Z",
+        ),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+
+    let mut substituted_support = manifest(&artifact);
+    substituted_support.support_evidence_available_at.pop_first();
+    substituted_support.support_evidence_available_at.insert(
+        "evidence-foreign-resource".into(),
+        "2026-07-20T00:00:00Z".into(),
+    );
+    assert_eq!(
+        execute_topic_context_posterior_run(
+            &request,
+            &accepted(&request),
+            &substituted_support,
             &artifact,
             "2026-08-02T00:00:00Z",
         ),
