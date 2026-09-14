@@ -12,6 +12,8 @@ const OTHER_DRAW_PAYLOAD_DIGEST: &str =
     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const EVIDENCE_DIGEST: &str =
     "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const OTHER_EVIDENCE_DIGEST: &str =
+    "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210";
 
 fn receipt() -> RubinProjectionActivationReceiptV1 {
     RubinProjectionActivationReceiptV1::new(
@@ -34,18 +36,40 @@ fn receipt() -> RubinProjectionActivationReceiptV1 {
     .expect("receipt")
 }
 
+fn inject_duplicate_member(canonical: &str, field: &str, first: &str, second: &str) -> String {
+    let unique_member = format!("\"{field}\":\"{second}\"");
+    let duplicate_members = format!("\"{field}\":\"{first}\",\"{field}\":\"{second}\"");
+    let ambiguous = canonical.replacen(&unique_member, &duplicate_members, 1);
+    assert_ne!(ambiguous, canonical, "fixture must inject the duplicate member");
+    ambiguous
+}
+
 #[test]
 fn duplicate_draw_digest_member_is_rejected_before_authority_interpretation() {
     let canonical = receipt().to_json().expect("canonical receipt");
-    let unique_member = format!(
-        "\"complete_data_draws_sha256\":\"{DRAW_PAYLOAD_DIGEST}\""
+    let ambiguous = inject_duplicate_member(
+        &canonical,
+        "complete_data_draws_sha256",
+        OTHER_DRAW_PAYLOAD_DIGEST,
+        DRAW_PAYLOAD_DIGEST,
     );
-    let duplicate_members = format!(
-        "\"complete_data_draws_sha256\":\"{OTHER_DRAW_PAYLOAD_DIGEST}\",\"complete_data_draws_sha256\":\"{DRAW_PAYLOAD_DIGEST}\""
-    );
-    let ambiguous = canonical.replacen(&unique_member, &duplicate_members, 1);
 
-    assert_ne!(ambiguous, canonical, "fixture must inject the duplicate member");
+    assert_eq!(
+        RubinProjectionActivationReceiptV1::from_json(&ambiguous),
+        Err(AnalysisEngineError::InvalidEvidence)
+    );
+}
+
+#[test]
+fn duplicate_nested_authority_member_is_rejected_before_inner_receipt_reparse() {
+    let canonical = receipt().to_json().expect("canonical receipt");
+    let ambiguous = inject_duplicate_member(
+        &canonical,
+        "validation_evidence_sha256",
+        OTHER_EVIDENCE_DIGEST,
+        EVIDENCE_DIGEST,
+    );
+
     assert_eq!(
         RubinProjectionActivationReceiptV1::from_json(&ambiguous),
         Err(AnalysisEngineError::InvalidEvidence)
