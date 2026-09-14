@@ -25,6 +25,7 @@ uuid.workspace = true
 
 [dev-dependencies]
 corpus_split = { path = "../corpus_split", version = "0.2.0" }
+evidence_core = { path = "../evidence_core", version = "0.2.0" }
 membership_core = { path = "../membership_core", version = "0.2.0" }
 relation_graph = { path = "../relation_graph", version = "0.2.0" }
 
