@@ -710,6 +710,25 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Equation 5 of 2017-era three-term `asymTOTALVAR` was requested
+    /// with a non-strictly-negative drift and a nonzero latent
+    /// contribution. Lasting `−q / (2 a) + trait / a² + (B / a)² v`
+    /// requires stable `a < 0`. All-zero contributions remain `θ`.
+    AsymptoticTotalObservedVarianceRequiresStableDrift,
+    /// Unstandardised 2017-era three-term `asymTOTALVAR`
+    /// `−q / (2 a) + trait / a² + (B / a)² v` was treated as Eq. 5 of
+    /// that total. The latent total is not `Var(y)`.
+    UnstandardisedAsymptoticTotalVarianceIsNotAsymptoticTotalObservedVariance,
+    /// Equation 5 of §4.3 stationary `T0VAR`
+    /// `λ²(trait + −q / (2 a) + (B / a)² v) + θ` was treated as
+    /// Eq. 5 of 2017-era three-term `asymTOTALVAR`. Stationary
+    /// `T0VAR` uses untransformed `TRAITVAR`; `asymTRAITVAR` is
+    /// `trait / a²`.
+    StationaryInitialObservedVarianceIsNotAsymptoticTotalObservedVariance,
+    /// Driver Table 2 `MANIFESTVAR` `θ` was treated as Eq. 5 of
+    /// 2017-era three-term `asymTOTALVAR`. Measurement error is not
+    /// `λ²` of that latent total plus `θ`.
+    MeasurementErrorIsNotAsymptoticTotalObservedVariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1253,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::AsymptoticTotalObservedVarianceRequiresStableDrift => {
+                "asymptotic total observed variance requires stable drift"
+            }
+            Self::UnstandardisedAsymptoticTotalVarianceIsNotAsymptoticTotalObservedVariance => {
+                "unstandardised asymptotic total variance is not asymptotic total observed variance"
+            }
+            Self::StationaryInitialObservedVarianceIsNotAsymptoticTotalObservedVariance => {
+                "stationary initial observed variance is not asymptotic total observed variance"
+            }
+            Self::MeasurementErrorIsNotAsymptoticTotalObservedVariance => {
+                "measurement error is not asymptotic total observed variance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2102,28 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn asymptotic_total_observed_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptoticTotalObservedVarianceRequiresStableDrift.to_string(),
+            "asymptotic total observed variance requires stable drift"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedAsymptoticTotalVarianceIsNotAsymptoticTotalObservedVariance
+                .to_string(),
+            "unstandardised asymptotic total variance is not asymptotic total observed variance"
+        );
+        assert_eq!(
+            PsychometricError::StationaryInitialObservedVarianceIsNotAsymptoticTotalObservedVariance
+                .to_string(),
+            "stationary initial observed variance is not asymptotic total observed variance"
+        );
+        assert_eq!(
+            PsychometricError::MeasurementErrorIsNotAsymptoticTotalObservedVariance.to_string(),
+            "measurement error is not asymptotic total observed variance"
         );
     }
 }

@@ -40,6 +40,8 @@ The executable standardised-manifest-variance slice recovers Driver et al. (2017
 
 The executable standardised-trait-variance slice recovers Driver et al. (2017, p. 16 `TRAITVARstd`) as `trait / trait = 1` after strictly positive `TRAITVAR` (Table 2 `φ_ξ`; §7.1; footnote 4; 2017-era `summary.ctsemFit.R` `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR`; JSS PDF re-opened 2026-08-26T17:45Z). Unlike `T0VARstd` there is no ridge addend. Unstandardised `TRAITVAR` is defined for a zero trait and is not that map. `p_0 / p_0 = 1` is the named `T0VARstd` first-occasion correlation and is not `TRAITVARstd` even when both equal 1. `t0_b² v` is `addedT0TIPREDVAR` and is not this correlation. Zero `TRAITVAR` and a non-event clock fail closed. `TRAITVAR` does not require `a < 0`. This is not ctsem estimation.
 
+The executable Eq. 5 three-term `asymTOTALVAR` slice recovers Driver et al. (2017, Eq. 5 of 2017-era commented `asymTOTALVAR`) as `λ²(−q / (2 a) + trait / a² + (B / a)² v) + θ` (Eq. 1, p. 4; Eq. 4–5, p. 5; Table 2, p. 12; §4.3, p. 9; §7.2, pp. 20–21; p. 16; 2017-era `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-31T05:20Z). Form the three-term total inline; do not export it; `ψ = 0` this slice. A zero loading is exactly `θ`. All-zero latent contributions return `θ` even if `a ≥ 0`. `a ≥ 0` with any nonzero contribution fails closed. `λ²(trait + −q / (2 a) + (B / a)² v) + θ` is Eq. 5 of stationary `T0VAR` and is not this map. `MANIFESTVAR` is not `Var(y)`. The unstandardised three-term total is not `Var(y)`. This is not ctsem estimation.
+
 Input/process/intervention/outcome paths obey event-time order. Temporal precedence, document linkage, event tracking, or model prediction alone do not justify causal language.
 
 ## Non-goals
