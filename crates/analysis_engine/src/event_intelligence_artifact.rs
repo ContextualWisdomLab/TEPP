@@ -221,6 +221,10 @@ pub struct EventIntelligenceExecution {
     pub terminal_result: AnalysisRunTerminalResult,
 }
 
+#[expect(
+    clippy::missing_panics_doc,
+    reason = "validated composition and bounded constants cannot fail"
+)]
 /// Execute cutoff-safe TDT/CHRONOS composition as one analysis-run profile.
 ///
 /// The caller supplies already-extracted artifacts. This executor does not
@@ -232,10 +236,6 @@ pub struct EventIntelligenceExecution {
 ///
 /// Returns a request/receipt/snapshot/cutoff/profile error, composition
 /// failure, or invalid/oversized artifact error.
-#[expect(
-    clippy::missing_panics_doc,
-    reason = "validated composition and bounded constants cannot fail"
-)]
 pub fn execute_event_intelligence_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
