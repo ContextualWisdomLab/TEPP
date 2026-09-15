@@ -31,6 +31,23 @@ class WorkflowQueueHygieneTests(unittest.TestCase):
                 workflow,
             )
 
+    def test_pull_request_workflows_skip_draft_pull_requests(self) -> None:
+        """A draft's iteration must not consume queue slots or runner time."""
+
+        guard = (
+            "if: ${{ github.event_name != 'pull_request' "
+            "|| !github.event.pull_request.draft }}"
+        )
+        for workflow_name, job_count in (("ci.yml", 4), ("docs-quality.yml", 1)):
+            workflow = (WORKFLOW_DIRECTORY / workflow_name).read_text(encoding="utf-8")
+            with self.subTest(workflow=workflow_name):
+                # Every job carries the guard, so no gate is silently dropped.
+                self.assertEqual(workflow.count(guard), job_count)
+                # Marking a draft ready must re-run the gates it skipped.
+                self.assertIn("      - ready_for_review\n", workflow)
+                # Returning a ready PR to draft must cancel its in-flight local run.
+                self.assertIn("      - converted_to_draft\n", workflow)
+
     def test_central_scheduler_replaces_local_hourly_caller(self) -> None:
         """A local timer must not duplicate central PR scheduling."""
 
