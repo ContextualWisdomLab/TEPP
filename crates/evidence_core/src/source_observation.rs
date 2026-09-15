@@ -64,6 +64,10 @@ impl SourceObservation {
         self.system_observed_at
     }
 
+    /// Build an observation from one owner-controlled timestamp.
+    ///
+    /// This helper stays private so deterministic tests can exercise temporal
+    /// refusal branches without exposing a caller-selectable production clock.
     fn from_trusted_timestamp(
         source_artifact: &SourceArtifact,
         observed_at: &str,
@@ -119,6 +123,10 @@ impl SourceAvailability {
         self.available_at
     }
 
+    /// Build availability from one owner-controlled timestamp.
+    ///
+    /// This helper remains private so tests can exercise clock-ordering failure
+    /// without adding a production API that permits caller-selected backdating.
     fn from_trusted_timestamp(
         observation: &SourceObservation,
         available_at: &str,
