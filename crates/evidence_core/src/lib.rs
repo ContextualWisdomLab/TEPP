@@ -7,8 +7,8 @@
 //! records, source spans whose byte, Unicode-scalar, page, and layout
 //! coordinates are validated before entering later temporal or psychometric
 //! layers, versioned source-snapshot evidence bindings, Evidence-owned source
-//! ingress observations, and strict versioned JSON wire contracts that
-//! reconstruct records only through the same domain validation boundary.
+//! observation/availability records, and strict versioned JSON wire contracts
+//! that reconstruct records only through the same domain validation boundary.
 //! Embedded `data:image` units keep their original offsets and are not lexical
 //! inference text.
 
@@ -39,6 +39,8 @@ pub use image_unit::EmbeddedImageUnit;
 pub use image_unit::embedded_image_units;
 /// Refuse treating an embedded image URI as lexical inference text.
 pub use image_unit::refuse_base64_image_as_lexical_text;
+/// Evidence-owned availability of a previously observed source artifact.
+pub use source_observation::SourceAvailability;
 /// Evidence-owned observation of an immutable source artifact entering TEPP.
 pub use source_observation::SourceObservation;
 /// Maximum canonical JSON size accepted for one source-snapshot receipt.
