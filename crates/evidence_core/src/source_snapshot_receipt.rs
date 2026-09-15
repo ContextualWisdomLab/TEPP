@@ -1,6 +1,6 @@
 //! Versioned immutable source-snapshot evidence bindings.
 
-use crate::{ContentDigest, EvidenceError, EvidenceId, SourceObservation};
+use crate::{ContentDigest, EvidenceError, EvidenceId, SourceAvailability};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use temporal_core::{AvailableTime, SystemTime};
@@ -15,11 +15,11 @@ const MAX_SNAPSHOT_IDENTIFIER_BYTES: usize = 256;
 ///
 /// The receipt binds a stable receipt identity, the owning immutable source
 /// artifact identity, logical snapshot identity, exact source-content SHA-256,
-/// and the Evidence-owned source-ingress clocks from [`SourceObservation`].
-/// Downstream analysis may retain the canonical receipt digest as an opaque
-/// binding. This object does not assert source ownership, signature,
-/// authorization, external authenticity, or chain of custody, and it does not
-/// substitute for a numeric estimator-payload digest.
+/// and the Evidence-owned observation/availability clocks from
+/// [`SourceAvailability`]. Downstream analysis may retain the canonical receipt
+/// digest as an opaque binding. This object does not assert source ownership,
+/// signature, authorization, external authenticity, or chain of custody, and it
+/// does not substitute for a numeric estimator-payload digest.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceSnapshotReceiptV1 {
@@ -45,32 +45,31 @@ struct SourceSnapshotReceiptWireV1 {
 }
 
 impl SourceSnapshotReceiptV1 {
-    /// Construct one receipt from an Evidence-owned source observation.
+    /// Construct one receipt from Evidence-owned source availability.
     ///
     /// Evidence mints the receipt identity internally. Source-artifact identity,
     /// source-content digest, system observation time, and availability time are
-    /// copied from the owner-controlled observation rather than accepted as free
-    /// constructor arguments. In this schema version, Evidence ingress makes the
-    /// source available immediately, so the two nominal clocks must represent
-    /// the same absolute instant.
+    /// copied from the owner-controlled availability record rather than accepted
+    /// as free constructor arguments. Availability must not precede source
+    /// observation, but the two clocks remain distinct and need not be equal.
     ///
     /// # Errors
     ///
     /// Returns [`EvidenceError::InvalidWirePayload`] when the snapshot identity
     /// is empty, mutable, noncanonical, or otherwise outside the bounded
     /// Evidence contract.
-    pub fn from_source_observation(
+    pub fn from_source_availability(
         snapshot_id: impl Into<String>,
-        observation: &SourceObservation,
+        availability: &SourceAvailability,
     ) -> Result<Self, EvidenceError> {
         let receipt = Self {
             schema_version: SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION.into(),
             receipt_id: EvidenceId::new().to_string(),
-            source_artifact_id: observation.source_artifact_id().to_string(),
+            source_artifact_id: availability.source_artifact_id().to_string(),
             snapshot_id: snapshot_id.into(),
-            source_snapshot_sha256: observation.source_snapshot_sha256().to_string(),
-            system_observed_at: observation.system_observed_at().to_rfc3339(),
-            available_at: observation.available_at().to_rfc3339(),
+            source_snapshot_sha256: availability.source_snapshot_sha256().to_string(),
+            system_observed_at: availability.system_observed_at().to_rfc3339(),
+            available_at: availability.available_at().to_rfc3339(),
         };
         receipt.validate()?;
         Ok(receipt)
@@ -161,7 +160,7 @@ impl SourceSnapshotReceiptV1 {
         &self.system_observed_at
     }
 
-    /// Return the canonical RFC 3339 availability clock derived at Evidence ingress.
+    /// Return the canonical RFC 3339 Evidence-owned availability clock.
     #[must_use]
     pub fn available_at(&self) -> &str {
         &self.available_at
@@ -192,7 +191,7 @@ impl SourceSnapshotReceiptV1 {
             .map_err(|_| EvidenceError::InvalidWirePayload)?;
         if system_observed.to_rfc3339() != self.system_observed_at
             || available.to_rfc3339() != self.available_at
-            || system_observed.instant() != available.instant()
+            || available.instant() < system_observed.instant()
         {
             return Err(EvidenceError::InvalidWirePayload);
         }
@@ -235,7 +234,7 @@ mod tests {
         SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION, SourceSnapshotReceiptV1,
         serialize_bounded_receipt, valid_snapshot_id,
     };
-    use crate::{EvidenceError, SourceArtifact, SourceObservation};
+    use crate::{EvidenceError, SourceArtifact, SourceAvailability, SourceObservation};
     use serde::Serialize;
     use serde::ser::Serializer;
 
@@ -253,9 +252,10 @@ mod tests {
     fn receipt() -> SourceSnapshotReceiptV1 {
         let source_artifact = SourceArtifact::from_bytes(b"canonical snapshot").expect("artifact");
         let observation = SourceObservation::observe(&source_artifact).expect("observation");
-        SourceSnapshotReceiptV1::from_source_observation(
+        let availability = SourceAvailability::make_available(&observation).expect("availability");
+        SourceSnapshotReceiptV1::from_source_availability(
             "snapshot-rubin-loading",
-            &observation,
+            &availability,
         )
         .expect("receipt")
     }
@@ -279,6 +279,7 @@ mod tests {
     fn mutable_and_malformed_snapshot_identifiers_fail_closed() {
         let source_artifact = SourceArtifact::from_bytes(b"source").expect("artifact");
         let observation = SourceObservation::observe(&source_artifact).expect("observation");
+        let availability = SourceAvailability::make_available(&observation).expect("availability");
         for alias in [
             "main",
             "master",
@@ -290,7 +291,7 @@ mod tests {
             "issue-42",
         ] {
             assert_eq!(
-                SourceSnapshotReceiptV1::from_source_observation(alias, &observation),
+                SourceSnapshotReceiptV1::from_source_availability(alias, &availability),
                 Err(EvidenceError::InvalidWirePayload)
             );
         }
@@ -375,10 +376,10 @@ mod tests {
             Err(EvidenceError::InvalidWirePayload)
         );
 
-        let mut mismatched_clocks = canonical;
-        mismatched_clocks.available_at = "2000-01-01T00:00:00Z".into();
+        let mut backdated_availability = canonical;
+        backdated_availability.available_at = "2000-01-01T00:00:00Z".into();
         assert_eq!(
-            mismatched_clocks.to_json(),
+            backdated_availability.to_json(),
             Err(EvidenceError::InvalidWirePayload)
         );
     }
