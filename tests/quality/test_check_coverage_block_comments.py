@@ -85,6 +85,40 @@ class CoverageBlockCommentRegressionTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(str(source), 3)
             )
 
+    def test_unterminated_block_comment_swallows_the_line_beneath(self) -> None:
+        """An opener with no closer makes the text under it comment, not code."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "open_ended_comment.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Commented => {\n'
+                '        /* an opener with no closer on this line\n'
+                '        "arm body after an unterminated opener"\n'
+                '    }\n'
+                '};\n',
+                encoding="utf-8",
+            )
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 4))
+
+    def test_arm_walk_skips_an_unterminated_block_comment_opener(self) -> None:
+        """`_is_match_arm_body` walks past an opener that never closes.
+
+        `is_executable_source_line` cannot reach this branch: a line under an
+        unterminated opener is comment text and is filtered earlier. The walk
+        still has to handle the shape, so it is exercised directly.
+        """
+
+        lines = [
+            "let message = match self {",
+            "    Self::Commented => {",
+            "        /* an opener with no closer on this line",
+            '        "arm body after an unterminated opener"',
+            "    }",
+            "};",
+        ]
+        self.assertTrue(coverage_contract._is_match_arm_body(lines, 4))
+
     def test_blank_line_between_arm_label_and_literal_body(self) -> None:
         """A blank line is not a code token and must not end the walk."""
 
