@@ -368,7 +368,7 @@ fn valid_snapshot_id(value: &str) -> bool {
         .any(|suffix| !suffix.is_empty() && suffix.bytes().all(|byte| byte.is_ascii_digit()));
     !matches!(
         normalized.as_str(),
-        "latest" | "main" | "master" | "latest-release" | "release-latest"
+        "head" | "latest" | "main" | "master" | "latest-release" | "release-latest"
     ) && !numeric_alias
 }
 
@@ -441,6 +441,7 @@ mod tests {
         let observation = SourceObservation::observe(&source_artifact).expect("observation");
         let availability = SourceAvailability::make_available(&observation).expect("availability");
         for alias in [
+            "HEAD",
             "main",
             "master",
             "latest",
