@@ -331,8 +331,8 @@ fn validate_receipt_fields(
     }
     let system_observed = SystemTime::parse_rfc3339(system_observed_at)
         .map_err(|_| EvidenceError::InvalidWirePayload)?;
-    let available =
-        AvailableTime::parse_rfc3339(available_at).map_err(|_| EvidenceError::InvalidWirePayload)?;
+    let available = AvailableTime::parse_rfc3339(available_at)
+        .map_err(|_| EvidenceError::InvalidWirePayload)?;
     if system_observed.to_rfc3339() != system_observed_at
         || available.to_rfc3339() != available_at
         || available.instant() < system_observed.instant()
@@ -377,7 +377,8 @@ mod tests {
     use super::{
         MAX_SNAPSHOT_IDENTIFIER_BYTES, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT,
         SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION, SourceSnapshotReceiptV1,
-        ValidatedSourceSnapshotReceiptWireV1, serialize_bounded_receipt, valid_snapshot_id,
+        ValidatedSourceSnapshotReceiptWireV1, enforce_receipt_byte_limit,
+        serialize_bounded_receipt, valid_snapshot_id,
     };
     use crate::{EvidenceError, SourceArtifact, SourceAvailability, SourceObservation};
     use serde::Serialize;
@@ -398,11 +399,8 @@ mod tests {
         let source_artifact = SourceArtifact::from_bytes(b"canonical snapshot").expect("artifact");
         let observation = SourceObservation::observe(&source_artifact).expect("observation");
         let availability = SourceAvailability::make_available(&observation).expect("availability");
-        SourceSnapshotReceiptV1::from_source_availability(
-            "snapshot-rubin-loading",
-            &availability,
-        )
-        .expect("receipt")
+        SourceSnapshotReceiptV1::from_source_availability("snapshot-rubin-loading", &availability)
+            .expect("receipt")
     }
 
     #[test]
@@ -458,8 +456,11 @@ mod tests {
         }
         assert!(!valid_snapshot_id(""));
         assert!(!valid_snapshot_id("snapshot/branch"));
-        assert!(!valid_snapshot_id(&"a".repeat(MAX_SNAPSHOT_IDENTIFIER_BYTES + 1)));
+        assert!(!valid_snapshot_id(
+            &"a".repeat(MAX_SNAPSHOT_IDENTIFIER_BYTES + 1)
+        ));
         assert!(valid_snapshot_id("snapshot:v1_2026.09-15"));
+        assert!(valid_snapshot_id("pr-release-v1"));
     }
 
     #[test]
@@ -509,8 +510,9 @@ mod tests {
         );
 
         let mut uppercase_observation_id = canonical.clone();
-        uppercase_observation_id.source_observation_id =
-            uppercase_observation_id.source_observation_id.to_ascii_uppercase();
+        uppercase_observation_id.source_observation_id = uppercase_observation_id
+            .source_observation_id
+            .to_ascii_uppercase();
         assert_eq!(
             uppercase_observation_id.to_json(),
             Err(EvidenceError::InvalidWirePayload)
@@ -524,8 +526,9 @@ mod tests {
         );
 
         let mut uppercase_availability_id = canonical.clone();
-        uppercase_availability_id.source_availability_id =
-            uppercase_availability_id.source_availability_id.to_ascii_uppercase();
+        uppercase_availability_id.source_availability_id = uppercase_availability_id
+            .source_availability_id
+            .to_ascii_uppercase();
         assert_eq!(
             uppercase_availability_id.to_json(),
             Err(EvidenceError::InvalidWirePayload)
@@ -550,6 +553,14 @@ mod tests {
         bad_system_time.system_observed_at = "not-a-time".into();
         assert_eq!(
             bad_system_time.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut offset_system_time = canonical.clone();
+        offset_system_time.system_observed_at =
+            offset_system_time.system_observed_at.replace('Z', "+00:00");
+        assert_eq!(
+            offset_system_time.to_json(),
             Err(EvidenceError::InvalidWirePayload)
         );
 
@@ -588,6 +599,19 @@ mod tests {
         );
         assert_eq!(
             serialize_bounded_receipt(&"ok").expect("bounded json"),
+            "\"ok\""
+        );
+    }
+
+    #[test]
+    fn byte_limit_is_a_non_generic_post_serialization_boundary() {
+        let oversized = "x".repeat(SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT + 1);
+        assert_eq!(
+            enforce_receipt_byte_limit(oversized),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            enforce_receipt_byte_limit("\"ok\"".into()).expect("bounded payload"),
             "\"ok\""
         );
     }
