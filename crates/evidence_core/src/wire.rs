@@ -16,6 +16,9 @@ const JSON_U8_ARRAY_WORST_CASE_BYTES_PER_CONTENT_BYTE: usize = 4;
 const JSON_STRING_WORST_CASE_BYTES_PER_TEXT_BYTE: usize = 6;
 // Fixed schema keys, UUIDv7, digest, punctuation, and a small future-version margin.
 const EVIDENCE_WIRE_METADATA_ALLOWANCE_BYTES: usize = 256;
+// Source-span wire contains only fixed-width identifiers, coordinates, and optional page geometry.
+// A fixed cap keeps malformed external envelopes bounded before serde allocates String fields.
+const SOURCE_SPAN_WIRE_BYTE_LIMIT: usize = 4 * 1024;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -151,21 +154,29 @@ pub(crate) fn deserialize_source_span(
     payload: &str,
     document: &DocumentRecord,
 ) -> Result<SourceSpan, EvidenceError> {
+    if payload.len() > SOURCE_SPAN_WIRE_BYTE_LIMIT {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
     let wire: SourceSpanWire = deserialize_wire(payload)?;
+    let canonical = serialize_wire(&wire)?;
     validate_version(wire.schema_version)?;
     let document_id = EvidenceId::from_str(&wire.document_id)?;
     if document_id != document.id() {
         return Err(EvidenceError::SpanDocumentMismatch);
     }
     let page_location = wire.page_location.map(PageLocation::try_from).transpose()?;
-    SourceSpan::new(
+    let span = SourceSpan::new(
         document,
         wire.byte_start,
         wire.byte_end,
         wire.scalar_start,
         wire.scalar_end,
         page_location,
-    )
+    )?;
+    if canonical != payload {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
+    Ok(span)
 }
 
 impl From<PageLocation> for PageLocationWire {
