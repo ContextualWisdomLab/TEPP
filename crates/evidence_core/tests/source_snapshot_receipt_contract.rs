@@ -111,6 +111,28 @@ fn availability_and_system_observation_remain_distinct_nominal_clocks() {
 }
 
 #[test]
+fn git_head_alias_cannot_be_minted_as_immutable_snapshot_identity() {
+    let source_artifact = SourceArtifact::from_bytes(SOURCE_A_BYTES).expect("artifact");
+    let observation = SourceObservation::observe(&source_artifact).expect("observation");
+    let availability = SourceAvailability::make_available(&observation).expect("availability");
+
+    for alias in ["HEAD", "Head"] {
+        assert_eq!(
+            SourceSnapshotReceiptV1::from_source_availability(alias, &availability),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+    }
+
+    assert!(
+        SourceSnapshotReceiptV1::from_source_availability(
+            "snapshot:v1_2026.09-15",
+            &availability,
+        )
+        .is_ok()
+    );
+}
+
+#[test]
 fn wire_refuses_noncanonical_digest_unknown_duplicate_and_oversized_payloads() {
     let canonical = receipt(SOURCE_A_BYTES).to_json().expect("json");
     let wire: serde_json::Value = serde_json::from_str(&canonical).expect("json");
