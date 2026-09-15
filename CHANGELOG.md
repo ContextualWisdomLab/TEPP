@@ -421,7 +421,6 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Security
 
-- `rustls` moves from the pinned `=0.23.43` to `=0.23.45`, clearing RUSTSEC-2026-0285 (GHSA-2mjx-qc3c-rqvc, CVE-2025-61730), in which TLS 1.3 handshake messages were accepted across encryption level boundaries. The pin reached the workspace through `service_tls` directly and through `sqlx-core`, so `cargo deny check advisories` failed on every branch until the pin moved.
 - Naruon interchange refuses `x-apikey`, `x-api_key`, and hyphenated `api-key` credential-header aliases, not only `x-api-key`.
 - GitHub HTTPS fleet transport maps request, response, and close-path network exceptions to `upstream_unavailable` without leaking raw provider exception text.
 - Disabled-state classification and live disable confirmation now accept GitHub's official `disabled_manually`, `disabled_fork`, `disabled_inactivity`, and `deleted` registry states so orphan bootstrap/repair identities can be retired without name-only heuristics.
