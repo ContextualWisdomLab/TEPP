@@ -4,7 +4,10 @@ use crate::{
     ContentDigest, DocumentRecord, EvidenceError, EvidenceId, PageLocation, SourceArtifact,
     SourceSpan, ValidatedDocumentRecordWire, ValidatedSourceArtifactWire,
 };
+use serde::de::{DeserializeSeed, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
+use std::fmt;
 use std::str::FromStr;
 
 /// The only JSON wire-schema version accepted by this crate.
@@ -29,6 +32,18 @@ struct SourceArtifactWire {
     content_bytes: Vec<u8>,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceArtifactWirePreflight<'payload> {
+    schema_version: u16,
+    #[serde(borrow)]
+    artifact_id: &'payload RawValue,
+    #[serde(borrow)]
+    content_sha256: &'payload RawValue,
+    #[serde(borrow)]
+    content_bytes: &'payload RawValue,
+}
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct DocumentRecordWire {
@@ -37,6 +52,20 @@ struct DocumentRecordWire {
     source_artifact_id: String,
     content_sha256: String,
     text: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DocumentRecordWirePreflight<'payload> {
+    schema_version: u16,
+    #[serde(borrow)]
+    document_id: &'payload RawValue,
+    #[serde(borrow)]
+    source_artifact_id: &'payload RawValue,
+    #[serde(borrow)]
+    content_sha256: &'payload RawValue,
+    #[serde(borrow)]
+    text: &'payload RawValue,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -63,6 +92,51 @@ struct PageLocationWire {
     height: f64,
 }
 
+struct BoundedByteArraySeed {
+    maximum_bytes: usize,
+}
+
+struct BoundedByteArrayVisitor {
+    maximum_bytes: usize,
+}
+
+impl<'de> DeserializeSeed<'de> for BoundedByteArraySeed {
+    type Value = ();
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_seq(BoundedByteArrayVisitor {
+            maximum_bytes: self.maximum_bytes,
+        })
+    }
+}
+
+impl<'de> Visitor<'de> for BoundedByteArrayVisitor {
+    type Value = ();
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a byte array within the configured Evidence limit")
+    }
+
+    fn visit_seq<A>(self, mut sequence: A) -> Result<Self::Value, A::Error>
+    where
+        A: SeqAccess<'de>,
+    {
+        let mut decoded_bytes = 0_usize;
+        while sequence.next_element::<u8>()?.is_some() {
+            decoded_bytes = decoded_bytes.saturating_add(1);
+            if decoded_bytes > self.maximum_bytes {
+                return Err(<A::Error as serde::de::Error>::custom(
+                    "decoded Evidence byte array exceeds limit",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
 pub(crate) fn serialize_source_artifact(
     artifact: &SourceArtifact,
 ) -> Result<String, EvidenceError> {
@@ -83,6 +157,7 @@ pub(crate) fn deserialize_source_artifact(
         maximum_bytes,
         JSON_U8_ARRAY_WORST_CASE_BYTES_PER_CONTENT_BYTE,
     )?;
+    preflight_source_artifact_wire(payload, maximum_bytes)?;
     let wire: SourceArtifactWire = deserialize_wire(payload)?;
     let canonical = serialize_wire(&wire)?;
     validate_version(wire.schema_version)?;
@@ -119,6 +194,7 @@ pub(crate) fn deserialize_document(
         maximum_bytes,
         JSON_STRING_WORST_CASE_BYTES_PER_TEXT_BYTE,
     )?;
+    preflight_document_wire(payload, maximum_bytes)?;
     let wire: DocumentRecordWire = deserialize_wire(payload)?;
     let canonical = serialize_wire(&wire)?;
     validate_version(wire.schema_version)?;
@@ -209,6 +285,118 @@ impl TryFrom<PageLocationWire> for PageLocation {
     }
 }
 
+fn preflight_source_artifact_wire(
+    payload: &str,
+    maximum_bytes: usize,
+) -> Result<(), EvidenceError> {
+    let wire: SourceArtifactWirePreflight<'_> = deserialize_wire(payload)?;
+    validate_version(wire.schema_version)?;
+    validate_metadata_raw_value(wire.artifact_id.get())?;
+    validate_metadata_raw_value(wire.content_sha256.get())?;
+    validate_bounded_u8_array_raw(wire.content_bytes.get(), maximum_bytes)
+}
+
+fn preflight_document_wire(payload: &str, maximum_bytes: usize) -> Result<(), EvidenceError> {
+    let wire: DocumentRecordWirePreflight<'_> = deserialize_wire(payload)?;
+    validate_version(wire.schema_version)?;
+    validate_metadata_raw_value(wire.document_id.get())?;
+    validate_metadata_raw_value(wire.source_artifact_id.get())?;
+    validate_metadata_raw_value(wire.content_sha256.get())?;
+    validate_bounded_json_string_raw(wire.text.get(), maximum_bytes)
+}
+
+fn validate_metadata_raw_value(raw: &str) -> Result<(), EvidenceError> {
+    if raw.len() > EVIDENCE_WIRE_METADATA_ALLOWANCE_BYTES {
+        Err(EvidenceError::InvalidWirePayload)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_bounded_u8_array_raw(raw: &str, maximum_bytes: usize) -> Result<(), EvidenceError> {
+    let mut deserializer = serde_json::Deserializer::from_str(raw);
+    BoundedByteArraySeed { maximum_bytes }
+        .deserialize(&mut deserializer)
+        .map_err(|_| EvidenceError::InvalidWirePayload)?;
+    deserializer
+        .end()
+        .map_err(|_| EvidenceError::InvalidWirePayload)
+}
+
+fn validate_bounded_json_string_raw(
+    raw: &str,
+    maximum_bytes: usize,
+) -> Result<(), EvidenceError> {
+    let Some(inner) = raw.strip_prefix('"').and_then(|value| value.strip_suffix('"')) else {
+        return Err(EvidenceError::InvalidWirePayload);
+    };
+    let bytes = inner.as_bytes();
+    let mut index = 0_usize;
+    let mut decoded_bytes = 0_usize;
+    while index < bytes.len() {
+        let (width, next_index) = if bytes[index] == b'\\' {
+            decoded_escape_width(bytes, index)?
+        } else {
+            (1_usize, index + 1)
+        };
+        decoded_bytes = decoded_bytes.saturating_add(width);
+        if decoded_bytes > maximum_bytes {
+            return Err(EvidenceError::InvalidWirePayload);
+        }
+        index = next_index;
+    }
+    Ok(())
+}
+
+fn decoded_escape_width(bytes: &[u8], slash_index: usize) -> Result<(usize, usize), EvidenceError> {
+    let escape = *bytes
+        .get(slash_index + 1)
+        .ok_or(EvidenceError::InvalidWirePayload)?;
+    match escape {
+        b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => {
+            Ok((1, slash_index + 2))
+        }
+        b'u' => decoded_unicode_escape_width(bytes, slash_index),
+        _ => Err(EvidenceError::InvalidWirePayload),
+    }
+}
+
+fn decoded_unicode_escape_width(
+    bytes: &[u8],
+    slash_index: usize,
+) -> Result<(usize, usize), EvidenceError> {
+    let first_end = slash_index.saturating_add(6);
+    let first = parse_hex_quad(
+        bytes
+            .get(slash_index + 2..first_end)
+            .ok_or(EvidenceError::InvalidWirePayload)?,
+    )?;
+    if (0xD800..=0xDBFF).contains(&first) {
+        let second_end = first_end.saturating_add(6);
+        let second_escape = bytes
+            .get(first_end..second_end)
+            .ok_or(EvidenceError::InvalidWirePayload)?;
+        if !second_escape.starts_with(b"\\u") {
+            return Err(EvidenceError::InvalidWirePayload);
+        }
+        let second = parse_hex_quad(&second_escape[2..])?;
+        if !(0xDC00..=0xDFFF).contains(&second) {
+            return Err(EvidenceError::InvalidWirePayload);
+        }
+        return Ok((4, second_end));
+    }
+    let scalar = char::from_u32(u32::from(first)).ok_or(EvidenceError::InvalidWirePayload)?;
+    Ok((scalar.len_utf8(), first_end))
+}
+
+fn parse_hex_quad(bytes: &[u8]) -> Result<u16, EvidenceError> {
+    if bytes.len() != 4 {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
+    let digits = std::str::from_utf8(bytes).map_err(|_| EvidenceError::InvalidWirePayload)?;
+    u16::from_str_radix(digits, 16).map_err(|_| EvidenceError::InvalidWirePayload)
+}
+
 fn validate_raw_wire_size(
     payload: &str,
     maximum_content_bytes: usize,
@@ -246,8 +434,10 @@ where
 #[cfg(test)]
 mod tests {
     use super::{
-        deserialize_wire, preflight_document_wire, preflight_source_artifact_wire, serialize_wire,
-        validate_version,
+        EVIDENCE_WIRE_METADATA_ALLOWANCE_BYTES, decoded_escape_width, deserialize_wire,
+        parse_hex_quad, preflight_document_wire, preflight_source_artifact_wire, serialize_wire,
+        validate_bounded_json_string_raw, validate_bounded_u8_array_raw,
+        validate_metadata_raw_value, validate_version,
     };
     use crate::EvidenceError;
     use serde::Serialize;
@@ -297,6 +487,10 @@ mod tests {
             preflight_source_artifact_wire(payload, 2),
             Err(EvidenceError::InvalidWirePayload)
         );
+        assert_eq!(
+            preflight_source_artifact_wire("{}", 3),
+            Err(EvidenceError::InvalidWirePayload)
+        );
     }
 
     #[test]
@@ -305,6 +499,124 @@ mod tests {
         assert_eq!(preflight_document_wire(payload, 3), Ok(()));
         assert_eq!(
             preflight_document_wire(payload, 2),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            preflight_document_wire("{}", 3),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn byte_array_preflight_fails_closed_without_allocating_a_vec() {
+        assert_eq!(validate_bounded_u8_array_raw("[0,1]", 2), Ok(()));
+        assert_eq!(
+            validate_bounded_u8_array_raw("[0,1]", 1),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_u8_array_raw("[256]", 1),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_u8_array_raw("\"bytes\"", 8),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_u8_array_raw("[0] 1", 1),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn text_preflight_handles_plain_simple_unicode_and_surrogate_escapes() {
+        assert_eq!(validate_bounded_json_string_raw("\"\"", 0), Ok(()));
+        assert_eq!(validate_bounded_json_string_raw("\"abc\"", 3), Ok(()));
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\n""#, 1),
+            Ok(())
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\u00e9""#, 2),
+            Ok(())
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\uD83D\uDE00""#, 4),
+            Ok(())
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""é""#, 2),
+            Ok(())
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw("\"abc\"", 2),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn text_preflight_rejects_non_strings_and_invalid_escape_shapes() {
+        assert_eq!(
+            validate_bounded_json_string_raw("123", 3),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw("\"abc", 3),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\q""#, 1),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\uDC00""#, 3),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\uD83D""#, 4),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\uD83Dabcdef""#, 4),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\uD83D\u0041""#, 4),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""\u00G0""#, 3),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            decoded_escape_width(b"\\", 0),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn metadata_preflight_caps_caller_controlled_string_values() {
+        assert_eq!(validate_metadata_raw_value("\"id\""), Ok(()));
+        let oversized = "x".repeat(EVIDENCE_WIRE_METADATA_ALLOWANCE_BYTES + 1);
+        assert_eq!(
+            validate_metadata_raw_value(&oversized),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn hex_quad_parser_rejects_wrong_width_and_non_hex_digits() {
+        assert_eq!(parse_hex_quad(b"00e9"), Ok(0x00e9));
+        assert_eq!(
+            parse_hex_quad(b"abc"),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_hex_quad(b"00G0"),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            parse_hex_quad(&[0xff, b'0', b'0', b'0']),
             Err(EvidenceError::InvalidWirePayload)
         );
     }
