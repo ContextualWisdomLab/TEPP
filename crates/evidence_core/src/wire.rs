@@ -245,7 +245,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{deserialize_wire, serialize_wire, validate_version};
+    use super::{
+        deserialize_wire, preflight_document_wire, preflight_source_artifact_wire, serialize_wire,
+        validate_version,
+    };
     use crate::EvidenceError;
     use serde::Serialize;
     use serde::ser::Serializer;
@@ -283,6 +286,26 @@ mod tests {
         assert_eq!(
             validate_version(2),
             Err(EvidenceError::UnsupportedWireVersion)
+        );
+    }
+
+    #[test]
+    fn artifact_preflight_bounds_decoded_byte_count_before_vec_deserialization() {
+        let payload = r#"{"schema_version":1,"artifact_id":"id","content_sha256":"digest","content_bytes":[0,1,2]}"#;
+        assert_eq!(preflight_source_artifact_wire(payload, 3), Ok(()));
+        assert_eq!(
+            preflight_source_artifact_wire(payload, 2),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn document_preflight_bounds_decoded_utf8_bytes_including_escapes() {
+        let payload = r#"{"schema_version":1,"document_id":"doc","source_artifact_id":"source","content_sha256":"digest","text":"\u00e9\n"}"#;
+        assert_eq!(preflight_document_wire(payload, 3), Ok(()));
+        assert_eq!(
+            preflight_document_wire(payload, 2),
+            Err(EvidenceError::InvalidWirePayload)
         );
     }
 }
