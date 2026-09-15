@@ -2,7 +2,7 @@
 
 use evidence_core::{
     EvidenceError, SourceArtifact, SourceAvailability, SourceObservation,
-    SourceSnapshotReceiptV1,
+    SourceSnapshotReceiptV1, ValidatedSourceSnapshotReceiptWireV1,
 };
 
 #[test]
@@ -19,13 +19,13 @@ fn semantically_equivalent_noncanonical_json_fails_closed() {
 
     let leading_whitespace = format!(" {canonical}");
     assert_eq!(
-        SourceSnapshotReceiptV1::from_json(&leading_whitespace),
+        ValidatedSourceSnapshotReceiptWireV1::from_json(&leading_whitespace),
         Err(EvidenceError::InvalidWirePayload)
     );
 
     let trailing_newline = format!("{canonical}\n");
     assert_eq!(
-        SourceSnapshotReceiptV1::from_json(&trailing_newline),
+        ValidatedSourceSnapshotReceiptWireV1::from_json(&trailing_newline),
         Err(EvidenceError::InvalidWirePayload)
     );
 }
