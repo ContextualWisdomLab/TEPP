@@ -47,6 +47,23 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         count, covered = self.totals([(2, 9), (3, 0), (4, 2), (6, 7)])
         self.assertEqual((count, covered), (4, 4))
 
+    def test_inline_comment_after_opener_preserves_the_reconciliation_proof(self) -> None:
+        """Trailing comments cannot hide an opener whose body demonstrably ran."""
+
+        source = self.root / "commented_guard.rs"
+        source.write_text(
+            "fn validate(value: &str) {\n"
+            "    if value.contains(\"//\") { // audited guard\n"
+            "        println!(\"accepted\");\n"
+            "    }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        report = self.root / "commented_guard.lcov"
+        report.write_text(lcov(source, [(2, 0), (3, 4)]), encoding="utf-8")
+        loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+        self.assertEqual((loaded["count"], loaded["covered"]), (2, 2))
+
     def test_genuine_zero_on_a_block_opener_is_kept(self) -> None:
         """When the body never ran either, the zero is a real gap."""
 
