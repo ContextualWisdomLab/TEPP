@@ -1,4 +1,4 @@
-"""Contract for dropping impossible zero counts from the authored-line gate."""
+"""Contract for reconciling impossible LCOV zero counts without shrinking denominator."""
 
 from __future__ import annotations
 
@@ -41,33 +41,33 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
         return loaded["count"], loaded["covered"]
 
-    def test_impossible_zero_is_dropped(self) -> None:
-        """Line 3 opens the block that line 4 ran inside, so its zero is noise."""
+    def test_impossible_zero_is_reconciled_without_shrinking_denominator(self) -> None:
+        """A positive nested body proves its zero-count opener executed."""
 
         count, covered = self.totals([(2, 9), (3, 0), (4, 2), (6, 7)])
-        self.assertEqual((count, covered), (2, 2))
+        self.assertEqual((count, covered), (4, 4))
 
     def test_genuine_zero_on_a_block_opener_is_kept(self) -> None:
         """When the body never ran either, the zero is a real gap."""
 
         count, covered = self.totals([(2, 9), (3, 0), (4, 0), (6, 7)])
-        self.assertEqual((count, covered), (3, 1))
+        self.assertEqual((count, covered), (4, 2))
 
     def test_zero_on_a_line_that_opens_no_block_is_kept(self) -> None:
         """Only a block opener can be contradicted by the line beneath it."""
 
         count, covered = self.totals([(2, 0), (3, 4), (4, 2), (6, 7)])
-        self.assertEqual((count, covered), (3, 2))
+        self.assertEqual((count, covered), (4, 3))
 
     def test_zero_without_a_following_record_is_kept(self) -> None:
         """An opener with no measured body has nothing to contradict it."""
 
         count, covered = self.totals([(2, 9), (3, 0), (6, 7)])
-        self.assertEqual((count, covered), (2, 1))
+        self.assertEqual((count, covered), (3, 2))
 
 
 class BlockOpenerProbeTests(unittest.TestCase):
-    """`opens_a_block` guards its own file access, not only the loader's."""
+    """`opens_a_block` guards its own source probe boundaries."""
 
     def test_unreadable_source_opens_no_block(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

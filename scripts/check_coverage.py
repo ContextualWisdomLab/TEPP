@@ -63,7 +63,6 @@ def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int
     return coordinates, true_count, false_count
 
 
-
 def is_live_sqlx_transport_source(filename: str) -> bool:
     """Return whether *filename* is the live-server SQLx transport source.
 
@@ -241,10 +240,12 @@ def is_executable_source_line(
         "();",
         "};",
         "});",
-        "Ok(())",
     }:
         return False
-    if _is_standalone_string_literal(text) or text.startswith("} else"):
+    if (
+        _is_standalone_string_literal(text)
+        and not _is_match_arm_body(lines, line_number)
+    ) or text.startswith("} else"):
         return False
     if text.endswith(" {"):
         type_name = text[:-2]
@@ -452,6 +453,7 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 ('"', "r\"", "r#", "br\"", "br#")
             )
     return False
+
 
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""
@@ -681,6 +683,54 @@ def _character_literal_end(line: str, cursor: int) -> int | None:
     return None
 
 
+def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
+    """Return whether *line_number* is the whole body of a ``match`` arm.
+
+    A match arm whose body is one string literal is executable production
+    behavior: a zero count means the arm was never taken. Comments between the
+    arm label and its literal body are not executable code and must not hide it
+    from the authored-line denominator.
+    """
+
+    block_comment_depth = 0
+    for index in range(line_number - 2, -1, -1):
+        previous = lines[index].strip()
+        if not previous:
+            continue
+        if block_comment_depth:
+            block_comment_depth += previous.count("*/") - previous.count("/*")
+            if block_comment_depth > 0:
+                continue
+            block_comment_depth = 0
+            previous = previous.rsplit("/*", 1)[0].strip()
+            if not previous:
+                continue
+        if previous.startswith("//"):
+            continue
+        if previous.startswith("/*"):
+            if "*/" not in previous:
+                continue
+            previous = previous.split("*/", 1)[1].strip()
+            if not previous:
+                continue
+        if previous.endswith("*/") and "/*" not in previous:
+            block_comment_depth = previous.count("*/")
+            continue
+        if "/*" in previous and previous.endswith("*/"):
+            # A leading complete block comment may have been stripped above;
+            # any opener left here follows executable code on the same line.
+            previous = previous.split("/*", 1)[0].strip()
+        if previous.endswith("=>") or previous.endswith("=> {"):
+            return True
+        for marker in range(len(previous) - 1):
+            if previous[marker : marker + 2] == "//" and previous[:marker].rstrip().endswith(
+                ("=>", "=> {")
+            ):
+                return True
+        return False
+    return False
+
+
 def _is_standalone_string_literal(text: str) -> bool:
     """Return whether *text* is only a normal string literal and punctuation."""
     if not text.startswith('"'):
@@ -694,44 +744,6 @@ def _is_standalone_string_literal(text: str) -> bool:
         else:
             escaped = False
     return False
-
-
-def opens_a_block(source_path: str, line_number: int, repository_root: Path | None) -> bool:
-    """Return whether *line_number* ends by opening a brace-delimited block."""
-
-    try:
-        path = (
-            resolve_repository_source_path(source_path, repository_root)
-            if repository_root is not None
-            else Path(source_path)
-        )
-        lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return False
-    if line_number <= 0 or line_number > len(lines):
-        return False
-    return lines[line_number - 1].rstrip().endswith("{")
-
-
-def drop_contradictory_zero_counts(
-    line_counts: dict[tuple[str, int], int], repository_root: Path | None
-) -> None:
-    """Remove zero counts that a nested positive count proves wrong.
-
-    LLVM sometimes emits a zero count for a line that opens a block while the
-    first line inside that block carries a positive count. A block body cannot
-    run while the line opening it never does, so the zero is an instrumentation
-    artifact rather than uncovered production behavior, and counting it would
-    fail the contract for a gap that does not exist.
-    """
-
-    for key in [key for key, count in line_counts.items() if count == 0]:
-        source_path, line_number = key
-        inner = line_counts.get((source_path, line_number + 1))
-        if inner is None or inner <= 0:
-            continue
-        if opens_a_block(source_path, line_number, repository_root):
-            del line_counts[key]
 
 
 def load_lcov_line_totals(
@@ -779,7 +791,6 @@ def load_lcov_line_totals(
         raise ValueError("LCOV source record must end with end_of_record")
     if not line_counts:
         raise ValueError("LCOV report contains no authored source lines")
-    drop_contradictory_zero_counts(line_counts, root)
     covered = sum(execution_count > 0 for execution_count in line_counts.values())
     return {"lines": {"count": len(line_counts), "covered": covered}}
 
