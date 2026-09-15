@@ -696,6 +696,44 @@ def _is_standalone_string_literal(text: str) -> bool:
     return False
 
 
+def opens_a_block(source_path: str, line_number: int, repository_root: Path | None) -> bool:
+    """Return whether *line_number* ends by opening a brace-delimited block."""
+
+    try:
+        path = (
+            resolve_repository_source_path(source_path, repository_root)
+            if repository_root is not None
+            else Path(source_path)
+        )
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    if line_number <= 0 or line_number > len(lines):
+        return False
+    return lines[line_number - 1].rstrip().endswith("{")
+
+
+def drop_contradictory_zero_counts(
+    line_counts: dict[tuple[str, int], int], repository_root: Path | None
+) -> None:
+    """Remove zero counts that a nested positive count proves wrong.
+
+    LLVM sometimes emits a zero count for a line that opens a block while the
+    first line inside that block carries a positive count. A block body cannot
+    run while the line opening it never does, so the zero is an instrumentation
+    artifact rather than uncovered production behavior, and counting it would
+    fail the contract for a gap that does not exist.
+    """
+
+    for key in [key for key, count in line_counts.items() if count == 0]:
+        source_path, line_number = key
+        inner = line_counts.get((source_path, line_number + 1))
+        if inner is None or inner <= 0:
+            continue
+        if opens_a_block(source_path, line_number, repository_root):
+            del line_counts[key]
+
+
 def load_lcov_line_totals(
     path: Path, repository_root: Path | None = None
 ) -> Mapping[str, Any]:
@@ -741,6 +779,7 @@ def load_lcov_line_totals(
         raise ValueError("LCOV source record must end with end_of_record")
     if not line_counts:
         raise ValueError("LCOV report contains no authored source lines")
+    drop_contradictory_zero_counts(line_counts, root)
     covered = sum(execution_count > 0 for execution_count in line_counts.values())
     return {"lines": {"count": len(line_counts), "covered": covered}}
 

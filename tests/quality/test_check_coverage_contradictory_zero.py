@@ -1,0 +1,96 @@
+"""Contract for dropping impossible zero counts from the authored-line gate."""
+
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from scripts import check_coverage as coverage_contract
+
+
+def lcov(source: Path, records: list[tuple[int, int]]) -> str:
+    """Return a framed LCOV report for one source file."""
+
+    body = "".join(f"DA:{line},{count}\n" for line, count in records)
+    return f"SF:{source}\n{body}end_of_record\n"
+
+
+class ContradictoryZeroCountTests(unittest.TestCase):
+    """A block body cannot run while the line opening it never does."""
+
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+        self.source = self.root / "guard.rs"
+        self.source.write_text(
+            "fn validate(value: &str) -> Result<(), Error> {\n"
+            "    let lower = value.to_ascii_lowercase();\n"
+            "    if !lower.contains(\"marker\") {\n"
+            "        return Err(Error::Missing);\n"
+            "    }\n"
+            "    Ok(())\n"
+            "}\n",
+            encoding="utf-8",
+        )
+
+    def totals(self, records: list[tuple[int, int]]) -> tuple[int, int]:
+        report = self.root / "report.lcov"
+        report.write_text(lcov(self.source, records), encoding="utf-8")
+        loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+        return loaded["count"], loaded["covered"]
+
+    def test_impossible_zero_is_dropped(self) -> None:
+        """Line 3 opens the block that line 4 ran inside, so its zero is noise."""
+
+        count, covered = self.totals([(2, 9), (3, 0), (4, 2), (6, 7)])
+        self.assertEqual((count, covered), (2, 2))
+
+    def test_genuine_zero_on_a_block_opener_is_kept(self) -> None:
+        """When the body never ran either, the zero is a real gap."""
+
+        count, covered = self.totals([(2, 9), (3, 0), (4, 0), (6, 7)])
+        self.assertEqual((count, covered), (3, 1))
+
+    def test_zero_on_a_line_that_opens_no_block_is_kept(self) -> None:
+        """Only a block opener can be contradicted by the line beneath it."""
+
+        count, covered = self.totals([(2, 0), (3, 4), (4, 2), (6, 7)])
+        self.assertEqual((count, covered), (3, 2))
+
+    def test_zero_without_a_following_record_is_kept(self) -> None:
+        """An opener with no measured body has nothing to contradict it."""
+
+        count, covered = self.totals([(2, 9), (3, 0), (6, 7)])
+        self.assertEqual((count, covered), (2, 1))
+
+
+class BlockOpenerProbeTests(unittest.TestCase):
+    """`opens_a_block` guards its own file access, not only the loader's."""
+
+    def test_unreadable_source_opens_no_block(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "absent.rs"
+            self.assertFalse(
+                coverage_contract.opens_a_block(str(missing), 1, Path(temporary))
+            )
+
+    def test_line_outside_the_file_opens_no_block(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "short.rs"
+            source.write_text("fn run() {\n", encoding="utf-8")
+            root = Path(temporary)
+            self.assertTrue(coverage_contract.opens_a_block(str(source), 1, root))
+            self.assertFalse(coverage_contract.opens_a_block(str(source), 0, root))
+            self.assertFalse(coverage_contract.opens_a_block(str(source), 9, root))
+
+    def test_absent_repository_root_reads_the_path_directly(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "direct.rs"
+            source.write_text("fn run() {\n", encoding="utf-8")
+            self.assertTrue(coverage_contract.opens_a_block(str(source), 1, None))
+
+
+if __name__ == "__main__":
+    unittest.main()
