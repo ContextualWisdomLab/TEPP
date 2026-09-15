@@ -10,6 +10,13 @@ use std::str::FromStr;
 /// The only JSON wire-schema version accepted by this crate.
 pub const WIRE_SCHEMA_VERSION: u16 = 1;
 
+// A canonical JSON array encodes each u8 as at most three digits plus one comma.
+const JSON_U8_ARRAY_WORST_CASE_BYTES_PER_CONTENT_BYTE: usize = 4;
+// One UTF-8 input byte can expand to at most one six-byte `\u00XX` JSON escape.
+const JSON_STRING_WORST_CASE_BYTES_PER_TEXT_BYTE: usize = 6;
+// Fixed schema keys, UUIDv7, digest, punctuation, and a small future-version margin.
+const EVIDENCE_WIRE_METADATA_ALLOWANCE_BYTES: usize = 256;
+
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct SourceArtifactWire {
@@ -68,6 +75,11 @@ pub(crate) fn deserialize_source_artifact(
     payload: &str,
     maximum_bytes: usize,
 ) -> Result<ValidatedSourceArtifactWire, EvidenceError> {
+    validate_raw_wire_size(
+        payload,
+        maximum_bytes,
+        JSON_U8_ARRAY_WORST_CASE_BYTES_PER_CONTENT_BYTE,
+    )?;
     let wire: SourceArtifactWire = deserialize_wire(payload)?;
     let canonical = serialize_wire(&wire)?;
     validate_version(wire.schema_version)?;
@@ -99,6 +111,11 @@ pub(crate) fn deserialize_document(
     payload: &str,
     maximum_bytes: usize,
 ) -> Result<ValidatedDocumentRecordWire, EvidenceError> {
+    validate_raw_wire_size(
+        payload,
+        maximum_bytes,
+        JSON_STRING_WORST_CASE_BYTES_PER_TEXT_BYTE,
+    )?;
     let wire: DocumentRecordWire = deserialize_wire(payload)?;
     let canonical = serialize_wire(&wire)?;
     validate_version(wire.schema_version)?;
@@ -178,6 +195,21 @@ impl TryFrom<PageLocationWire> for PageLocation {
             wire.width,
             wire.height,
         )
+    }
+}
+
+fn validate_raw_wire_size(
+    payload: &str,
+    maximum_content_bytes: usize,
+    expansion_factor: usize,
+) -> Result<(), EvidenceError> {
+    let maximum_wire_bytes = maximum_content_bytes
+        .saturating_mul(expansion_factor)
+        .saturating_add(EVIDENCE_WIRE_METADATA_ALLOWANCE_BYTES);
+    if payload.len() > maximum_wire_bytes {
+        Err(EvidenceError::InvalidWirePayload)
+    } else {
+        Ok(())
     }
 }
 
