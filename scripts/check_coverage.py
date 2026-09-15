@@ -746,6 +746,73 @@ def _is_standalone_string_literal(text: str) -> bool:
     return False
 
 
+def _rust_code_before_line_comment(line: str) -> str:
+    """Return one Rust source line with comments removed outside literals."""
+
+    code: list[str] = []
+    in_string = False
+    raw_hashes: int | None = None
+    block_comment_depth = 0
+    cursor = 0
+    while cursor < len(line):
+        if block_comment_depth:
+            if line.startswith("/*", cursor):
+                block_comment_depth += 1
+                cursor += 2
+            elif line.startswith("*/", cursor):
+                block_comment_depth -= 1
+                cursor += 2
+            else:
+                cursor += 1
+            continue
+        if raw_hashes is not None:
+            delimiter = '"' + ("#" * raw_hashes)
+            closing = line.find(delimiter, cursor)
+            if closing == -1:
+                code.append(line[cursor:])
+                break
+            code.append(line[cursor : closing + len(delimiter)])
+            cursor = closing + len(delimiter)
+            raw_hashes = None
+            continue
+        if in_string:
+            character = line[cursor]
+            code.append(character)
+            if character == "\\" and cursor + 1 < len(line):
+                cursor += 1
+                code.append(line[cursor])
+            elif character == '"':
+                in_string = False
+            cursor += 1
+            continue
+        if line.startswith("//", cursor):
+            break
+        if line.startswith("/*", cursor):
+            block_comment_depth = 1
+            cursor += 2
+            continue
+        raw_start = _raw_string_start(line, cursor)
+        if raw_start is not None:
+            raw_hashes, next_cursor = raw_start
+            code.append(line[cursor:next_cursor])
+            cursor = next_cursor
+            continue
+        if line[cursor] == '"':
+            in_string = True
+            code.append(line[cursor])
+            cursor += 1
+            continue
+        if line[cursor] == "'":
+            character_end = _character_literal_end(line, cursor)
+            if character_end is not None:
+                code.append(line[cursor:character_end])
+                cursor = character_end
+                continue
+        code.append(line[cursor])
+        cursor += 1
+    return "".join(code)
+
+
 def opens_a_block(source_path: str, line_number: int, repository_root: Path | None) -> bool:
     """Return whether *line_number* ends by opening a brace-delimited block."""
 
@@ -760,7 +827,8 @@ def opens_a_block(source_path: str, line_number: int, repository_root: Path | No
         return False
     if line_number <= 0 or line_number > len(lines):
         return False
-    return lines[line_number - 1].rstrip().endswith("{")
+    code = _rust_code_before_line_comment(lines[line_number - 1])
+    return code.rstrip().endswith("{")
 
 
 def reconcile_contradictory_zero_counts(
