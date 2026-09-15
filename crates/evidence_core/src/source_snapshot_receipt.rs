@@ -34,10 +34,12 @@ pub struct SourceSnapshotReceiptV1 {
 impl SourceSnapshotReceiptV1 {
     /// Construct one receipt from an already validated immutable source artifact.
     ///
-    /// The content digest is derived from the artifact rather than accepted as a
-    /// free caller-supplied authority. Identity and digest remain separate so
-    /// equal bytes ingested into distinct Evidence records do not collapse their
-    /// provenance context.
+    /// Evidence mints the receipt identity internally. The content digest is
+    /// derived from the artifact rather than accepted as a free caller-supplied
+    /// authority. Receipt identity, source-artifact identity, and content digest
+    /// remain separate so callers cannot reuse one receipt UUID for multiple
+    /// immutable records and equal bytes ingested into distinct Evidence records
+    /// do not collapse their provenance context.
     ///
     /// # Errors
     ///
@@ -45,14 +47,13 @@ impl SourceSnapshotReceiptV1 {
     /// is empty, mutable, noncanonical, or otherwise outside the bounded
     /// Evidence contract.
     pub fn from_source_artifact(
-        receipt_id: EvidenceId,
         snapshot_id: impl Into<String>,
         source_artifact: &SourceArtifact,
         available_at: AvailableTime,
     ) -> Result<Self, EvidenceError> {
         let receipt = Self {
             schema_version: SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION.into(),
-            receipt_id: receipt_id.to_string(),
+            receipt_id: EvidenceId::new().to_string(),
             source_artifact_id: source_artifact.id().to_string(),
             snapshot_id: snapshot_id.into(),
             source_snapshot_sha256: source_artifact.content_digest().to_string(),
@@ -198,10 +199,9 @@ mod tests {
         SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION, SourceSnapshotReceiptV1,
         serialize_bounded_receipt, valid_snapshot_id,
     };
-    use crate::{EvidenceError, EvidenceId, SourceArtifact};
+    use crate::{EvidenceError, SourceArtifact};
     use serde::Serialize;
     use serde::ser::Serializer;
-    use std::str::FromStr;
     use temporal_core::AvailableTime;
 
     struct SerializationFailure;
@@ -218,7 +218,6 @@ mod tests {
     fn receipt() -> SourceSnapshotReceiptV1 {
         let source_artifact = SourceArtifact::from_bytes(b"canonical snapshot").expect("artifact");
         SourceSnapshotReceiptV1::from_source_artifact(
-            EvidenceId::from_str("018f1f6b-7c2a-7abc-8def-0123456789ab").expect("uuidv7"),
             "snapshot-rubin-loading",
             &source_artifact,
             AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability"),
@@ -243,7 +242,6 @@ mod tests {
 
     #[test]
     fn mutable_and_malformed_snapshot_identifiers_fail_closed() {
-        let id = EvidenceId::from_str("018f1f6b-7c2a-7abc-8def-0123456789ab").expect("uuidv7");
         let source_artifact = SourceArtifact::from_bytes(b"source").expect("artifact");
         let available =
             AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
@@ -258,12 +256,7 @@ mod tests {
             "issue-42",
         ] {
             assert_eq!(
-                SourceSnapshotReceiptV1::from_source_artifact(
-                    id,
-                    alias,
-                    &source_artifact,
-                    available,
-                ),
+                SourceSnapshotReceiptV1::from_source_artifact(alias, &source_artifact, available),
                 Err(EvidenceError::InvalidWirePayload)
             );
         }

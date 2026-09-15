@@ -7,7 +7,6 @@ use evidence_core::{
 use std::str::FromStr;
 use temporal_core::AvailableTime;
 
-const RECEIPT_ID: &str = "018f1f6b-7c2a-7abc-8def-0123456789ab";
 const SNAPSHOT_ID: &str = "snapshot-rubin-loading";
 const SOURCE_A_BYTES: &[u8] = b"canonical snapshot a";
 const SOURCE_B_BYTES: &[u8] = b"canonical snapshot b";
@@ -15,7 +14,6 @@ const SOURCE_B_BYTES: &[u8] = b"canonical snapshot b";
 fn receipt(source_bytes: &[u8], available_at: &str) -> SourceSnapshotReceiptV1 {
     let source_artifact = SourceArtifact::from_bytes(source_bytes).expect("artifact");
     SourceSnapshotReceiptV1::from_source_artifact(
-        EvidenceId::from_str(RECEIPT_ID).expect("uuidv7"),
         SNAPSHOT_ID,
         &source_artifact,
         AvailableTime::parse_rfc3339(available_at).expect("availability"),
@@ -24,21 +22,18 @@ fn receipt(source_bytes: &[u8], available_at: &str) -> SourceSnapshotReceiptV1 {
 }
 
 #[test]
-fn creation_must_not_allow_receipt_identity_reuse() {
+fn creation_mints_distinct_receipt_identity_inside_evidence() {
     let source_artifact = SourceArtifact::from_bytes(b"same source record").expect("artifact");
-    let supplied_id = EvidenceId::from_str(RECEIPT_ID).expect("uuidv7");
     let available =
         AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
 
     let first = SourceSnapshotReceiptV1::from_source_artifact(
-        supplied_id,
         SNAPSHOT_ID,
         &source_artifact,
         available,
     )
     .expect("first receipt");
     let second = SourceSnapshotReceiptV1::from_source_artifact(
-        supplied_id,
         SNAPSHOT_ID,
         &source_artifact,
         available,
@@ -46,6 +41,8 @@ fn creation_must_not_allow_receipt_identity_reuse() {
     .expect("second receipt");
 
     assert_ne!(first.receipt_id(), second.receipt_id());
+    assert!(EvidenceId::from_str(first.receipt_id()).is_ok());
+    assert!(EvidenceId::from_str(second.receipt_id()).is_ok());
 }
 
 #[test]
@@ -58,18 +55,15 @@ fn source_artifact_identity_is_bound_separately_from_equal_content() {
     );
     assert_ne!(first_artifact.id(), second_artifact.id());
 
-    let receipt_id = EvidenceId::from_str(RECEIPT_ID).expect("uuidv7");
     let available =
         AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
     let first = SourceSnapshotReceiptV1::from_source_artifact(
-        receipt_id,
         SNAPSHOT_ID,
         &first_artifact,
         available,
     )
     .expect("first receipt");
     let second = SourceSnapshotReceiptV1::from_source_artifact(
-        receipt_id,
         SNAPSHOT_ID,
         &second_artifact,
         available,
@@ -88,6 +82,7 @@ fn source_artifact_identity_is_bound_separately_from_equal_content() {
         EvidenceId::from_str(second.source_artifact_id()).expect("second source identity"),
         second_artifact.id()
     );
+    assert_ne!(first.receipt_id(), second.receipt_id());
     assert_ne!(
         first.binding_sha256().expect("first binding"),
         second.binding_sha256().expect("second binding")
@@ -114,7 +109,7 @@ fn same_logical_snapshot_with_different_source_bytes_has_different_binding() {
 fn availability_is_authoritative_receipt_data_not_a_constructor_cutoff() {
     let future = receipt(SOURCE_A_BYTES, "2026-08-02T00:00:00Z");
     assert_eq!(future.available_at(), "2026-08-02T00:00:00Z");
-    assert_eq!(future.receipt_id(), RECEIPT_ID);
+    assert!(EvidenceId::from_str(future.receipt_id()).is_ok());
 }
 
 #[test]
@@ -162,9 +157,11 @@ fn noncanonical_uuid_and_availability_wire_values_fail_closed() {
     let canonical = receipt(SOURCE_A_BYTES, "2026-07-31T23:59:59Z")
         .to_json()
         .expect("json");
-    let uppercase_receipt_id = RECEIPT_ID.to_ascii_uppercase();
+    let wire: serde_json::Value = serde_json::from_str(&canonical).expect("json");
+    let receipt_id = wire["receipt_id"].as_str().expect("receipt id");
+    let uppercase_receipt_id = receipt_id.to_ascii_uppercase();
 
-    let uppercase_id = canonical.replace(RECEIPT_ID, &uppercase_receipt_id);
+    let uppercase_id = canonical.replace(receipt_id, &uppercase_receipt_id);
     assert_eq!(
         SourceSnapshotReceiptV1::from_json(&uppercase_id),
         Err(EvidenceError::InvalidWirePayload)
