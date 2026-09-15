@@ -2,43 +2,30 @@
 
 use evidence_core::{
     EvidenceError, EvidenceId, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT, SourceArtifact,
-    SourceSnapshotReceiptV1,
+    SourceObservation, SourceSnapshotReceiptV1,
 };
 use std::str::FromStr;
-use temporal_core::AvailableTime;
+use temporal_core::{AvailableTime, SystemTime};
 
 const SNAPSHOT_ID: &str = "snapshot-rubin-loading";
 const SOURCE_A_BYTES: &[u8] = b"canonical snapshot a";
 const SOURCE_B_BYTES: &[u8] = b"canonical snapshot b";
 
-fn receipt(source_bytes: &[u8], available_at: &str) -> SourceSnapshotReceiptV1 {
+fn receipt(source_bytes: &[u8]) -> SourceSnapshotReceiptV1 {
     let source_artifact = SourceArtifact::from_bytes(source_bytes).expect("artifact");
-    SourceSnapshotReceiptV1::from_source_artifact(
-        SNAPSHOT_ID,
-        &source_artifact,
-        AvailableTime::parse_rfc3339(available_at).expect("availability"),
-    )
-    .expect("receipt")
+    let observation = SourceObservation::observe(&source_artifact).expect("observation");
+    SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &observation).expect("receipt")
 }
 
 #[test]
 fn creation_mints_distinct_receipt_identity_inside_evidence() {
     let source_artifact = SourceArtifact::from_bytes(b"same source record").expect("artifact");
-    let available =
-        AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
+    let observation = SourceObservation::observe(&source_artifact).expect("observation");
 
-    let first = SourceSnapshotReceiptV1::from_source_artifact(
-        SNAPSHOT_ID,
-        &source_artifact,
-        available,
-    )
-    .expect("first receipt");
-    let second = SourceSnapshotReceiptV1::from_source_artifact(
-        SNAPSHOT_ID,
-        &source_artifact,
-        available,
-    )
-    .expect("second receipt");
+    let first = SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &observation)
+        .expect("first receipt");
+    let second = SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &observation)
+        .expect("second receipt");
 
     assert_ne!(first.receipt_id(), second.receipt_id());
     assert!(EvidenceId::from_str(first.receipt_id()).is_ok());
@@ -55,20 +42,13 @@ fn source_artifact_identity_is_bound_separately_from_equal_content() {
     );
     assert_ne!(first_artifact.id(), second_artifact.id());
 
-    let available =
-        AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
-    let first = SourceSnapshotReceiptV1::from_source_artifact(
-        SNAPSHOT_ID,
-        &first_artifact,
-        available,
-    )
-    .expect("first receipt");
-    let second = SourceSnapshotReceiptV1::from_source_artifact(
-        SNAPSHOT_ID,
-        &second_artifact,
-        available,
-    )
-    .expect("second receipt");
+    let first_observation = SourceObservation::observe(&first_artifact).expect("first observation");
+    let second_observation =
+        SourceObservation::observe(&second_artifact).expect("second observation");
+    let first = SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &first_observation)
+        .expect("first receipt");
+    let second = SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &second_observation)
+        .expect("second receipt");
 
     assert_eq!(
         first.source_snapshot_sha256(),
@@ -91,8 +71,8 @@ fn source_artifact_identity_is_bound_separately_from_equal_content() {
 
 #[test]
 fn same_logical_snapshot_with_different_source_bytes_has_different_binding() {
-    let first = receipt(SOURCE_A_BYTES, "2026-07-31T23:59:59Z");
-    let second = receipt(SOURCE_B_BYTES, "2026-07-31T23:59:59Z");
+    let first = receipt(SOURCE_A_BYTES);
+    let second = receipt(SOURCE_B_BYTES);
 
     assert_eq!(first.snapshot_id(), second.snapshot_id());
     assert_ne!(
@@ -106,17 +86,19 @@ fn same_logical_snapshot_with_different_source_bytes_has_different_binding() {
 }
 
 #[test]
-fn availability_is_authoritative_receipt_data_not_a_constructor_cutoff() {
-    let future = receipt(SOURCE_A_BYTES, "2026-08-02T00:00:00Z");
-    assert_eq!(future.available_at(), "2026-08-02T00:00:00Z");
-    assert!(EvidenceId::from_str(future.receipt_id()).is_ok());
+fn availability_and_system_observation_remain_distinct_nominal_clocks() {
+    let observed = receipt(SOURCE_A_BYTES);
+    let system_observed =
+        SystemTime::parse_rfc3339(observed.system_observed_at()).expect("system time");
+    let available = AvailableTime::parse_rfc3339(observed.available_at()).expect("availability");
+
+    assert_eq!(system_observed.instant(), available.instant());
+    assert!(EvidenceId::from_str(observed.receipt_id()).is_ok());
 }
 
 #[test]
 fn wire_refuses_noncanonical_digest_unknown_duplicate_and_oversized_payloads() {
-    let canonical = receipt(SOURCE_A_BYTES, "2026-07-31T23:59:59Z")
-        .to_json()
-        .expect("json");
+    let canonical = receipt(SOURCE_A_BYTES).to_json().expect("json");
     let wire: serde_json::Value = serde_json::from_str(&canonical).expect("json");
     let source_digest = wire["source_snapshot_sha256"]
         .as_str()
@@ -153,10 +135,8 @@ fn wire_refuses_noncanonical_digest_unknown_duplicate_and_oversized_payloads() {
 }
 
 #[test]
-fn noncanonical_uuid_and_availability_wire_values_fail_closed() {
-    let canonical = receipt(SOURCE_A_BYTES, "2026-07-31T23:59:59Z")
-        .to_json()
-        .expect("json");
+fn noncanonical_uuid_and_clock_wire_values_fail_closed() {
+    let canonical = receipt(SOURCE_A_BYTES).to_json().expect("json");
     let wire: serde_json::Value = serde_json::from_str(&canonical).expect("json");
     let receipt_id = wire["receipt_id"].as_str().expect("receipt id");
     let uppercase_receipt_id = receipt_id.to_ascii_uppercase();
@@ -167,10 +147,8 @@ fn noncanonical_uuid_and_availability_wire_values_fail_closed() {
         Err(EvidenceError::InvalidWirePayload)
     );
 
-    let noncanonical_time = canonical.replace(
-        "2026-07-31T23:59:59Z",
-        "2026-08-01T08:59:59+09:00",
-    );
+    let available_at = wire["available_at"].as_str().expect("available time");
+    let noncanonical_time = canonical.replace(available_at, "2026-08-01T08:59:59+09:00");
     assert_eq!(
         SourceSnapshotReceiptV1::from_json(&noncanonical_time),
         Err(EvidenceError::InvalidWirePayload)
