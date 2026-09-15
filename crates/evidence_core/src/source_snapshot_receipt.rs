@@ -92,11 +92,7 @@ impl SourceSnapshotReceiptV1 {
     /// validated, serialized, or kept inside the bounded wire envelope.
     pub fn to_json(&self) -> Result<String, EvidenceError> {
         self.validate()?;
-        let payload = serde_json::to_string(self).map_err(|_| EvidenceError::InvalidWirePayload)?;
-        if payload.len() > SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT {
-            return Err(EvidenceError::InvalidWirePayload);
-        }
-        Ok(payload)
+        serialize_bounded_receipt(self)
     }
 
     /// Return the SHA-256 of canonical receipt JSON for opaque downstream binding.
@@ -167,6 +163,14 @@ impl SourceSnapshotReceiptV1 {
     }
 }
 
+fn serialize_bounded_receipt<T: Serialize>(value: &T) -> Result<String, EvidenceError> {
+    let payload = serde_json::to_string(value).map_err(|_| EvidenceError::InvalidWirePayload)?;
+    if payload.len() > SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
+    Ok(payload)
+}
+
 fn valid_snapshot_id(value: &str) -> bool {
     if value.is_empty()
         || value.len() > MAX_SNAPSHOT_IDENTIFIER_BYTES
@@ -189,10 +193,27 @@ fn valid_snapshot_id(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION, SourceSnapshotReceiptV1};
+    use super::{
+        MAX_SNAPSHOT_IDENTIFIER_BYTES, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT,
+        SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION, SourceSnapshotReceiptV1,
+        serialize_bounded_receipt, valid_snapshot_id,
+    };
     use crate::{EvidenceError, EvidenceId, SourceArtifact};
+    use serde::Serialize;
+    use serde::ser::Serializer;
     use std::str::FromStr;
     use temporal_core::AvailableTime;
+
+    struct SerializationFailure;
+
+    impl Serialize for SerializationFailure {
+        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(serde::ser::Error::custom("intentional test failure"))
+        }
+    }
 
     fn receipt() -> SourceSnapshotReceiptV1 {
         let source_artifact = SourceArtifact::from_bytes(b"canonical snapshot").expect("artifact");
@@ -221,12 +242,21 @@ mod tests {
     }
 
     #[test]
-    fn mutable_snapshot_aliases_fail_closed() {
+    fn mutable_and_malformed_snapshot_identifiers_fail_closed() {
         let id = EvidenceId::from_str("018f1f6b-7c2a-7abc-8def-0123456789ab").expect("uuidv7");
         let source_artifact = SourceArtifact::from_bytes(b"source").expect("artifact");
         let available =
             AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
-        for alias in ["main", "latest", "pr-123", "issue-42"] {
+        for alias in [
+            "main",
+            "master",
+            "latest",
+            "latest-release",
+            "release-latest",
+            "pr-123",
+            "pull-123",
+            "issue-42",
+        ] {
             assert_eq!(
                 SourceSnapshotReceiptV1::from_source_artifact(
                     id,
@@ -237,5 +267,92 @@ mod tests {
                 Err(EvidenceError::InvalidWirePayload)
             );
         }
+        assert!(!valid_snapshot_id(""));
+        assert!(!valid_snapshot_id("snapshot/branch"));
+        assert!(!valid_snapshot_id(&"a".repeat(MAX_SNAPSHOT_IDENTIFIER_BYTES + 1)));
+        assert!(valid_snapshot_id("snapshot:v1_2026.09-15"));
+    }
+
+    #[test]
+    fn private_validation_branches_refuse_noncanonical_fields() {
+        let canonical = receipt();
+        let mut unsupported = canonical.clone();
+        unsupported.schema_version = "tepp.evidence.source_snapshot_receipt.v2".into();
+        assert_eq!(
+            unsupported.to_json(),
+            Err(EvidenceError::UnsupportedWireVersion)
+        );
+
+        let mut bad_receipt_id = canonical.clone();
+        bad_receipt_id.receipt_id = "not-a-uuid".into();
+        assert_eq!(
+            bad_receipt_id.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut uppercase_receipt_id = canonical.clone();
+        uppercase_receipt_id.receipt_id = uppercase_receipt_id.receipt_id.to_ascii_uppercase();
+        assert_eq!(
+            uppercase_receipt_id.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut bad_source_id = canonical.clone();
+        bad_source_id.source_artifact_id = "not-a-uuid".into();
+        assert_eq!(
+            bad_source_id.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut uppercase_source_id = canonical.clone();
+        uppercase_source_id.source_artifact_id =
+            uppercase_source_id.source_artifact_id.to_ascii_uppercase();
+        assert_eq!(
+            uppercase_source_id.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut bad_digest = canonical.clone();
+        bad_digest.source_snapshot_sha256 = "not-a-digest".into();
+        assert_eq!(
+            bad_digest.to_json(),
+            Err(EvidenceError::InvalidContentDigest)
+        );
+
+        let mut uppercase_digest = canonical.clone();
+        uppercase_digest.source_snapshot_sha256 =
+            uppercase_digest.source_snapshot_sha256.to_ascii_uppercase();
+        assert_eq!(
+            uppercase_digest.to_json(),
+            Err(EvidenceError::InvalidContentDigest)
+        );
+
+        let mut bad_time = canonical.clone();
+        bad_time.available_at = "not-a-time".into();
+        assert_eq!(bad_time.to_json(), Err(EvidenceError::InvalidWirePayload));
+
+        let mut offset_time = canonical;
+        offset_time.available_at = "2026-08-01T08:59:59+09:00".into();
+        assert_eq!(
+            offset_time.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+    }
+
+    #[test]
+    fn bounded_serializer_covers_failure_and_size_paths() {
+        assert_eq!(
+            serialize_bounded_receipt(&SerializationFailure),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        let oversized = "x".repeat(SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT + 1);
+        assert_eq!(
+            serialize_bounded_receipt(&oversized),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            serialize_bounded_receipt(&"ok").expect("bounded json"),
+            "\"ok\""
+        );
     }
 }
