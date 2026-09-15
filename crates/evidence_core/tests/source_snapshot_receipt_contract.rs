@@ -55,8 +55,14 @@ fn source_artifact_identity_is_bound_separately_from_equal_content() {
         first.source_snapshot_sha256(),
         second.source_snapshot_sha256()
     );
-    assert_eq!(first.source_artifact_id(), first_artifact.id().to_string());
-    assert_eq!(second.source_artifact_id(), second_artifact.id().to_string());
+    assert_eq!(
+        EvidenceId::from_str(first.source_artifact_id()).expect("first source identity"),
+        first_artifact.id()
+    );
+    assert_eq!(
+        EvidenceId::from_str(second.source_artifact_id()).expect("second source identity"),
+        second_artifact.id()
+    );
     assert_ne!(
         first.binding_sha256().expect("first binding"),
         second.binding_sha256().expect("second binding")
@@ -95,8 +101,9 @@ fn wire_refuses_noncanonical_digest_unknown_duplicate_and_oversized_payloads() {
     let source_digest = wire["source_snapshot_sha256"]
         .as_str()
         .expect("source digest");
+    let uppercase_source_digest = source_digest.to_ascii_uppercase();
 
-    let uppercase = canonical.replace(source_digest, &source_digest.to_ascii_uppercase());
+    let uppercase = canonical.replace(source_digest, &uppercase_source_digest);
     assert_eq!(
         SourceSnapshotReceiptV1::from_json(&uppercase),
         Err(EvidenceError::InvalidContentDigest)
@@ -130,8 +137,9 @@ fn noncanonical_uuid_and_availability_wire_values_fail_closed() {
     let canonical = receipt(SOURCE_A_BYTES, "2026-07-31T23:59:59Z")
         .to_json()
         .expect("json");
+    let uppercase_receipt_id = RECEIPT_ID.to_ascii_uppercase();
 
-    let uppercase_id = canonical.replace(RECEIPT_ID, &RECEIPT_ID.to_ascii_uppercase());
+    let uppercase_id = canonical.replace(RECEIPT_ID, &uppercase_receipt_id);
     assert_eq!(
         SourceSnapshotReceiptV1::from_json(&uppercase_id),
         Err(EvidenceError::InvalidWirePayload)
