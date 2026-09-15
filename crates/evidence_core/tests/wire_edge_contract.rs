@@ -100,6 +100,36 @@ fn source_span_wire_rejects_malformed_document_identifier() {
 }
 
 #[test]
+fn source_span_wire_rejects_oversized_envelopes_before_identifier_validation() {
+    let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
+    let document =
+        DocumentRecord::from_text(artifact.id(), "document").expect("document must be valid");
+    let span = SourceSpan::new(&document, 0, 8, 0, 8, None).expect("span must be valid");
+    let serialized = span.to_wire_json().expect("span must serialize");
+    let oversized = replace_field(&serialized, "document_id", json!("x".repeat(8 * 1024)));
+
+    assert_eq!(
+        SourceSpan::from_wire_json(&oversized, &document).unwrap_err(),
+        EvidenceError::InvalidWirePayload
+    );
+}
+
+#[test]
+fn source_span_wire_rejects_noncanonical_json() {
+    let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
+    let document =
+        DocumentRecord::from_text(artifact.id(), "document").expect("document must be valid");
+    let span = SourceSpan::new(&document, 0, 8, 0, 8, None).expect("span must be valid");
+    let serialized = span.to_wire_json().expect("span must serialize");
+    let noncanonical = format!(" {serialized}");
+
+    assert_eq!(
+        SourceSpan::from_wire_json(&noncanonical, &document).unwrap_err(),
+        EvidenceError::InvalidWirePayload
+    );
+}
+
+#[test]
 fn wire_validation_errors_have_stable_redacted_messages() {
     let cases = [
         (
