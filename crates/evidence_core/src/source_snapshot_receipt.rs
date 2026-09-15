@@ -20,6 +20,11 @@ const MAX_SNAPSHOT_IDENTIFIER_BYTES: usize = 256;
 /// digest as an opaque binding. This object does not assert source ownership,
 /// signature, authorization, external authenticity, or chain of custody, and it
 /// does not substitute for a numeric estimator-payload digest.
+///
+/// Arbitrary JSON cannot construct this owner-issued type. Persisted/external
+/// JSON is parsed only as [`ValidatedSourceSnapshotReceiptWireV1`]; repository or
+/// service authentication is a separate boundary before any later code may
+/// treat that wire record as trusted Evidence state.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceSnapshotReceiptV1 {
@@ -32,9 +37,27 @@ pub struct SourceSnapshotReceiptV1 {
     available_at: String,
 }
 
+/// Canonical, structurally validated source-snapshot receipt wire record.
+///
+/// This type proves only that one JSON payload is canonical and satisfies the
+/// receipt field invariants. It is deliberately distinct from
+/// [`SourceSnapshotReceiptV1`]: parsing bytes does not prove that the Evidence
+/// owner issued, stored, or authenticated the record.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ValidatedSourceSnapshotReceiptWireV1 {
+    schema_version: String,
+    receipt_id: String,
+    source_artifact_id: String,
+    snapshot_id: String,
+    source_snapshot_sha256: String,
+    system_observed_at: String,
+    available_at: String,
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct SourceSnapshotReceiptWireV1 {
+struct SourceSnapshotReceiptWireDtoV1 {
     schema_version: String,
     receipt_id: String,
     source_artifact_id: String,
@@ -72,40 +95,6 @@ impl SourceSnapshotReceiptV1 {
             available_at: availability.available_at().to_rfc3339(),
         };
         receipt.validate()?;
-        Ok(receipt)
-    }
-
-    /// Parse and validate one bounded canonical JSON receipt.
-    ///
-    /// Parsing validates identity/digest/clock shape and canonical encoding. It
-    /// does not authenticate an arbitrary wire sender; consumers still require
-    /// their owning repository/service authority before accepting a parsed
-    /// receipt as trusted Evidence state.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`EvidenceError::InvalidWirePayload`] for malformed, duplicate,
-    /// unknown, noncanonical, or oversized receipt JSON, and
-    /// [`EvidenceError::UnsupportedWireVersion`] for another schema version.
-    pub fn from_json(payload: &str) -> Result<Self, EvidenceError> {
-        if payload.len() > SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT {
-            return Err(EvidenceError::InvalidWirePayload);
-        }
-        let wire: SourceSnapshotReceiptWireV1 =
-            serde_json::from_str(payload).map_err(|_| EvidenceError::InvalidWirePayload)?;
-        let receipt = Self {
-            schema_version: wire.schema_version,
-            receipt_id: wire.receipt_id,
-            source_artifact_id: wire.source_artifact_id,
-            snapshot_id: wire.snapshot_id,
-            source_snapshot_sha256: wire.source_snapshot_sha256,
-            system_observed_at: wire.system_observed_at,
-            available_at: wire.available_at,
-        };
-        receipt.validate()?;
-        if serialize_bounded_receipt(&receipt)? != payload {
-            return Err(EvidenceError::InvalidWirePayload);
-        }
         Ok(receipt)
     }
 
@@ -167,36 +156,139 @@ impl SourceSnapshotReceiptV1 {
     }
 
     fn validate(&self) -> Result<(), EvidenceError> {
-        if self.schema_version != SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION {
-            return Err(EvidenceError::UnsupportedWireVersion);
-        }
-        let parsed_receipt_id =
-            EvidenceId::from_str(&self.receipt_id).map_err(|_| EvidenceError::InvalidWirePayload)?;
-        let parsed_source_artifact_id = EvidenceId::from_str(&self.source_artifact_id)
-            .map_err(|_| EvidenceError::InvalidWirePayload)?;
-        if parsed_receipt_id.to_string() != self.receipt_id
-            || parsed_source_artifact_id.to_string() != self.source_artifact_id
-            || !valid_snapshot_id(&self.snapshot_id)
-        {
-            return Err(EvidenceError::InvalidWirePayload);
-        }
-        let digest = ContentDigest::from_str(&self.source_snapshot_sha256)
-            .map_err(|_| EvidenceError::InvalidContentDigest)?;
-        if digest.to_string() != self.source_snapshot_sha256 {
-            return Err(EvidenceError::InvalidContentDigest);
-        }
-        let system_observed = SystemTime::parse_rfc3339(&self.system_observed_at)
-            .map_err(|_| EvidenceError::InvalidWirePayload)?;
-        let available = AvailableTime::parse_rfc3339(&self.available_at)
-            .map_err(|_| EvidenceError::InvalidWirePayload)?;
-        if system_observed.to_rfc3339() != self.system_observed_at
-            || available.to_rfc3339() != self.available_at
-            || available.instant() < system_observed.instant()
-        {
-            return Err(EvidenceError::InvalidWirePayload);
-        }
-        Ok(())
+        validate_receipt_fields(
+            &self.schema_version,
+            &self.receipt_id,
+            &self.source_artifact_id,
+            &self.snapshot_id,
+            &self.source_snapshot_sha256,
+            &self.system_observed_at,
+            &self.available_at,
+        )
     }
+}
+
+impl ValidatedSourceSnapshotReceiptWireV1 {
+    /// Parse and structurally validate one bounded canonical JSON receipt.
+    ///
+    /// Successful parsing does not authenticate the sender or promote this wire
+    /// record into [`SourceSnapshotReceiptV1`]. A repository/service owner must
+    /// separately authenticate persisted state before trusted scientific use.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`EvidenceError::InvalidWirePayload`] for malformed, duplicate,
+    /// unknown, noncanonical, backdated, or oversized receipt JSON, and
+    /// [`EvidenceError::UnsupportedWireVersion`] for another schema version.
+    pub fn from_json(payload: &str) -> Result<Self, EvidenceError> {
+        if payload.len() > SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT {
+            return Err(EvidenceError::InvalidWirePayload);
+        }
+        let wire: SourceSnapshotReceiptWireDtoV1 =
+            serde_json::from_str(payload).map_err(|_| EvidenceError::InvalidWirePayload)?;
+        let validated = Self {
+            schema_version: wire.schema_version,
+            receipt_id: wire.receipt_id,
+            source_artifact_id: wire.source_artifact_id,
+            snapshot_id: wire.snapshot_id,
+            source_snapshot_sha256: wire.source_snapshot_sha256,
+            system_observed_at: wire.system_observed_at,
+            available_at: wire.available_at,
+        };
+        validated.validate()?;
+        if serialize_bounded_receipt(&validated)? != payload {
+            return Err(EvidenceError::InvalidWirePayload);
+        }
+        Ok(validated)
+    }
+
+    /// Return the canonical RFC 9562 UUIDv7 receipt identity from the wire record.
+    #[must_use]
+    pub fn receipt_id(&self) -> &str {
+        &self.receipt_id
+    }
+
+    /// Return the immutable source-artifact identity from the wire record.
+    #[must_use]
+    pub fn source_artifact_id(&self) -> &str {
+        &self.source_artifact_id
+    }
+
+    /// Return the logical source-snapshot identity from the wire record.
+    #[must_use]
+    pub fn snapshot_id(&self) -> &str {
+        &self.snapshot_id
+    }
+
+    /// Return the canonical lowercase source-content SHA-256 from the wire record.
+    #[must_use]
+    pub fn source_snapshot_sha256(&self) -> &str {
+        &self.source_snapshot_sha256
+    }
+
+    /// Return the canonical RFC 3339 source-observation system clock.
+    #[must_use]
+    pub fn system_observed_at(&self) -> &str {
+        &self.system_observed_at
+    }
+
+    /// Return the canonical RFC 3339 availability clock from the wire record.
+    #[must_use]
+    pub fn available_at(&self) -> &str {
+        &self.available_at
+    }
+
+    fn validate(&self) -> Result<(), EvidenceError> {
+        validate_receipt_fields(
+            &self.schema_version,
+            &self.receipt_id,
+            &self.source_artifact_id,
+            &self.snapshot_id,
+            &self.source_snapshot_sha256,
+            &self.system_observed_at,
+            &self.available_at,
+        )
+    }
+}
+
+fn validate_receipt_fields(
+    schema_version: &str,
+    receipt_id: &str,
+    source_artifact_id: &str,
+    snapshot_id: &str,
+    source_snapshot_sha256: &str,
+    system_observed_at: &str,
+    available_at: &str,
+) -> Result<(), EvidenceError> {
+    if schema_version != SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION {
+        return Err(EvidenceError::UnsupportedWireVersion);
+    }
+    let parsed_receipt_id =
+        EvidenceId::from_str(receipt_id).map_err(|_| EvidenceError::InvalidWirePayload)?;
+    let parsed_source_artifact_id =
+        EvidenceId::from_str(source_artifact_id).map_err(|_| EvidenceError::InvalidWirePayload)?;
+    if parsed_receipt_id.to_string() != receipt_id
+        || parsed_source_artifact_id.to_string() != source_artifact_id
+        || !valid_snapshot_id(snapshot_id)
+    {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
+    let digest = ContentDigest::from_str(source_snapshot_sha256)
+        .map_err(|_| EvidenceError::InvalidContentDigest)?;
+    if digest.to_string() != source_snapshot_sha256 {
+        return Err(EvidenceError::InvalidContentDigest);
+    }
+    let system_observed = SystemTime::parse_rfc3339(system_observed_at)
+        .map_err(|_| EvidenceError::InvalidWirePayload)?;
+    let available =
+        AvailableTime::parse_rfc3339(available_at).map_err(|_| EvidenceError::InvalidWirePayload)?;
+    if system_observed.to_rfc3339() != system_observed_at
+        || available.to_rfc3339() != available_at
+        || available.instant() < system_observed.instant()
+    {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
+    Ok(())
 }
 
 fn serialize_bounded_receipt<T: Serialize>(value: &T) -> Result<String, EvidenceError> {
@@ -232,7 +324,7 @@ mod tests {
     use super::{
         MAX_SNAPSHOT_IDENTIFIER_BYTES, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT,
         SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION, SourceSnapshotReceiptV1,
-        serialize_bounded_receipt, valid_snapshot_id,
+        ValidatedSourceSnapshotReceiptWireV1, serialize_bounded_receipt, valid_snapshot_id,
     };
     use crate::{EvidenceError, SourceArtifact, SourceAvailability, SourceObservation};
     use serde::Serialize;
@@ -261,14 +353,21 @@ mod tests {
     }
 
     #[test]
-    fn canonical_round_trip_preserves_binding() {
+    fn canonical_wire_round_trip_preserves_fields_without_trust_promotion() {
         let receipt = receipt();
         let json = receipt.to_json().expect("json");
         assert!(json.contains(SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION));
+        let parsed =
+            ValidatedSourceSnapshotReceiptWireV1::from_json(&json).expect("validated wire");
+        assert_eq!(parsed.receipt_id(), receipt.receipt_id());
+        assert_eq!(parsed.source_artifact_id(), receipt.source_artifact_id());
+        assert_eq!(parsed.snapshot_id(), receipt.snapshot_id());
         assert_eq!(
-            SourceSnapshotReceiptV1::from_json(&json),
-            Ok(receipt.clone())
+            parsed.source_snapshot_sha256(),
+            receipt.source_snapshot_sha256()
         );
+        assert_eq!(parsed.system_observed_at(), receipt.system_observed_at());
+        assert_eq!(parsed.available_at(), receipt.available_at());
         assert_eq!(
             receipt.binding_sha256().expect("binding").to_string().len(),
             64
@@ -302,7 +401,7 @@ mod tests {
     }
 
     #[test]
-    fn private_validation_branches_refuse_noncanonical_fields() {
+    fn private_owner_validation_branches_refuse_noncanonical_fields() {
         let canonical = receipt();
         let mut unsupported = canonical.clone();
         unsupported.schema_version = "tepp.evidence.source_snapshot_receipt.v2".into();
