@@ -1,6 +1,6 @@
-//! Versioned immutable source-snapshot provenance receipts.
+//! Versioned immutable source-snapshot evidence bindings.
 
-use crate::{ContentDigest, EvidenceError, EvidenceId};
+use crate::{ContentDigest, EvidenceError, EvidenceId, SourceArtifact};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use temporal_core::AvailableTime;
@@ -11,42 +11,51 @@ pub const SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION: &str = "tepp.evidence.source_s
 pub const SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT: usize = 16 * 1024;
 const MAX_SNAPSHOT_IDENTIFIER_BYTES: usize = 256;
 
-/// Immutable Evidence-owned provenance for one exact source snapshot.
+/// Immutable Evidence-owned binding for one exact source snapshot.
 ///
-/// The receipt binds a stable receipt identity, logical snapshot identity,
-/// exact source-content SHA-256, and the authoritative time at which that
-/// immutable snapshot became available. Downstream analysis may retain only
-/// the receipt digest as an opaque provenance binding; that binding does not
-/// substitute for the numeric estimator-payload digest.
+/// The receipt binds a stable receipt identity, the owning immutable
+/// [`SourceArtifact`] identity, logical snapshot identity, exact source-content
+/// SHA-256, and the authoritative time at which that source snapshot became
+/// available. Downstream analysis may retain the canonical receipt digest as an
+/// opaque binding. This object does not assert source ownership, signature,
+/// authorization, or chain of custody, and it does not substitute for a numeric
+/// estimator-payload digest.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceSnapshotReceiptV1 {
     schema_version: String,
     receipt_id: String,
+    source_artifact_id: String,
     snapshot_id: String,
     source_snapshot_sha256: String,
     available_at: String,
 }
 
 impl SourceSnapshotReceiptV1 {
-    /// Construct one validated immutable source-snapshot receipt.
+    /// Construct one receipt from an already validated immutable source artifact.
+    ///
+    /// The content digest is derived from the artifact rather than accepted as a
+    /// free caller-supplied authority. Identity and digest remain separate so
+    /// equal bytes ingested into distinct Evidence records do not collapse their
+    /// provenance context.
     ///
     /// # Errors
     ///
     /// Returns [`EvidenceError::InvalidWirePayload`] when the snapshot identity
     /// is empty, mutable, noncanonical, or otherwise outside the bounded
     /// Evidence contract.
-    pub fn new(
+    pub fn from_source_artifact(
         receipt_id: EvidenceId,
         snapshot_id: impl Into<String>,
-        source_snapshot_sha256: ContentDigest,
+        source_artifact: &SourceArtifact,
         available_at: AvailableTime,
     ) -> Result<Self, EvidenceError> {
         let receipt = Self {
             schema_version: SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION.into(),
             receipt_id: receipt_id.to_string(),
+            source_artifact_id: source_artifact.id().to_string(),
             snapshot_id: snapshot_id.into(),
-            source_snapshot_sha256: source_snapshot_sha256.to_string(),
+            source_snapshot_sha256: source_artifact.content_digest().to_string(),
             available_at: available_at.to_rfc3339(),
         };
         receipt.validate()?;
@@ -54,6 +63,11 @@ impl SourceSnapshotReceiptV1 {
     }
 
     /// Parse and validate one bounded canonical JSON receipt.
+    ///
+    /// Parsing validates identity/digest/clock shape and canonical encoding. It
+    /// does not authenticate an arbitrary wire sender; consumers still require
+    /// their owning repository/service authority before accepting a receipt as
+    /// trusted Evidence state.
     ///
     /// # Errors
     ///
@@ -91,13 +105,20 @@ impl SourceSnapshotReceiptV1 {
     ///
     /// Returns an evidence validation error when canonical serialization fails.
     pub fn binding_sha256(&self) -> Result<ContentDigest, EvidenceError> {
-        self.to_json().map(|payload| ContentDigest::sha256(payload.as_bytes()))
+        self.to_json()
+            .map(|payload| ContentDigest::sha256(payload.as_bytes()))
     }
 
     /// Return the canonical RFC 9562 UUIDv7 receipt identity.
     #[must_use]
     pub fn receipt_id(&self) -> &str {
         &self.receipt_id
+    }
+
+    /// Return the owning immutable source-artifact identity.
+    #[must_use]
+    pub fn source_artifact_id(&self) -> &str {
+        &self.source_artifact_id
     }
 
     /// Return the immutable logical source-snapshot identity.
@@ -124,7 +145,12 @@ impl SourceSnapshotReceiptV1 {
         }
         let parsed_receipt_id =
             EvidenceId::from_str(&self.receipt_id).map_err(|_| EvidenceError::InvalidWirePayload)?;
-        if parsed_receipt_id.to_string() != self.receipt_id || !valid_snapshot_id(&self.snapshot_id) {
+        let parsed_source_artifact_id = EvidenceId::from_str(&self.source_artifact_id)
+            .map_err(|_| EvidenceError::InvalidWirePayload)?;
+        if parsed_receipt_id.to_string() != self.receipt_id
+            || parsed_source_artifact_id.to_string() != self.source_artifact_id
+            || !valid_snapshot_id(&self.snapshot_id)
+        {
             return Err(EvidenceError::InvalidWirePayload);
         }
         let digest = ContentDigest::from_str(&self.source_snapshot_sha256)
@@ -164,18 +190,16 @@ fn valid_snapshot_id(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION, SourceSnapshotReceiptV1};
-    use crate::{ContentDigest, EvidenceError, EvidenceId};
+    use crate::{EvidenceError, EvidenceId, SourceArtifact};
     use std::str::FromStr;
     use temporal_core::AvailableTime;
 
     fn receipt() -> SourceSnapshotReceiptV1 {
-        SourceSnapshotReceiptV1::new(
+        let source_artifact = SourceArtifact::from_bytes(b"canonical snapshot").expect("artifact");
+        SourceSnapshotReceiptV1::from_source_artifact(
             EvidenceId::from_str("018f1f6b-7c2a-7abc-8def-0123456789ab").expect("uuidv7"),
             "snapshot-rubin-loading",
-            ContentDigest::from_str(
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-            )
-            .expect("digest"),
+            &source_artifact,
             AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability"),
         )
         .expect("receipt")
@@ -186,18 +210,30 @@ mod tests {
         let receipt = receipt();
         let json = receipt.to_json().expect("json");
         assert!(json.contains(SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION));
-        assert_eq!(SourceSnapshotReceiptV1::from_json(&json), Ok(receipt.clone()));
-        assert_eq!(receipt.binding_sha256().expect("binding").to_string().len(), 64);
+        assert_eq!(
+            SourceSnapshotReceiptV1::from_json(&json),
+            Ok(receipt.clone())
+        );
+        assert_eq!(
+            receipt.binding_sha256().expect("binding").to_string().len(),
+            64
+        );
     }
 
     #[test]
     fn mutable_snapshot_aliases_fail_closed() {
         let id = EvidenceId::from_str("018f1f6b-7c2a-7abc-8def-0123456789ab").expect("uuidv7");
-        let digest = ContentDigest::sha256(b"source");
-        let available = AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
+        let source_artifact = SourceArtifact::from_bytes(b"source").expect("artifact");
+        let available =
+            AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
         for alias in ["main", "latest", "pr-123", "issue-42"] {
             assert_eq!(
-                SourceSnapshotReceiptV1::new(id, alias, digest, available),
+                SourceSnapshotReceiptV1::from_source_artifact(
+                    id,
+                    alias,
+                    &source_artifact,
+                    available,
+                ),
                 Err(EvidenceError::InvalidWirePayload)
             );
         }

@@ -1,7 +1,7 @@
 //! Public contract for immutable Evidence-owned source-snapshot receipts.
 
 use evidence_core::{
-    ContentDigest, EvidenceError, EvidenceId, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT, SourceArtifact,
+    EvidenceError, EvidenceId, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT, SourceArtifact,
     SourceSnapshotReceiptV1,
 };
 use std::str::FromStr;
@@ -9,14 +9,15 @@ use temporal_core::AvailableTime;
 
 const RECEIPT_ID: &str = "018f1f6b-7c2a-7abc-8def-0123456789ab";
 const SNAPSHOT_ID: &str = "snapshot-rubin-loading";
-const SOURCE_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const SOURCE_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const SOURCE_A_BYTES: &[u8] = b"canonical snapshot a";
+const SOURCE_B_BYTES: &[u8] = b"canonical snapshot b";
 
-fn receipt(source_sha256: &str, available_at: &str) -> SourceSnapshotReceiptV1 {
-    SourceSnapshotReceiptV1::new(
+fn receipt(source_bytes: &[u8], available_at: &str) -> SourceSnapshotReceiptV1 {
+    let source_artifact = SourceArtifact::from_bytes(source_bytes).expect("artifact");
+    SourceSnapshotReceiptV1::from_source_artifact(
         EvidenceId::from_str(RECEIPT_ID).expect("uuidv7"),
         SNAPSHOT_ID,
-        ContentDigest::from_str(source_sha256).expect("digest"),
+        &source_artifact,
         AvailableTime::parse_rfc3339(available_at).expect("availability"),
     )
     .expect("receipt")
@@ -26,11 +27,15 @@ fn receipt(source_sha256: &str, available_at: &str) -> SourceSnapshotReceiptV1 {
 fn source_artifact_identity_is_bound_separately_from_equal_content() {
     let first_artifact = SourceArtifact::from_bytes(b"same canonical snapshot").expect("artifact");
     let second_artifact = SourceArtifact::from_bytes(b"same canonical snapshot").expect("artifact");
-    assert_eq!(first_artifact.content_digest(), second_artifact.content_digest());
+    assert_eq!(
+        first_artifact.content_digest(),
+        second_artifact.content_digest()
+    );
     assert_ne!(first_artifact.id(), second_artifact.id());
 
     let receipt_id = EvidenceId::from_str(RECEIPT_ID).expect("uuidv7");
-    let available = AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
+    let available =
+        AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
     let first = SourceSnapshotReceiptV1::from_source_artifact(
         receipt_id,
         SNAPSHOT_ID,
@@ -46,19 +51,28 @@ fn source_artifact_identity_is_bound_separately_from_equal_content() {
     )
     .expect("second receipt");
 
-    assert_eq!(first.source_snapshot_sha256(), second.source_snapshot_sha256());
+    assert_eq!(
+        first.source_snapshot_sha256(),
+        second.source_snapshot_sha256()
+    );
     assert_eq!(first.source_artifact_id(), first_artifact.id().to_string());
     assert_eq!(second.source_artifact_id(), second_artifact.id().to_string());
-    assert_ne!(first.binding_sha256(), second.binding_sha256());
+    assert_ne!(
+        first.binding_sha256().expect("first binding"),
+        second.binding_sha256().expect("second binding")
+    );
 }
 
 #[test]
 fn same_logical_snapshot_with_different_source_bytes_has_different_binding() {
-    let first = receipt(SOURCE_A, "2026-07-31T23:59:59Z");
-    let second = receipt(SOURCE_B, "2026-07-31T23:59:59Z");
+    let first = receipt(SOURCE_A_BYTES, "2026-07-31T23:59:59Z");
+    let second = receipt(SOURCE_B_BYTES, "2026-07-31T23:59:59Z");
 
     assert_eq!(first.snapshot_id(), second.snapshot_id());
-    assert_ne!(first.source_snapshot_sha256(), second.source_snapshot_sha256());
+    assert_ne!(
+        first.source_snapshot_sha256(),
+        second.source_snapshot_sha256()
+    );
     assert_ne!(
         first.binding_sha256().expect("first binding"),
         second.binding_sha256().expect("second binding")
@@ -67,18 +81,22 @@ fn same_logical_snapshot_with_different_source_bytes_has_different_binding() {
 
 #[test]
 fn availability_is_authoritative_receipt_data_not_a_constructor_cutoff() {
-    let future = receipt(SOURCE_A, "2026-08-02T00:00:00Z");
+    let future = receipt(SOURCE_A_BYTES, "2026-08-02T00:00:00Z");
     assert_eq!(future.available_at(), "2026-08-02T00:00:00Z");
     assert_eq!(future.receipt_id(), RECEIPT_ID);
 }
 
 #[test]
 fn wire_refuses_noncanonical_digest_unknown_duplicate_and_oversized_payloads() {
-    let canonical = receipt(SOURCE_A, "2026-07-31T23:59:59Z")
+    let canonical = receipt(SOURCE_A_BYTES, "2026-07-31T23:59:59Z")
         .to_json()
         .expect("json");
+    let wire: serde_json::Value = serde_json::from_str(&canonical).expect("json");
+    let source_digest = wire["source_snapshot_sha256"]
+        .as_str()
+        .expect("source digest");
 
-    let uppercase = canonical.replace(SOURCE_A, &SOURCE_A.to_ascii_uppercase());
+    let uppercase = canonical.replace(source_digest, &source_digest.to_ascii_uppercase());
     assert_eq!(
         SourceSnapshotReceiptV1::from_json(&uppercase),
         Err(EvidenceError::InvalidContentDigest)
@@ -109,7 +127,7 @@ fn wire_refuses_noncanonical_digest_unknown_duplicate_and_oversized_payloads() {
 
 #[test]
 fn noncanonical_uuid_and_availability_wire_values_fail_closed() {
-    let canonical = receipt(SOURCE_A, "2026-07-31T23:59:59Z")
+    let canonical = receipt(SOURCE_A_BYTES, "2026-07-31T23:59:59Z")
         .to_json()
         .expect("json");
 
