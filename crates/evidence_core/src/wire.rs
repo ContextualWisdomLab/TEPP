@@ -7,7 +7,6 @@ use crate::{
 use serde::de::{DeserializeSeed, SeqAccess, Visitor};
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
-use std::cell::Cell;
 use std::fmt;
 use std::str::FromStr;
 
@@ -93,18 +92,16 @@ struct PageLocationWire {
     height: f64,
 }
 
-struct BoundedByteArraySeed<'limit> {
+struct BoundedByteArraySeed {
     maximum_bytes: usize,
-    exceeded_limit: &'limit Cell<bool>,
 }
 
-struct BoundedByteArrayVisitor<'limit> {
+struct BoundedByteArrayVisitor {
     maximum_bytes: usize,
-    exceeded_limit: &'limit Cell<bool>,
 }
 
-impl<'de> DeserializeSeed<'de> for BoundedByteArraySeed<'_> {
-    type Value = ();
+impl<'de> DeserializeSeed<'de> for BoundedByteArraySeed {
+    type Value = bool;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -112,13 +109,12 @@ impl<'de> DeserializeSeed<'de> for BoundedByteArraySeed<'_> {
     {
         deserializer.deserialize_seq(BoundedByteArrayVisitor {
             maximum_bytes: self.maximum_bytes,
-            exceeded_limit: self.exceeded_limit,
         })
     }
 }
 
-impl<'de> Visitor<'de> for BoundedByteArrayVisitor<'_> {
-    type Value = ();
+impl<'de> Visitor<'de> for BoundedByteArrayVisitor {
+    type Value = bool;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("a byte array within the configured Evidence limit")
@@ -131,14 +127,8 @@ impl<'de> Visitor<'de> for BoundedByteArrayVisitor<'_> {
         let mut decoded_bytes = 0_usize;
         while sequence.next_element::<u8>()?.is_some() {
             decoded_bytes = decoded_bytes.saturating_add(1);
-            if decoded_bytes > self.maximum_bytes {
-                self.exceeded_limit.set(true);
-                return Err(<A::Error as serde::de::Error>::custom(
-                    "decoded Evidence byte array exceeds limit",
-                ));
-            }
         }
-        Ok(())
+        Ok(decoded_bytes > self.maximum_bytes)
     }
 }
 
@@ -320,22 +310,17 @@ fn validate_metadata_raw_value(raw: &str) -> Result<(), EvidenceError> {
 
 fn validate_bounded_u8_array_raw(raw: &str, maximum_bytes: usize) -> Result<(), EvidenceError> {
     let mut deserializer = serde_json::Deserializer::from_str(raw);
-    let exceeded_limit = Cell::new(false);
-    let result = BoundedByteArraySeed {
-        maximum_bytes,
-        exceeded_limit: &exceeded_limit,
-    }
-    .deserialize(&mut deserializer);
-    if result.is_err() {
-        return if exceeded_limit.get() {
-            Err(EvidenceError::SourceArtifactTooLarge)
-        } else {
-            Err(EvidenceError::InvalidWirePayload)
-        };
-    }
+    let exceeded_limit = BoundedByteArraySeed { maximum_bytes }
+        .deserialize(&mut deserializer)
+        .map_err(|_| EvidenceError::InvalidWirePayload)?;
     deserializer
         .end()
-        .map_err(|_| EvidenceError::InvalidWirePayload)
+        .map_err(|_| EvidenceError::InvalidWirePayload)?;
+    if exceeded_limit {
+        Err(EvidenceError::SourceArtifactTooLarge)
+    } else {
+        Ok(())
+    }
 }
 
 fn validate_bounded_json_string_raw(raw: &str, maximum_bytes: usize) -> Result<(), EvidenceError> {
@@ -348,6 +333,7 @@ fn validate_bounded_json_string_raw(raw: &str, maximum_bytes: usize) -> Result<(
     let bytes = inner.as_bytes();
     let mut index = 0_usize;
     let mut decoded_bytes = 0_usize;
+    let mut exceeded_limit = false;
     while index < bytes.len() {
         let (width, next_index) = if bytes[index] == b'\\' {
             decoded_escape_width(bytes, index)?
@@ -355,12 +341,14 @@ fn validate_bounded_json_string_raw(raw: &str, maximum_bytes: usize) -> Result<(
             (1_usize, index + 1)
         };
         decoded_bytes = decoded_bytes.saturating_add(width);
-        if decoded_bytes > maximum_bytes {
-            return Err(EvidenceError::DocumentTooLarge);
-        }
+        exceeded_limit |= decoded_bytes > maximum_bytes;
         index = next_index;
     }
-    Ok(())
+    if exceeded_limit {
+        Err(EvidenceError::DocumentTooLarge)
+    } else {
+        Ok(())
+    }
 }
 
 fn decoded_escape_width(bytes: &[u8], slash_index: usize) -> Result<(usize, usize), EvidenceError> {
@@ -528,6 +516,10 @@ mod tests {
             Err(EvidenceError::SourceArtifactTooLarge)
         );
         assert_eq!(
+            validate_bounded_u8_array_raw("[0,1,256]", 1),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
             validate_bounded_u8_array_raw("[256]", 1),
             Err(EvidenceError::InvalidWirePayload)
         );
@@ -570,6 +562,10 @@ mod tests {
         );
         assert_eq!(
             validate_bounded_json_string_raw(r#""\q""#, 1),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+        assert_eq!(
+            validate_bounded_json_string_raw(r#""ab\q""#, 1),
             Err(EvidenceError::InvalidWirePayload)
         );
         assert_eq!(
