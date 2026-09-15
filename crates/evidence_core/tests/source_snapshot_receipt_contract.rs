@@ -24,6 +24,31 @@ fn receipt(source_bytes: &[u8], available_at: &str) -> SourceSnapshotReceiptV1 {
 }
 
 #[test]
+fn creation_must_not_allow_receipt_identity_reuse() {
+    let source_artifact = SourceArtifact::from_bytes(b"same source record").expect("artifact");
+    let supplied_id = EvidenceId::from_str(RECEIPT_ID).expect("uuidv7");
+    let available =
+        AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
+
+    let first = SourceSnapshotReceiptV1::from_source_artifact(
+        supplied_id,
+        SNAPSHOT_ID,
+        &source_artifact,
+        available,
+    )
+    .expect("first receipt");
+    let second = SourceSnapshotReceiptV1::from_source_artifact(
+        supplied_id,
+        SNAPSHOT_ID,
+        &source_artifact,
+        available,
+    )
+    .expect("second receipt");
+
+    assert_ne!(first.receipt_id(), second.receipt_id());
+}
+
+#[test]
 fn source_artifact_identity_is_bound_separately_from_equal_content() {
     let first_artifact = SourceArtifact::from_bytes(b"same canonical snapshot").expect("artifact");
     let second_artifact = SourceArtifact::from_bytes(b"same canonical snapshot").expect("artifact");
