@@ -321,13 +321,12 @@ fn validate_metadata_raw_value(raw: &str) -> Result<(), EvidenceError> {
 fn validate_bounded_u8_array_raw(raw: &str, maximum_bytes: usize) -> Result<(), EvidenceError> {
     let mut deserializer = serde_json::Deserializer::from_str(raw);
     let exceeded_limit = Cell::new(false);
-    if BoundedByteArraySeed {
+    let result = BoundedByteArraySeed {
         maximum_bytes,
         exceeded_limit: &exceeded_limit,
     }
-    .deserialize(&mut deserializer)
-    .is_err()
-    {
+    .deserialize(&mut deserializer);
+    if result.is_err() {
         return if exceeded_limit.get() {
             Err(EvidenceError::SourceArtifactTooLarge)
         } else {
@@ -339,11 +338,11 @@ fn validate_bounded_u8_array_raw(raw: &str, maximum_bytes: usize) -> Result<(), 
         .map_err(|_| EvidenceError::InvalidWirePayload)
 }
 
-fn validate_bounded_json_string_raw(
-    raw: &str,
-    maximum_bytes: usize,
-) -> Result<(), EvidenceError> {
-    let Some(inner) = raw.strip_prefix('"').and_then(|value| value.strip_suffix('"')) else {
+fn validate_bounded_json_string_raw(raw: &str, maximum_bytes: usize) -> Result<(), EvidenceError> {
+    let Some(inner) = raw
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+    else {
         return Err(EvidenceError::InvalidWirePayload);
     };
     let bytes = inner.as_bytes();
@@ -369,9 +368,7 @@ fn decoded_escape_width(bytes: &[u8], slash_index: usize) -> Result<(usize, usiz
         .get(slash_index + 1)
         .ok_or(EvidenceError::InvalidWirePayload)?;
     match escape {
-        b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => {
-            Ok((1, slash_index + 2))
-        }
+        b'"' | b'\\' | b'/' | b'b' | b'f' | b'n' | b'r' | b't' => Ok((1, slash_index + 2)),
         b'u' => decoded_unicode_escape_width(bytes, slash_index),
         _ => Err(EvidenceError::InvalidWirePayload),
     }
@@ -548,22 +545,13 @@ mod tests {
     fn text_preflight_handles_plain_simple_unicode_and_surrogate_escapes() {
         assert_eq!(validate_bounded_json_string_raw("\"\"", 0), Ok(()));
         assert_eq!(validate_bounded_json_string_raw("\"abc\"", 3), Ok(()));
-        assert_eq!(
-            validate_bounded_json_string_raw(r#""\n""#, 1),
-            Ok(())
-        );
-        assert_eq!(
-            validate_bounded_json_string_raw(r#""\u00e9""#, 2),
-            Ok(())
-        );
+        assert_eq!(validate_bounded_json_string_raw(r#""\n""#, 1), Ok(()));
+        assert_eq!(validate_bounded_json_string_raw(r#""\u00e9""#, 2), Ok(()));
         assert_eq!(
             validate_bounded_json_string_raw(r#""\uD83D\uDE00""#, 4),
             Ok(())
         );
-        assert_eq!(
-            validate_bounded_json_string_raw(r#""é""#, 2),
-            Ok(())
-        );
+        assert_eq!(validate_bounded_json_string_raw(r#""é""#, 2), Ok(()));
         assert_eq!(
             validate_bounded_json_string_raw("\"abc\"", 2),
             Err(EvidenceError::DocumentTooLarge)
