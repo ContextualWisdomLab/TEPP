@@ -15,14 +15,25 @@ const MAX_SNAPSHOT_IDENTIFIER_BYTES: usize = 256;
 ///
 /// The receipt binds a stable receipt identity, the owning immutable
 /// [`SourceArtifact`] identity, logical snapshot identity, exact source-content
-/// SHA-256, and the authoritative time at which that source snapshot became
+/// SHA-256, and the recorded time at which that source snapshot became
 /// available. Downstream analysis may retain the canonical receipt digest as an
 /// opaque binding. This object does not assert source ownership, signature,
 /// authorization, or chain of custody, and it does not substitute for a numeric
 /// estimator-payload digest.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SourceSnapshotReceiptV1 {
+    schema_version: String,
+    receipt_id: String,
+    source_artifact_id: String,
+    snapshot_id: String,
+    source_snapshot_sha256: String,
+    available_at: String,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceSnapshotReceiptWireV1 {
     schema_version: String,
     receipt_id: String,
     source_artifact_id: String,
@@ -79,9 +90,20 @@ impl SourceSnapshotReceiptV1 {
         if payload.len() > SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT {
             return Err(EvidenceError::InvalidWirePayload);
         }
-        let receipt: Self =
+        let wire: SourceSnapshotReceiptWireV1 =
             serde_json::from_str(payload).map_err(|_| EvidenceError::InvalidWirePayload)?;
+        let receipt = Self {
+            schema_version: wire.schema_version,
+            receipt_id: wire.receipt_id,
+            source_artifact_id: wire.source_artifact_id,
+            snapshot_id: wire.snapshot_id,
+            source_snapshot_sha256: wire.source_snapshot_sha256,
+            available_at: wire.available_at,
+        };
         receipt.validate()?;
+        if serialize_bounded_receipt(&receipt)? != payload {
+            return Err(EvidenceError::InvalidWirePayload);
+        }
         Ok(receipt)
     }
 
@@ -130,7 +152,7 @@ impl SourceSnapshotReceiptV1 {
         &self.source_snapshot_sha256
     }
 
-    /// Return the canonical RFC 3339 availability clock.
+    /// Return the canonical RFC 3339 recorded availability clock.
     #[must_use]
     pub fn available_at(&self) -> &str {
         &self.available_at
