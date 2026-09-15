@@ -141,13 +141,18 @@ class ContradictoryZeroCountTests(unittest.TestCase):
 
 
 class BlockOpenerProbeTests(unittest.TestCase):
-    """`opens_a_block` guards its own source probe boundaries."""
+    """Coverage source probes fail closed at filesystem and trivia boundaries."""
 
     def test_unreadable_source_opens_no_block(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             missing = Path(temporary) / "absent.rs"
             self.assertFalse(
                 coverage_contract.opens_a_block(str(missing), 1, Path(temporary))
+            )
+            self.assertIsNone(
+                coverage_contract._first_meaningful_source_line_after(
+                    str(missing), 1, Path(temporary)
+                )
             )
 
     def test_line_outside_the_file_opens_no_block(self) -> None:
@@ -162,8 +167,22 @@ class BlockOpenerProbeTests(unittest.TestCase):
     def test_absent_repository_root_reads_the_path_directly(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             source = Path(temporary) / "direct.rs"
-            source.write_text("fn run() {\n", encoding="utf-8")
+            source.write_text("fn run() {\n    work();\n", encoding="utf-8")
             self.assertTrue(coverage_contract.opens_a_block(str(source), 1, None))
+            self.assertEqual(
+                coverage_contract._first_meaningful_source_line_after(str(source), 1, None),
+                2,
+            )
+
+    def test_only_blank_and_line_comments_produce_no_nested_evidence_line(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "trivia.rs"
+            source.write_text("if ready {\n\n    // note\n", encoding="utf-8")
+            self.assertIsNone(
+                coverage_contract._first_meaningful_source_line_after(
+                    str(source), 1, Path(temporary)
+                )
+            )
 
 
 if __name__ == "__main__":

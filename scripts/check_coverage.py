@@ -831,24 +831,51 @@ def opens_a_block(source_path: str, line_number: int, repository_root: Path | No
     return code.rstrip().endswith("{")
 
 
+def _first_meaningful_source_line_after(
+    source_path: str, line_number: int, repository_root: Path | None
+) -> int | None:
+    """Return the first later line that is not blank or a line-only comment."""
+
+    try:
+        path = (
+            resolve_repository_source_path(source_path, repository_root)
+            if repository_root is not None
+            else Path(source_path)
+        )
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for candidate_number in range(line_number + 1, len(lines) + 1):
+        stripped = lines[candidate_number - 1].strip()
+        if not stripped or stripped.startswith("//"):
+            continue
+        return candidate_number
+    return None
+
+
 def reconcile_contradictory_zero_counts(
     line_counts: dict[tuple[str, int], int], repository_root: Path | None
 ) -> None:
     """Mark a proven-executed zero-count opener covered without deleting it.
 
-    LLVM can report a zero count for a brace-delimited opener while the first
-    measured line inside the block has a positive count. The nested execution
-    proves the opener ran, but it does not prove the exact opener frequency.
-    Promote only that contradictory zero to the minimal positive line count so
-    the authored denominator and every genuine zero remain unchanged.
+    LLVM can report a zero count for a brace-delimited opener while its first
+    meaningful nested line has a positive count. Blank and line-comment-only
+    lines are not authored coverage units, so they cannot break that proof. A
+    closing brace or any other meaningful unmeasured line stops the proof;
+    reconciliation never crosses into a sibling statement outside the block.
     """
 
     for key in [key for key, count in line_counts.items() if count == 0]:
         source_path, line_number = key
-        nested_count = line_counts.get((source_path, line_number + 1))
-        if nested_count is None or nested_count <= 0:
+        if not opens_a_block(source_path, line_number, repository_root):
             continue
-        if opens_a_block(source_path, line_number, repository_root):
+        nested_line = _first_meaningful_source_line_after(
+            source_path, line_number, repository_root
+        )
+        if nested_line is None:
+            continue
+        nested_count = line_counts.get((source_path, nested_line))
+        if nested_count is not None and nested_count > 0:
             line_counts[key] = 1
 
 
