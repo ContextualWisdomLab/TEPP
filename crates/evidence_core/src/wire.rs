@@ -2,7 +2,7 @@
 
 use crate::{
     ContentDigest, DocumentRecord, EvidenceError, EvidenceId, PageLocation, SourceArtifact,
-    SourceSpan,
+    SourceSpan, ValidatedSourceArtifactWire,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -67,12 +67,15 @@ pub(crate) fn serialize_source_artifact(
 pub(crate) fn deserialize_source_artifact(
     payload: &str,
     maximum_bytes: usize,
-) -> Result<SourceArtifact, EvidenceError> {
+) -> Result<ValidatedSourceArtifactWire, EvidenceError> {
     let wire: SourceArtifactWire = deserialize_wire(payload)?;
     validate_version(wire.schema_version)?;
+    if serialize_wire(&wire)? != payload {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
     let artifact_id = EvidenceId::from_str(&wire.artifact_id)?;
     let content_digest = ContentDigest::from_str(&wire.content_sha256)?;
-    SourceArtifact::from_wire_parts(
+    ValidatedSourceArtifactWire::from_wire_parts(
         artifact_id,
         content_digest,
         wire.content_bytes,

@@ -8,9 +8,9 @@
 //! coordinates are validated before entering later temporal or psychometric
 //! layers, versioned source-snapshot evidence bindings, Evidence-owned source
 //! observation/availability records, and strict versioned JSON wire contracts
-//! that reconstruct records only through the same domain validation boundary.
-//! Embedded `data:image` units keep their original offsets and are not lexical
-//! inference text.
+//! that validate external records without promoting caller-supplied identity
+//! into owner-issued Evidence state. Embedded `data:image` units keep their
+//! original offsets and are not lexical inference text.
 
 mod artifact;
 mod digest;
@@ -23,8 +23,10 @@ mod source_snapshot_receipt;
 mod span;
 mod wire;
 
-/// An immutable source artifact with a verified content digest.
+/// An immutable source artifact with an Evidence-issued identity and verified content digest.
 pub use artifact::SourceArtifact;
+/// Canonical validated source-artifact wire input that is not owner-authenticated Evidence state.
+pub use artifact::ValidatedSourceArtifactWire;
 /// A canonical `SHA-256` content digest.
 pub use digest::ContentDigest;
 /// An immutable UTF-8 document linked to its source artifact.

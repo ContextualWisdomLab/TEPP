@@ -1,7 +1,8 @@
 //! Versioned, fail-closed JSON wire contracts for immutable evidence records.
 
 use evidence_core::{
-    DocumentRecord, EvidenceError, PageLocation, SourceArtifact, SourceSpan, WIRE_SCHEMA_VERSION,
+    DocumentRecord, EvidenceError, PageLocation, SourceArtifact, SourceSpan,
+    ValidatedSourceArtifactWire, WIRE_SCHEMA_VERSION,
 };
 use serde_json::{Value, json};
 
@@ -18,11 +19,12 @@ fn replace_field(serialized: &str, field: &str, replacement: Value) -> String {
 }
 
 #[test]
-fn source_artifact_wire_round_trip_preserves_identity_digest_and_bytes() {
+fn source_artifact_wire_round_trip_preserves_validated_identity_digest_and_bytes() {
     let artifact = SourceArtifact::from_bytes(b"\x00source\xff").expect("artifact must be valid");
     let serialized = artifact.to_wire_json().expect("artifact must serialize");
     let value: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
-    let restored = SourceArtifact::from_wire_json(&serialized).expect("wire record must validate");
+    let restored = ValidatedSourceArtifactWire::from_json(&serialized)
+        .expect("wire record must validate without becoming owner state");
 
     assert_eq!(value["schema_version"], json!(WIRE_SCHEMA_VERSION));
     assert_eq!(value["artifact_id"], json!(artifact.id().to_string()));
@@ -34,35 +36,41 @@ fn source_artifact_wire_round_trip_preserves_identity_digest_and_bytes() {
         value["content_bytes"],
         json!([0, 115, 111, 117, 114, 99, 101, 255])
     );
-    assert_eq!(restored, artifact);
+    assert_eq!(restored.artifact_id(), artifact.id());
+    assert_eq!(restored.content_digest(), artifact.content_digest());
+    assert_eq!(restored.content(), artifact.content());
 }
 
 #[test]
-fn source_artifact_wire_rejects_unknown_version_fields_and_digest_mismatch() {
+fn source_artifact_wire_rejects_unknown_version_fields_digest_mismatch_and_noncanonical_json() {
     let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
     let serialized = artifact.to_wire_json().expect("artifact must serialize");
 
     let unsupported = replace_field(&serialized, "schema_version", json!(2));
     assert_eq!(
-        SourceArtifact::from_wire_json(&unsupported).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json(&unsupported).unwrap_err(),
         EvidenceError::UnsupportedWireVersion
     );
 
     let mut unknown: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
     unknown["unexpected"] = json!(true);
     assert_eq!(
-        SourceArtifact::from_wire_json(&unknown.to_string()).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json(&unknown.to_string()).unwrap_err(),
         EvidenceError::InvalidWirePayload
     );
 
     let mismatch = replace_field(&serialized, "content_sha256", json!("00".repeat(32)));
     assert_eq!(
-        SourceArtifact::from_wire_json(&mismatch).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json(&mismatch).unwrap_err(),
         EvidenceError::ContentDigestMismatch
     );
 
     assert_eq!(
-        SourceArtifact::from_wire_json("not JSON").unwrap_err(),
+        ValidatedSourceArtifactWire::from_json("not JSON").unwrap_err(),
+        EvidenceError::InvalidWirePayload
+    );
+    assert_eq!(
+        ValidatedSourceArtifactWire::from_json(&format!(" {serialized}")).unwrap_err(),
         EvidenceError::InvalidWirePayload
     );
 }
@@ -73,14 +81,14 @@ fn source_artifact_wire_reapplies_content_limits() {
     let serialized = artifact.to_wire_json().expect("artifact must serialize");
 
     assert_eq!(
-        SourceArtifact::from_wire_json_with_limit(&serialized, 3).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json_with_limit(&serialized, 3).unwrap_err(),
         EvidenceError::SourceArtifactTooLarge
     );
-    assert_eq!(
-        SourceArtifact::from_wire_json_with_limit(&serialized, 4)
-            .expect("boundary size must be valid"),
-        artifact
-    );
+    let validated = ValidatedSourceArtifactWire::from_json_with_limit(&serialized, 4)
+        .expect("boundary size must be valid");
+    assert_eq!(validated.artifact_id(), artifact.id());
+    assert_eq!(validated.content_digest(), artifact.content_digest());
+    assert_eq!(validated.content(), artifact.content());
 }
 
 #[test]
@@ -169,7 +177,7 @@ fn source_span_wire_round_trip_revalidates_exact_coordinates_and_page_location()
 fn source_span_wire_rejects_wrong_document_unknown_fields_versions_and_invalid_ranges() {
     let (_, document) = artifact_and_document("Aé🧠Z");
     let (_, other) = artifact_and_document("other");
-    let span = SourceSpan::new(&document, 1, 7, 1, 3, None).expect("span must be valid");
+    let span = SourceSpan::new(&document, 1, 7, 1, 3, None).expect("source span must be valid");
     let serialized = span.to_wire_json().expect("span must serialize");
 
     assert_eq!(
