@@ -64,6 +64,27 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
         self.assertEqual((loaded["count"], loaded["covered"]), (2, 2))
 
+    def test_rust_line_comment_scanner_preserves_literal_comment_markers(self) -> None:
+        """Only a lexical Rust line comment is removed from an opener probe."""
+
+        cases = (
+            ("if ready { // audited", "if ready { "),
+            ('if value == "//" { // audited', 'if value == "//" { '),
+            ('if value == "escaped \\\"// marker" { // audited', 'if value == "escaped \\\"// marker" { '),
+            ('if value == r#"//"# { // audited', 'if value == r#"//"# { '),
+            ("if value == '/' { // audited", "if value == '/' { "),
+            ("if value == '\\'' { // audited", "if value == '\\'' { "),
+            ("if ready /* outer /* nested */ still outer */ { // audited", "if ready  { "),
+            ("if ready /* open block comment", "if ready "),
+            ('let value = r#"raw string continues // {', 'let value = r#"raw string continues // {'),
+            ("let lifetime: &'a str = value;", "let lifetime: &'a str = value;"),
+        )
+        for source, expected in cases:
+            with self.subTest(source=source):
+                self.assertEqual(
+                    coverage_contract._rust_code_before_line_comment(source), expected
+                )
+
     def test_genuine_zero_on_a_block_opener_is_kept(self) -> None:
         """When the body never ran either, the zero is a real gap."""
 
