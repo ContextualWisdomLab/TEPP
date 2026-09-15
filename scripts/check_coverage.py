@@ -746,6 +746,44 @@ def _is_standalone_string_literal(text: str) -> bool:
     return False
 
 
+def opens_a_block(source_path: str, line_number: int, repository_root: Path | None) -> bool:
+    """Return whether *line_number* ends by opening a brace-delimited block."""
+
+    try:
+        path = (
+            resolve_repository_source_path(source_path, repository_root)
+            if repository_root is not None
+            else Path(source_path)
+        )
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    if line_number <= 0 or line_number > len(lines):
+        return False
+    return lines[line_number - 1].rstrip().endswith("{")
+
+
+def reconcile_contradictory_zero_counts(
+    line_counts: dict[tuple[str, int], int], repository_root: Path | None
+) -> None:
+    """Mark a proven-executed zero-count opener covered without deleting it.
+
+    LLVM can report a zero count for a brace-delimited opener while the first
+    measured line inside the block has a positive count. The nested execution
+    proves the opener ran, but it does not prove the exact opener frequency.
+    Promote only that contradictory zero to the minimal positive line count so
+    the authored denominator and every genuine zero remain unchanged.
+    """
+
+    for key in [key for key, count in line_counts.items() if count == 0]:
+        source_path, line_number = key
+        nested_count = line_counts.get((source_path, line_number + 1))
+        if nested_count is None or nested_count <= 0:
+            continue
+        if opens_a_block(source_path, line_number, repository_root):
+            line_counts[key] = 1
+
+
 def load_lcov_line_totals(
     path: Path, repository_root: Path | None = None
 ) -> Mapping[str, Any]:
@@ -791,6 +829,7 @@ def load_lcov_line_totals(
         raise ValueError("LCOV source record must end with end_of_record")
     if not line_counts:
         raise ValueError("LCOV report contains no authored source lines")
+    reconcile_contradictory_zero_counts(line_counts, root)
     covered = sum(execution_count > 0 for execution_count in line_counts.values())
     return {"lines": {"count": len(line_counts), "covered": covered}}
 
