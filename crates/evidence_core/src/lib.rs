@@ -49,6 +49,8 @@ pub use source_snapshot_receipt::SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT;
 pub use source_snapshot_receipt::SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION;
 /// Evidence-owned immutable source-snapshot binding receipt.
 pub use source_snapshot_receipt::SourceSnapshotReceiptV1;
+/// Canonical validated receipt wire that is not owner-authenticated Evidence state.
+pub use source_snapshot_receipt::ValidatedSourceSnapshotReceiptWireV1;
 /// A validated page-relative location for source evidence.
 pub use span::PageLocation;
 /// An exact byte, Unicode-scalar, and optional page/layout span.
