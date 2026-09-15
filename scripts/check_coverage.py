@@ -720,13 +720,9 @@ def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
             # A leading complete block comment may have been stripped above;
             # any opener left here follows executable code on the same line.
             previous = previous.split("/*", 1)[0].strip()
-        if previous.endswith("=>") or previous.endswith("=> {"):
+        code = _rust_code_before_line_comment(previous).rstrip()
+        if code.endswith(("=>", "=> {")):
             return True
-        for marker in range(len(previous) - 1):
-            if previous[marker : marker + 2] == "//" and previous[:marker].rstrip().endswith(
-                ("=>", "=> {")
-            ):
-                return True
         return False
     return False
 
