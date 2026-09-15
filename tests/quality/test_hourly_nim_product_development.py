@@ -37,12 +37,11 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
     """Structural tests for the credential-separated product-development loop."""
 
     def test_hourly_workflow_schedule_credentials_and_queue_gate(self) -> None:
-        """Run at minute 47 with provider discovery and fail closed around inventory."""
+        """Accept central dispatch only, discover providers, fail closed around inventory."""
 
         text = _text(WORKFLOW)
         bootstrap = _text(BOOTSTRAP)
         for token in (
-            'cron: "47 * * * *"',
             "workflow_dispatch:",
             "dry_run:",
             "hourly-nim-product-development-${{ github.repository }}",
@@ -79,6 +78,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             self.assertIn(token, text)
         for token in ("discover_all_models", "register_credential", "PROVIDER_CREDENTIAL_NAMES"):
             self.assertIn(token, bootstrap)
+        self.assertNotIn("schedule:", text)
         self.assertNotIn("COPILOT_GITHUB_TOKEN", text)
         self.assertNotIn("CONTEXTUAL_ORCHESTRATOR_TOKEN=", text)
         self.assertEqual(text.count("gh pr create"), 1)
