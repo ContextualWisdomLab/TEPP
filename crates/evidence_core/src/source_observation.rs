@@ -6,12 +6,14 @@ use temporal_core::{AvailableTime, SystemTime};
 
 /// Evidence-owned observation of one immutable source artifact entering TEPP.
 ///
-/// Production creation reads the wall clock inside the Evidence boundary and
-/// records only the nominal [`SystemTime`] at which TEPP observed the source.
-/// Callers cannot select or backdate that clock. Observation does not itself
-/// mean that the evidence is already available to an analyst or model.
+/// Production creation mints a stable Evidence identity, reads the wall clock
+/// inside the Evidence boundary, and records the nominal [`SystemTime`] at which
+/// TEPP observed the source. Callers cannot select either the identity or that
+/// timestamp. Observation does not itself mean that the evidence is already
+/// available to an analyst or model.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceObservation {
+    observation_id: EvidenceId,
     source_artifact_id: EvidenceId,
     source_snapshot_sha256: ContentDigest,
     system_observed_at: SystemTime,
@@ -19,12 +21,16 @@ pub struct SourceObservation {
 
 /// Evidence-owned availability of one previously observed source artifact.
 ///
-/// Production creation takes a second owner-controlled wall-clock reading when
-/// the observed source becomes available to TEPP analysis. System observation
-/// and evidence availability therefore remain separate nominal clocks and may
-/// differ. Availability may never precede the owning source observation.
+/// Production creation mints a distinct Evidence identity and takes a second
+/// owner-controlled wall-clock reading when the observed source becomes
+/// available to TEPP analysis. The record retains the exact source-observation
+/// identity it follows. System observation and evidence availability remain
+/// separate nominal clocks and may differ. Availability may never precede the
+/// owning source observation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceAvailability {
+    availability_id: EvidenceId,
+    source_observation_id: EvidenceId,
     source_artifact_id: EvidenceId,
     source_snapshot_sha256: ContentDigest,
     system_observed_at: SystemTime,
@@ -34,8 +40,8 @@ pub struct SourceAvailability {
 impl SourceObservation {
     /// Observe an immutable source artifact at the Evidence ingress boundary.
     ///
-    /// Production callers have no API for selecting or backdating the recorded
-    /// system timestamp.
+    /// Production callers have no API for selecting or backdating the record
+    /// identity or the recorded system timestamp.
     ///
     /// # Errors
     ///
@@ -44,6 +50,12 @@ impl SourceObservation {
     pub fn observe(source_artifact: &SourceArtifact) -> Result<Self, EvidenceError> {
         let observed_at = Timestamp::now().to_string();
         Self::from_trusted_timestamp(source_artifact, &observed_at)
+    }
+
+    /// Return the Evidence-owned identity of this source-observation record.
+    #[must_use]
+    pub const fn observation_id(&self) -> EvidenceId {
+        self.observation_id
     }
 
     /// Return the immutable Evidence source-artifact identity.
@@ -68,6 +80,8 @@ impl SourceObservation {
     ///
     /// This helper stays private so deterministic tests can exercise temporal
     /// refusal branches without exposing a caller-selectable production clock.
+    /// Record identity remains Evidence-owned even on this deterministic test
+    /// path.
     fn from_trusted_timestamp(
         source_artifact: &SourceArtifact,
         observed_at: &str,
@@ -75,6 +89,7 @@ impl SourceObservation {
         let system_observed_at = SystemTime::parse_rfc3339(observed_at)
             .map_err(|_| EvidenceError::InvalidWirePayload)?;
         Ok(Self {
+            observation_id: EvidenceId::new(),
             source_artifact_id: source_artifact.id(),
             source_snapshot_sha256: source_artifact.content_digest(),
             system_observed_at,
@@ -85,9 +100,10 @@ impl SourceObservation {
 impl SourceAvailability {
     /// Mark an observed immutable source artifact available to TEPP analysis.
     ///
-    /// A fresh Evidence-owned clock reading is used for availability. The
-    /// operation fails closed if the trusted wall clock has moved behind the
-    /// source observation, rather than fabricating an earlier availability.
+    /// A fresh Evidence-owned identity and clock reading are used for
+    /// availability. The operation fails closed if the trusted wall clock has
+    /// moved behind the source observation, rather than fabricating an earlier
+    /// availability.
     ///
     /// # Errors
     ///
@@ -97,6 +113,18 @@ impl SourceAvailability {
     pub fn make_available(observation: &SourceObservation) -> Result<Self, EvidenceError> {
         let available_at = Timestamp::now().to_string();
         Self::from_trusted_timestamp(observation, &available_at)
+    }
+
+    /// Return the Evidence-owned identity of this source-availability record.
+    #[must_use]
+    pub const fn availability_id(&self) -> EvidenceId {
+        self.availability_id
+    }
+
+    /// Return the exact Evidence source-observation identity this record follows.
+    #[must_use]
+    pub const fn source_observation_id(&self) -> EvidenceId {
+        self.source_observation_id
     }
 
     /// Return the immutable Evidence source-artifact identity.
@@ -127,6 +155,8 @@ impl SourceAvailability {
     ///
     /// This helper remains private so tests can exercise clock-ordering failure
     /// without adding a production API that permits caller-selected backdating.
+    /// Record identity remains Evidence-owned even on this deterministic test
+    /// path.
     fn from_trusted_timestamp(
         observation: &SourceObservation,
         available_at: &str,
@@ -137,6 +167,8 @@ impl SourceAvailability {
             return Err(EvidenceError::InvalidWirePayload);
         }
         Ok(Self {
+            availability_id: EvidenceId::new(),
+            source_observation_id: observation.observation_id(),
             source_artifact_id: observation.source_artifact_id(),
             source_snapshot_sha256: observation.source_snapshot_sha256(),
             system_observed_at: observation.system_observed_at(),
@@ -185,6 +217,10 @@ mod tests {
         .expect("availability");
 
         assert_eq!(
+            availability.source_observation_id(),
+            observation.observation_id()
+        );
+        assert_eq!(
             availability.source_artifact_id(),
             observation.source_artifact_id()
         );
@@ -197,6 +233,45 @@ mod tests {
             observation.system_observed_at()
         );
         assert!(availability.available_at().instant() > observation.system_observed_at().instant());
+    }
+
+    #[test]
+    fn repeated_owner_records_do_not_use_timestamps_as_identity() {
+        let artifact = SourceArtifact::from_bytes(b"snapshot").expect("artifact");
+        let first_observation = SourceObservation::from_trusted_timestamp(
+            &artifact,
+            "2026-09-15T02:00:00Z",
+        )
+        .expect("first observation");
+        let second_observation = SourceObservation::from_trusted_timestamp(
+            &artifact,
+            "2026-09-15T02:00:00Z",
+        )
+        .expect("second observation");
+        assert_ne!(first_observation.observation_id(), second_observation.observation_id());
+        assert_eq!(
+            first_observation.system_observed_at(),
+            second_observation.system_observed_at()
+        );
+
+        let first_availability = SourceAvailability::from_trusted_timestamp(
+            &first_observation,
+            "2026-09-15T02:00:01Z",
+        )
+        .expect("first availability");
+        let second_availability = SourceAvailability::from_trusted_timestamp(
+            &first_observation,
+            "2026-09-15T02:00:01Z",
+        )
+        .expect("second availability");
+        assert_ne!(
+            first_availability.availability_id(),
+            second_availability.availability_id()
+        );
+        assert_eq!(
+            first_availability.source_observation_id(),
+            second_availability.source_observation_id()
+        );
     }
 
     #[test]

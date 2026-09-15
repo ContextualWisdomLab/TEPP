@@ -14,12 +14,13 @@ const MAX_SNAPSHOT_IDENTIFIER_BYTES: usize = 256;
 /// Immutable Evidence-owned binding for one exact source snapshot.
 ///
 /// The receipt binds a stable receipt identity, the owning immutable source
-/// artifact identity, logical snapshot identity, exact source-content SHA-256,
-/// and the Evidence-owned observation/availability clocks from
-/// [`SourceAvailability`]. Downstream analysis may retain the canonical receipt
-/// digest as an opaque binding. This object does not assert source ownership,
-/// signature, authorization, external authenticity, or chain of custody, and it
-/// does not substitute for a numeric estimator-payload digest.
+/// artifact identity, exact Evidence-owned observation and availability record
+/// identities, logical snapshot identity, exact source-content SHA-256, and the
+/// Evidence-owned observation/availability clocks from [`SourceAvailability`].
+/// Downstream analysis may retain the canonical receipt digest as an opaque
+/// binding. This object does not assert source ownership, signature,
+/// authorization, external authenticity, or chain of custody, and it does not
+/// substitute for a numeric estimator-payload digest.
 ///
 /// Arbitrary JSON cannot construct this owner-issued type. Persisted/external
 /// JSON is parsed only as [`ValidatedSourceSnapshotReceiptWireV1`]; repository or
@@ -31,6 +32,8 @@ pub struct SourceSnapshotReceiptV1 {
     schema_version: String,
     receipt_id: String,
     source_artifact_id: String,
+    source_observation_id: String,
+    source_availability_id: String,
     snapshot_id: String,
     source_snapshot_sha256: String,
     system_observed_at: String,
@@ -49,6 +52,8 @@ pub struct ValidatedSourceSnapshotReceiptWireV1 {
     schema_version: String,
     receipt_id: String,
     source_artifact_id: String,
+    source_observation_id: String,
+    source_availability_id: String,
     snapshot_id: String,
     source_snapshot_sha256: String,
     system_observed_at: String,
@@ -61,6 +66,8 @@ struct SourceSnapshotReceiptWireDtoV1 {
     schema_version: String,
     receipt_id: String,
     source_artifact_id: String,
+    source_observation_id: String,
+    source_availability_id: String,
     snapshot_id: String,
     source_snapshot_sha256: String,
     system_observed_at: String,
@@ -70,11 +77,12 @@ struct SourceSnapshotReceiptWireDtoV1 {
 impl SourceSnapshotReceiptV1 {
     /// Construct one receipt from Evidence-owned source availability.
     ///
-    /// Evidence mints the receipt identity internally. Source-artifact identity,
-    /// source-content digest, system observation time, and availability time are
-    /// copied from the owner-controlled availability record rather than accepted
-    /// as free constructor arguments. Availability must not precede source
-    /// observation, but the two clocks remain distinct and need not be equal.
+    /// Evidence mints the receipt identity internally. Source-artifact,
+    /// source-observation, and source-availability identities, source-content
+    /// digest, system observation time, and availability time are copied from
+    /// the owner-controlled availability record rather than accepted as free
+    /// constructor arguments. Availability must not precede source observation,
+    /// but the two clocks remain distinct and need not be equal.
     ///
     /// # Errors
     ///
@@ -89,6 +97,8 @@ impl SourceSnapshotReceiptV1 {
             schema_version: SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION.into(),
             receipt_id: EvidenceId::new().to_string(),
             source_artifact_id: availability.source_artifact_id().to_string(),
+            source_observation_id: availability.source_observation_id().to_string(),
+            source_availability_id: availability.availability_id().to_string(),
             snapshot_id: snapshot_id.into(),
             source_snapshot_sha256: availability.source_snapshot_sha256().to_string(),
             system_observed_at: availability.system_observed_at().to_rfc3339(),
@@ -131,6 +141,18 @@ impl SourceSnapshotReceiptV1 {
         &self.source_artifact_id
     }
 
+    /// Return the exact Evidence-owned source-observation record identity.
+    #[must_use]
+    pub fn source_observation_id(&self) -> &str {
+        &self.source_observation_id
+    }
+
+    /// Return the exact Evidence-owned source-availability record identity.
+    #[must_use]
+    pub fn source_availability_id(&self) -> &str {
+        &self.source_availability_id
+    }
+
     /// Return the immutable logical source-snapshot identity.
     #[must_use]
     pub fn snapshot_id(&self) -> &str {
@@ -161,6 +183,8 @@ impl SourceSnapshotReceiptV1 {
             &self.schema_version,
             &self.receipt_id,
             &self.source_artifact_id,
+            &self.source_observation_id,
+            &self.source_availability_id,
             &self.snapshot_id,
             &self.source_snapshot_sha256,
             &self.system_observed_at,
@@ -191,6 +215,8 @@ impl ValidatedSourceSnapshotReceiptWireV1 {
             schema_version: wire.schema_version,
             receipt_id: wire.receipt_id,
             source_artifact_id: wire.source_artifact_id,
+            source_observation_id: wire.source_observation_id,
+            source_availability_id: wire.source_availability_id,
             snapshot_id: wire.snapshot_id,
             source_snapshot_sha256: wire.source_snapshot_sha256,
             system_observed_at: wire.system_observed_at,
@@ -213,6 +239,18 @@ impl ValidatedSourceSnapshotReceiptWireV1 {
     #[must_use]
     pub fn source_artifact_id(&self) -> &str {
         &self.source_artifact_id
+    }
+
+    /// Return the source-observation record identity from the wire record.
+    #[must_use]
+    pub fn source_observation_id(&self) -> &str {
+        &self.source_observation_id
+    }
+
+    /// Return the source-availability record identity from the wire record.
+    #[must_use]
+    pub fn source_availability_id(&self) -> &str {
+        &self.source_availability_id
     }
 
     /// Return the logical source-snapshot identity from the wire record.
@@ -245,6 +283,8 @@ impl ValidatedSourceSnapshotReceiptWireV1 {
             &self.schema_version,
             &self.receipt_id,
             &self.source_artifact_id,
+            &self.source_observation_id,
+            &self.source_availability_id,
             &self.snapshot_id,
             &self.source_snapshot_sha256,
             &self.system_observed_at,
@@ -258,6 +298,8 @@ fn validate_receipt_fields(
     schema_version: &str,
     receipt_id: &str,
     source_artifact_id: &str,
+    source_observation_id: &str,
+    source_availability_id: &str,
     snapshot_id: &str,
     source_snapshot_sha256: &str,
     system_observed_at: &str,
@@ -270,8 +312,14 @@ fn validate_receipt_fields(
         EvidenceId::from_str(receipt_id).map_err(|_| EvidenceError::InvalidWirePayload)?;
     let parsed_source_artifact_id =
         EvidenceId::from_str(source_artifact_id).map_err(|_| EvidenceError::InvalidWirePayload)?;
+    let parsed_source_observation_id = EvidenceId::from_str(source_observation_id)
+        .map_err(|_| EvidenceError::InvalidWirePayload)?;
+    let parsed_source_availability_id = EvidenceId::from_str(source_availability_id)
+        .map_err(|_| EvidenceError::InvalidWirePayload)?;
     if parsed_receipt_id.to_string() != receipt_id
         || parsed_source_artifact_id.to_string() != source_artifact_id
+        || parsed_source_observation_id.to_string() != source_observation_id
+        || parsed_source_availability_id.to_string() != source_availability_id
         || !valid_snapshot_id(snapshot_id)
     {
         return Err(EvidenceError::InvalidWirePayload);
@@ -366,6 +414,14 @@ mod tests {
             ValidatedSourceSnapshotReceiptWireV1::from_json(&json).expect("validated wire");
         assert_eq!(parsed.receipt_id(), receipt.receipt_id());
         assert_eq!(parsed.source_artifact_id(), receipt.source_artifact_id());
+        assert_eq!(
+            parsed.source_observation_id(),
+            receipt.source_observation_id()
+        );
+        assert_eq!(
+            parsed.source_availability_id(),
+            receipt.source_availability_id()
+        );
         assert_eq!(parsed.snapshot_id(), receipt.snapshot_id());
         assert_eq!(
             parsed.source_snapshot_sha256(),
@@ -441,6 +497,36 @@ mod tests {
             uppercase_source_id.source_artifact_id.to_ascii_uppercase();
         assert_eq!(
             uppercase_source_id.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut bad_observation_id = canonical.clone();
+        bad_observation_id.source_observation_id = "not-a-uuid".into();
+        assert_eq!(
+            bad_observation_id.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut uppercase_observation_id = canonical.clone();
+        uppercase_observation_id.source_observation_id =
+            uppercase_observation_id.source_observation_id.to_ascii_uppercase();
+        assert_eq!(
+            uppercase_observation_id.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut bad_availability_id = canonical.clone();
+        bad_availability_id.source_availability_id = "not-a-uuid".into();
+        assert_eq!(
+            bad_availability_id.to_json(),
+            Err(EvidenceError::InvalidWirePayload)
+        );
+
+        let mut uppercase_availability_id = canonical.clone();
+        uppercase_availability_id.source_availability_id =
+            uppercase_availability_id.source_availability_id.to_ascii_uppercase();
+        assert_eq!(
+            uppercase_availability_id.to_json(),
             Err(EvidenceError::InvalidWirePayload)
         );
 
