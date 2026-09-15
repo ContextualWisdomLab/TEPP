@@ -2,7 +2,6 @@
 
 use crate::{ContentDigest, EvidenceError, EvidenceId};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::str::FromStr;
 use temporal_core::AvailableTime;
 
