@@ -71,9 +71,11 @@ crates/longitudinal_core
 crates/membership_core
 crates/membership_target
 crates/modality_source
+crates/mlx_native_receipt
 crates/model_selection
 crates/network_analysis
 crates/operational_log
+crates/orchestrator_live
 crates/outcome_order
 crates/payload_bound
 crates/persistence_postgres
