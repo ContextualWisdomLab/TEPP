@@ -64,6 +64,42 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
         self.assertEqual((loaded["count"], loaded["covered"]), (2, 2))
 
+    def test_blank_and_line_comment_gap_preserves_nested_execution_proof(self) -> None:
+        """Non-authored trivia cannot make a proven-executed opener look uncovered."""
+
+        source = self.root / "gapped_guard.rs"
+        source.write_text(
+            "fn validate(ready: bool) {\n"
+            "    if ready {\n"
+            "\n"
+            "        // audit note\n"
+            "        println!(\"accepted\");\n"
+            "    }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        report = self.root / "gapped_guard.lcov"
+        report.write_text(lcov(source, [(2, 0), (5, 4)]), encoding="utf-8")
+        loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+        self.assertEqual((loaded["count"], loaded["covered"]), (2, 2))
+
+    def test_reconciliation_does_not_cross_a_closed_block(self) -> None:
+        """A later sibling statement cannot prove an empty opener executed."""
+
+        source = self.root / "closed_guard.rs"
+        source.write_text(
+            "fn validate(ready: bool) {\n"
+            "    if ready {\n"
+            "    }\n"
+            "    println!(\"outside\");\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        report = self.root / "closed_guard.lcov"
+        report.write_text(lcov(source, [(2, 0), (4, 4)]), encoding="utf-8")
+        loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+        self.assertEqual((loaded["count"], loaded["covered"]), (2, 1))
+
     def test_rust_line_comment_scanner_preserves_literal_comment_markers(self) -> None:
         """Only a lexical Rust line comment is removed from an opener probe."""
 
