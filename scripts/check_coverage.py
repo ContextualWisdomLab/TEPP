@@ -473,6 +473,9 @@ def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
             and stripped.endswith("=> {")
             and not nested_arrow_seen
         ):
+            # The opener of the preceding sibling arm sits directly above its
+            # body with no nested match between, so every guard token found so
+            # far belongs to that sibling rather than to this arm.
             return guard_found
         if "=>" in stripped and brace_depth >= 1:
             nested_arrow_seen = True
@@ -714,6 +717,8 @@ def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
             block_comment_depth = previous.count("*/")
             continue
         if "/*" in previous and previous.endswith("*/"):
+            # A leading complete block comment may have been stripped above;
+            # any opener left here follows executable code on the same line.
             previous = previous.split("/*", 1)[0].strip()
         if previous.endswith("=>") or previous.endswith("=> {"):
             return True
@@ -756,6 +761,7 @@ def load_lcov_line_totals(
             source_path = raw_line[3:]
             if not source_path:
                 raise ValueError("LCOV source path must not be empty")
+            # Fail closed on traversal before reading any source file content.
             resolve_repository_source_path(source_path, root)
         elif raw_line.startswith("DA:"):
             if source_path is None:
