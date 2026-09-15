@@ -55,3 +55,60 @@ fn historical_cutoff_before_evidence_availability_cannot_admit_the_receipt() {
     assert!(available.instant() > historical_cutoff.instant());
     assert!(available.instant() >= system_observed.instant());
 }
+
+#[test]
+fn owner_records_have_distinct_identities_and_receipt_preserves_exact_lineage() {
+    let source_artifact = SourceArtifact::from_bytes(b"same immutable snapshot").expect("artifact");
+    let first_observation = SourceObservation::observe(&source_artifact).expect("first observation");
+    let second_observation = SourceObservation::observe(&source_artifact).expect("second observation");
+
+    assert_ne!(first_observation.observation_id(), second_observation.observation_id());
+    assert_eq!(first_observation.source_artifact_id(), second_observation.source_artifact_id());
+    assert_eq!(
+        first_observation.source_snapshot_sha256(),
+        second_observation.source_snapshot_sha256()
+    );
+
+    let first_availability =
+        SourceAvailability::make_available(&first_observation).expect("first availability");
+    let second_availability =
+        SourceAvailability::make_available(&second_observation).expect("second availability");
+
+    assert_ne!(
+        first_availability.availability_id(),
+        second_availability.availability_id()
+    );
+    assert_eq!(
+        first_availability.source_observation_id(),
+        first_observation.observation_id()
+    );
+    assert_eq!(
+        second_availability.source_observation_id(),
+        second_observation.observation_id()
+    );
+
+    let receipt = SourceSnapshotReceiptV1::from_source_availability(
+        "snapshot-rubin-loading-owner-lineage-v1",
+        &first_availability,
+    )
+    .expect("receipt");
+    assert_eq!(
+        receipt.source_observation_id(),
+        first_observation.observation_id().to_string()
+    );
+    assert_eq!(
+        receipt.source_availability_id(),
+        first_availability.availability_id().to_string()
+    );
+
+    let canonical: serde_json::Value =
+        serde_json::from_str(&receipt.to_json().expect("canonical receipt")).expect("json");
+    assert_eq!(
+        canonical["source_observation_id"].as_str(),
+        Some(receipt.source_observation_id())
+    );
+    assert_eq!(
+        canonical["source_availability_id"].as_str(),
+        Some(receipt.source_availability_id())
+    );
+}
