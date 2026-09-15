@@ -1,7 +1,7 @@
 //! Public contract for immutable Evidence-owned source-snapshot receipts.
 
 use evidence_core::{
-    ContentDigest, EvidenceError, EvidenceId, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT,
+    ContentDigest, EvidenceError, EvidenceId, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT, SourceArtifact,
     SourceSnapshotReceiptV1,
 };
 use std::str::FromStr;
@@ -20,6 +20,36 @@ fn receipt(source_sha256: &str, available_at: &str) -> SourceSnapshotReceiptV1 {
         AvailableTime::parse_rfc3339(available_at).expect("availability"),
     )
     .expect("receipt")
+}
+
+#[test]
+fn source_artifact_identity_is_bound_separately_from_equal_content() {
+    let first_artifact = SourceArtifact::from_bytes(b"same canonical snapshot").expect("artifact");
+    let second_artifact = SourceArtifact::from_bytes(b"same canonical snapshot").expect("artifact");
+    assert_eq!(first_artifact.content_digest(), second_artifact.content_digest());
+    assert_ne!(first_artifact.id(), second_artifact.id());
+
+    let receipt_id = EvidenceId::from_str(RECEIPT_ID).expect("uuidv7");
+    let available = AvailableTime::parse_rfc3339("2026-07-31T23:59:59Z").expect("availability");
+    let first = SourceSnapshotReceiptV1::from_source_artifact(
+        receipt_id,
+        SNAPSHOT_ID,
+        &first_artifact,
+        available,
+    )
+    .expect("first receipt");
+    let second = SourceSnapshotReceiptV1::from_source_artifact(
+        receipt_id,
+        SNAPSHOT_ID,
+        &second_artifact,
+        available,
+    )
+    .expect("second receipt");
+
+    assert_eq!(first.source_snapshot_sha256(), second.source_snapshot_sha256());
+    assert_eq!(first.source_artifact_id(), first_artifact.id().to_string());
+    assert_eq!(second.source_artifact_id(), second_artifact.id().to_string());
+    assert_ne!(first.binding_sha256(), second.binding_sha256());
 }
 
 #[test]
