@@ -655,6 +655,7 @@ mod tests {
                 run_cost numeric(12, 4) NOT NULL,
                 system_time timestamptz NOT NULL,
                 PRIMARY KEY (tenant_record_id),
+                ,
                 CHECK (run_cost > 0)
             );",
             "DROP TABLE tenant_record;",
@@ -670,6 +671,7 @@ mod tests {
             &conforming_up_sql(
                 "RAISE EXCEPTION 'x' USING ERRCODE = 'integrity_constraint_violation';
                  -- CREATE TABLEX nothing;
+                 -- 1CONSTRAINT digit_prefixed_word;
                  ALTER TABLE tenant_record DROP CONSTRAINT IF EXISTS tenant_record_unique;",
             ),
             "DROP TABLE tenant_record;",
