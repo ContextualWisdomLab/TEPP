@@ -63,7 +63,6 @@ def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int
     return coordinates, true_count, false_count
 
 
-
 def is_live_sqlx_transport_source(filename: str) -> bool:
     """Return whether *filename* is the live-server SQLx transport source.
 
@@ -241,10 +240,12 @@ def is_executable_source_line(
         "();",
         "};",
         "});",
-        "Ok(())",
     }:
         return False
-    if _is_standalone_string_literal(text) or text.startswith("} else"):
+    if (
+        _is_standalone_string_literal(text)
+        and not _is_match_arm_body(lines, line_number)
+    ) or text.startswith("} else"):
         return False
     if text.endswith(" {"):
         type_name = text[:-2]
@@ -679,6 +680,50 @@ def _character_literal_end(line: str, cursor: int) -> int | None:
     if candidate < len(line) and line[candidate] == "'":
         return candidate + 1
     return None
+
+
+def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
+    """Return whether *line_number* is the whole body of a ``match`` arm.
+
+    A match arm whose body is one string literal is executable production
+    behavior: a zero count means the arm was never taken. Comments between the
+    arm label and its literal body are not executable code and must not hide it
+    from the authored-line denominator.
+    """
+
+    block_comment_depth = 0
+    for index in range(line_number - 2, -1, -1):
+        previous = lines[index].strip()
+        if not previous:
+            continue
+        if block_comment_depth:
+            block_comment_depth += previous.count("*/") - previous.count("/*")
+            if block_comment_depth > 0:
+                continue
+            block_comment_depth = 0
+            previous = previous.rsplit("/*", 1)[0].strip()
+            if not previous:
+                continue
+        if previous.startswith("//"):
+            continue
+        if previous.startswith("/*"):
+            continue
+        if previous.endswith("*/") and "/*" not in previous:
+            block_comment_depth = previous.count("*/")
+            continue
+        if "/*" in previous and previous.endswith("*/"):
+            # A line starting with "/*" was already consumed above, so the
+            # text before the opener is never empty here.
+            previous = previous.split("/*", 1)[0].strip()
+        if previous.endswith("=>") or previous.endswith("=> {"):
+            return True
+        for marker in range(len(previous) - 1):
+            if previous[marker : marker + 2] == "//" and previous[:marker].rstrip().endswith(
+                ("=>", "=> {")
+            ):
+                return True
+        return False
+    return False
 
 
 def _is_standalone_string_literal(text: str) -> bool:
