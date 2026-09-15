@@ -454,6 +454,7 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
             )
     return False
 
+
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""
 
@@ -707,13 +708,17 @@ def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
         if previous.startswith("//"):
             continue
         if previous.startswith("/*"):
-            continue
+            if "*/" not in previous:
+                continue
+            previous = previous.split("*/", 1)[1].strip()
+            if not previous:
+                continue
         if previous.endswith("*/") and "/*" not in previous:
             block_comment_depth = previous.count("*/")
             continue
         if "/*" in previous and previous.endswith("*/"):
-            # A line starting with "/*" was already consumed above, so the
-            # text before the opener is never empty here.
+            # A leading complete block comment may have been stripped above;
+            # any opener left here follows executable code on the same line.
             previous = previous.split("/*", 1)[0].strip()
         if previous.endswith("=>") or previous.endswith("=> {"):
             return True
