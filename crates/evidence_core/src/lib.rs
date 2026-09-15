@@ -6,7 +6,8 @@
 //! `UUIDv7` identifiers, canonical `SHA-256` digests, immutable byte and text
 //! records, source spans whose byte, Unicode-scalar, page, and layout
 //! coordinates are validated before entering later temporal or psychometric
-//! layers, and strict versioned JSON wire contracts that reconstruct records
+//! layers, versioned source-snapshot receipts for downstream provenance
+//! binding, and strict versioned JSON wire contracts that reconstruct records
 //! only through the same domain validation boundary. Embedded `data:image`
 //! units keep their original offsets and are not lexical inference text.
 
@@ -16,6 +17,7 @@ mod document;
 mod error;
 mod identifier;
 mod image_unit;
+mod source_snapshot_receipt;
 mod span;
 mod wire;
 
@@ -35,6 +37,12 @@ pub use image_unit::EmbeddedImageUnit;
 pub use image_unit::embedded_image_units;
 /// Refuse treating an embedded image URI as lexical inference text.
 pub use image_unit::refuse_base64_image_as_lexical_text;
+/// Maximum canonical JSON size accepted for one source-snapshot receipt.
+pub use source_snapshot_receipt::SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT;
+/// Versioned wire schema for immutable source-snapshot receipts.
+pub use source_snapshot_receipt::SOURCE_SNAPSHOT_RECEIPT_SCHEMA_VERSION;
+/// Evidence-owned immutable source-snapshot provenance receipt.
+pub use source_snapshot_receipt::SourceSnapshotReceiptV1;
 /// A validated page-relative location for source evidence.
 pub use span::PageLocation;
 /// An exact byte, Unicode-scalar, and optional page/layout span.
