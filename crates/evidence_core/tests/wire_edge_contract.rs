@@ -1,6 +1,9 @@
 //! Edge-case contracts for strict evidence JSON reconstruction.
 
-use evidence_core::{DocumentRecord, EvidenceError, SourceArtifact, SourceSpan};
+use evidence_core::{
+    DocumentRecord, EvidenceError, SourceArtifact, SourceSpan, ValidatedDocumentRecordWire,
+    ValidatedSourceArtifactWire,
+};
 use serde_json::{Value, json};
 
 fn replace_field(serialized: &str, field: &str, replacement: Value) -> String {
@@ -16,7 +19,7 @@ fn artifact_wire_rejects_invalid_identifiers_digests_and_empty_content() {
 
     let malformed_identifier = replace_field(&serialized, "artifact_id", json!("not-a-uuid"));
     assert_eq!(
-        SourceArtifact::from_wire_json(&malformed_identifier).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json(&malformed_identifier).unwrap_err(),
         EvidenceError::InvalidEvidenceId
     );
 
@@ -26,25 +29,25 @@ fn artifact_wire_rejects_invalid_identifiers_digests_and_empty_content() {
         json!("550e8400-e29b-41d4-a716-446655440000"),
     );
     assert_eq!(
-        SourceArtifact::from_wire_json(&wrong_uuid_version).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json(&wrong_uuid_version).unwrap_err(),
         EvidenceError::InvalidEvidenceId
     );
 
     let malformed_digest = replace_field(&serialized, "content_sha256", json!("00"));
     assert_eq!(
-        SourceArtifact::from_wire_json(&malformed_digest).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json(&malformed_digest).unwrap_err(),
         EvidenceError::InvalidContentDigest
     );
 
     let empty_content = replace_field(&serialized, "content_bytes", json!([]));
     assert_eq!(
-        SourceArtifact::from_wire_json(&empty_content).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json(&empty_content).unwrap_err(),
         EvidenceError::EmptySourceArtifact
     );
 
     let invalid_byte = replace_field(&serialized, "content_bytes", json!([256]));
     assert_eq!(
-        SourceArtifact::from_wire_json(&invalid_byte).unwrap_err(),
+        ValidatedSourceArtifactWire::from_json(&invalid_byte).unwrap_err(),
         EvidenceError::InvalidWirePayload
     );
 }
@@ -58,25 +61,25 @@ fn document_wire_rejects_invalid_identifiers_digests_and_empty_text() {
 
     let malformed_document = replace_field(&serialized, "document_id", json!("invalid"));
     assert_eq!(
-        DocumentRecord::from_wire_json(&malformed_document).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&malformed_document).unwrap_err(),
         EvidenceError::InvalidEvidenceId
     );
 
     let malformed_source = replace_field(&serialized, "source_artifact_id", json!("invalid"));
     assert_eq!(
-        DocumentRecord::from_wire_json(&malformed_source).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&malformed_source).unwrap_err(),
         EvidenceError::InvalidEvidenceId
     );
 
     let malformed_digest = replace_field(&serialized, "content_sha256", json!("invalid"));
     assert_eq!(
-        DocumentRecord::from_wire_json(&malformed_digest).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&malformed_digest).unwrap_err(),
         EvidenceError::InvalidContentDigest
     );
 
     let empty_text = replace_field(&serialized, "text", json!(""));
     assert_eq!(
-        DocumentRecord::from_wire_json(&empty_text).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&empty_text).unwrap_err(),
         EvidenceError::EmptyDocument
     );
 }
@@ -93,6 +96,36 @@ fn source_span_wire_rejects_malformed_document_identifier() {
     assert_eq!(
         SourceSpan::from_wire_json(&malformed, &document).unwrap_err(),
         EvidenceError::InvalidEvidenceId
+    );
+}
+
+#[test]
+fn source_span_wire_rejects_oversized_envelopes_before_identifier_validation() {
+    let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
+    let document =
+        DocumentRecord::from_text(artifact.id(), "document").expect("document must be valid");
+    let span = SourceSpan::new(&document, 0, 8, 0, 8, None).expect("span must be valid");
+    let serialized = span.to_wire_json().expect("span must serialize");
+    let oversized = replace_field(&serialized, "document_id", json!("x".repeat(8 * 1024)));
+
+    assert_eq!(
+        SourceSpan::from_wire_json(&oversized, &document).unwrap_err(),
+        EvidenceError::InvalidWirePayload
+    );
+}
+
+#[test]
+fn source_span_wire_rejects_noncanonical_json() {
+    let artifact = SourceArtifact::from_bytes(b"source").expect("artifact must be valid");
+    let document =
+        DocumentRecord::from_text(artifact.id(), "document").expect("document must be valid");
+    let span = SourceSpan::new(&document, 0, 8, 0, 8, None).expect("span must be valid");
+    let serialized = span.to_wire_json().expect("span must serialize");
+    let noncanonical = format!(" {serialized}");
+
+    assert_eq!(
+        SourceSpan::from_wire_json(&noncanonical, &document).unwrap_err(),
+        EvidenceError::InvalidWirePayload
     );
 }
 
