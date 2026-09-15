@@ -69,18 +69,20 @@ pub(crate) fn deserialize_source_artifact(
     maximum_bytes: usize,
 ) -> Result<ValidatedSourceArtifactWire, EvidenceError> {
     let wire: SourceArtifactWire = deserialize_wire(payload)?;
+    let canonical = serialize_wire(&wire)?;
     validate_version(wire.schema_version)?;
-    if serialize_wire(&wire)? != payload {
-        return Err(EvidenceError::InvalidWirePayload);
-    }
     let artifact_id = EvidenceId::from_str(&wire.artifact_id)?;
     let content_digest = ContentDigest::from_str(&wire.content_sha256)?;
-    ValidatedSourceArtifactWire::from_wire_parts(
+    let validated = ValidatedSourceArtifactWire::from_wire_parts(
         artifact_id,
         content_digest,
         wire.content_bytes,
         maximum_bytes,
-    )
+    )?;
+    if canonical != payload {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
+    Ok(validated)
 }
 
 pub(crate) fn serialize_document(document: &DocumentRecord) -> Result<String, EvidenceError> {
