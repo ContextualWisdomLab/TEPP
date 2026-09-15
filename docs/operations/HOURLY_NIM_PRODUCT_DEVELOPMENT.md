@@ -6,12 +6,13 @@ issue. It is
 separate from the deterministic minute-17 quality sentinel and never merges,
 releases, deploys, approves, or changes reviewer credentials.
 
-## Schedule and queue behavior
+## Admission and queue behavior
 
-`.github/workflows/hourly-nim-product-development.yml` runs at minute 47 of every
-hour and supports `workflow_dispatch` with `dry_run=true`. The nonzero minute
-avoids the busiest scheduler boundary. A repository-scoped concurrency group
-does not cancel an active run.
+`.github/workflows/hourly-nim-product-development.yml` carries no local
+`schedule` trigger. The central development coordinator in the organisation
+`.github` repository owns the hourly cadence and admits this workflow through
+`workflow_dispatch`, which also supports a manual `dry_run=true`. A
+repository-scoped concurrency group does not cancel an active run.
 
 Before checkout or model execution, the proposal job reads at most one open pull
 request and one open issue. Unreadable inventory, any open PR or issue, any
