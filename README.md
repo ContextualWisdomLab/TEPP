@@ -18,14 +18,14 @@ decomposition. It adds the independently usable `analysis_engine` vertical
 slice: bounded cutoff-safe readiness work that emits a digest-bound terminal
 artifact or a redacted no-eligible-evidence result. That slice is active-PR
 evidence, not a psychometric estimator or a release claim.
-The current workspace contains 50 independently documented Rust crates. Each
+The current workspace contains 58 independently documented Rust crates. Each
 crate exposes a bounded, tested contract for evidence, temporal semantics,
 event and relation reasoning, membership, persistence, simulation, validation,
 API exchange, compute planning, or evidence-grounded interpretation. Numerical
 and psychometric authority remains on the CPU `f64` reference path; streamed
 accelerator plans must preserve the full observation set and fail closed to the
 reference path when resources or validation are insufficient.
-The repository currently implements 54 independently documented crates rather
+The repository currently implements 58 independently documented crates rather
 than a full commercial release. The implemented crates include topic
 measurement, the analysis engine, and psychometric input/recovery gates; they
 do not claim a complete commercial estimator,
@@ -71,9 +71,11 @@ crates/longitudinal_core
 crates/membership_core
 crates/membership_target
 crates/modality_source
+crates/mlx_native_receipt
 crates/model_selection
 crates/network_analysis
 crates/operational_log
+crates/orchestrator_live
 crates/outcome_order
 crates/payload_bound
 crates/persistence_postgres
