@@ -2,7 +2,7 @@
 
 use evidence_core::{
     EvidenceError, EvidenceId, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT, SourceArtifact,
-    SourceObservation, SourceSnapshotReceiptV1,
+    SourceAvailability, SourceObservation, SourceSnapshotReceiptV1,
 };
 use std::str::FromStr;
 use temporal_core::{AvailableTime, SystemTime};
@@ -14,17 +14,20 @@ const SOURCE_B_BYTES: &[u8] = b"canonical snapshot b";
 fn receipt(source_bytes: &[u8]) -> SourceSnapshotReceiptV1 {
     let source_artifact = SourceArtifact::from_bytes(source_bytes).expect("artifact");
     let observation = SourceObservation::observe(&source_artifact).expect("observation");
-    SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &observation).expect("receipt")
+    let availability = SourceAvailability::make_available(&observation).expect("availability");
+    SourceSnapshotReceiptV1::from_source_availability(SNAPSHOT_ID, &availability)
+        .expect("receipt")
 }
 
 #[test]
 fn creation_mints_distinct_receipt_identity_inside_evidence() {
     let source_artifact = SourceArtifact::from_bytes(b"same source record").expect("artifact");
     let observation = SourceObservation::observe(&source_artifact).expect("observation");
+    let availability = SourceAvailability::make_available(&observation).expect("availability");
 
-    let first = SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &observation)
+    let first = SourceSnapshotReceiptV1::from_source_availability(SNAPSHOT_ID, &availability)
         .expect("first receipt");
-    let second = SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &observation)
+    let second = SourceSnapshotReceiptV1::from_source_availability(SNAPSHOT_ID, &availability)
         .expect("second receipt");
 
     assert_ne!(first.receipt_id(), second.receipt_id());
@@ -45,10 +48,20 @@ fn source_artifact_identity_is_bound_separately_from_equal_content() {
     let first_observation = SourceObservation::observe(&first_artifact).expect("first observation");
     let second_observation =
         SourceObservation::observe(&second_artifact).expect("second observation");
-    let first = SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &first_observation)
-        .expect("first receipt");
-    let second = SourceSnapshotReceiptV1::from_source_observation(SNAPSHOT_ID, &second_observation)
-        .expect("second receipt");
+    let first_availability =
+        SourceAvailability::make_available(&first_observation).expect("first availability");
+    let second_availability =
+        SourceAvailability::make_available(&second_observation).expect("second availability");
+    let first = SourceSnapshotReceiptV1::from_source_availability(
+        SNAPSHOT_ID,
+        &first_availability,
+    )
+    .expect("first receipt");
+    let second = SourceSnapshotReceiptV1::from_source_availability(
+        SNAPSHOT_ID,
+        &second_availability,
+    )
+    .expect("second receipt");
 
     assert_eq!(
         first.source_snapshot_sha256(),
@@ -92,7 +105,7 @@ fn availability_and_system_observation_remain_distinct_nominal_clocks() {
         SystemTime::parse_rfc3339(observed.system_observed_at()).expect("system time");
     let available = AvailableTime::parse_rfc3339(observed.available_at()).expect("availability");
 
-    assert_eq!(system_observed.instant(), available.instant());
+    assert!(available.instant() >= system_observed.instant());
     assert!(EvidenceId::from_str(observed.receipt_id()).is_ok());
 }
 
