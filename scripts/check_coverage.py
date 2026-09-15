@@ -712,9 +712,9 @@ def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
             block_comment_depth = previous.count("*/")
             continue
         if "/*" in previous and previous.endswith("*/"):
+            # A line starting with "/*" was already consumed above, so the
+            # text before the opener is never empty here.
             previous = previous.split("/*", 1)[0].strip()
-            if not previous:
-                continue
         if previous.endswith("=>") or previous.endswith("=> {"):
             return True
         for marker in range(len(previous) - 1):

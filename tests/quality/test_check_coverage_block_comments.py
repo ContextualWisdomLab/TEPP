@@ -85,6 +85,69 @@ class CoverageBlockCommentRegressionTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(str(source), 3)
             )
 
+    def test_blank_line_between_arm_label_and_literal_body(self) -> None:
+        """A blank line is not a code token and must not end the walk."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "blank_line_arm.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Spaced => {\n'
+                '\n'
+                '        "arm body after a blank line"\n'
+                '    }\n'
+                '};\n',
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 4))
+
+    def test_block_comment_opening_on_its_own_line_is_fully_skipped(self) -> None:
+        """A multi-line comment whose opener starts the line leaves no token."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "opener_own_line.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Commented =>\n'
+                '        /* the opener owns this line\n'
+                '           and the comment closes here */\n'
+                '        "arm body after an owned opener",\n'
+                '};\n',
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 5))
+
+    def test_multiline_block_comment_opened_after_the_arm_label(self) -> None:
+        """The arm label survives when it opens the comment that follows it."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "opener_after_label.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Commented => { /* the label opens this note\n'
+                '       which closes on the next line */\n'
+                '        "arm body after a label-opened note"\n'
+                '    }\n'
+                '};\n',
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 4))
+
+    def test_trailing_block_comment_on_the_arm_label_is_stripped(self) -> None:
+        """`=> { /* note */` still ends the arm pattern once the note is cut."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "trailing_block_comment.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Commented => { /* note */\n'
+                '        "arm body after a trailing block comment"\n'
+                '    }\n'
+                '};\n',
+                encoding="utf-8",
+            )
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 3))
+
     def test_lcov_retains_match_arm_literal_after_block_comment(self) -> None:
         """LCOV denominator keeps the literal even when LLVM reports zero hits."""
 
