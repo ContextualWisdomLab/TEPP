@@ -13,7 +13,10 @@ fn owner_document_binds_the_exact_owner_issued_source_handle() {
 
     assert_eq!(artifact.id(), document.source_artifact_id());
     assert_eq!(document.source_artifact_id(), artifact.id());
-    assert_eq!(document.content_digest(), ContentDigest::sha256(b"document"));
+    assert_eq!(
+        document.content_digest(),
+        ContentDigest::sha256(b"document")
+    );
     assert_eq!(document.text(), "document");
 }
 

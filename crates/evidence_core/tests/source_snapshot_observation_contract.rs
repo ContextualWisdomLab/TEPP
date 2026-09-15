@@ -7,7 +7,8 @@ use temporal_core::{AvailableTime, KnowledgeCutoff, SystemTime};
 
 #[test]
 fn snapshot_receipt_derives_clock_from_evidence_owned_availability() {
-    let source_artifact = SourceArtifact::from_bytes(b"observed immutable snapshot").expect("artifact");
+    let source_artifact =
+        SourceArtifact::from_bytes(b"observed immutable snapshot").expect("artifact");
     let observation = SourceObservation::observe(&source_artifact).expect("observation");
     let availability = SourceAvailability::make_available(&observation).expect("availability");
     let receipt = SourceSnapshotReceiptV1::from_source_availability(
@@ -49,8 +50,7 @@ fn historical_cutoff_before_evidence_availability_cannot_admit_the_receipt() {
     let available = AvailableTime::parse_rfc3339(receipt.available_at()).expect("availability");
     let system_observed =
         SystemTime::parse_rfc3339(receipt.system_observed_at()).expect("system observation");
-    let historical_cutoff =
-        KnowledgeCutoff::parse_rfc3339("2000-01-01T00:00:00Z").expect("cutoff");
+    let historical_cutoff = KnowledgeCutoff::parse_rfc3339("2000-01-01T00:00:00Z").expect("cutoff");
 
     assert!(available.instant() > historical_cutoff.instant());
     assert!(available.instant() >= system_observed.instant());
@@ -59,11 +59,19 @@ fn historical_cutoff_before_evidence_availability_cannot_admit_the_receipt() {
 #[test]
 fn owner_records_have_distinct_identities_and_receipt_preserves_exact_lineage() {
     let source_artifact = SourceArtifact::from_bytes(b"same immutable snapshot").expect("artifact");
-    let first_observation = SourceObservation::observe(&source_artifact).expect("first observation");
-    let second_observation = SourceObservation::observe(&source_artifact).expect("second observation");
+    let first_observation =
+        SourceObservation::observe(&source_artifact).expect("first observation");
+    let second_observation =
+        SourceObservation::observe(&source_artifact).expect("second observation");
 
-    assert_ne!(first_observation.observation_id(), second_observation.observation_id());
-    assert_eq!(first_observation.source_artifact_id(), second_observation.source_artifact_id());
+    assert_ne!(
+        first_observation.observation_id(),
+        second_observation.observation_id()
+    );
+    assert_eq!(
+        first_observation.source_artifact_id(),
+        second_observation.source_artifact_id()
+    );
     assert_eq!(
         first_observation.source_snapshot_sha256(),
         second_observation.source_snapshot_sha256()

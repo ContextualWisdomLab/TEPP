@@ -342,9 +342,14 @@ fn validate_receipt_fields(
     Ok(())
 }
 
-/// Serialize one receipt-shaped record and enforce the public wire byte ceiling.
+/// Serialize one receipt-shaped record before applying the public wire byte ceiling.
 fn serialize_bounded_receipt<T: Serialize>(value: &T) -> Result<String, EvidenceError> {
     let payload = serde_json::to_string(value).map_err(|_| EvidenceError::InvalidWirePayload)?;
+    enforce_receipt_byte_limit(payload)
+}
+
+/// Enforce the receipt byte ceiling after serialization, independent of serializer type.
+fn enforce_receipt_byte_limit(payload: String) -> Result<String, EvidenceError> {
     if payload.len() > SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT {
         return Err(EvidenceError::InvalidWirePayload);
     }

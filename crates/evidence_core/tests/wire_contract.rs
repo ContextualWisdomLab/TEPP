@@ -147,7 +147,10 @@ fn document_wire_rejects_unknown_version_fields_digest_mismatch_limits_and_nonca
     let validated = ValidatedDocumentRecordWire::from_json_with_limit(&serialized, 4)
         .expect("boundary size must be valid");
     assert_eq!(validated.document_id(), document.id());
-    assert_eq!(validated.source_artifact_id(), document.source_artifact_id());
+    assert_eq!(
+        validated.source_artifact_id(),
+        document.source_artifact_id()
+    );
     assert_eq!(validated.content_digest(), document.content_digest());
     assert_eq!(validated.text(), document.text());
     assert_eq!(

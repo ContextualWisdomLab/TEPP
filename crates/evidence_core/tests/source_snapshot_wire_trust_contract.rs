@@ -20,6 +20,9 @@ fn canonical_wire_reconstruction_remains_untrusted_until_owner_authentication() 
     let parsed = ValidatedSourceSnapshotReceiptWireV1::from_json(&payload)
         .expect("validated untrusted wire");
     assert_eq!(parsed.receipt_id(), owner_receipt.receipt_id());
-    assert_eq!(parsed.source_artifact_id(), owner_receipt.source_artifact_id());
+    assert_eq!(
+        parsed.source_artifact_id(),
+        owner_receipt.source_artifact_id()
+    );
     assert_eq!(parsed.available_at(), owner_receipt.available_at());
 }

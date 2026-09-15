@@ -190,11 +190,9 @@ mod tests {
     #[test]
     fn trusted_observation_clock_binds_source_identity_and_content() {
         let artifact = SourceArtifact::from_bytes(b"snapshot").expect("artifact");
-        let observation = SourceObservation::from_trusted_timestamp(
-            &artifact,
-            "2026-09-15T02:00:00.123456789Z",
-        )
-        .expect("observation");
+        let observation =
+            SourceObservation::from_trusted_timestamp(&artifact, "2026-09-15T02:00:00.123456789Z")
+                .expect("observation");
 
         assert_eq!(observation.source_artifact_id(), artifact.id());
         assert_eq!(
@@ -210,11 +208,9 @@ mod tests {
     #[test]
     fn availability_is_a_distinct_later_owner_clock() {
         let observation = observed_at("2026-09-15T02:00:00Z");
-        let availability = SourceAvailability::from_trusted_timestamp(
-            &observation,
-            "2026-09-15T02:00:01Z",
-        )
-        .expect("availability");
+        let availability =
+            SourceAvailability::from_trusted_timestamp(&observation, "2026-09-15T02:00:01Z")
+                .expect("availability");
 
         assert_eq!(
             availability.source_observation_id(),
@@ -238,32 +234,27 @@ mod tests {
     #[test]
     fn repeated_owner_records_do_not_use_timestamps_as_identity() {
         let artifact = SourceArtifact::from_bytes(b"snapshot").expect("artifact");
-        let first_observation = SourceObservation::from_trusted_timestamp(
-            &artifact,
-            "2026-09-15T02:00:00Z",
-        )
-        .expect("first observation");
-        let second_observation = SourceObservation::from_trusted_timestamp(
-            &artifact,
-            "2026-09-15T02:00:00Z",
-        )
-        .expect("second observation");
-        assert_ne!(first_observation.observation_id(), second_observation.observation_id());
+        let first_observation =
+            SourceObservation::from_trusted_timestamp(&artifact, "2026-09-15T02:00:00Z")
+                .expect("first observation");
+        let second_observation =
+            SourceObservation::from_trusted_timestamp(&artifact, "2026-09-15T02:00:00Z")
+                .expect("second observation");
+        assert_ne!(
+            first_observation.observation_id(),
+            second_observation.observation_id()
+        );
         assert_eq!(
             first_observation.system_observed_at(),
             second_observation.system_observed_at()
         );
 
-        let first_availability = SourceAvailability::from_trusted_timestamp(
-            &first_observation,
-            "2026-09-15T02:00:01Z",
-        )
-        .expect("first availability");
-        let second_availability = SourceAvailability::from_trusted_timestamp(
-            &first_observation,
-            "2026-09-15T02:00:01Z",
-        )
-        .expect("second availability");
+        let first_availability =
+            SourceAvailability::from_trusted_timestamp(&first_observation, "2026-09-15T02:00:01Z")
+                .expect("first availability");
+        let second_availability =
+            SourceAvailability::from_trusted_timestamp(&first_observation, "2026-09-15T02:00:01Z")
+                .expect("second availability");
         assert_ne!(
             first_availability.availability_id(),
             second_availability.availability_id()
@@ -278,10 +269,7 @@ mod tests {
     fn availability_before_observation_fails_closed() {
         let observation = observed_at("2026-09-15T02:00:01Z");
         assert_eq!(
-            SourceAvailability::from_trusted_timestamp(
-                &observation,
-                "2026-09-15T02:00:00Z"
-            ),
+            SourceAvailability::from_trusted_timestamp(&observation, "2026-09-15T02:00:00Z"),
             Err(EvidenceError::InvalidWirePayload)
         );
     }

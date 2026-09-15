@@ -16,8 +16,7 @@ fn receipt(source_bytes: &[u8]) -> SourceSnapshotReceiptV1 {
     let source_artifact = SourceArtifact::from_bytes(source_bytes).expect("artifact");
     let observation = SourceObservation::observe(&source_artifact).expect("observation");
     let availability = SourceAvailability::make_available(&observation).expect("availability");
-    SourceSnapshotReceiptV1::from_source_availability(SNAPSHOT_ID, &availability)
-        .expect("receipt")
+    SourceSnapshotReceiptV1::from_source_availability(SNAPSHOT_ID, &availability).expect("receipt")
 }
 
 #[test]
@@ -53,16 +52,11 @@ fn source_artifact_identity_is_bound_separately_from_equal_content() {
         SourceAvailability::make_available(&first_observation).expect("first availability");
     let second_availability =
         SourceAvailability::make_available(&second_observation).expect("second availability");
-    let first = SourceSnapshotReceiptV1::from_source_availability(
-        SNAPSHOT_ID,
-        &first_availability,
-    )
-    .expect("first receipt");
-    let second = SourceSnapshotReceiptV1::from_source_availability(
-        SNAPSHOT_ID,
-        &second_availability,
-    )
-    .expect("second receipt");
+    let first = SourceSnapshotReceiptV1::from_source_availability(SNAPSHOT_ID, &first_availability)
+        .expect("first receipt");
+    let second =
+        SourceSnapshotReceiptV1::from_source_availability(SNAPSHOT_ID, &second_availability)
+            .expect("second receipt");
 
     assert_eq!(
         first.source_snapshot_sha256(),
@@ -124,11 +118,8 @@ fn git_head_alias_cannot_be_minted_as_immutable_snapshot_identity() {
     }
 
     assert!(
-        SourceSnapshotReceiptV1::from_source_availability(
-            "snapshot:v1_2026.09-15",
-            &availability,
-        )
-        .is_ok()
+        SourceSnapshotReceiptV1::from_source_availability("snapshot:v1_2026.09-15", &availability,)
+            .is_ok()
     );
 }
 
