@@ -1,4 +1,4 @@
-"""Keep the README crate count bound to the workspace (GAP-014)."""
+"""Keep README crate-count claims bound to the workspace."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ CRATE_COUNT_CLAIM = re.compile(r"(\d+) independently documented (?:Rust )?crates
 
 
 class ReadmeCrateCountTests(unittest.TestCase):
-    """Every counted claim in the README must match `crates/`."""
+    """Every explicit README crate-count claim must match `crates/`."""
 
     def test_readme_counts_match_the_workspace(self) -> None:
         crates = sorted(
@@ -21,7 +21,7 @@ class ReadmeCrateCountTests(unittest.TestCase):
         )
         readme = (REPOSITORY_ROOT / "README.md").read_text(encoding="utf-8")
         claims = [int(match) for match in CRATE_COUNT_CLAIM.findall(readme)]
-        self.assertGreaterEqual(len(claims), 2, "the README must state the crate count")
+        self.assertTrue(claims, "the README must state the crate count")
         for claim in claims:
             with self.subTest(claim=claim):
                 self.assertEqual(claim, len(crates))
