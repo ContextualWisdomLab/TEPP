@@ -3,6 +3,7 @@
 use evidence_core::{
     EvidenceError, EvidenceId, SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT, SourceArtifact,
     SourceAvailability, SourceObservation, SourceSnapshotReceiptV1,
+    ValidatedSourceSnapshotReceiptWireV1,
 };
 use std::str::FromStr;
 use temporal_core::{AvailableTime, SystemTime};
@@ -120,13 +121,13 @@ fn wire_refuses_noncanonical_digest_unknown_duplicate_and_oversized_payloads() {
 
     let uppercase = canonical.replace(source_digest, &uppercase_source_digest);
     assert_eq!(
-        SourceSnapshotReceiptV1::from_json(&uppercase),
+        ValidatedSourceSnapshotReceiptWireV1::from_json(&uppercase),
         Err(EvidenceError::InvalidContentDigest)
     );
 
     let unknown = canonical.replacen('{', "{\"unexpected\":true,", 1);
     assert_eq!(
-        SourceSnapshotReceiptV1::from_json(&unknown),
+        ValidatedSourceSnapshotReceiptWireV1::from_json(&unknown),
         Err(EvidenceError::InvalidWirePayload)
     );
 
@@ -136,13 +137,13 @@ fn wire_refuses_noncanonical_digest_unknown_duplicate_and_oversized_payloads() {
         1,
     );
     assert_eq!(
-        SourceSnapshotReceiptV1::from_json(&duplicate),
+        ValidatedSourceSnapshotReceiptWireV1::from_json(&duplicate),
         Err(EvidenceError::InvalidWirePayload)
     );
 
     let oversized = "x".repeat(SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT + 1);
     assert_eq!(
-        SourceSnapshotReceiptV1::from_json(&oversized),
+        ValidatedSourceSnapshotReceiptWireV1::from_json(&oversized),
         Err(EvidenceError::InvalidWirePayload)
     );
 }
@@ -156,14 +157,14 @@ fn noncanonical_uuid_and_clock_wire_values_fail_closed() {
 
     let uppercase_id = canonical.replace(receipt_id, &uppercase_receipt_id);
     assert_eq!(
-        SourceSnapshotReceiptV1::from_json(&uppercase_id),
+        ValidatedSourceSnapshotReceiptWireV1::from_json(&uppercase_id),
         Err(EvidenceError::InvalidWirePayload)
     );
 
     let available_at = wire["available_at"].as_str().expect("available time");
     let noncanonical_time = canonical.replace(available_at, "2026-08-01T08:59:59+09:00");
     assert_eq!(
-        SourceSnapshotReceiptV1::from_json(&noncanonical_time),
+        ValidatedSourceSnapshotReceiptWireV1::from_json(&noncanonical_time),
         Err(EvidenceError::InvalidWirePayload)
     );
 }
