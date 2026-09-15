@@ -155,6 +155,7 @@ impl SourceSnapshotReceiptV1 {
         &self.available_at
     }
 
+    /// Recheck all owner-issued receipt invariants before serialization/use.
     fn validate(&self) -> Result<(), EvidenceError> {
         validate_receipt_fields(
             &self.schema_version,
@@ -238,6 +239,7 @@ impl ValidatedSourceSnapshotReceiptWireV1 {
         &self.available_at
     }
 
+    /// Recheck structural wire invariants without promoting trust state.
     fn validate(&self) -> Result<(), EvidenceError> {
         validate_receipt_fields(
             &self.schema_version,
@@ -251,6 +253,7 @@ impl ValidatedSourceSnapshotReceiptWireV1 {
     }
 }
 
+/// Validate the shared identity, digest, and temporal invariants for owner and wire records.
 fn validate_receipt_fields(
     schema_version: &str,
     receipt_id: &str,
@@ -291,6 +294,7 @@ fn validate_receipt_fields(
     Ok(())
 }
 
+/// Serialize one receipt-shaped record and enforce the public wire byte ceiling.
 fn serialize_bounded_receipt<T: Serialize>(value: &T) -> Result<String, EvidenceError> {
     let payload = serde_json::to_string(value).map_err(|_| EvidenceError::InvalidWirePayload)?;
     if payload.len() > SOURCE_SNAPSHOT_RECEIPT_BYTE_LIMIT {
@@ -299,6 +303,7 @@ fn serialize_bounded_receipt<T: Serialize>(value: &T) -> Result<String, Evidence
     Ok(payload)
 }
 
+/// Accept only bounded immutable snapshot identifiers and reject mutable locator aliases.
 fn valid_snapshot_id(value: &str) -> bool {
     if value.is_empty()
         || value.len() > MAX_SNAPSHOT_IDENTIFIER_BYTES
