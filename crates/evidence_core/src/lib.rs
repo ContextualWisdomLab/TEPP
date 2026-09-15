@@ -25,12 +25,16 @@ mod wire;
 
 /// An immutable source artifact with an Evidence-issued identity and verified content digest.
 pub use artifact::SourceArtifact;
+/// Evidence-issued nominal identity handle for one trusted source artifact.
+pub use artifact::SourceArtifactId;
 /// Canonical validated source-artifact wire input that is not owner-authenticated Evidence state.
 pub use artifact::ValidatedSourceArtifactWire;
 /// A canonical `SHA-256` content digest.
 pub use digest::ContentDigest;
 /// An immutable UTF-8 document linked to its source artifact.
 pub use document::DocumentRecord;
+/// Canonical validated document wire input that is not owner-authenticated Evidence state.
+pub use document::ValidatedDocumentRecordWire;
 /// Fail-closed evidence-domain validation errors.
 pub use error::EvidenceError;
 /// A validated RFC 9562 `UUIDv7` evidence identifier.

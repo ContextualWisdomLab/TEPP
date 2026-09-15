@@ -1,7 +1,8 @@
 //! Edge-case contracts for strict evidence JSON reconstruction.
 
 use evidence_core::{
-    DocumentRecord, EvidenceError, SourceArtifact, SourceSpan, ValidatedSourceArtifactWire,
+    DocumentRecord, EvidenceError, SourceArtifact, SourceSpan, ValidatedDocumentRecordWire,
+    ValidatedSourceArtifactWire,
 };
 use serde_json::{Value, json};
 
@@ -60,25 +61,25 @@ fn document_wire_rejects_invalid_identifiers_digests_and_empty_text() {
 
     let malformed_document = replace_field(&serialized, "document_id", json!("invalid"));
     assert_eq!(
-        DocumentRecord::from_wire_json(&malformed_document).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&malformed_document).unwrap_err(),
         EvidenceError::InvalidEvidenceId
     );
 
     let malformed_source = replace_field(&serialized, "source_artifact_id", json!("invalid"));
     assert_eq!(
-        DocumentRecord::from_wire_json(&malformed_source).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&malformed_source).unwrap_err(),
         EvidenceError::InvalidEvidenceId
     );
 
     let malformed_digest = replace_field(&serialized, "content_sha256", json!("invalid"));
     assert_eq!(
-        DocumentRecord::from_wire_json(&malformed_digest).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&malformed_digest).unwrap_err(),
         EvidenceError::InvalidContentDigest
     );
 
     let empty_text = replace_field(&serialized, "text", json!(""));
     assert_eq!(
-        DocumentRecord::from_wire_json(&empty_text).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&empty_text).unwrap_err(),
         EvidenceError::EmptyDocument
     );
 }

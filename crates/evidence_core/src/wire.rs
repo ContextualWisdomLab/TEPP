@@ -2,7 +2,7 @@
 
 use crate::{
     ContentDigest, DocumentRecord, EvidenceError, EvidenceId, PageLocation, SourceArtifact,
-    SourceSpan, ValidatedSourceArtifactWire,
+    SourceSpan, ValidatedDocumentRecordWire, ValidatedSourceArtifactWire,
 };
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -98,19 +98,24 @@ pub(crate) fn serialize_document(document: &DocumentRecord) -> Result<String, Ev
 pub(crate) fn deserialize_document(
     payload: &str,
     maximum_bytes: usize,
-) -> Result<DocumentRecord, EvidenceError> {
+) -> Result<ValidatedDocumentRecordWire, EvidenceError> {
     let wire: DocumentRecordWire = deserialize_wire(payload)?;
+    let canonical = serialize_wire(&wire)?;
     validate_version(wire.schema_version)?;
     let document_id = EvidenceId::from_str(&wire.document_id)?;
     let source_artifact_id = EvidenceId::from_str(&wire.source_artifact_id)?;
     let content_digest = ContentDigest::from_str(&wire.content_sha256)?;
-    DocumentRecord::from_wire_parts(
+    let validated = ValidatedDocumentRecordWire::from_wire_parts(
         document_id,
         source_artifact_id,
         content_digest,
         wire.text,
         maximum_bytes,
-    )
+    )?;
+    if canonical != payload {
+        return Err(EvidenceError::InvalidWirePayload);
+    }
+    Ok(validated)
 }
 
 pub(crate) fn serialize_source_span(span: &SourceSpan) -> Result<String, EvidenceError> {

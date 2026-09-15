@@ -90,7 +90,7 @@ impl SourceObservation {
             .map_err(|_| EvidenceError::InvalidWirePayload)?;
         Ok(Self {
             observation_id: EvidenceId::new(),
-            source_artifact_id: source_artifact.id(),
+            source_artifact_id: source_artifact.id().evidence_id(),
             source_snapshot_sha256: source_artifact.content_digest(),
             system_observed_at,
         })

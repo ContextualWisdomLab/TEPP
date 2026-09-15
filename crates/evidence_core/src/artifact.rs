@@ -1,9 +1,50 @@
 //! Immutable source-artifact bytes and mutation detection.
 
 use crate::{ContentDigest, EvidenceError, EvidenceId};
+use std::fmt;
 use std::sync::Arc;
+use uuid::Uuid;
 
 const DEFAULT_SOURCE_ARTIFACT_BYTE_LIMIT: usize = 64 * 1024 * 1024;
+
+/// An Evidence-issued, non-forgeable handle for one trusted source artifact.
+///
+/// The wrapped [`EvidenceId`] is intentionally private and there is no parser or
+/// public conversion from a bare identifier. Callers obtain this handle only
+/// from [`SourceArtifact::id`], so APIs that require source-artifact provenance
+/// can reject syntactically valid but unbacked evidence identifiers by type.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct SourceArtifactId(EvidenceId);
+
+impl SourceArtifactId {
+    /// Return the underlying UUID value without enabling handle reconstruction.
+    #[must_use]
+    pub const fn as_uuid(&self) -> Uuid {
+        self.0.as_uuid()
+    }
+
+    pub(crate) const fn evidence_id(self) -> EvidenceId {
+        self.0
+    }
+}
+
+impl fmt::Display for SourceArtifactId {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl PartialEq<EvidenceId> for SourceArtifactId {
+    fn eq(&self, other: &EvidenceId) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<SourceArtifactId> for EvidenceId {
+    fn eq(&self, other: &SourceArtifactId) -> bool {
+        *self == other.0
+    }
+}
 
 /// An immutable source artifact whose identity is issued inside Evidence.
 ///
@@ -14,7 +55,7 @@ const DEFAULT_SOURCE_ARTIFACT_BYTE_LIMIT: usize = 64 * 1024 * 1024;
 /// Evidence-owned repository restoration boundary is implemented.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SourceArtifact {
-    id: EvidenceId,
+    id: SourceArtifactId,
     content_digest: ContentDigest,
     content: Arc<[u8]>,
 }
@@ -70,7 +111,7 @@ impl SourceArtifact {
         validate_content(content, maximum_bytes)?;
 
         Ok(Self {
-            id: EvidenceId::new(),
+            id: SourceArtifactId(EvidenceId::new()),
             content_digest: ContentDigest::sha256(content),
             content: Arc::from(content),
         })
@@ -90,9 +131,9 @@ impl SourceArtifact {
         crate::wire::serialize_source_artifact(self)
     }
 
-    /// Return the stable owner-issued artifact identifier.
+    /// Return the stable Evidence-issued source-artifact handle.
     #[must_use]
-    pub const fn id(&self) -> EvidenceId {
+    pub const fn id(&self) -> SourceArtifactId {
         self.id
     }
 

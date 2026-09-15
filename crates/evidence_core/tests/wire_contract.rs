@@ -2,7 +2,7 @@
 
 use evidence_core::{
     DocumentRecord, EvidenceError, PageLocation, SourceArtifact, SourceSpan,
-    ValidatedSourceArtifactWire, WIRE_SCHEMA_VERSION,
+    ValidatedDocumentRecordWire, ValidatedSourceArtifactWire, WIRE_SCHEMA_VERSION,
 };
 use serde_json::{Value, json};
 
@@ -92,11 +92,12 @@ fn source_artifact_wire_reapplies_content_limits() {
 }
 
 #[test]
-fn document_wire_round_trip_preserves_identity_source_digest_and_unicode() {
+fn document_wire_round_trip_preserves_validated_identity_source_digest_and_unicode() {
     let (_, document) = artifact_and_document("Aé🧠Z");
     let serialized = document.to_wire_json().expect("document must serialize");
     let value: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
-    let restored = DocumentRecord::from_wire_json(&serialized).expect("wire record must validate");
+    let restored = ValidatedDocumentRecordWire::from_json(&serialized)
+        .expect("wire record must validate without becoming owner state");
 
     assert_eq!(value["schema_version"], json!(WIRE_SCHEMA_VERSION));
     assert_eq!(value["document_id"], json!(document.id().to_string()));
@@ -109,43 +110,52 @@ fn document_wire_round_trip_preserves_identity_source_digest_and_unicode() {
         json!(document.content_digest().to_string())
     );
     assert_eq!(value["text"], json!("Aé🧠Z"));
-    assert_eq!(restored, document);
+    assert_eq!(restored.document_id(), document.id());
+    assert_eq!(restored.source_artifact_id(), document.source_artifact_id());
+    assert_eq!(restored.content_digest(), document.content_digest());
+    assert_eq!(restored.text(), document.text());
+    assert_eq!(restored.scalar_length(), document.scalar_length());
 }
 
 #[test]
-fn document_wire_rejects_unknown_version_fields_digest_mismatch_and_limits() {
+fn document_wire_rejects_unknown_version_fields_digest_mismatch_limits_and_noncanonical_json() {
     let (_, document) = artifact_and_document("four");
     let serialized = document.to_wire_json().expect("document must serialize");
 
     let unsupported = replace_field(&serialized, "schema_version", json!(9));
     assert_eq!(
-        DocumentRecord::from_wire_json(&unsupported).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&unsupported).unwrap_err(),
         EvidenceError::UnsupportedWireVersion
     );
 
     let mut unknown: Value = serde_json::from_str(&serialized).expect("wire JSON must parse");
     unknown["private_scalar_length"] = json!(4);
     assert_eq!(
-        DocumentRecord::from_wire_json(&unknown.to_string()).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&unknown.to_string()).unwrap_err(),
         EvidenceError::InvalidWirePayload
     );
 
     let mismatch = replace_field(&serialized, "content_sha256", json!("00".repeat(32)));
     assert_eq!(
-        DocumentRecord::from_wire_json(&mismatch).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&mismatch).unwrap_err(),
         EvidenceError::ContentDigestMismatch
     );
     assert_eq!(
-        DocumentRecord::from_wire_json_with_limit(&serialized, 3).unwrap_err(),
+        ValidatedDocumentRecordWire::from_json_with_limit(&serialized, 3).unwrap_err(),
         EvidenceError::DocumentTooLarge
     );
+    let validated = ValidatedDocumentRecordWire::from_json_with_limit(&serialized, 4)
+        .expect("boundary size must be valid");
+    assert_eq!(validated.document_id(), document.id());
+    assert_eq!(validated.source_artifact_id(), document.source_artifact_id());
+    assert_eq!(validated.content_digest(), document.content_digest());
+    assert_eq!(validated.text(), document.text());
     assert_eq!(
-        DocumentRecord::from_wire_json_with_limit(&serialized, 4)
-            .expect("boundary size must be valid"),
-        document
+        ValidatedDocumentRecordWire::from_json("[").unwrap_err(),
+        EvidenceError::InvalidWirePayload
     );
     assert_eq!(
-        DocumentRecord::from_wire_json("[").unwrap_err(),
+        ValidatedDocumentRecordWire::from_json(&format!(" {serialized}")).unwrap_err(),
         EvidenceError::InvalidWirePayload
     );
 }
