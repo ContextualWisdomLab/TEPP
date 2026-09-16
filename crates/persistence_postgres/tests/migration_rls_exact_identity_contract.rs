@@ -1,0 +1,53 @@
+use persistence_postgres::{MigrationCatalog, MigrationContractError, validate_migration_catalog};
+
+fn rls_catalog(policy_predicate: &str, tenant_setting: &str) -> MigrationCatalog {
+    let up_sql = format!(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            tenant_record_id_shadow uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR ALL
+            USING (
+                {policy_predicate}::text = nullif(current_setting('{tenant_setting}', true), '')
+            )
+            WITH CHECK (
+                {policy_predicate}::text = nullif(current_setting('{tenant_setting}', true), '')
+            );
+        "
+    );
+    MigrationCatalog::from_sql(&up_sql, "DROP TABLE document_record;")
+}
+
+#[test]
+fn tenant_policy_requires_the_exact_tenant_record_id_identifier() {
+    let catalog = rls_catalog(
+        "tenant_record_id_shadow",
+        "tepp.current_tenant_record_id",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
+
+#[test]
+fn tenant_policy_requires_the_exact_session_guc_key() {
+    let catalog = rls_catalog(
+        "tenant_record_id",
+        "tepp.current_tenant_record_id_shadow",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingTenantSessionGuc)
+    );
+}
