@@ -65,7 +65,31 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     }
 
     let normalized = String::from_utf8(normalized).ok()?;
-    Some(normalized.split_whitespace().collect::<Vec<_>>().join(" "))
+    Some(canonicalize_structural_keywords(&normalized))
+}
+
+fn canonicalize_structural_keywords(sql: &str) -> String {
+    let tokens = sql.split_whitespace().collect::<Vec<_>>();
+    let mut canonical = Vec::with_capacity(tokens.len());
+    let mut index = 0usize;
+    while index < tokens.len() {
+        if tokens[index].eq_ignore_ascii_case("CREATE")
+            && tokens
+                .get(index + 1)
+                .is_some_and(|token| token.eq_ignore_ascii_case("MATERIALIZED"))
+            && tokens
+                .get(index + 2)
+                .is_some_and(|token| token.eq_ignore_ascii_case("VIEW"))
+        {
+            canonical.push(tokens[index]);
+            canonical.push(tokens[index + 2]);
+            index += 3;
+        } else {
+            canonical.push(tokens[index]);
+            index += 1;
+        }
+    }
+    canonical.join(" ")
 }
 
 fn scan_single_quoted_literal(bytes: &[u8], start: usize) -> Option<(usize, &[u8])> {
@@ -215,6 +239,17 @@ mod tests {
         .expect("well-formed quoted identifiers");
         assert!(normalized.contains("CREATE INDEX Bad ON tenant_record ( good_name )"));
         assert!(normalized.contains("CREATE VIEW INVALID_QUOTED_IDENTIFIER AS SELECT 1"));
+    }
+
+    #[test]
+    fn materialized_views_share_the_view_object_parser() {
+        let normalized = normalize_migration_sql(
+            "create materialized view bad_name AS SELECT 1; CREATE VIEW good_name AS SELECT 1;",
+        )
+        .expect("well-formed materialized view");
+        assert!(normalized.contains("create view bad_name AS SELECT 1;"));
+        assert!(normalized.contains("CREATE VIEW good_name AS SELECT 1;"));
+        assert!(!normalized.to_ascii_uppercase().contains("MATERIALIZED VIEW"));
     }
 
     #[test]
