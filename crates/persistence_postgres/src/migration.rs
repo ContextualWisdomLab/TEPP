@@ -21,8 +21,16 @@ pub use core::MigrationCatalog;
 pub fn validate_migration_catalog(
     catalog: &MigrationCatalog,
 ) -> Result<(), MigrationContractError> {
+    let runtime_role_declared =
+        validation::declares_created_role(catalog.up_sql(), "tepp_app_runtime")
+            .ok_or(MigrationContractError::EmptyMigrationSql)?;
     let normalized_up = validation::normalize_migration_sql(catalog.up_sql())
         .ok_or(MigrationContractError::EmptyMigrationSql)?;
+    let requires_runtime_role = validation::declares_row_level_security(&normalized_up);
     let normalized = MigrationCatalog::from_sql(&normalized_up, catalog.down_sql());
-    core::validate_migration_catalog(&normalized)
+    core::validate_migration_catalog(&normalized)?;
+    if requires_runtime_role && !runtime_role_declared {
+        return Err(MigrationContractError::MissingAppRuntimeRole);
+    }
+    Ok(())
 }
