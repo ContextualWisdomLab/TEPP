@@ -54,6 +54,17 @@ fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
 
     while index < bytes.len() {
         match bytes[index] {
+            b'E' | b'e' if bytes.get(index + 1) == Some(&b'\'') => {
+                let (next, literal) = scan_escape_quoted_literal(bytes, index + 1)?;
+                normalized.push(b' ');
+                if literal_is_atomic(literal) {
+                    normalized.push(b'\'');
+                    normalized.extend_from_slice(literal);
+                    normalized.push(b'\'');
+                }
+                normalized.push(b' ');
+                index = next;
+            }
             b'\'' => {
                 let (next, literal) = scan_single_quoted_literal(bytes, index)?;
                 normalized.push(b' ');
@@ -345,6 +356,29 @@ fn scan_single_quoted_literal(bytes: &[u8], start: usize) -> Option<(usize, &[u8
     None
 }
 
+fn scan_escape_quoted_literal(bytes: &[u8], start: usize) -> Option<(usize, &[u8])> {
+    let mut index = start + 1;
+    let content_start = index;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'\\' => {
+                index += 2;
+            }
+            b'\'' => {
+                if bytes.get(index + 1) == Some(&b'\'') {
+                    index += 2;
+                    continue;
+                }
+                return Some((index + 1, &bytes[content_start..index]));
+            }
+            _ => {
+                index += 1;
+            }
+        }
+    }
+    None
+}
+
 fn scan_quoted_identifier(bytes: &[u8], start: usize) -> Option<(usize, Vec<u8>)> {
     let mut index = start + 1;
     let mut identifier = Vec::new();
@@ -461,6 +495,16 @@ mod tests {
         assert!(normalized.contains("'tepp.current_tenant_record_id'"));
         assert!(normalized.contains("'x'"));
         assert!(!normalized.contains("''"));
+    }
+
+    #[test]
+    fn postgres_escape_strings_respect_backslash_and_doubled_quote_boundaries() {
+        let normalized = normalize_migration_sql(
+            r"SELECT E'it\'s ''still'' one literal', e'tepp.current_tenant_record_id';",
+        )
+        .expect("well-formed PostgreSQL escape strings");
+        assert!(!normalized.contains("still"));
+        assert!(normalized.contains("'tepp.current_tenant_record_id'"));
     }
 
     #[test]
@@ -657,6 +701,7 @@ mod tests {
     fn malformed_lexical_regions_fail_closed() {
         for sql in [
             "SELECT 'unterminated",
+            "SELECT E'unterminated",
             "CREATE TABLE \"unterminated",
             "/* unterminated",
             "DO $body$ unterminated",
