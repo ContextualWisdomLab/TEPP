@@ -85,27 +85,42 @@ fn declares_tenant_session_guc(normalized_sql: &str) -> bool {
     false
 }
 
-/// Return whether the normalized policy statement contains the exact unquoted
-/// tenant key identifier. Atomic string literals are retained by normalization,
-/// so quote parity prevents the GUC literal itself from impersonating a column.
+/// Return whether a row predicate in the normalized policy statement contains
+/// the exact unquoted tenant key identifier. Header names, target tables, and
+/// role lists are excluded so they cannot impersonate predicate evidence.
 fn policy_binds_tenant_identifier(policy_sql: &str) -> bool {
     const TENANT_IDENTIFIER: &str = "tenant_record_id";
 
+    let lower = policy_sql.to_ascii_lowercase();
+    let Some(on_start) = lower.find(" on ") else {
+        return false;
+    };
+    let predicate_search_start = on_start + " on ".len();
+    let tail = &lower[predicate_search_start..];
+    let using_start = tail.find(" using ").map(|index| predicate_search_start + index);
+    let check_start = tail
+        .find(" with check ")
+        .map(|index| predicate_search_start + index);
+    let Some(predicate_start) = [using_start, check_start].into_iter().flatten().min() else {
+        return false;
+    };
+    let predicate_sql = &policy_sql[predicate_start..];
+
     let mut search_from = 0usize;
-    while let Some(relative) = policy_sql[search_from..].find(TENANT_IDENTIFIER) {
+    while let Some(relative) = predicate_sql[search_from..].find(TENANT_IDENTIFIER) {
         let start = search_from + relative;
         let end = start + TENANT_IDENTIFIER.len();
-        let inside_atomic_literal = policy_sql[..start]
+        let inside_atomic_literal = predicate_sql[..start]
             .bytes()
             .filter(|byte| *byte == b'\'')
             .count()
             % 2
             == 1;
-        let starts_at_boundary = policy_sql[..start]
+        let starts_at_boundary = predicate_sql[..start]
             .chars()
             .next_back()
             .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_');
-        let ends_at_boundary = policy_sql[end..]
+        let ends_at_boundary = predicate_sql[end..]
             .chars()
             .next()
             .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_');
@@ -262,13 +277,16 @@ mod tests {
     #[test]
     fn tenant_identifier_must_be_structural_policy_evidence() {
         assert!(policy_binds_tenant_identifier(
-            "using (tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true ))"
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true ))"
         ));
         assert!(!policy_binds_tenant_identifier(
-            "using (document_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true ))"
+            "create policy document_record_tenant_isolation on document_record using (document_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true ))"
         ));
         assert!(!policy_binds_tenant_identifier(
-            "using (tenant_record_id_shadow is not null)"
+            "create policy tenant_record_id on document_record using (document_record_id is not null)"
+        ));
+        assert!(!policy_binds_tenant_identifier(
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id_shadow is not null)"
         ));
     }
 
