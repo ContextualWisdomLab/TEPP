@@ -20,7 +20,8 @@ fn source_preflight_preserves_too_large_semantics_before_vec_allocation() {
 #[test]
 fn document_preflight_preserves_too_large_semantics_before_string_allocation() {
     let artifact = SourceArtifact::from_bytes(b"four").expect("artifact must be valid");
-    let document = DocumentRecord::from_text(artifact.id(), "four").expect("document must be valid");
+    let document =
+        DocumentRecord::from_text(artifact.id(), "four").expect("document must be valid");
     let wire = document.to_wire_json().expect("document must serialize");
 
     assert_eq!(
