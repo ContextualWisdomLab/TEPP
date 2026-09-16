@@ -56,7 +56,12 @@ fn normalize_catalog_sql(sql: &str) -> Option<String> {
 }
 
 fn canonicalize_concurrent_index_modifier(sql: &str) -> String {
-    let tokens = sql.split_whitespace().collect::<Vec<_>>();
+    // PostgreSQL does not require whitespace after a statement delimiter. The
+    // lexical pass has already masked quoted/commented semicolons, so exposing
+    // real delimiters as tokens here keeps `;CREATE INDEX CONCURRENTLY` on the
+    // same structural path as its whitespace-separated form.
+    let tokenizable = sql.replace(';', " ; ");
+    let tokens = tokenizable.split_whitespace().collect::<Vec<_>>();
     let mut canonical = Vec::with_capacity(tokens.len());
     let mut index = 0usize;
 
@@ -113,6 +118,12 @@ mod tests {
                 "CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS tenant_record_lookup_index ON tenant_record"
             ),
             "CREATE UNIQUE INDEX IF NOT EXISTS tenant_record_lookup_index ON tenant_record"
+        );
+        assert_eq!(
+            canonicalize_concurrent_index_modifier(
+                "CREATE TABLE tenant_record (tenant_record_id uuid);CREATE INDEX CONCURRENTLY tenant_record_lookup_index ON tenant_record"
+            ),
+            "CREATE TABLE tenant_record (tenant_record_id uuid) ; CREATE INDEX tenant_record_lookup_index ON tenant_record"
         );
     }
 }
