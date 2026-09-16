@@ -14,6 +14,8 @@ pub use core::MigrationCatalog;
 /// The lexical boundary removes comments and quoted SQL bodies from the
 /// structural parser view, exposes quoted identifiers with their declared
 /// spelling, and rejects unterminated lexical regions before contract parsing.
+/// Both forward and rollback SQL pass through that boundary before structural
+/// validation so malformed rollback text cannot bypass the catalog contract.
 ///
 /// # Errors
 ///
@@ -26,8 +28,10 @@ pub fn validate_migration_catalog(
             .ok_or(MigrationContractError::EmptyMigrationSql)?;
     let normalized_up = validation::normalize_migration_sql(catalog.up_sql())
         .ok_or(MigrationContractError::EmptyMigrationSql)?;
+    let normalized_down = validation::normalize_migration_sql(catalog.down_sql())
+        .ok_or(MigrationContractError::EmptyMigrationSql)?;
     let requires_runtime_role = validation::declares_row_level_security(&normalized_up);
-    let normalized = MigrationCatalog::from_sql(&normalized_up, catalog.down_sql());
+    let normalized = MigrationCatalog::from_sql(&normalized_up, &normalized_down);
     core::validate_migration_catalog(&normalized)?;
     if requires_runtime_role && !runtime_role_declared {
         return Err(MigrationContractError::MissingAppRuntimeRole);
