@@ -84,6 +84,20 @@ fn canonicalize_structural_keywords(sql: &str) -> String {
             canonical.push(tokens[index]);
             canonical.push(tokens[index + 2]);
             index += 3;
+        } else if tokens[index].eq_ignore_ascii_case("CREATE")
+            && tokens
+                .get(index + 1)
+                .is_some_and(|token| token.eq_ignore_ascii_case("OR"))
+            && tokens
+                .get(index + 2)
+                .is_some_and(|token| token.eq_ignore_ascii_case("REPLACE"))
+            && tokens
+                .get(index + 3)
+                .is_some_and(|token| token.eq_ignore_ascii_case("VIEW"))
+        {
+            canonical.push(tokens[index]);
+            canonical.push(tokens[index + 3]);
+            index += 4;
         } else {
             canonical.push(tokens[index]);
             index += 1;
@@ -242,14 +256,17 @@ mod tests {
     }
 
     #[test]
-    fn materialized_views_share_the_view_object_parser() {
+    fn view_modifiers_share_the_view_object_parser() {
         let normalized = normalize_migration_sql(
-            "create materialized view bad_name AS SELECT 1; CREATE VIEW good_name AS SELECT 1;",
+            "create materialized view materialized_view AS SELECT 1; CREATE OR REPLACE VIEW replaceable_view AS SELECT 1; CREATE VIEW ordinary_view AS SELECT 1;",
         )
-        .expect("well-formed materialized view");
-        assert!(normalized.contains("create view bad_name AS SELECT 1;"));
-        assert!(normalized.contains("CREATE VIEW good_name AS SELECT 1;"));
-        assert!(!normalized.to_ascii_uppercase().contains("MATERIALIZED VIEW"));
+        .expect("well-formed view declarations");
+        assert!(normalized.contains("create view materialized_view AS SELECT 1;"));
+        assert!(normalized.contains("CREATE VIEW replaceable_view AS SELECT 1;"));
+        assert!(normalized.contains("CREATE VIEW ordinary_view AS SELECT 1;"));
+        let upper = normalized.to_ascii_uppercase();
+        assert!(!upper.contains("MATERIALIZED VIEW"));
+        assert!(!upper.contains("OR REPLACE VIEW"));
     }
 
     #[test]
