@@ -248,17 +248,17 @@ fn validate_retention_legal_hold(up_sql: &str) -> Result<(), MigrationContractEr
 }
 
 fn validate_table_body(table: &str, body: &str) -> Result<(), MigrationContractError> {
-    for column in parse_column_names(body) {
-        if !is_multi_word_snake_case(&column) {
+    let columns = parse_column_names(body);
+    for column in &columns {
+        if !is_multi_word_snake_case(column) {
             return Err(MigrationContractError::SingleWordObjectName);
         }
     }
-    let lower = body.to_ascii_lowercase();
-    if requires_tenant_boundary(table) && !lower.contains("tenant_record_id") {
+    if requires_tenant_boundary(table) && !columns.contains("tenant_record_id") {
         return Err(MigrationContractError::MissingTenantBoundary);
     }
 
-    if !has_system_time_column(&lower) {
+    if !has_system_time_column(body) {
         return Err(MigrationContractError::MissingTemporalColumns);
     }
 
@@ -267,7 +267,7 @@ fn validate_table_body(table: &str, body: &str) -> Result<(), MigrationContractE
         return Ok(());
     }
 
-    if !has_domain_time_column(&lower) {
+    if !has_domain_time_column(body) {
         return Err(MigrationContractError::MissingTemporalColumns);
     }
     Ok(())
@@ -342,17 +342,16 @@ fn is_registry_or_audit_table(table: &str) -> bool {
     table == "tenant_record" || table == "audit_event"
 }
 
-fn has_system_time_column(lower_body: &str) -> bool {
-    let has_system_time = lower_body.contains("system_time");
-    let has_system_from = lower_body.contains("system_from");
-    let has_recorded_system_time = lower_body.contains("recorded_system_time");
-    has_system_time | has_system_from | has_recorded_system_time
+fn has_system_time_column(body: &str) -> bool {
+    let columns = parse_column_names(body);
+    columns.contains("system_time")
+        || columns.contains("system_from")
+        || columns.contains("recorded_system_time")
 }
 
-fn has_domain_time_column(lower_body: &str) -> bool {
-    let has_available = lower_body.contains("available_time");
-    let has_valid_from = lower_body.contains("valid_from");
-    has_available | has_valid_from
+fn has_domain_time_column(body: &str) -> bool {
+    let columns = parse_column_names(body);
+    columns.contains("available_time") || columns.contains("valid_from")
 }
 
 /// Object kinds whose `CREATE` statements name a database object.
