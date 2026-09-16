@@ -139,6 +139,47 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
         self.assertEqual((loaded["count"], loaded["covered"]), (1, 0))
 
+    def test_multiline_comment_closer_before_structural_brace_is_not_authored(self) -> None:
+        """A comment closer must not turn a structural closing brace into authored code."""
+
+        source = self.root / "comment_closer_brace.rs"
+        source.write_text(
+            "fn validate(ready: bool) {\n"
+            "    if ready {\n"
+            "        /* audit note\n"
+            "        */ }\n"
+            "    println!(\"outside\");\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        self.assertFalse(
+            coverage_contract.is_executable_source_line(str(source), 4, self.root)
+        )
+        report = self.root / "comment_closer_brace.lcov"
+        report.write_text(lcov(source, [(4, 0), (5, 3)]), encoding="utf-8")
+        loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+        self.assertEqual((loaded["count"], loaded["covered"]), (1, 1))
+
+    def test_complete_block_comment_before_structural_brace_is_not_authored(self) -> None:
+        """Same-line block-comment trivia cannot disguise a structural brace."""
+
+        source = self.root / "inline_comment_brace.rs"
+        source.write_text(
+            "fn validate(ready: bool) {\n"
+            "    if ready {\n"
+            "        /* audit note */ }\n"
+            "    println!(\"outside\");\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        self.assertFalse(
+            coverage_contract.is_executable_source_line(str(source), 3, self.root)
+        )
+        report = self.root / "inline_comment_brace.lcov"
+        report.write_text(lcov(source, [(3, 0), (4, 3)]), encoding="utf-8")
+        loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+        self.assertEqual((loaded["count"], loaded["covered"]), (1, 1))
+
     def test_rust_line_comment_scanner_preserves_literal_comment_markers(self) -> None:
         """Only a lexical Rust line comment is removed from an opener probe."""
 
