@@ -71,3 +71,15 @@ fn adjacent_atomic_literals_cannot_splice_a_create_keyword() {
 
     assert_eq!(validate_migration_catalog(&catalog), Ok(()));
 }
+
+#[test]
+fn materialized_view_names_are_covered_by_the_object_naming_contract() {
+    let catalog = conforming_catalog(
+        "CREATE MATERIALIZED VIEW Bad AS SELECT tenant_record_id FROM tenant_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::SingleWordObjectName)
+    );
+}
