@@ -46,8 +46,9 @@ pub fn validate_migration_catalog(
 }
 
 /// Require the tenant setting key to be the first argument of PostgreSQL's
-/// `current_setting` call rather than accepting the same literal anywhere in
-/// the migration text.
+/// unqualified `current_setting` call rather than accepting the same literal
+/// anywhere in the migration text. Schema-qualified lookalikes fail closed so
+/// application-defined functions cannot impersonate the built-in witness.
 fn declares_tenant_session_guc(normalized_sql: &str) -> bool {
     const FUNCTION_NAME: &str = "current_setting";
     const TENANT_GUC: &str = "'tepp.current_tenant_record_id'";
@@ -56,16 +57,18 @@ fn declares_tenant_session_guc(normalized_sql: &str) -> bool {
     while let Some(relative) = normalized_sql[search_from..].find(FUNCTION_NAME) {
         let start = search_from + relative;
         let end = start + FUNCTION_NAME.len();
+        let prefix = normalized_sql[..start].trim_end();
         let starts_at_boundary = normalized_sql[..start]
             .chars()
             .next_back()
             .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_');
+        let is_unqualified = !prefix.ends_with('.');
         let ends_at_boundary = normalized_sql[end..]
             .chars()
             .next()
             .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_');
 
-        if starts_at_boundary && ends_at_boundary {
+        if starts_at_boundary && is_unqualified && ends_at_boundary {
             let after_name = normalized_sql[end..].trim_start();
             if let Some(arguments) = after_name.strip_prefix('(') {
                 let first_argument = arguments.trim_start();
@@ -212,6 +215,12 @@ mod tests {
         ));
         assert!(!declares_tenant_session_guc(
             "current_setting ( 'tepp.current_tenant_record_id_shadow' , true )"
+        ));
+        assert!(!declares_tenant_session_guc(
+            "tenant_schema.current_setting ( 'tepp.current_tenant_record_id' , true )"
+        ));
+        assert!(!declares_tenant_session_guc(
+            "tenant_schema . current_setting ( 'tepp.current_tenant_record_id' , true )"
         ));
     }
 
