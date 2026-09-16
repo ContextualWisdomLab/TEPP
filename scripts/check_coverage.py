@@ -467,7 +467,10 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
         if index == line_number:
             if target_started_in_block_comment and not target_has_code_after_comment:
                 return True
-            if block_comment_depth > 0 or stripped.startswith("/*") and stripped.endswith("*/"):
+            if block_comment_depth > 0 or (
+                stripped.startswith("/*")
+                and not _rust_code_before_line_comment(line).strip()
+            ):
                 return True
             return in_string and started_literal and stripped.startswith(
                 ('"', "r\"", "r#", "br\"", "br#")
@@ -741,6 +744,8 @@ def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
             # any opener left here follows executable code on the same line.
             previous = previous.split("/*", 1)[0].strip()
         code = _rust_code_before_line_comment(previous).rstrip()
+        if not code:
+            continue
         if code.endswith(("=>", "=> {")):
             return True
         return False
