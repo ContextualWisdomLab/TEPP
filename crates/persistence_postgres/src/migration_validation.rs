@@ -180,7 +180,7 @@ fn literal_is_atomic(literal: &[u8]) -> bool {
     !literal.is_empty()
         && literal
             .iter()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'.'))
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'.'))
 }
 
 #[cfg(test)]
