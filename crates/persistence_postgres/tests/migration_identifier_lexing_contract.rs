@@ -194,3 +194,29 @@ fn runtime_role_must_still_exist_after_the_forward_migration() {
         Err(MigrationContractError::MissingAppRuntimeRole)
     );
 }
+
+#[test]
+fn adjacent_statement_delimiters_cannot_hide_runtime_role_drops() {
+    for drop_alias in ["DROP ROLE", "DROP USER", "DROP GROUP"] {
+        let up_sql = format!(
+            "CREATE TABLE tenant_record (\n\
+                 tenant_record_id uuid PRIMARY KEY,\n\
+                 system_time timestamptz NOT NULL\n\
+             );\n\
+             CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;{drop_alias} tepp_app_runtime;\n\
+             ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;\n\
+             ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;\n\
+             CREATE POLICY tenant_record_tenant_isolation ON tenant_record\n\
+                 FOR ALL\n\
+                 USING (tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), ''))\n\
+                 WITH CHECK (tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), ''));"
+        );
+        let catalog = MigrationCatalog::from_sql(&up_sql, "DROP TABLE tenant_record;");
+
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{drop_alias}"
+        );
+    }
+}
