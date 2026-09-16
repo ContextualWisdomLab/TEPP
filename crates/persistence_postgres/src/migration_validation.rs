@@ -4,6 +4,41 @@ const INVALID_QUOTED_IDENTIFIER: &[u8] = b"INVALID_QUOTED_IDENTIFIER";
 const INVALID_QUALIFIED_IDENTIFIER: &str = "INVALID_QUALIFIED_IDENTIFIER";
 
 pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
+    let normalized = lexically_normalize_migration_sql(sql)?;
+    Some(canonicalize_structural_keywords(&normalized))
+}
+
+pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
+    let normalized = lexically_normalize_migration_sql(sql)?;
+    let tokens = normalized.split_whitespace().collect::<Vec<_>>();
+    let mut index = 0usize;
+    while index + 2 < tokens.len() {
+        if tokens[index].eq_ignore_ascii_case("CREATE")
+            && tokens.get(index + 1).is_some_and(|token| {
+                token.eq_ignore_ascii_case("ROLE")
+                    || token.eq_ignore_ascii_case("USER")
+                    || token.eq_ignore_ascii_case("GROUP")
+            })
+        {
+            let name = tokens[index + 2]
+                .chars()
+                .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+                .collect::<String>();
+            if name.eq_ignore_ascii_case(expected_role) {
+                return Some(true);
+            }
+        }
+        index += 1;
+    }
+    Some(false)
+}
+
+pub(super) fn declares_row_level_security(normalized_sql: &str) -> bool {
+    let lower = normalized_sql.to_ascii_lowercase();
+    lower.contains("enable row level security") || lower.contains("create policy")
+}
+
+fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
     let bytes = sql.as_bytes();
     let mut normalized = Vec::with_capacity(bytes.len());
     let mut index = 0usize;
@@ -65,8 +100,7 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
         }
     }
 
-    let normalized = String::from_utf8(normalized).ok()?;
-    Some(canonicalize_structural_keywords(&normalized))
+    String::from_utf8(normalized).ok()
 }
 
 fn canonicalize_structural_keywords(sql: &str) -> String {
@@ -276,7 +310,10 @@ fn quoted_identifier_is_structurally_safe(identifier: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{INVALID_QUALIFIED_IDENTIFIER, normalize_migration_sql};
+    use super::{
+        INVALID_QUALIFIED_IDENTIFIER, declares_created_role, declares_row_level_security,
+        normalize_migration_sql,
+    };
 
     #[test]
     fn lexical_normalization_masks_declaration_shaped_trivia() {
@@ -329,6 +366,37 @@ mod tests {
             let normalized = normalize_migration_sql(statement).expect("well-formed role declaration");
             assert!(normalized.starts_with("CREATE TYPE "), "{statement}");
         }
+    }
+
+    #[test]
+    fn role_declaration_evidence_uses_the_lexical_boundary() {
+        assert_eq!(
+            declares_created_role("CREATE ROLE tepp_app_runtime NOSUPERUSER;", "tepp_app_runtime"),
+            Some(true)
+        );
+        assert_eq!(
+            declares_created_role("CREATE USER \"tepp_app_runtime\" NOSUPERUSER;", "tepp_app_runtime"),
+            Some(true)
+        );
+        assert_eq!(
+            declares_created_role(
+                "-- CREATE ROLE tepp_app_runtime;\nSELECT 'CREATE ROLE tepp_app_runtime';",
+                "tepp_app_runtime"
+            ),
+            Some(false)
+        );
+    }
+
+    #[test]
+    fn rls_detection_runs_on_lexically_normalized_sql() {
+        let normalized = normalize_migration_sql(
+            "-- ENABLE ROW LEVEL SECURITY\nCREATE POLICY tenant_record_isolation ON tenant_record USING (true);",
+        )
+        .expect("well-formed RLS SQL");
+        assert!(declares_row_level_security(&normalized));
+        let trivia = normalize_migration_sql("SELECT 'CREATE POLICY hidden';")
+            .expect("well-formed literal");
+        assert!(!declares_row_level_security(&trivia));
     }
 
     #[test]
