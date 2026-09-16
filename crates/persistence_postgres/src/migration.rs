@@ -34,6 +34,9 @@ pub fn validate_migration_catalog(
     if requires_runtime_role && !declares_tenant_session_guc(&normalized_up) {
         return Err(MigrationContractError::MissingTenantSessionGuc);
     }
+    if requires_runtime_role && !tenant_policies_bind_session_guc(&normalized_up) {
+        return Err(MigrationContractError::MissingRlsPolicy);
+    }
     let normalized = MigrationCatalog::from_sql(&normalized_up, &normalized_down);
     core::validate_migration_catalog(&normalized)?;
     if requires_runtime_role && !runtime_role_declared {
@@ -77,6 +80,29 @@ fn declares_tenant_session_guc(normalized_sql: &str) -> bool {
         search_from = end;
     }
     false
+}
+
+/// Bind tenant-session evidence to each policy statement instead of allowing a
+/// real `current_setting` call elsewhere in the migration to vouch for a policy
+/// whose predicate never consults the tenant session key.
+fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
+    const CREATE_POLICY: &str = "create policy";
+
+    let lower = normalized_sql.to_ascii_lowercase();
+    let mut search_from = 0usize;
+    let mut saw_policy = false;
+    while let Some(relative) = lower[search_from..].find(CREATE_POLICY) {
+        saw_policy = true;
+        let start = search_from + relative;
+        let statement_tail = &normalized_sql[start..];
+        let statement_end = statement_tail.find(';').unwrap_or(statement_tail.len());
+        let statement = &statement_tail[..statement_end];
+        if !declares_tenant_session_guc(statement) {
+            return false;
+        }
+        search_from = start + CREATE_POLICY.len();
+    }
+    saw_policy
 }
 
 /// Normalize SQL and then remove PostgreSQL's `CONCURRENTLY` index modifier
@@ -143,7 +169,10 @@ fn canonicalize_concurrent_index_modifier(sql: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{canonicalize_concurrent_index_modifier, declares_tenant_session_guc};
+    use super::{
+        canonicalize_concurrent_index_modifier, declares_tenant_session_guc,
+        tenant_policies_bind_session_guc,
+    };
 
     #[test]
     fn tenant_guc_requires_a_current_setting_call() {
@@ -158,6 +187,16 @@ mod tests {
         ));
         assert!(!declares_tenant_session_guc(
             "current_setting ( 'tepp.current_tenant_record_id_shadow' , true )"
+        ));
+    }
+
+    #[test]
+    fn tenant_guc_must_be_bound_to_the_policy_statement() {
+        assert!(tenant_policies_bind_session_guc(
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true ));"
+        ));
+        assert!(!tenant_policies_bind_session_guc(
+            "select current_setting ( 'tepp.current_tenant_record_id' , true ); create policy document_record_tenant_isolation on document_record using (tenant_record_id is not null);"
         ));
     }
 
