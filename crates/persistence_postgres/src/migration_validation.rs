@@ -11,7 +11,9 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
                 let (next, literal) = scan_single_quoted_literal(bytes, index)?;
                 normalized.push(b' ');
                 if literal_is_atomic(literal) {
+                    normalized.push(b'\'');
                     normalized.extend_from_slice(literal);
+                    normalized.push(b'\'');
                 }
                 normalized.push(b' ');
                 index = next;
@@ -179,9 +181,17 @@ mod tests {
     fn lexical_normalization_preserves_atomic_contract_literals() {
         let sql = "SELECT current_setting('tepp.current_tenant_record_id', true), 'x', '';";
         let normalized = normalize_migration_sql(sql).expect("well-formed SQL");
-        assert!(normalized.contains("tepp.current_tenant_record_id"));
-        assert!(normalized.contains(" x "));
+        assert!(normalized.contains("'tepp.current_tenant_record_id'"));
+        assert!(normalized.contains("'x'"));
         assert!(!normalized.contains("''"));
+    }
+
+    #[test]
+    fn atomic_literals_keep_boundaries_between_sql_keywords() {
+        let normalized = normalize_migration_sql("SELECT 'CREATE'\n'INDEX' AS literal_text;")
+            .expect("well-formed adjacent literals");
+        assert!(!normalized.contains("CREATE INDEX"));
+        assert!(normalized.contains("'CREATE' 'INDEX'"));
     }
 
     #[test]
