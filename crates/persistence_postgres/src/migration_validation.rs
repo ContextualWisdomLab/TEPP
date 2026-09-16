@@ -1,6 +1,7 @@
 //! PostgreSQL lexical normalization for migration contract parsing.
 
 const INVALID_QUOTED_IDENTIFIER: &[u8] = b"INVALID_QUOTED_IDENTIFIER";
+const INVALID_QUALIFIED_IDENTIFIER: &str = "INVALID_QUALIFIED_IDENTIFIER";
 
 pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     let bytes = sql.as_bytes();
@@ -103,7 +104,56 @@ fn canonicalize_structural_keywords(sql: &str) -> String {
             index += 1;
         }
     }
-    canonical.join(" ")
+
+    let mut guarded = canonical
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<String>>();
+    let mut index = 0usize;
+    while index < guarded.len() {
+        if guarded[index].eq_ignore_ascii_case("CREATE") {
+            let kind_index = if guarded
+                .get(index + 1)
+                .is_some_and(|token| token.eq_ignore_ascii_case("OR"))
+                && guarded
+                    .get(index + 2)
+                    .is_some_and(|token| token.eq_ignore_ascii_case("REPLACE"))
+            {
+                index + 3
+            } else if guarded
+                .get(index + 1)
+                .is_some_and(|token| token.eq_ignore_ascii_case("UNIQUE"))
+            {
+                index + 2
+            } else {
+                index + 1
+            };
+            let mut name_index = kind_index + 1;
+            if guarded
+                .get(name_index)
+                .is_some_and(|token| token.eq_ignore_ascii_case("IF"))
+                && guarded
+                    .get(name_index + 1)
+                    .is_some_and(|token| token.eq_ignore_ascii_case("NOT"))
+                && guarded
+                    .get(name_index + 2)
+                    .is_some_and(|token| token.eq_ignore_ascii_case("EXISTS"))
+            {
+                name_index += 3;
+            }
+            let qualified = guarded
+                .get(name_index)
+                .is_some_and(|token| token.contains('.'))
+                || guarded
+                    .get(name_index + 1)
+                    .is_some_and(|token| token.starts_with('.'));
+            if qualified && name_index < guarded.len() {
+                guarded[name_index] = INVALID_QUALIFIED_IDENTIFIER.to_owned();
+            }
+        }
+        index += 1;
+    }
+    guarded.join(" ")
 }
 
 fn scan_single_quoted_literal(bytes: &[u8], start: usize) -> Option<(usize, &[u8])> {
@@ -267,6 +317,19 @@ mod tests {
         let upper = normalized.to_ascii_uppercase();
         assert!(!upper.contains("MATERIALIZED VIEW"));
         assert!(!upper.contains("OR REPLACE VIEW"));
+    }
+
+    #[test]
+    fn qualified_created_names_fail_closed_before_prefix_truncation() {
+        for sql in [
+            "CREATE VIEW audit_schema.Bad AS SELECT 1;",
+            "CREATE VIEW \"audit_schema\".\"Bad\" AS SELECT 1;",
+            "CREATE OR REPLACE FUNCTION audit_schema.Bad() RETURNS void AS $$ SELECT 1 $$ LANGUAGE sql;",
+            "CREATE UNIQUE INDEX IF NOT EXISTS audit_schema.Bad ON tenant_record (tenant_record_id);",
+        ] {
+            let normalized = normalize_migration_sql(sql).expect("well-formed qualified declaration");
+            assert!(normalized.contains(INVALID_QUALIFIED_IDENTIFIER), "{sql}");
+        }
     }
 
     #[test]
