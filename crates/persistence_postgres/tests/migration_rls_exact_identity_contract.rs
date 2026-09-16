@@ -109,7 +109,7 @@ fn tenant_setting_call_outside_policy_cannot_cover_policy() {
 }
 
 #[test]
-fn supplemental_policy_need_not_repeat_the_tenant_session_predicate() {
+fn restrictive_supplemental_policy_need_not_repeat_the_tenant_session_predicate() {
     let catalog = MigrationCatalog::from_sql(
         r"
         CREATE TABLE document_record (
@@ -130,6 +130,7 @@ fn supplemental_policy_need_not_repeat_the_tenant_session_predicate() {
                 tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
             );
         CREATE POLICY document_record_visibility_guard ON document_record
+            AS RESTRICTIVE
             FOR SELECT
             USING (document_record_id IS NOT NULL);
         ",
