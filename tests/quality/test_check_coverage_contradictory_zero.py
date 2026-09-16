@@ -220,6 +220,28 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         self.assertEqual((count, covered), (3, 2))
 
 
+class NestedLineAbsenceTests(unittest.TestCase):
+    """An opener with nothing meaningful beneath it cannot be contradicted."""
+
+    def test_opener_with_no_following_source_line_keeps_its_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "trailing_opener.rs"
+            source.write_text(
+                "fn run() -> Result<(), Error> {\n"
+                "    let value = compute();\n"
+                "    if value.is_empty() {\n"
+                "        // only a comment lives here\n",
+                encoding="utf-8",
+            )
+            report = root / "report.lcov"
+            report.write_text(
+                f"SF:{source}\nDA:2,9\nDA:3,0\nend_of_record\n", encoding="utf-8"
+            )
+            loaded = coverage_contract.load_lcov_line_totals(report, root)["lines"]
+            self.assertEqual((loaded["count"], loaded["covered"]), (2, 1))
+
+
 class BlockOpenerProbeTests(unittest.TestCase):
     """Coverage source probes fail closed at filesystem and trivia boundaries."""
 
