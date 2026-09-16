@@ -240,5 +240,42 @@ class CoverageBlockCommentRegressionTests(unittest.TestCase):
             )
 
 
+class ArmWalkTriviaTests(unittest.TestCase):
+    """The arm walk handles a block comment opener that never closes."""
+
+    def test_arm_walk_skips_an_unterminated_block_comment_opener(self) -> None:
+        """`is_executable_source_line` cannot reach this shape.
+
+        A line beneath an unterminated opener is comment text and is filtered
+        before the arm walk runs, so the branch is exercised directly.
+        """
+
+        lines = [
+            "let message = match self {",
+            "    Self::Commented => {",
+            "        /* an opener with no closer on this line",
+            '        "arm body after an unterminated opener"',
+            "    }",
+            "};",
+        ]
+        self.assertTrue(coverage_contract._is_match_arm_body(lines, 4))
+
+    def test_unterminated_block_comment_swallows_the_line_beneath(self) -> None:
+        """The public path treats that text as comment, not code."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "open_ended.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Commented => {\n'
+                '        /* an opener with no closer on this line\n'
+                '        "arm body after an unterminated opener"\n'
+                '    }\n'
+                '};\n',
+                encoding="utf-8",
+            )
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 4))
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
