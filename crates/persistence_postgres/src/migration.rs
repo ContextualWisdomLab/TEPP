@@ -82,9 +82,22 @@ fn declares_tenant_session_guc(normalized_sql: &str) -> bool {
     false
 }
 
-/// Bind tenant-session evidence to each policy statement instead of allowing a
-/// real `current_setting` call elsewhere in the migration to vouch for a policy
-/// whose predicate never consults the tenant session key.
+/// Return whether the normalized policy explicitly declares PostgreSQL's
+/// restrictive policy composition mode. Restrictive policies can only narrow
+/// rows already admitted by permissive policies, so they need not repeat the
+/// tenant-session predicate themselves.
+fn policy_is_restrictive(policy_sql: &str) -> bool {
+    let tokens = policy_sql.split_whitespace().collect::<Vec<_>>();
+    tokens.windows(2).any(|pair| {
+        pair[0].eq_ignore_ascii_case("AS") && pair[1].eq_ignore_ascii_case("RESTRICTIVE")
+    })
+}
+
+/// Bind tenant-session evidence to every policy that can independently admit
+/// rows. PostgreSQL permissive policies are OR-composed, so a permissive policy
+/// without the tenant-session predicate could widen access even when another
+/// tenant-isolation policy is correct. Restrictive policies are AND-composed
+/// and may add narrower conditions without duplicating the tenant key lookup.
 fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
     const CREATE_POLICY: &str = "create policy";
 
@@ -97,7 +110,7 @@ fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
         let statement_tail = &normalized_sql[start..];
         let statement_end = statement_tail.find(';').unwrap_or(statement_tail.len());
         let statement = &statement_tail[..statement_end];
-        if !declares_tenant_session_guc(statement) {
+        if !policy_is_restrictive(statement) && !declares_tenant_session_guc(statement) {
             return false;
         }
         search_from = start + CREATE_POLICY.len();
@@ -171,7 +184,7 @@ fn canonicalize_concurrent_index_modifier(sql: &str) -> String {
 mod tests {
     use super::{
         canonicalize_concurrent_index_modifier, declares_tenant_session_guc,
-        tenant_policies_bind_session_guc,
+        policy_is_restrictive, tenant_policies_bind_session_guc,
     };
 
     #[test]
@@ -191,12 +204,21 @@ mod tests {
     }
 
     #[test]
-    fn tenant_guc_must_be_bound_to_the_policy_statement() {
+    fn tenant_guc_is_required_for_permissive_but_not_restrictive_policies() {
         assert!(tenant_policies_bind_session_guc(
             "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true ));"
         ));
         assert!(!tenant_policies_bind_session_guc(
             "select current_setting ( 'tepp.current_tenant_record_id' , true ); create policy document_record_tenant_isolation on document_record using (tenant_record_id is not null);"
+        ));
+        assert!(tenant_policies_bind_session_guc(
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_visibility_guard on document_record as restrictive for select using (document_record_id is not null);"
+        ));
+        assert!(policy_is_restrictive(
+            "create policy document_record_visibility_guard on document_record AS RESTRICTIVE for select using (true)"
+        ));
+        assert!(!policy_is_restrictive(
+            "create policy document_record_visibility_guard on document_record AS PERMISSIVE for select using (true)"
         ));
     }
 
