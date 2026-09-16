@@ -83,3 +83,15 @@ fn materialized_view_names_are_covered_by_the_object_naming_contract() {
         Err(MigrationContractError::SingleWordObjectName)
     );
 }
+
+#[test]
+fn replaceable_view_names_are_covered_by_the_object_naming_contract() {
+    let catalog = conforming_catalog(
+        "CREATE OR REPLACE VIEW Bad AS SELECT tenant_record_id FROM tenant_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::SingleWordObjectName)
+    );
+}
