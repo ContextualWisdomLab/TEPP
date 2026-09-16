@@ -1,5 +1,7 @@
 //! PostgreSQL lexical normalization for migration contract parsing.
 
+use std::collections::BTreeSet;
+
 const INVALID_QUOTED_IDENTIFIER: &[u8] = b"INVALID_QUOTED_IDENTIFIER";
 const INVALID_QUALIFIED_IDENTIFIER: &str = "INVALID_QUALIFIED_IDENTIFIER";
 
@@ -16,22 +18,28 @@ pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bo
     // scanning; whitespace is not required around either delimiter.
     let role_tokens = normalized.replace(';', " ; ").replace(',', " , ");
     let tokens = role_tokens.split_whitespace().collect::<Vec<_>>();
-    let mut declared = false;
+    let mut declared_roles = BTreeSet::new();
     let mut index = 0usize;
     while index < tokens.len() {
         if is_role_creation_alias(&tokens, index) {
-            let name = role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
-            if name.eq_ignore_ascii_case(expected_role) {
-                declared = true;
+            let name = normalized_role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
+            if !name.is_empty() {
+                declared_roles.insert(name);
             }
-        } else if is_role_drop_alias(&tokens, index)
-            && drop_statement_mentions_role(&tokens, index, expected_role)
-        {
-            declared = false;
+        } else if is_role_drop_alias(&tokens, index) {
+            for name in drop_statement_role_names(&tokens, index) {
+                declared_roles.remove(&name);
+            }
+        } else if is_role_rename_alias(&tokens, index) {
+            let source = normalized_role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
+            let target = normalized_role_identifier(tokens.get(index + 5).copied().unwrap_or_default());
+            if declared_roles.remove(&source) && !target.is_empty() {
+                declared_roles.insert(target);
+            }
         }
         index += 1;
     }
-    Some(declared)
+    Some(declared_roles.contains(&expected_role.to_ascii_lowercase()))
 }
 
 pub(super) fn declares_row_level_security(normalized_sql: &str) -> bool {
@@ -148,6 +156,35 @@ fn is_role_drop_alias(tokens: &[&str], drop_index: usize) -> bool {
         || kind.eq_ignore_ascii_case("GROUP")
 }
 
+fn is_role_rename_alias(tokens: &[&str], alter_index: usize) -> bool {
+    if !tokens
+        .get(alter_index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("ALTER"))
+    {
+        return false;
+    }
+    let Some(kind) = tokens.get(alter_index + 1) else {
+        return false;
+    };
+    if kind.eq_ignore_ascii_case("USER")
+        && tokens
+            .get(alter_index + 2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("MAPPING"))
+    {
+        return false;
+    }
+    (kind.eq_ignore_ascii_case("ROLE")
+        || kind.eq_ignore_ascii_case("USER")
+        || kind.eq_ignore_ascii_case("GROUP"))
+        && tokens
+            .get(alter_index + 3)
+            .is_some_and(|token| token.eq_ignore_ascii_case("RENAME"))
+        && tokens
+            .get(alter_index + 4)
+            .is_some_and(|token| token.eq_ignore_ascii_case("TO"))
+        && tokens.get(alter_index + 5).is_some()
+}
+
 fn role_identifier(fragment: &str) -> String {
     fragment
         .trim_start_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
@@ -156,7 +193,11 @@ fn role_identifier(fragment: &str) -> String {
         .collect()
 }
 
-fn drop_statement_mentions_role(tokens: &[&str], drop_index: usize, expected_role: &str) -> bool {
+fn normalized_role_identifier(fragment: &str) -> String {
+    role_identifier(fragment).to_ascii_lowercase()
+}
+
+fn drop_statement_role_names(tokens: &[&str], drop_index: usize) -> Vec<String> {
     let mut name_index = drop_index + 2;
     if tokens
         .get(name_index)
@@ -168,18 +209,20 @@ fn drop_statement_mentions_role(tokens: &[&str], drop_index: usize, expected_rol
         name_index += 2;
     }
 
+    let mut names = Vec::new();
     while let Some(token) = tokens.get(name_index) {
-        for fragment in token.split(',') {
-            if role_identifier(fragment).eq_ignore_ascii_case(expected_role) {
-                return true;
-            }
-        }
-        if token.contains(';') {
+        if *token == ";" {
             break;
+        }
+        if *token != "," {
+            let name = normalized_role_identifier(token);
+            if !name.is_empty() {
+                names.push(name);
+            }
         }
         name_index += 1;
     }
-    false
+    names
 }
 
 fn canonicalize_structural_keywords(sql: &str) -> String {
@@ -196,6 +239,14 @@ fn canonicalize_structural_keywords(sql: &str) -> String {
             canonical.push(tokens[index]);
             canonical.push("TYPE");
             index += 2;
+        } else if is_role_rename_alias(&tokens, index) {
+            // RENAME changes the durable database-object name. Project the target
+            // through the same one-name scanner so ALTER ROLE/USER/GROUP cannot
+            // bypass the canonical snake_case naming authority.
+            canonical.push("CREATE");
+            canonical.push("TYPE");
+            canonical.push(tokens[index + 5]);
+            index += 6;
         } else if tokens[index].eq_ignore_ascii_case("CREATE")
             && tokens
                 .get(index + 1)
@@ -513,6 +564,44 @@ mod tests {
             ),
             Some(false)
         );
+        assert_eq!(
+            declares_created_role(
+                "CREATE ROLE tepp_app_runtime; ALTER ROLE tepp_app_runtime RENAME TO archived_runtime_role;",
+                "tepp_app_runtime"
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            declares_created_role(
+                "CREATE ROLE archived_runtime_role; ALTER USER archived_runtime_role RENAME TO tepp_app_runtime;",
+                "tepp_app_runtime"
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            declares_created_role(
+                "CREATE ROLE tepp_app_runtime; ALTER GROUP absent_role RENAME TO other_role;",
+                "tepp_app_runtime"
+            ),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn role_rename_targets_share_the_created_object_name_scanner() {
+        for statement in [
+            "ALTER ROLE role_name RENAME TO renamed_role;",
+            "ALTER USER user_name RENAME TO renamed_user;",
+            "ALTER GROUP group_name RENAME TO renamed_group;",
+        ] {
+            let normalized = normalize_migration_sql(statement).expect("well-formed role rename");
+            assert!(normalized.starts_with("CREATE TYPE renamed_"), "{statement}");
+        }
+        let user_mapping = normalize_migration_sql(
+            "ALTER USER MAPPING FOR CURRENT_USER SERVER foreign_server OPTIONS (SET user 'x');",
+        )
+        .expect("well-formed user mapping alteration");
+        assert!(user_mapping.starts_with("ALTER USER MAPPING "));
     }
 
     #[test]
