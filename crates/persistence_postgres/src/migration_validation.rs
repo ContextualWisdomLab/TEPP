@@ -10,7 +10,12 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
 
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
     let normalized = lexically_normalize_migration_sql(sql)?;
-    let tokens = normalized.split_whitespace().collect::<Vec<_>>();
+    // The lexical pass has already masked literals/comments and converted
+    // representable quoted identifiers. PostgreSQL statement/list delimiters
+    // remain structural, so make them explicit tokens before role lifecycle
+    // scanning; whitespace is not required around either delimiter.
+    let role_tokens = normalized.replace(';', " ; ").replace(',', " , ");
+    let tokens = role_tokens.split_whitespace().collect::<Vec<_>>();
     let mut declared = false;
     let mut index = 0usize;
     while index < tokens.len() {
@@ -500,6 +505,13 @@ mod tests {
                 "tepp_app_runtime"
             ),
             Some(true)
+        );
+        assert_eq!(
+            declares_created_role(
+                "CREATE ROLE tepp_app_runtime;DROP ROLE tepp_app_runtime;",
+                "tepp_app_runtime"
+            ),
+            Some(false)
         );
     }
 
