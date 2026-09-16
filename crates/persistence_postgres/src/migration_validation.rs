@@ -1,5 +1,7 @@
 //! PostgreSQL lexical normalization for migration contract parsing.
 
+const INVALID_QUOTED_IDENTIFIER: &[u8] = b"INVALID_QUOTED_IDENTIFIER";
+
 pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     let bytes = sql.as_bytes();
     let mut normalized = Vec::with_capacity(bytes.len());
@@ -21,7 +23,11 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
             b'"' => {
                 let (next, identifier) = scan_quoted_identifier(bytes, index)?;
                 normalized.push(b' ');
-                normalized.extend_from_slice(&identifier);
+                if quoted_identifier_is_structurally_safe(&identifier) {
+                    normalized.extend_from_slice(&identifier);
+                } else {
+                    normalized.extend_from_slice(INVALID_QUOTED_IDENTIFIER);
+                }
                 normalized.push(b' ');
                 index = next;
             }
@@ -159,6 +165,13 @@ fn literal_is_atomic(literal: &[u8]) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'.'))
 }
 
+fn quoted_identifier_is_structurally_safe(identifier: &[u8]) -> bool {
+    !identifier.is_empty()
+        && identifier
+            .iter()
+            .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+}
+
 #[cfg(test)]
 mod tests {
     use super::normalize_migration_sql;
@@ -195,13 +208,13 @@ mod tests {
     }
 
     #[test]
-    fn quoted_identifiers_preserve_declared_spelling_and_escaped_quotes() {
+    fn quoted_identifiers_preserve_safe_spelling_and_reject_unrepresentable_content() {
         let normalized = normalize_migration_sql(
             "CREATE INDEX \"Bad\" ON tenant_record (\"good_name\"); CREATE VIEW \"a\"\"b\" AS SELECT 1;",
         )
         .expect("well-formed quoted identifiers");
         assert!(normalized.contains("CREATE INDEX Bad ON tenant_record ( good_name )"));
-        assert!(normalized.contains("CREATE VIEW a\"b AS SELECT 1"));
+        assert!(normalized.contains("CREATE VIEW INVALID_QUOTED_IDENTIFIER AS SELECT 1"));
     }
 
     #[test]
