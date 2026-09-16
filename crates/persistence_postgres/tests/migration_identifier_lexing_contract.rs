@@ -126,3 +126,32 @@ fn created_role_aliases_are_covered_by_the_object_naming_contract() {
         );
     }
 }
+
+#[test]
+fn runtime_role_reference_does_not_substitute_for_role_declaration() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE tenant_record (
+            tenant_record_id uuid PRIMARY KEY,
+            system_time timestamptz NOT NULL
+        );
+        GRANT SELECT ON TABLE tenant_record TO tepp_app_runtime;
+        ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY tenant_record_tenant_isolation ON tenant_record
+            FOR ALL
+            USING (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            )
+            WITH CHECK (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            );
+        ",
+        "DROP TABLE tenant_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingAppRuntimeRole)
+    );
+}
