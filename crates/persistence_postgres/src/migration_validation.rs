@@ -11,20 +11,22 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
     let normalized = lexically_normalize_migration_sql(sql)?;
     let tokens = normalized.split_whitespace().collect::<Vec<_>>();
+    let mut declared = false;
     let mut index = 0usize;
-    while index + 2 < tokens.len() {
+    while index < tokens.len() {
         if is_role_creation_alias(&tokens, index) {
-            let name = tokens[index + 2]
-                .chars()
-                .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
-                .collect::<String>();
+            let name = role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
             if name.eq_ignore_ascii_case(expected_role) {
-                return Some(true);
+                declared = true;
             }
+        } else if is_role_drop_alias(&tokens, index)
+            && drop_statement_mentions_role(&tokens, index, expected_role)
+        {
+            declared = false;
         }
         index += 1;
     }
-    Some(false)
+    Some(declared)
 }
 
 pub(super) fn declares_row_level_security(normalized_sql: &str) -> bool {
@@ -117,6 +119,62 @@ fn is_role_creation_alias(tokens: &[&str], create_index: usize) -> bool {
     kind.eq_ignore_ascii_case("ROLE")
         || kind.eq_ignore_ascii_case("USER")
         || kind.eq_ignore_ascii_case("GROUP")
+}
+
+fn is_role_drop_alias(tokens: &[&str], drop_index: usize) -> bool {
+    if !tokens
+        .get(drop_index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("DROP"))
+    {
+        return false;
+    }
+    let Some(kind) = tokens.get(drop_index + 1) else {
+        return false;
+    };
+    if kind.eq_ignore_ascii_case("USER")
+        && tokens
+            .get(drop_index + 2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("MAPPING"))
+    {
+        return false;
+    }
+    kind.eq_ignore_ascii_case("ROLE")
+        || kind.eq_ignore_ascii_case("USER")
+        || kind.eq_ignore_ascii_case("GROUP")
+}
+
+fn role_identifier(fragment: &str) -> String {
+    fragment
+        .trim_start_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
+        .chars()
+        .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+        .collect()
+}
+
+fn drop_statement_mentions_role(tokens: &[&str], drop_index: usize, expected_role: &str) -> bool {
+    let mut name_index = drop_index + 2;
+    if tokens
+        .get(name_index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("IF"))
+        && tokens
+            .get(name_index + 1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("EXISTS"))
+    {
+        name_index += 2;
+    }
+
+    while let Some(token) = tokens.get(name_index) {
+        for fragment in token.split(',') {
+            if role_identifier(fragment).eq_ignore_ascii_case(expected_role) {
+                return true;
+            }
+        }
+        if token.contains(';') {
+            break;
+        }
+        name_index += 1;
+    }
+    false
 }
 
 fn canonicalize_structural_keywords(sql: &str) -> String {
@@ -407,6 +465,41 @@ mod tests {
                 "tepp_app_runtime"
             ),
             Some(false)
+        );
+        assert_eq!(
+            declares_created_role(
+                "CREATE ROLE tepp_app_runtime; DROP ROLE tepp_app_runtime;",
+                "tepp_app_runtime"
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            declares_created_role(
+                "DROP ROLE IF EXISTS tepp_app_runtime; CREATE USER tepp_app_runtime;",
+                "tepp_app_runtime"
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            declares_created_role(
+                "CREATE GROUP tepp_app_runtime; DROP GROUP IF EXISTS other_role,tepp_app_runtime;",
+                "tepp_app_runtime"
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            declares_created_role(
+                "CREATE ROLE tepp_app_runtime; DROP USER tepp_app_runtime;",
+                "tepp_app_runtime"
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            declares_created_role(
+                "CREATE ROLE tepp_app_runtime; DROP USER MAPPING FOR tepp_app_runtime SERVER foreign_server;",
+                "tepp_app_runtime"
+            ),
+            Some(true)
         );
     }
 
