@@ -75,6 +75,20 @@ fn canonicalize_structural_keywords(sql: &str) -> String {
     let mut index = 0usize;
     while index < tokens.len() {
         if tokens[index].eq_ignore_ascii_case("CREATE")
+            && tokens.get(index + 1).is_some_and(|token| {
+                token.eq_ignore_ascii_case("ROLE")
+                    || token.eq_ignore_ascii_case("USER")
+                    || token.eq_ignore_ascii_case("GROUP")
+            })
+        {
+            // ROLE is a cluster-level object used by TEPP's shipped RLS migration;
+            // USER and GROUP are PostgreSQL aliases for CREATE ROLE. The downstream
+            // structural parser only needs a one-name CREATE shape, so route all
+            // three spellings through its existing generic CREATE TYPE name scanner.
+            canonical.push(tokens[index]);
+            canonical.push("TYPE");
+            index += 2;
+        } else if tokens[index].eq_ignore_ascii_case("CREATE")
             && tokens
                 .get(index + 1)
                 .is_some_and(|token| token.eq_ignore_ascii_case("MATERIALIZED"))
@@ -303,6 +317,18 @@ mod tests {
         .expect("well-formed quoted identifiers");
         assert!(normalized.contains("CREATE INDEX Bad ON tenant_record ( good_name )"));
         assert!(normalized.contains("CREATE VIEW INVALID_QUOTED_IDENTIFIER AS SELECT 1"));
+    }
+
+    #[test]
+    fn role_creation_aliases_share_the_created_object_name_scanner() {
+        for statement in [
+            "CREATE ROLE role_name NOSUPERUSER;",
+            "CREATE USER user_name NOSUPERUSER;",
+            "CREATE GROUP group_name NOSUPERUSER;",
+        ] {
+            let normalized = normalize_migration_sql(statement).expect("well-formed role declaration");
+            assert!(normalized.starts_with("CREATE TYPE "), "{statement}");
+        }
     }
 
     #[test]
