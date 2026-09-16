@@ -359,7 +359,9 @@ fn contains_unquoted_identifier(sql: &str, identifier: &str) -> bool {
             .count()
             % 2
             == 1;
-        if !inside_atomic_literal && is_word_start(sql, start) && !identifier_continues_after(sql, end)
+        if !inside_atomic_literal
+            && is_word_start(sql, start)
+            && !identifier_continues_after(sql, end)
         {
             return true;
         }
@@ -935,7 +937,7 @@ mod tests {
                 system_time timestamptz NOT NULL
             );
             CREATE ROLE tepp_app_runtime NOSUPERUSER;
-            -- tepp.current_tenant_record_id referenced for GUC scan; isolation policy omitted
+            SELECT current_setting('tepp.current_tenant_record_id', true);
             ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
             ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
             ",
@@ -954,7 +956,7 @@ mod tests {
                 system_time timestamptz NOT NULL
             );
             CREATE ROLE tepp_app_runtime NOSUPERUSER;
-            -- bind GUC name for scan: tepp.current_tenant_record_id
+            SELECT current_setting('tepp.current_tenant_record_id', true);
             ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
             ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
             CREATE POLICY tenant_record_tenant_isolation ON tenant_record
