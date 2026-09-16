@@ -13,13 +13,7 @@ pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bo
     let tokens = normalized.split_whitespace().collect::<Vec<_>>();
     let mut index = 0usize;
     while index + 2 < tokens.len() {
-        if tokens[index].eq_ignore_ascii_case("CREATE")
-            && tokens.get(index + 1).is_some_and(|token| {
-                token.eq_ignore_ascii_case("ROLE")
-                    || token.eq_ignore_ascii_case("USER")
-                    || token.eq_ignore_ascii_case("GROUP")
-            })
-        {
+        if is_role_creation_alias(&tokens, index) {
             let name = tokens[index + 2]
                 .chars()
                 .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
@@ -103,22 +97,39 @@ fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
     String::from_utf8(normalized).ok()
 }
 
+fn is_role_creation_alias(tokens: &[&str], create_index: usize) -> bool {
+    if !tokens
+        .get(create_index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("CREATE"))
+    {
+        return false;
+    }
+    let Some(kind) = tokens.get(create_index + 1) else {
+        return false;
+    };
+    if kind.eq_ignore_ascii_case("USER")
+        && tokens
+            .get(create_index + 2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("MAPPING"))
+    {
+        return false;
+    }
+    kind.eq_ignore_ascii_case("ROLE")
+        || kind.eq_ignore_ascii_case("USER")
+        || kind.eq_ignore_ascii_case("GROUP")
+}
+
 fn canonicalize_structural_keywords(sql: &str) -> String {
     let tokens = sql.split_whitespace().collect::<Vec<_>>();
     let mut canonical = Vec::with_capacity(tokens.len());
     let mut index = 0usize;
     while index < tokens.len() {
-        if tokens[index].eq_ignore_ascii_case("CREATE")
-            && tokens.get(index + 1).is_some_and(|token| {
-                token.eq_ignore_ascii_case("ROLE")
-                    || token.eq_ignore_ascii_case("USER")
-                    || token.eq_ignore_ascii_case("GROUP")
-            })
-        {
+        if is_role_creation_alias(&tokens, index) {
             // ROLE is a cluster-level object used by TEPP's shipped RLS migration;
-            // USER and GROUP are PostgreSQL aliases for CREATE ROLE. The downstream
-            // structural parser only needs a one-name CREATE shape, so route all
-            // three spellings through its existing generic CREATE TYPE name scanner.
+            // USER and GROUP are PostgreSQL aliases for CREATE ROLE. CREATE USER
+            // MAPPING is a distinct SQL/MED statement and must not enter this path.
+            // The downstream structural parser only needs a one-name CREATE shape,
+            // so route role aliases through its existing CREATE TYPE name scanner.
             canonical.push(tokens[index]);
             canonical.push("TYPE");
             index += 2;
@@ -366,6 +377,11 @@ mod tests {
             let normalized = normalize_migration_sql(statement).expect("well-formed role declaration");
             assert!(normalized.starts_with("CREATE TYPE "), "{statement}");
         }
+        let user_mapping = normalize_migration_sql(
+            "CREATE USER MAPPING FOR CURRENT_USER SERVER foreign_server;",
+        )
+        .expect("well-formed user mapping");
+        assert!(user_mapping.starts_with("CREATE USER MAPPING "));
     }
 
     #[test]
@@ -381,6 +397,13 @@ mod tests {
         assert_eq!(
             declares_created_role(
                 "-- CREATE ROLE tepp_app_runtime;\nSELECT 'CREATE ROLE tepp_app_runtime';",
+                "tepp_app_runtime"
+            ),
+            Some(false)
+        );
+        assert_eq!(
+            declares_created_role(
+                "CREATE USER MAPPING FOR tepp_app_runtime SERVER foreign_server;",
                 "tepp_app_runtime"
             ),
             Some(false)
