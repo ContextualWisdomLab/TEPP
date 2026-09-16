@@ -31,12 +31,52 @@ pub fn validate_migration_catalog(
     let normalized_down = normalize_catalog_sql(catalog.down_sql())
         .ok_or(MigrationContractError::EmptyMigrationSql)?;
     let requires_runtime_role = validation::declares_row_level_security(&normalized_up);
+    if requires_runtime_role && !declares_tenant_session_guc(&normalized_up) {
+        return Err(MigrationContractError::MissingTenantSessionGuc);
+    }
     let normalized = MigrationCatalog::from_sql(&normalized_up, &normalized_down);
     core::validate_migration_catalog(&normalized)?;
     if requires_runtime_role && !runtime_role_declared {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     }
     Ok(())
+}
+
+/// Require the tenant setting key to be the first argument of PostgreSQL's
+/// `current_setting` call rather than accepting the same literal anywhere in
+/// the migration text.
+fn declares_tenant_session_guc(normalized_sql: &str) -> bool {
+    const FUNCTION_NAME: &str = "current_setting";
+    const TENANT_GUC: &str = "'tepp.current_tenant_record_id'";
+
+    let mut search_from = 0usize;
+    while let Some(relative) = normalized_sql[search_from..].find(FUNCTION_NAME) {
+        let start = search_from + relative;
+        let end = start + FUNCTION_NAME.len();
+        let starts_at_boundary = normalized_sql[..start]
+            .chars()
+            .next_back()
+            .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_');
+        let ends_at_boundary = normalized_sql[end..]
+            .chars()
+            .next()
+            .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_');
+
+        if starts_at_boundary && ends_at_boundary {
+            let after_name = normalized_sql[end..].trim_start();
+            if let Some(arguments) = after_name.strip_prefix('(') {
+                let first_argument = arguments.trim_start();
+                if let Some(after_key) = first_argument.strip_prefix(TENANT_GUC) {
+                    let delimiter = after_key.trim_start().chars().next();
+                    if matches!(delimiter, Some(',' | ')')) {
+                        return true;
+                    }
+                }
+            }
+        }
+        search_from = end;
+    }
+    false
 }
 
 /// Normalize SQL and then remove PostgreSQL's `CONCURRENTLY` index modifier
@@ -103,7 +143,23 @@ fn canonicalize_concurrent_index_modifier(sql: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::canonicalize_concurrent_index_modifier;
+    use super::{canonicalize_concurrent_index_modifier, declares_tenant_session_guc};
+
+    #[test]
+    fn tenant_guc_requires_a_current_setting_call() {
+        assert!(declares_tenant_session_guc(
+            "tenant_record_id = current_setting ( 'tepp.current_tenant_record_id' , true )"
+        ));
+        assert!(!declares_tenant_session_guc(
+            "select 'tepp.current_tenant_record_id'"
+        ));
+        assert!(!declares_tenant_session_guc(
+            "other_current_setting ( 'tepp.current_tenant_record_id' , true )"
+        ));
+        assert!(!declares_tenant_session_guc(
+            "current_setting ( 'tepp.current_tenant_record_id_shadow' , true )"
+        ));
+    }
 
     #[test]
     fn concurrent_index_modifier_is_removed_without_changing_the_declared_name() {
