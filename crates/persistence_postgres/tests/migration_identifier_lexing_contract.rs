@@ -1,0 +1,51 @@
+use persistence_postgres::{MigrationCatalog, MigrationContractError, validate_migration_catalog};
+
+fn conforming_catalog(extra_sql: &str) -> MigrationCatalog {
+    let up_sql = format!(
+        "CREATE TABLE tenant_record (\n\
+             tenant_record_id uuid PRIMARY KEY,\n\
+             system_time timestamptz NOT NULL\n\
+         );\n{extra_sql}"
+    );
+    MigrationCatalog::from_sql(&up_sql, "DROP TABLE tenant_record;")
+}
+
+#[test]
+fn quoted_created_object_cannot_bypass_the_naming_contract() {
+    let catalog = conforming_catalog(
+        "CREATE INDEX \"Bad\" ON tenant_record (tenant_record_id);",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::SingleWordObjectName)
+    );
+}
+
+#[test]
+fn quoted_column_cannot_bypass_the_naming_contract() {
+    let catalog = MigrationCatalog::from_sql(
+        "CREATE TABLE tenant_record (\n\
+             tenant_record_id uuid PRIMARY KEY,\n\
+             system_time timestamptz NOT NULL,\n\
+             \"Bad\" text\n\
+         );",
+        "DROP TABLE tenant_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::SingleWordObjectName)
+    );
+}
+
+#[test]
+fn declaration_shaped_text_inside_sql_trivia_is_not_an_object() {
+    let catalog = conforming_catalog(
+        "-- CREATE INDEX Bad ON tenant_record (tenant_record_id);\n\
+         SELECT 'CREATE INDEX Bad ON tenant_record (tenant_record_id);';\n\
+         /* CREATE INDEX Bad ON tenant_record (tenant_record_id); */",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
