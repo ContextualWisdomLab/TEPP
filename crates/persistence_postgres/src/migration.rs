@@ -82,15 +82,27 @@ fn declares_tenant_session_guc(normalized_sql: &str) -> bool {
     false
 }
 
-/// Return whether the normalized policy explicitly declares PostgreSQL's
-/// restrictive policy composition mode. Restrictive policies can only narrow
-/// rows already admitted by permissive policies, so they need not repeat the
-/// tenant-session predicate themselves.
+/// Return whether the normalized policy header explicitly declares
+/// PostgreSQL's restrictive policy composition mode. Only the grammar slot
+/// immediately after `ON table_name` counts; `AS restrictive` inside a policy
+/// expression is an SQL alias and must not change composition semantics.
 fn policy_is_restrictive(policy_sql: &str) -> bool {
     let tokens = policy_sql.split_whitespace().collect::<Vec<_>>();
-    tokens.windows(2).any(|pair| {
-        pair[0].eq_ignore_ascii_case("AS") && pair[1].eq_ignore_ascii_case("RESTRICTIVE")
-    })
+    let Some(on_index) = tokens
+        .iter()
+        .enumerate()
+        .skip(2)
+        .find_map(|(index, token)| token.eq_ignore_ascii_case("ON").then_some(index))
+    else {
+        return false;
+    };
+
+    tokens
+        .get(on_index + 2)
+        .is_some_and(|token| token.eq_ignore_ascii_case("AS"))
+        && tokens
+            .get(on_index + 3)
+            .is_some_and(|token| token.eq_ignore_ascii_case("RESTRICTIVE"))
 }
 
 /// Bind tenant-session evidence to every policy that can independently admit
@@ -219,6 +231,9 @@ mod tests {
         ));
         assert!(!policy_is_restrictive(
             "create policy document_record_visibility_guard on document_record AS PERMISSIVE for select using (true)"
+        ));
+        assert!(!policy_is_restrictive(
+            "create policy document_record_visibility_guard on document_record for select using (exists (select 1 AS restrictive))"
         ));
     }
 
