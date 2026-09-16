@@ -740,6 +740,8 @@ def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
             block_comment_depth = previous.count("*/")
             continue
         if "/*" in previous and previous.endswith("*/"):
+            # A leading complete block comment may have been stripped above;
+            # any opener left here follows executable code on the same line.
             previous = previous.split("/*", 1)[0].strip()
         code = _rust_code_before_line_comment(previous).rstrip()
         if not code:
@@ -915,6 +917,7 @@ def load_lcov_line_totals(
             source_path = raw_line[3:]
             if not source_path:
                 raise ValueError("LCOV source path must not be empty")
+            # Fail closed on traversal before reading any source file content.
             resolve_repository_source_path(source_path, root)
         elif raw_line.startswith("DA:"):
             if source_path is None:
