@@ -50,6 +50,7 @@ mod manifest_sql;
 mod membership_sql;
 mod mention_sql;
 mod migration;
+mod migration_validation;
 mod model_run_sql;
 mod naming;
 mod project_sql;
@@ -160,7 +161,7 @@ pub use mention_sql::insert_event_mention_sql;
 /// Embedded and ad-hoc migration catalogs.
 pub use migration::MigrationCatalog;
 /// Validate migration SQL against TEPP contracts.
-pub use migration::validate_migration_catalog;
+pub use migration_validation::validate_migration_catalog;
 /// Append-only corpus split manifest row.
 pub use model_run_sql::CorpusSplitManifestRecord;
 /// Append-only model artifact row.
