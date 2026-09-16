@@ -1,1 +1,0 @@
-Fixed protected-main commercial-development contract drift introduced by #490: the TEPP entrypoint is now documented and tested as dispatch-only under the organization-level coordinator, while retaining fail-closed queue, credential, and publication boundaries.
