@@ -353,21 +353,22 @@ def _is_structural_comma_continuation(
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
-    """Return whether a source line is only a continuation of a string literal.
+    """Return whether a source line is only a continuation of a string or comment.
 
-    LLVM assigns one line location to a multi-line SQL or JSON literal, while
-    LCOV can still emit zero-count records for its continuation lines. Those
-    bytes are data, not independently executable Rust statements. Rust comments,
-    character literals, and raw-string delimiters are ignored while finding the
-    literal so embedded quote characters cannot hide later production lines.
+    LLVM can emit zero-count rows for multi-line string and block-comment
+    continuations. The target remains trivia only when a block comment occupies
+    the whole target line; executable source after a closing ``*/`` keeps that
+    line in the authored denominator.
     """
 
     in_string = False
     block_comment_depth = 0
     raw_hashes: int | None = None
     for index, line in enumerate(lines, start=1):
-        if index == line_number and (in_string or block_comment_depth > 0):
+        target_started_in_block_comment = index == line_number and block_comment_depth > 0
+        if index == line_number and in_string:
             return True
+        target_has_code_after_comment = False
         stripped = line.strip()
         started_literal = False
         escaped = False
@@ -409,6 +410,8 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 continue
             if line.startswith("//", position):
                 break
+            if target_started_in_block_comment and not line[position].isspace():
+                target_has_code_after_comment = True
             if line[position] == "'":
                 char_start = position
                 position += 1
@@ -447,6 +450,8 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 started_literal = True
             position += 1
         if index == line_number:
+            if target_started_in_block_comment and not target_has_code_after_comment:
+                return True
             if block_comment_depth > 0 or stripped.startswith("/*") and stripped.endswith("*/"):
                 return True
             return in_string and started_literal and stripped.startswith(
@@ -830,7 +835,7 @@ def opens_a_block(source_path: str, line_number: int, repository_root: Path | No
 def _first_meaningful_source_line_after(
     source_path: str, line_number: int, repository_root: Path | None
 ) -> int | None:
-    """Return the first later line that is not blank or a line-only comment."""
+    """Return the first later line that is not non-authored lexical trivia."""
 
     try:
         path = (
@@ -844,6 +849,8 @@ def _first_meaningful_source_line_after(
     for candidate_number in range(line_number + 1, len(lines) + 1):
         stripped = lines[candidate_number - 1].strip()
         if not stripped or stripped.startswith("//"):
+            continue
+        if _line_in_multiline_string(lines, candidate_number):
             continue
         return candidate_number
     return None
