@@ -23,6 +23,18 @@ fn quoted_created_object_cannot_bypass_the_naming_contract() {
 }
 
 #[test]
+fn quoted_identifier_with_escaped_quote_cannot_truncate_to_a_valid_prefix() {
+    let catalog = conforming_catalog(
+        "CREATE INDEX \"good_index\"\"suffix\" ON tenant_record (tenant_record_id);",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::SingleWordObjectName)
+    );
+}
+
+#[test]
 fn quoted_column_cannot_bypass_the_naming_contract() {
     let catalog = MigrationCatalog::from_sql(
         "CREATE TABLE tenant_record (\n\
