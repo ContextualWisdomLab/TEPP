@@ -83,6 +83,25 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
         self.assertEqual((loaded["count"], loaded["covered"]), (2, 2))
 
+    def test_block_comment_only_gap_preserves_nested_execution_proof(self) -> None:
+        """Block-comment-only trivia cannot break proof from the first authored body."""
+
+        source = self.root / "block_comment_gap.rs"
+        source.write_text(
+            "fn validate(ready: bool) {\n"
+            "    if ready {\n"
+            "        /* audit note\n"
+            "           continued */\n"
+            "        println!(\"accepted\");\n"
+            "    }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        report = self.root / "block_comment_gap.lcov"
+        report.write_text(lcov(source, [(2, 0), (5, 4)]), encoding="utf-8")
+        loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+        self.assertEqual((loaded["count"], loaded["covered"]), (2, 2))
+
     def test_reconciliation_does_not_cross_a_closed_block(self) -> None:
         """A later sibling statement cannot prove an empty opener executed."""
 
@@ -99,6 +118,26 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         report.write_text(lcov(source, [(2, 0), (4, 4)]), encoding="utf-8")
         loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
         self.assertEqual((loaded["count"], loaded["covered"]), (2, 1))
+
+    def test_multiline_block_comment_closer_with_code_stays_authored(self) -> None:
+        """Code after a block-comment closer is executable, not comment continuation."""
+
+        source = self.root / "comment_closer_code.rs"
+        source.write_text(
+            "fn validate() {\n"
+            "    /* audit note\n"
+            "    */ do_work();\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        self.assertTrue(
+            coverage_contract.is_executable_source_line(str(source), 3, self.root)
+        )
+
+        report = self.root / "comment_closer_code.lcov"
+        report.write_text(lcov(source, [(3, 0)]), encoding="utf-8")
+        loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+        self.assertEqual((loaded["count"], loaded["covered"]), (1, 0))
 
     def test_rust_line_comment_scanner_preserves_literal_comment_markers(self) -> None:
         """Only a lexical Rust line comment is removed from an opener probe."""
@@ -150,7 +189,7 @@ class BlockOpenerProbeTests(unittest.TestCase):
                 coverage_contract.opens_a_block(str(missing), 1, Path(temporary))
             )
             self.assertIsNone(
-                coverage_contract._first_meaningful_source_line_after(
+                coverage_contract._first_meaning_source_line_after(
                     str(missing), 1, Path(temporary)
                 )
             )
