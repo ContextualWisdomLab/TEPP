@@ -79,7 +79,9 @@ fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
             b'"' => {
                 let (next, identifier) = scan_quoted_identifier(bytes, index)?;
                 normalized.push(b' ');
-                if quoted_identifier_is_structurally_safe(&identifier) {
+                if quoted_identifier_is_structurally_safe(&identifier)
+                    && !quoted_identifier_collides_with_table_syntax(&identifier)
+                {
                     normalized.extend_from_slice(&identifier);
                 } else {
                     normalized.extend_from_slice(INVALID_QUOTED_IDENTIFIER);
@@ -465,6 +467,21 @@ fn quoted_identifier_is_structurally_safe(identifier: &[u8]) -> bool {
         && identifier
             .iter()
             .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+}
+
+fn quoted_identifier_collides_with_table_syntax(identifier: &[u8]) -> bool {
+    const TABLE_CONSTRAINT_KEYWORDS: [&[u8]; 7] = [
+        b"constraint",
+        b"primary",
+        b"foreign",
+        b"unique",
+        b"check",
+        b"exclude",
+        b"like",
+    ];
+    TABLE_CONSTRAINT_KEYWORDS
+        .iter()
+        .any(|keyword| identifier.eq_ignore_ascii_case(keyword))
 }
 
 #[cfg(test)]
