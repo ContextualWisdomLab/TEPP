@@ -1,4 +1,4 @@
-use evidence_core::{EvidenceError, SourceArtifact, SourceAvailability, SourceObservation, SourceSnapshotReceiptV1};
+use evidence_core::{SourceArtifact, SourceAvailability, SourceObservation, SourceSnapshotReceiptV1};
 
 fn source_availability() -> SourceAvailability {
     let artifact = SourceArtifact::from_bytes(b"canonical snapshot").expect("artifact must be valid");
@@ -7,15 +7,13 @@ fn source_availability() -> SourceAvailability {
 }
 
 #[test]
-fn bare_mutable_locator_prefixes_fail_closed() {
+fn bare_locator_prefixes_without_numeric_targets_remain_literal_snapshot_ids() {
     let availability = source_availability();
 
-    for alias in ["pr-", "pull-", "issue-"] {
-        assert_eq!(
-            SourceSnapshotReceiptV1::from_source_availability(alias, &availability),
-            Err(EvidenceError::InvalidWirePayload),
-            "bare mutable locator prefix must not become an immutable snapshot identity: {alias}"
-        );
+    for snapshot_id in ["pr-", "pull-", "issue-"] {
+        let receipt = SourceSnapshotReceiptV1::from_source_availability(snapshot_id, &availability)
+            .expect("prefix without a numeric locator target is a literal immutable identifier");
+        assert_eq!(receipt.snapshot_id(), snapshot_id);
     }
 }
 
