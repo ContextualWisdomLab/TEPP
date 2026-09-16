@@ -281,7 +281,7 @@ fn validate_tenant_rls_contract(
     if !lower.contains("tepp_app_runtime") {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     }
-    if !lower.contains("tepp.current_tenant_record_id") {
+    if !lower.contains("'tepp.current_tenant_record_id'") {
         return Err(MigrationContractError::MissingTenantSessionGuc);
     }
 
@@ -317,7 +317,6 @@ fn table_has_rls_enabled(lower_sql: &str, table: &str) -> bool {
 }
 
 fn table_has_tenant_policy(lower_sql: &str, table: &str) -> bool {
-    let on_table = format!(" on {table}");
     let mut search_from = 0usize;
     while let Some(rel) = lower_sql[search_from..].find("create policy") {
         let abs = search_from + rel;
@@ -326,10 +325,45 @@ fn table_has_tenant_policy(lower_sql: &str, table: &str) -> bool {
             .find("create policy")
             .map_or(after_policy.len(), |idx| 13 + idx);
         let window = &after_policy[..window_end];
-        if window.contains(&on_table) && window.contains("tenant_record_id") {
+        if policy_targets_table(window, table)
+            && contains_unquoted_identifier(window, "tenant_record_id")
+        {
             return true;
         }
         search_from = abs + "create policy".len();
+    }
+    false
+}
+
+fn policy_targets_table(policy_sql: &str, table: &str) -> bool {
+    let needle = format!(" on {table}");
+    let mut search_from = 0usize;
+    while let Some(rel) = policy_sql[search_from..].find(&needle) {
+        let end = search_from + rel + needle.len();
+        if !identifier_continues_after(policy_sql, end) {
+            return true;
+        }
+        search_from = end;
+    }
+    false
+}
+
+fn contains_unquoted_identifier(sql: &str, identifier: &str) -> bool {
+    let mut search_from = 0usize;
+    while let Some(rel) = sql[search_from..].find(identifier) {
+        let start = search_from + rel;
+        let end = start + identifier.len();
+        let inside_atomic_literal = sql[..start]
+            .bytes()
+            .filter(|byte| *byte == b'\'')
+            .count()
+            % 2
+            == 1;
+        if !inside_atomic_literal && is_word_start(sql, start) && !identifier_continues_after(sql, end)
+        {
+            return true;
+        }
+        search_from = end;
     }
     false
 }
