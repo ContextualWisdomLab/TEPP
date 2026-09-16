@@ -487,16 +487,36 @@ fn parse_column_names(body: &str) -> BTreeSet<String> {
     names
 }
 
+fn identifier_continues_after(sql: &str, end: usize) -> bool {
+    sql[end..]
+        .chars()
+        .next()
+        .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+fn find_table_declaration_end(lower_sql: &str, needle: &str) -> Option<usize> {
+    let mut search_from = 0usize;
+    while let Some(rel) = lower_sql[search_from..].find(needle) {
+        let start = search_from + rel;
+        let end = start + needle.len();
+        if !identifier_continues_after(lower_sql, end) {
+            return Some(end);
+        }
+        search_from = end;
+    }
+    None
+}
+
 fn table_body<'a>(sql: &'a str, table: &str) -> Option<&'a str> {
     let lower = sql.to_ascii_lowercase();
     let needles = [
         format!("create table if not exists {table}"),
         format!("create table {table}"),
     ];
-    let start = needles
+    let declaration_end = needles
         .iter()
-        .find_map(|needle| lower.find(needle).map(|idx| (idx, needle.len())))?;
-    let after = &sql[start.0 + start.1..];
+        .find_map(|needle| find_table_declaration_end(&lower, needle))?;
+    let after = &sql[declaration_end..];
     let open = after.find('(')?;
     let mut depth = 0i32;
     for (idx, ch) in after[open..].char_indices() {
