@@ -24,6 +24,16 @@ fn concurrently_modifier_does_not_hide_a_valid_index_name() {
 }
 
 #[test]
+fn concurrently_modifier_is_recognized_after_statement_delimiter_without_whitespace() {
+    let catalog = MigrationCatalog::from_sql(
+        "CREATE TABLE tenant_record (tenant_record_id uuid PRIMARY KEY, system_time timestamptz NOT NULL);CREATE INDEX CONCURRENTLY tenant_record_lookup_index ON tenant_record (tenant_record_id);",
+        "DROP TABLE tenant_record;",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
+
+#[test]
 fn concurrently_modifier_cannot_hide_an_invalid_index_name() {
     for statement in [
         "CREATE INDEX CONCURRENTLY Bad ON tenant_record (tenant_record_id);",
