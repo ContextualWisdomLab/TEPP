@@ -52,6 +52,34 @@ fn quoted_column_cannot_bypass_the_naming_contract() {
 }
 
 #[test]
+fn quoted_column_named_like_a_table_constraint_keyword_is_still_an_identifier() {
+    for keyword in [
+        "constraint",
+        "primary",
+        "foreign",
+        "unique",
+        "check",
+        "exclude",
+        "like",
+    ] {
+        let up_sql = format!(
+            "CREATE TABLE tenant_record (\n\
+                 tenant_record_id uuid PRIMARY KEY,\n\
+                 system_time timestamptz NOT NULL,\n\
+                 \"{keyword}\" uuid\n\
+             );"
+        );
+        let catalog = MigrationCatalog::from_sql(&up_sql, "DROP TABLE tenant_record;");
+
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::SingleWordObjectName),
+            "quoted identifier {keyword} was reinterpreted as table syntax"
+        );
+    }
+}
+
+#[test]
 fn declaration_shaped_text_inside_sql_trivia_is_not_an_object() {
     let catalog = conforming_catalog(
         "-- CREATE INDEX Bad ON tenant_record (tenant_record_id);\n\
