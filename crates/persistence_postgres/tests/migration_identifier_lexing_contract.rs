@@ -95,3 +95,18 @@ fn replaceable_view_names_are_covered_by_the_object_naming_contract() {
         Err(MigrationContractError::SingleWordObjectName)
     );
 }
+
+#[test]
+fn qualified_created_object_cannot_hide_an_invalid_object_segment() {
+    for statement in [
+        "CREATE VIEW audit_schema.Bad AS SELECT tenant_record_id FROM tenant_record;",
+        "CREATE VIEW \"audit_schema\".\"Bad\" AS SELECT tenant_record_id FROM tenant_record;",
+    ] {
+        let catalog = conforming_catalog(statement);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::SingleWordObjectName),
+            "{statement}"
+        );
+    }
+}
