@@ -1,32 +1,6 @@
-//! Lexical normalization boundary for migration contract validation.
+//! PostgreSQL lexical normalization for migration contract parsing.
 
-use crate::migration::{MigrationCatalog, validate_migration_catalog as validate_normalized_catalog};
-use crate::MigrationContractError;
-
-/// Validate migration SQL after removing PostgreSQL lexical trivia from the
-/// structural view consumed by the migration contract parser.
-///
-/// Quoted identifiers are exposed with their declared spelling, while comments,
-/// quoted SQL bodies, and non-atomic string literals cannot introduce synthetic
-/// `CREATE` or `CONSTRAINT` declarations. Atomic literal values are retained so
-/// contracts such as `tepp.current_tenant_record_id` remain observable.
-///
-/// # Errors
-///
-/// Returns [`MigrationContractError::EmptyMigrationSql`] when the forward SQL
-/// has an unterminated quoted string, identifier, block comment, or dollar-quoted
-/// body. Otherwise returns the same migration contract errors as the normalized
-/// parser.
-pub fn validate_migration_catalog(
-    catalog: &MigrationCatalog,
-) -> Result<(), MigrationContractError> {
-    let normalized_up = normalize_migration_sql(catalog.up_sql())
-        .ok_or(MigrationContractError::EmptyMigrationSql)?;
-    let normalized = MigrationCatalog::from_sql(&normalized_up, catalog.down_sql());
-    validate_normalized_catalog(&normalized)
-}
-
-fn normalize_migration_sql(sql: &str) -> Option<String> {
+pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     let bytes = sql.as_bytes();
     let mut normalized = Vec::with_capacity(bytes.len());
     let mut index = 0usize;
