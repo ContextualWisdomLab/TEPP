@@ -49,3 +49,13 @@ fn declaration_shaped_text_inside_sql_trivia_is_not_an_object() {
 
     assert_eq!(validate_migration_catalog(&catalog), Ok(()));
 }
+
+#[test]
+fn adjacent_atomic_literals_cannot_splice_a_create_keyword() {
+    let catalog = conforming_catalog(
+        "SELECT 'CREATE'\n\
+                'INDEX' AS literal_text;",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
