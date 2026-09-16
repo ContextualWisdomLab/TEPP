@@ -262,7 +262,7 @@ fn quoted_identifier_is_structurally_safe(identifier: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::normalize_migration_sql;
+    use super::{INVALID_QUALIFIED_IDENTIFIER, normalize_migration_sql};
 
     #[test]
     fn lexical_normalization_masks_declaration_shaped_trivia() {
