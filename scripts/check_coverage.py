@@ -223,6 +223,21 @@ def is_executable_source_line(
     if _line_in_multiline_string(lines, line_number):
         return False
     text = lines[line_number - 1].strip()
+    if "*/" in text:
+        suffix = text.rsplit("*/", 1)[1].strip()
+        if suffix in {
+            "{",
+            "}",
+            "(",
+            ")",
+            "},",
+            ");",
+            "];",
+            "();",
+            "};",
+            "});",
+        }:
+            text = suffix
     if not text:
         return False
     if text.startswith("//"):
