@@ -110,3 +110,13 @@ fn qualified_created_object_cannot_hide_an_invalid_object_segment() {
         );
     }
 }
+
+#[test]
+fn created_role_names_are_covered_by_the_object_naming_contract() {
+    let catalog = conforming_catalog("CREATE ROLE Bad NOSUPERUSER NOBYPASSRLS;");
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::SingleWordObjectName)
+    );
+}
