@@ -128,6 +128,15 @@ fn created_role_aliases_are_covered_by_the_object_naming_contract() {
 }
 
 #[test]
+fn create_user_mapping_is_not_a_role_alias() {
+    let catalog = conforming_catalog(
+        "CREATE USER MAPPING FOR CURRENT_USER SERVER foreign_server;",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
+
+#[test]
 fn runtime_role_reference_does_not_substitute_for_role_declaration() {
     let catalog = MigrationCatalog::from_sql(
         r"
