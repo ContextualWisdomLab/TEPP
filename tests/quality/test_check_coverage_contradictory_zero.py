@@ -189,7 +189,7 @@ class BlockOpenerProbeTests(unittest.TestCase):
                 coverage_contract.opens_a_block(str(missing), 1, Path(temporary))
             )
             self.assertIsNone(
-                coverage_contract._first_meaning_source_line_after(
+                coverage_contract._first_meaningful_source_line_after(
                     str(missing), 1, Path(temporary)
                 )
             )
