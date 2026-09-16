@@ -507,6 +507,15 @@ fn find_table_declaration_end(lower_sql: &str, needle: &str) -> Option<usize> {
     None
 }
 
+fn starts_with_keyword(sql: &str, keyword: &str) -> bool {
+    sql.get(..keyword.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(keyword))
+        && sql[keyword.len()..]
+            .chars()
+            .next()
+            .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_')
+}
+
 fn table_body<'a>(sql: &'a str, table: &str) -> Option<&'a str> {
     let lower = sql.to_ascii_lowercase();
     let needles = [
@@ -516,18 +525,24 @@ fn table_body<'a>(sql: &'a str, table: &str) -> Option<&'a str> {
     let declaration_end = needles
         .iter()
         .find_map(|needle| find_table_declaration_end(&lower, needle))?;
-    let after = &sql[declaration_end..];
-    let open = after.find('(')?;
+    let after = sql[declaration_end..].trim_start();
+    if !after.starts_with('(') {
+        // `CREATE TABLE ... AS query` has no explicit column body. Represent it
+        // as an empty local body so temporal/tenant contracts fail closed,
+        // rather than borrowing a parenthesis from a later SQL statement.
+        return starts_with_keyword(after, "AS").then_some("");
+    }
     let mut depth = 0i32;
-    for (idx, ch) in after[open..].char_indices() {
+    for (idx, ch) in after.char_indices() {
         match ch {
             '(' => depth += 1,
             ')' => {
                 depth -= 1;
                 if depth == 0 {
-                    return Some(&after[open..=open + idx]);
+                    return Some(&after[..=idx]);
                 }
             }
+            ';' => return None,
             _ => {}
         }
     }
