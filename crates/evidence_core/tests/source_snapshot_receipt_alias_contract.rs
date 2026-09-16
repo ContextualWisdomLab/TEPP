@@ -1,7 +1,8 @@
 use evidence_core::{SourceArtifact, SourceAvailability, SourceObservation, SourceSnapshotReceiptV1};
 
 fn source_availability() -> SourceAvailability {
-    let artifact = SourceArtifact::from_bytes(b"canonical snapshot").expect("artifact must be valid");
+    let artifact =
+        SourceArtifact::from_bytes(b"canonical snapshot").expect("artifact must be valid");
     let observation = SourceObservation::observe(&artifact).expect("observation must be valid");
     SourceAvailability::make_available(&observation).expect("availability must be valid")
 }
