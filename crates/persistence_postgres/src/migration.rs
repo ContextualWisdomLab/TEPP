@@ -132,6 +132,77 @@ fn policy_binds_tenant_identifier(policy_sql: &str) -> bool {
     false
 }
 
+fn direct_tenant_operand(side: &str) -> bool {
+    let compact = side
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let trimmed = compact.trim_matches(|ch: char| matches!(ch, '(' | ')'));
+    matches!(trimmed, "tenant_record_id" | "tenant_record_id::text")
+}
+
+fn previous_predicate_boundary(lower_sql: &str, end: usize) -> usize {
+    const BOUNDARIES: [&str; 4] = [" and ", " or ", " using ", " with check "];
+    BOUNDARIES
+        .iter()
+        .filter_map(|boundary| {
+            lower_sql[..end]
+                .rfind(boundary)
+                .map(|index| index + boundary.len())
+        })
+        .max()
+        .unwrap_or(0)
+}
+
+fn next_predicate_boundary(lower_sql: &str, start: usize) -> usize {
+    const BOUNDARIES: [&str; 3] = [" and ", " or ", " with check "];
+    BOUNDARIES
+        .iter()
+        .filter_map(|boundary| {
+            lower_sql[start..]
+                .find(boundary)
+                .map(|index| start + index)
+        })
+        .min()
+        .unwrap_or(lower_sql.len())
+}
+
+/// Require the tenant column and tenant session key to participate in the same
+/// equality comparison. Co-presence in unrelated boolean terms is not tenant
+/// isolation evidence. This bounded recognizer intentionally accepts only the
+/// direct tenant identifier (optionally cast to text) on one side; the other
+/// side may wrap the exact `current_setting(...)` call, as the shipped migration
+/// does with `nullif`.
+fn policy_binds_tenant_session_equality(policy_sql: &str) -> bool {
+    let lower = policy_sql.to_ascii_lowercase();
+    let bytes = policy_sql.as_bytes();
+
+    for equality in 0..bytes.len() {
+        if bytes[equality] != b'=' {
+            continue;
+        }
+        let previous = equality.checked_sub(1).and_then(|index| bytes.get(index));
+        let next = bytes.get(equality + 1);
+        if previous.is_some_and(|byte| matches!(*byte, b'<' | b'>' | b'!' | b'='))
+            || next.is_some_and(|byte| matches!(*byte, b'<' | b'>' | b'='))
+        {
+            continue;
+        }
+
+        let left_start = previous_predicate_boundary(&lower, equality);
+        let right_end = next_predicate_boundary(&lower, equality + 1);
+        let left = &policy_sql[left_start..equality];
+        let right = &policy_sql[equality + 1..right_end];
+        if (direct_tenant_operand(left) && declares_tenant_session_guc(right))
+            || (declares_tenant_session_guc(left) && direct_tenant_operand(right))
+        {
+            return true;
+        }
+    }
+    false
+}
+
 /// Return whether the normalized policy header explicitly declares
 /// PostgreSQL's restrictive policy composition mode. Only the grammar slot
 /// immediately after `ON table_name` counts; `AS restrictive` inside a policy
@@ -157,9 +228,10 @@ fn policy_is_restrictive(policy_sql: &str) -> bool {
 
 /// Bind tenant identity and tenant-session evidence to every policy that can
 /// independently admit rows. PostgreSQL permissive policies are OR-composed,
-/// so a permissive policy must carry both witnesses inside its own structural
-/// statement. Restrictive policies are AND-composed and may add narrower
-/// conditions without duplicating the tenant predicate.
+/// so a permissive policy must carry the exact tenant identifier, the tenant
+/// session witness, and a direct equality binding between them inside its own
+/// structural statement. Restrictive policies are AND-composed and may add
+/// narrower conditions without duplicating the tenant predicate.
 fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
     const CREATE_POLICY: &str = "create policy";
 
@@ -174,7 +246,8 @@ fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
         let statement = &statement_tail[..statement_end];
         if !policy_is_restrictive(statement)
             && (!declares_tenant_session_guc(statement)
-                || !policy_binds_tenant_identifier(statement))
+                || !policy_binds_tenant_identifier(statement)
+                || !policy_binds_tenant_session_equality(statement))
         {
             return false;
         }
@@ -249,7 +322,8 @@ fn canonicalize_concurrent_index_modifier(sql: &str) -> String {
 mod tests {
     use super::{
         canonicalize_concurrent_index_modifier, declares_tenant_session_guc,
-        policy_binds_tenant_identifier, policy_is_restrictive, tenant_policies_bind_session_guc,
+        policy_binds_tenant_identifier, policy_binds_tenant_session_equality,
+        policy_is_restrictive, tenant_policies_bind_session_guc,
     };
 
     #[test]
@@ -291,6 +365,22 @@ mod tests {
     }
 
     #[test]
+    fn tenant_session_witness_must_be_relationally_bound() {
+        assert!(policy_binds_tenant_session_equality(
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = nullif ( current_setting ( 'tepp.current_tenant_record_id' , true ) , ))"
+        ));
+        assert!(policy_binds_tenant_session_equality(
+            "create policy document_record_tenant_isolation on document_record using (current_setting ( 'tepp.current_tenant_record_id' , true ) = tenant_record_id::text)"
+        ));
+        assert!(!policy_binds_tenant_session_equality(
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id is not null and current_setting ( 'tepp.current_tenant_record_id' , true ) is not null)"
+        ));
+        assert!(!policy_binds_tenant_session_equality(
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = document_record_id::text and current_setting ( 'tepp.current_tenant_record_id' , true ) is not null)"
+        ));
+    }
+
+    #[test]
     fn tenant_guc_is_required_for_permissive_but_not_restrictive_policies() {
         assert!(tenant_policies_bind_session_guc(
             "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true ));"
@@ -300,6 +390,9 @@ mod tests {
         ));
         assert!(!tenant_policies_bind_session_guc(
             "create policy document_record_tenant_isolation on document_record using (document_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); select tenant_record_id from document_record;"
+        ));
+        assert!(!tenant_policies_bind_session_guc(
+            "create policy document_record_tenant_isolation on document_record using (tenant_record_id is not null and current_setting ( 'tepp.current_tenant_record_id' , true ) is not null);"
         ));
         assert!(tenant_policies_bind_session_guc(
             "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_visibility_guard on document_record as restrictive for select using (document_record_id is not null);"
