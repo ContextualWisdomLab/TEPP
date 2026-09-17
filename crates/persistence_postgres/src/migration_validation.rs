@@ -5,12 +5,22 @@ use std::collections::BTreeMap;
 const INVALID_QUOTED_IDENTIFIER: &[u8] = b"INVALID_QUOTED_IDENTIFIER";
 const INVALID_QUALIFIED_IDENTIFIER: &str = "INVALID_QUALIFIED_IDENTIFIER";
 
+/// Final security-relevant attributes tracked for one PostgreSQL role.
+///
+/// The migration contract does not model the full PostgreSQL role catalog; it
+/// keeps only attributes that can bypass TEPP tenant row-level security.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct RoleSecurityState {
     is_superuser: bool,
     bypasses_rls: bool,
 }
 
+/// Normalize migration SQL for bounded structural contract parsing.
+///
+/// The lexical pass removes declaration-shaped trivia while preserving the few
+/// atomic literals required by downstream contracts. The structural pass then
+/// canonicalizes PostgreSQL aliases without pretending to be a full SQL parser.
+/// Returns `None` when any lexical region is malformed or unterminated.
 pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     let normalized = lexically_normalize_migration_sql(sql)?;
     Some(canonicalize_structural_keywords(&normalized))
@@ -85,11 +95,21 @@ pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bo
     )
 }
 
+/// Detect whether normalized migration SQL declares an RLS surface.
+///
+/// Either table enablement or policy creation activates downstream tenant RLS
+/// validation so partially declared isolation cannot remain outside the gate.
 pub(super) fn declares_row_level_security(normalized_sql: &str) -> bool {
     let lower = normalized_sql.to_ascii_lowercase();
     lower.contains("enable row level security") || lower.contains("create policy")
 }
 
+/// Mask quoted/comment bodies and preserve contract-relevant lexical atoms.
+///
+/// This pass maintains byte positions only insofar as needed for scanning; it
+/// intentionally inserts spaces around removed trivia so adjacent SQL tokens
+/// cannot become a synthetic declaration. Any unterminated lexical construct
+/// fails closed by returning `None`.
 fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
     let bytes = sql.as_bytes();
     let mut normalized = Vec::with_capacity(bytes.len());
@@ -168,6 +188,10 @@ fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
     String::from_utf8(normalized).ok()
 }
 
+/// Return whether `tokens[create_index..]` starts PostgreSQL CREATE ROLE/USER/GROUP.
+///
+/// `CREATE USER MAPPING` is deliberately excluded because it is an SQL/MED
+/// object rather than a role alias and must not enter role lifecycle evidence.
 fn is_role_creation_alias(tokens: &[&str], create_index: usize) -> bool {
     if !tokens
         .get(create_index)
@@ -190,6 +214,10 @@ fn is_role_creation_alias(tokens: &[&str], create_index: usize) -> bool {
         || kind.eq_ignore_ascii_case("GROUP")
 }
 
+/// Return whether `tokens[drop_index..]` starts PostgreSQL DROP ROLE/USER/GROUP.
+///
+/// `DROP USER MAPPING` remains outside the role lifecycle for the same SQL/MED
+/// ownership reason as its CREATE counterpart.
 fn is_role_drop_alias(tokens: &[&str], drop_index: usize) -> bool {
     if !tokens
         .get(drop_index)
@@ -212,6 +240,11 @@ fn is_role_drop_alias(tokens: &[&str], drop_index: usize) -> bool {
         || kind.eq_ignore_ascii_case("GROUP")
 }
 
+/// Return whether an ALTER ROLE/USER/GROUP statement has a complete RENAME TO shape.
+///
+/// A complete target is required because rename changes the durable role name;
+/// malformed rename syntax must not be reinterpreted as a generic attribute
+/// change or leave stale role evidence alive.
 fn is_role_rename_alias(tokens: &[&str], alter_index: usize) -> bool {
     if !tokens
         .get(alter_index)
@@ -241,6 +274,10 @@ fn is_role_rename_alias(tokens: &[&str], alter_index: usize) -> bool {
         && tokens.get(alter_index + 5).is_some()
 }
 
+/// Return whether `tokens[alter_index..]` starts a role-alias ALTER statement.
+///
+/// `ALTER USER MAPPING` is excluded so SQL/MED options cannot be interpreted as
+/// security attributes on `tepp_app_runtime`.
 fn is_role_alter_alias(tokens: &[&str], alter_index: usize) -> bool {
     if !tokens
         .get(alter_index)
@@ -263,6 +300,7 @@ fn is_role_alter_alias(tokens: &[&str], alter_index: usize) -> bool {
         || kind.eq_ignore_ascii_case("GROUP")
 }
 
+/// Return the exclusive token index of the current semicolon-delimited statement.
 fn statement_end(tokens: &[&str], start: usize) -> usize {
     tokens[start..]
         .iter()
@@ -270,6 +308,10 @@ fn statement_end(tokens: &[&str], start: usize) -> usize {
         .map_or(tokens.len(), |relative| start + relative)
 }
 
+/// Apply the security attributes that determine whether PostgreSQL RLS can be bypassed.
+///
+/// Later contradictory attributes intentionally win because PostgreSQL ALTER
+/// statements mutate role state in order; this helper models that final state.
 fn apply_role_security_attributes(tokens: &[&str], state: &mut RoleSecurityState) {
     for token in tokens {
         if token.eq_ignore_ascii_case("SUPERUSER") {
@@ -284,6 +326,11 @@ fn apply_role_security_attributes(tokens: &[&str], state: &mut RoleSecurityState
     }
 }
 
+/// Extract the bounded unquoted role identifier from one lifecycle token.
+///
+/// The lifecycle tokenizer has already separated commas and semicolons; this
+/// helper therefore accepts only the existing ASCII identifier subset instead
+/// of silently extending the role grammar beyond the validator's contract.
 fn role_identifier(fragment: &str) -> String {
     fragment
         .trim_start_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
@@ -292,6 +339,7 @@ fn role_identifier(fragment: &str) -> String {
         .collect()
 }
 
+/// Extract and case-fold a role identifier for PostgreSQL lifecycle comparison.
 fn normalized_role_identifier(fragment: &str) -> String {
     role_identifier(fragment).to_ascii_lowercase()
 }
@@ -345,6 +393,12 @@ fn drop_statement_role_names(tokens: &[&str], drop_index: usize) -> Option<Vec<S
     }
 }
 
+/// Canonicalize syntax variants that the structural migration parser owns as one concept.
+///
+/// Role aliases are projected through the existing one-name scanner; materialized
+/// and replaceable views are collapsed to `CREATE VIEW`; and schema-qualified
+/// created names are replaced with an invalid sentinel so downstream parsing
+/// fails closed instead of truncating to a locally valid prefix.
 fn canonicalize_structural_keywords(sql: &str) -> String {
     let tokens = sql.split_whitespace().collect::<Vec<_>>();
     let mut canonical = Vec::with_capacity(tokens.len());
@@ -449,6 +503,10 @@ fn canonicalize_structural_keywords(sql: &str) -> String {
     guarded.join(" ")
 }
 
+/// Scan a standard PostgreSQL single-quoted literal, honoring doubled quotes.
+///
+/// Returns the index immediately after the closing quote plus the raw literal
+/// payload. Unterminated literals return `None` and fail the outer lexical pass.
 fn scan_single_quoted_literal(bytes: &[u8], start: usize) -> Option<(usize, &[u8])> {
     let mut index = start + 1;
     let content_start = index;
@@ -465,6 +523,10 @@ fn scan_single_quoted_literal(bytes: &[u8], start: usize) -> Option<(usize, &[u8
     None
 }
 
+/// Scan a PostgreSQL `E'...'` literal with backslash and doubled-quote escapes.
+///
+/// `start` points at the opening quote rather than the preceding `E`. A trailing
+/// escape or missing close quote is treated as malformed SQL and returns `None`.
 fn scan_escape_quoted_literal(bytes: &[u8], start: usize) -> Option<(usize, &[u8])> {
     let mut index = start + 1;
     let content_start = index;
@@ -488,6 +550,10 @@ fn scan_escape_quoted_literal(bytes: &[u8], start: usize) -> Option<(usize, &[u8
     None
 }
 
+/// Scan a PostgreSQL double-quoted identifier and unescape doubled quotes.
+///
+/// The returned bytes retain declared spelling for later naming checks. Missing
+/// closing quotes return `None` rather than donating partial identifier evidence.
 fn scan_quoted_identifier(bytes: &[u8], start: usize) -> Option<(usize, Vec<u8>)> {
     let mut index = start + 1;
     let mut identifier = Vec::new();
@@ -506,6 +572,10 @@ fn scan_quoted_identifier(bytes: &[u8], start: usize) -> Option<(usize, Vec<u8>)
     None
 }
 
+/// Scan a possibly nested PostgreSQL block comment.
+///
+/// PostgreSQL permits nested `/* ... */` comments, so depth is tracked until the
+/// matching outer terminator. An unterminated comment returns `None`.
 fn scan_block_comment(bytes: &[u8], start: usize) -> Option<usize> {
     let mut depth = 1usize;
     let mut index = start + 2;
@@ -526,6 +596,12 @@ fn scan_block_comment(bytes: &[u8], start: usize) -> Option<usize> {
     None
 }
 
+/// Return the PostgreSQL dollar-quote delimiter beginning at `start`, if any.
+///
+/// A `$...$` sequence attached to a preceding unquoted identifier is not a
+/// delimiter. Tags follow PostgreSQL's scanner-level ASCII/high-bit byte rules,
+/// which keeps UTF-8 tag bytes valid while positional parameters such as `$1`
+/// remain ordinary SQL text.
 fn dollar_quote_delimiter(bytes: &[u8], start: usize) -> Option<&[u8]> {
     if bytes.get(start) != Some(&b'$') {
         return None;
@@ -558,6 +634,10 @@ fn dollar_quote_delimiter(bytes: &[u8], start: usize) -> Option<&[u8]> {
     None
 }
 
+/// Scan to the closing delimiter of a PostgreSQL dollar-quoted body.
+///
+/// The body is opaque to migration contract parsing. Missing closing delimiters
+/// return `None` so declaration-shaped text cannot escape an unterminated body.
 fn scan_dollar_quoted_body(bytes: &[u8], start: usize, delimiter: &[u8]) -> Option<usize> {
     let mut index = start + delimiter.len();
     while index + delimiter.len() <= bytes.len() {
@@ -569,6 +649,10 @@ fn scan_dollar_quoted_body(bytes: &[u8], start: usize, delimiter: &[u8]) -> Opti
     None
 }
 
+/// Return whether a quoted literal is safe to preserve as a contract atom.
+///
+/// Only non-empty alphanumeric/underscore/dot payloads survive normalization;
+/// arbitrary literal SQL remains masked and cannot donate structural evidence.
 fn literal_is_atomic(literal: &[u8]) -> bool {
     !literal.is_empty()
         && literal
@@ -576,6 +660,10 @@ fn literal_is_atomic(literal: &[u8]) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'.'))
 }
 
+/// Return whether a quoted identifier can be represented by the bounded parser.
+///
+/// Unsupported punctuation is replaced by an invalid sentinel rather than
+/// normalized into a different durable PostgreSQL object name.
 fn quoted_identifier_is_structurally_safe(identifier: &[u8]) -> bool {
     !identifier.is_empty()
         && identifier
@@ -583,6 +671,11 @@ fn quoted_identifier_is_structurally_safe(identifier: &[u8]) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
 }
 
+/// Return whether a quoted identifier would collide with table-clause syntax.
+///
+/// Quoted spellings such as `"primary"` are valid identifiers in PostgreSQL but
+/// cannot safely enter the structural column parser because that parser uses the
+/// same words to identify table constraints. They therefore fail closed.
 fn quoted_identifier_collides_with_table_syntax(identifier: &[u8]) -> bool {
     const TABLE_CONSTRAINT_KEYWORDS: [&[u8]; 7] = [
         b"constraint",
