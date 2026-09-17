@@ -1,11 +1,12 @@
-//! PostgreSQL lexical normalization facade and role-identity guards.
+//! PostgreSQL lexical normalization facade and role-lifecycle identity guard.
 //!
 //! The implementation remains the single lexical/structural authority. This
-//! facade preserves bounded pieces of PostgreSQL grammar information that would
+//! facade preserves one piece of PostgreSQL grammar information that would
 //! otherwise be lost when identity-equivalent lowercase quoted identifiers are
-//! projected onto bare tokens. `CURRENT_ROLE`, `CURRENT_USER`, and
-//! `SESSION_USER` are special unquoted `role_specification` values, while the
-//! same lowercase spellings in double quotes are ordinary named roles.
+//! projected onto bare tokens: `CURRENT_ROLE`, `CURRENT_USER`, and
+//! `SESSION_USER` are special unquoted `role_specification` values for role
+//! attribute changes, while the same lowercase spellings in double quotes are
+//! ordinary named roles.
 
 #[path = "migration_validation_impl.rs"]
 mod implementation;
@@ -13,20 +14,6 @@ mod implementation;
 /// Normalize migration SQL for bounded structural contract parsing.
 pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     implementation::normalize_migration_sql(sql)
-}
-
-/// Normalize the dedicated runtime-membership grantor evidence projection.
-///
-/// The general structural projection deliberately treats identity-equivalent
-/// lowercase quoted identifiers like their unquoted names. `GRANTED BY` is one
-/// place where that is not equivalent: an unquoted `CURRENT_USER` is a
-/// PostgreSQL pseudo-target, while `"current_user"` names an ordinary role. This
-/// grantor-only projection reuses the shared lexer after making those quoted
-/// spellings case-distinct, so the existing quoted-name sentinel preserves the
-/// identity boundary without globally changing valid object-name parsing.
-pub(super) fn normalize_runtime_membership_grantor_sql(sql: &str) -> Option<String> {
-    let grantor_sql = preserve_quoted_special_role_specifications(sql);
-    implementation::normalize_migration_sql(&grantor_sql)
 }
 
 /// Return whether the expected runtime role exists in the final migration state
