@@ -30,11 +30,13 @@ pub fn validate_migration_catalog(
         .ok_or(MigrationContractError::EmptyMigrationSql)?;
     let normalized_down = normalize_catalog_sql(catalog.down_sql())
         .ok_or(MigrationContractError::EmptyMigrationSql)?;
-    let requires_runtime_role = validation::declares_row_level_security(&normalized_up);
-    if requires_runtime_role && !declares_tenant_session_guc(&normalized_up) {
+    let committed_up = core::project_committed_sql(&normalized_up)
+        .ok_or(MigrationContractError::MissingAppRuntimeRole)?;
+    let requires_runtime_role = validation::declares_row_level_security(&committed_up);
+    if requires_runtime_role && !declares_tenant_session_guc(&committed_up) {
         return Err(MigrationContractError::MissingTenantSessionGuc);
     }
-    if requires_runtime_role && !tenant_policies_bind_session_guc(&normalized_up) {
+    if requires_runtime_role && !tenant_policies_bind_session_guc(&committed_up) {
         return Err(MigrationContractError::MissingRlsPolicy);
     }
     let normalized = MigrationCatalog::from_sql(&normalized_up, &normalized_down);
@@ -716,7 +718,7 @@ fn normalize_catalog_sql(sql: &str) -> Option<String> {
 
 /// Remove PostgreSQL's `CONCURRENTLY` modifier from CREATE INDEX structural syntax.
 ///
-/// The lexical pass has already masked quoted/comment semicolons, so exposing
+/// The lexical pass has already masked quoted/commented semicolons, so exposing
 /// real statement delimiters as tokens is safe. Only the modifier is removed;
 /// `UNIQUE`, `IF NOT EXISTS`, and the declared index name retain their order for
 /// downstream naming and qualified-name checks.
