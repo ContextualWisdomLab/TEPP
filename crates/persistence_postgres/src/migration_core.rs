@@ -418,15 +418,31 @@ const TABLE_CONSTRAINT_KEYWORDS: [&str; 7] = [
     "like",
 ];
 
-/// Return whether `index` starts a keyword rather than continuing a word.
+/// Return whether `ch` can continue a PostgreSQL unquoted identifier.
+///
+/// PostgreSQL's scanner permits ASCII letters/digits, `_`, `$`, and high-bit
+/// bytes after the first identifier byte. A non-ASCII Rust `char` is encoded
+/// from high-bit UTF-8 bytes, so treating it as continuation preserves the
+/// durable token for TEPP's stricter naming authority instead of truncating a
+/// valid PostgreSQL identifier to a safe-looking ASCII prefix.
+fn is_postgresql_identifier_continuation(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_' || ch == '$' || !ch.is_ascii()
+}
+
+/// Return whether `index` starts a keyword rather than continuing an identifier.
 fn is_word_start(sql: &str, index: usize) -> bool {
     sql[..index]
         .chars()
         .next_back()
-        .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_')
+        .is_none_or(|ch| !is_postgresql_identifier_continuation(ch))
 }
 
-/// Return the identifier at the start of `rest`, skipping an existence clause.
+/// Return the full unquoted identifier at the start of `rest`, skipping an existence clause.
+///
+/// This deliberately preserves PostgreSQL-valid continuation bytes such as `$`
+/// and non-ASCII text. TEPP's naming contract is evaluated afterwards against
+/// the complete durable spelling; this parser must not sanitize a forbidden
+/// spelling by truncating it.
 fn leading_identifier(rest: &str) -> String {
     let rest = rest.trim_start();
     let lower = rest.to_ascii_lowercase();
@@ -436,7 +452,7 @@ fn leading_identifier(rest: &str) -> String {
         .map_or(rest, |stripped| &rest[rest.len() - stripped.len()..])
         .trim_start();
     rest.chars()
-        .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
+        .take_while(|ch| is_postgresql_identifier_continuation(*ch))
         .collect()
 }
 
@@ -583,11 +599,12 @@ fn parse_column_names(body: &str) -> BTreeSet<String> {
     names
 }
 
+/// Return whether the byte immediately after `end` continues the same PostgreSQL identifier.
 fn identifier_continues_after(sql: &str, end: usize) -> bool {
     sql[end..]
         .chars()
         .next()
-        .is_some_and(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+        .is_some_and(is_postgresql_identifier_continuation)
 }
 
 fn find_table_declaration_end(lower_sql: &str, needle: &str) -> Option<usize> {
@@ -603,13 +620,14 @@ fn find_table_declaration_end(lower_sql: &str, needle: &str) -> Option<usize> {
     None
 }
 
+/// Return whether `sql` begins with a complete keyword rather than an identifier prefix.
 fn starts_with_keyword(sql: &str, keyword: &str) -> bool {
     sql.get(..keyword.len())
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case(keyword))
         && sql[keyword.len()..]
             .chars()
             .next()
-            .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_')
+            .is_none_or(|ch| !is_postgresql_identifier_continuation(ch))
 }
 
 fn table_body<'a>(sql: &'a str, table: &str) -> Option<&'a str> {
