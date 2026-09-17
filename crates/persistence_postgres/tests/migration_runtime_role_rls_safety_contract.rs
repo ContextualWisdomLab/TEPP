@@ -103,10 +103,12 @@ fn quoted_lowercase_membership_grantee_keeps_postgresql_identity() {
 }
 
 #[test]
-fn quoted_grantee_clause_keywords_do_not_hide_runtime_membership() {
+fn quoted_membership_keywords_do_not_hide_runtime_set_paths() {
     for role_sql in [
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO \"with\", tepp_app_runtime;",
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO \"granted\", tepp_app_runtime;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT \"to\" TO tepp_app_runtime;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT \"group\" TO tepp_app_runtime;",
     ] {
         let catalog = rls_catalog(role_sql);
         assert_eq!(
