@@ -103,6 +103,30 @@ fn quoted_lowercase_membership_grantee_keeps_postgresql_identity() {
 }
 
 #[test]
+fn quoted_grantee_clause_keywords_do_not_hide_runtime_membership() {
+    for role_sql in [
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO \"with\", tepp_app_runtime;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO \"granted\", tepp_app_runtime;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn quoted_revoke_clause_keyword_before_runtime_still_removes_membership() {
+    let catalog = rls_catalog(
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;\nREVOKE rls_bypass_operator FROM \"cascade\", tepp_app_runtime;",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
+
+#[test]
 fn runtime_role_cannot_gain_a_set_role_path_around_rls() {
     for role_sql in [
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;",
