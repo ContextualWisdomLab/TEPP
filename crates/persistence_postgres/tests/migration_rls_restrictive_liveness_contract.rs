@@ -87,6 +87,32 @@ CREATE POLICY document_record_reader_guard ON document_record
 }
 
 #[test]
+fn malformed_policy_role_lists_fail_closed() {
+    for role_list in ["reader_role,", "reader_role,,writer_role", ",reader_role"] {
+        let catalog = catalog_with_policies(&format!(
+            r"
+CREATE POLICY document_record_reader_isolation ON document_record
+    AS PERMISSIVE
+    FOR SELECT
+    TO reader_role
+    USING ({TENANT_BINDING});
+CREATE POLICY document_record_reader_guard ON document_record
+    AS RESTRICTIVE
+    FOR SELECT
+    TO {role_list}
+    USING (document_record_id IS NOT NULL);
+"
+        ));
+
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingRlsPolicy),
+            "malformed TO role list must fail closed: {role_list}"
+        );
+    }
+}
+
+#[test]
 fn restrictive_policy_may_narrow_matching_permissive_access() {
     let catalog = catalog_with_policies(&format!(
         r"
