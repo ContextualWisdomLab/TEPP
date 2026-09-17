@@ -31,15 +31,6 @@ pub(super) fn project_committed_sql(sql: &str) -> Option<String> {
     transaction_projection::project_committed_statements(sql)
 }
 
-/// Return whether normalized SQL contains top-level transaction control.
-///
-/// Transactional migrations defer the legacy facade RLS precheck to this core,
-/// where committed final state is available. Keeping detection here prevents the
-/// facade from growing a parallel BEGIN/COMMIT/ROLLBACK parser.
-pub(super) fn contains_transaction_control(sql: &str) -> bool {
-    transaction_projection::contains_transaction_control(sql)
-}
-
 /// Validate migration SQL after canonicalizing PostgreSQL table persistence modifiers.
 ///
 /// `UNLOGGED`, `TEMP`/`TEMPORARY`, and PostgreSQL's compatibility
