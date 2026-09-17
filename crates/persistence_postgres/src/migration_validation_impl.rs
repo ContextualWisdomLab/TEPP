@@ -1,9 +1,11 @@
 //! PostgreSQL lexical normalization for migration contract parsing.
 
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 
 const INVALID_QUOTED_IDENTIFIER: &[u8] = b"INVALID_QUOTED_IDENTIFIER";
 const INVALID_QUALIFIED_IDENTIFIER: &str = "INVALID_QUALIFIED_IDENTIFIER";
+const QUOTED_GRANTOR_IDENTITY_PREFIX: &str = "__tepp_quoted_grantor_identity_";
 
 /// Final security-relevant attributes tracked for one PostgreSQL role.
 ///
@@ -15,6 +17,12 @@ struct RoleSecurityState {
     bypasses_rls: bool,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum QuotedIdentifierProjection {
+    Structural,
+    GrantorIdentity,
+}
+
 /// Normalize migration SQL for bounded structural contract parsing.
 ///
 /// The lexical pass removes declaration-shaped trivia while preserving the few
@@ -23,6 +31,29 @@ struct RoleSecurityState {
 /// Returns `None` when any lexical region is malformed or unterminated.
 pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     let normalized = lexically_normalize_migration_sql(sql)?;
+    Some(canonicalize_structural_keywords(&normalized))
+}
+
+/// Normalize SQL while preserving exact quoted identity only for `GRANTED BY`.
+///
+/// PostgreSQL quoted role identifiers may contain punctuation, non-ASCII bytes,
+/// and doubled quotes. Grantor provenance needs that exact identity, while the
+/// ordinary migration naming boundary intentionally collapses unsupported quoted
+/// spellings to `INVALID_QUOTED_IDENTIFIER`. This entry point uses the same
+/// lexical scanner for both concerns: quoted identifiers are temporarily hex
+/// encoded during the lexical pass, then retained only in an explicit grantor
+/// slot and restored to the historical structural projection everywhere else.
+/// Caller-supplied occurrences of the reserved token prefix fail closed so SQL
+/// text cannot manufacture provenance state.
+pub(super) fn normalize_migration_sql_with_grantor_identity(sql: &str) -> Option<String> {
+    if sql.contains(QUOTED_GRANTOR_IDENTITY_PREFIX) {
+        return None;
+    }
+    let normalized = lexically_normalize_migration_sql_with_projection(
+        sql,
+        QuotedIdentifierProjection::GrantorIdentity,
+    )?;
+    let normalized = restore_quoted_identifier_projection(&normalized)?;
     Some(canonicalize_structural_keywords(&normalized))
 }
 
@@ -111,6 +142,18 @@ pub(super) fn declares_row_level_security(normalized_sql: &str) -> bool {
 /// cannot become a synthetic declaration. Any unterminated lexical construct
 /// fails closed by returning `None`.
 fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
+    lexically_normalize_migration_sql_with_projection(sql, QuotedIdentifierProjection::Structural)
+}
+
+/// Run the single PostgreSQL lexical scanner with the selected quoted projection.
+///
+/// Grantor identity is a validation-only representation choice, not a second
+/// lexer. Comments, strings, nested comments, dollar bodies, and quoted
+/// identifier escapes are scanned once here regardless of downstream consumer.
+fn lexically_normalize_migration_sql_with_projection(
+    sql: &str,
+    quoted_projection: QuotedIdentifierProjection,
+) -> Option<String> {
     let bytes = sql.as_bytes();
     let mut normalized = Vec::with_capacity(bytes.len());
     let mut index = 0usize;
@@ -142,12 +185,15 @@ fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
             b'"' => {
                 let (next, identifier) = scan_quoted_identifier(bytes, index)?;
                 normalized.push(b' ');
-                if quoted_identifier_is_structurally_safe(&identifier)
-                    && !quoted_identifier_collides_with_table_syntax(&identifier)
-                {
-                    normalized.extend_from_slice(&identifier);
-                } else {
-                    normalized.extend_from_slice(INVALID_QUOTED_IDENTIFIER);
+                match quoted_projection {
+                    QuotedIdentifierProjection::Structural => {
+                        append_structural_quoted_identifier(&mut normalized, &identifier);
+                    }
+                    QuotedIdentifierProjection::GrantorIdentity => {
+                        normalized.extend_from_slice(
+                            quoted_grantor_identity_sentinel(&identifier).as_bytes(),
+                        );
+                    }
                 }
                 normalized.push(b' ');
                 index = next;
@@ -186,6 +232,99 @@ fn lexically_normalize_migration_sql(sql: &str) -> Option<String> {
     }
 
     String::from_utf8(normalized).ok()
+}
+
+/// Apply the historical structural projection for one parsed quoted identifier.
+fn append_structural_quoted_identifier(normalized: &mut Vec<u8>, identifier: &[u8]) {
+    if quoted_identifier_is_structurally_safe(identifier)
+        && !quoted_identifier_collides_with_table_syntax(identifier)
+    {
+        normalized.extend_from_slice(identifier);
+    } else {
+        normalized.extend_from_slice(INVALID_QUOTED_IDENTIFIER);
+    }
+}
+
+/// Encode exact PostgreSQL quoted identity into one whitespace-free token.
+///
+/// The scanner has already unescaped doubled quotes, so the hex payload is the
+/// identifier PostgreSQL stores rather than its SQL source spelling. The `@`
+/// terminator is outside unquoted identifier grammar and bounds decoding.
+fn quoted_grantor_identity_sentinel(identifier: &[u8]) -> String {
+    let mut sentinel =
+        String::with_capacity(QUOTED_GRANTOR_IDENTITY_PREFIX.len() + identifier.len() * 2 + 1);
+    sentinel.push_str(QUOTED_GRANTOR_IDENTITY_PREFIX);
+    for byte in identifier {
+        write!(&mut sentinel, "{byte:02x}").expect("writing to String cannot fail");
+    }
+    sentinel.push('@');
+    sentinel
+}
+
+/// Decode one shared-lexer quoted identity token back to PostgreSQL identifier bytes.
+fn decode_quoted_grantor_identity(token: &str) -> Option<Vec<u8>> {
+    let hex = token
+        .strip_prefix(QUOTED_GRANTOR_IDENTITY_PREFIX)?
+        .strip_suffix('@')?;
+    if hex.len() % 2 != 0 {
+        return None;
+    }
+    let mut decoded = Vec::with_capacity(hex.len() / 2);
+    for pair in hex.as_bytes().chunks_exact(2) {
+        let pair = std::str::from_utf8(pair).ok()?;
+        decoded.push(u8::from_str_radix(pair, 16).ok()?);
+    }
+    Some(decoded)
+}
+
+/// Restore shared quoted-identity tokens outside an explicit grantor position.
+///
+/// Lowercase ASCII quoted role names that are identity-equivalent to ordinary
+/// unquoted identifiers retain the historical canonical spelling. PostgreSQL's
+/// special unquoted role specifications are excluded from that collapse because
+/// a quoted name such as `"current_user"` denotes a named role, not the
+/// executor-relative pseudo-target. All other exact identities remain encoded in
+/// `GRANTED BY` and return to the historical fail-closed structural projection
+/// elsewhere.
+fn restore_quoted_identifier_projection(normalized_sql: &str) -> Option<String> {
+    let mut restored = normalized_sql.to_owned();
+    let mut search_from = 0usize;
+
+    while let Some(relative) = restored[search_from..].find(QUOTED_GRANTOR_IDENTITY_PREFIX) {
+        let start = search_from + relative;
+        let suffix_start = start + QUOTED_GRANTOR_IDENTITY_PREFIX.len();
+        let relative_end = restored[suffix_start..].find('@')?;
+        let end = suffix_start + relative_end + 1;
+        let token = &restored[start..end];
+        let identifier = decode_quoted_grantor_identity(token)?;
+        let is_explicit_grantor = restored[..start]
+            .trim_end()
+            .to_ascii_lowercase()
+            .ends_with("granted by");
+        let is_special_role_specification = [b"current_role".as_slice(), b"current_user".as_slice(), b"session_user".as_slice()]
+            .iter()
+            .any(|special| identifier.eq_ignore_ascii_case(special));
+
+        if is_explicit_grantor
+            && (!quoted_identifier_is_structurally_safe(&identifier)
+                || is_special_role_specification)
+        {
+            search_from = end;
+            continue;
+        }
+
+        let replacement = if quoted_identifier_is_structurally_safe(&identifier)
+            && !quoted_identifier_collides_with_table_syntax(&identifier)
+        {
+            String::from_utf8(identifier).ok()?
+        } else {
+            String::from_utf8(INVALID_QUOTED_IDENTIFIER.to_vec()).ok()?
+        };
+        restored.replace_range(start..end, &replacement);
+        search_from = start + replacement.len();
+    }
+
+    Some(restored)
 }
 
 /// Return whether `tokens[create_index..]` starts PostgreSQL CREATE ROLE/USER/GROUP.
@@ -724,8 +863,9 @@ fn quoted_identifier_collides_with_table_syntax(identifier: &[u8]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        INVALID_QUALIFIED_IDENTIFIER, declares_created_role, declares_row_level_security,
-        normalize_migration_sql,
+        INVALID_QUALIFIED_IDENTIFIER, QUOTED_GRANTOR_IDENTITY_PREFIX, declares_created_role,
+        declares_row_level_security, normalize_migration_sql,
+        normalize_migration_sql_with_grantor_identity,
     };
 
     #[test]
@@ -777,6 +917,26 @@ mod tests {
         .expect("well-formed quoted identifiers");
         assert!(normalized.contains("CREATE INDEX good_index ON tenant_record ( good_name )"));
         assert!(normalized.contains("CREATE VIEW INVALID_QUOTED_IDENTIFIER AS SELECT 1"));
+    }
+
+    #[test]
+    fn shared_lexer_preserves_arbitrary_quoted_identity_only_for_explicit_grantors() {
+        let normalized = normalize_migration_sql_with_grantor_identity(
+            r#"GRANT reporting_owner TO tepp_app_runtime GRANTED BY "Grantor-A"; GRANT reporting_owner TO tepp_app_runtime GRANTED BY "권한A"; GRANT reporting_owner TO tepp_app_runtime GRANTED BY "Grantor""A"; CREATE ROLE "Grantor-B";"#,
+        )
+        .expect("well-formed quoted grantor identities");
+        assert_eq!(normalized.matches(QUOTED_GRANTOR_IDENTITY_PREFIX).count(), 3);
+        assert!(normalized.contains("CREATE TYPE INVALID_QUOTED_IDENTIFIER"));
+    }
+
+    #[test]
+    fn grantor_identity_projection_keeps_lowercase_equivalence_but_not_special_role_specs() {
+        let normalized = normalize_migration_sql_with_grantor_identity(
+            r#"GRANT reporting_owner TO tepp_app_runtime GRANTED BY "grantor_a"; GRANT reporting_owner TO tepp_app_runtime GRANTED BY "current_user";"#,
+        )
+        .expect("well-formed quoted grantors");
+        assert!(normalized.contains("GRANTED BY grantor_a"));
+        assert_eq!(normalized.matches(QUOTED_GRANTOR_IDENTITY_PREFIX).count(), 1);
     }
 
     #[test]
