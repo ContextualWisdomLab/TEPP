@@ -60,6 +60,31 @@ fn preserve_quoted_special_role_specifications(sql: &str) -> String {
         .replace("\"session_user\"", "\"SESSION_USER\"")
 }
 
+/// Replace one complete quoted spelling without entering a doubled-quote escape.
+///
+/// PostgreSQL escapes a double quote inside a quoted identifier by doubling it.
+/// The grantor preprojection must therefore ignore a target spelling whose
+/// opening or closing quote is adjacent to another quote; the shared lexer will
+/// later parse that larger identifier as one token. Comments and literal bodies
+/// still remain the shared lexer's responsibility.
+fn replace_complete_quoted_spelling(sql: &str, quoted: &str, replacement: &str) -> String {
+    let mut projected = sql.to_owned();
+    let mut search_from = 0usize;
+    while let Some(relative) = projected[search_from..].find(quoted) {
+        let start = search_from + relative;
+        let end = start + quoted.len();
+        let joins_doubled_quote = projected.as_bytes().get(start.wrapping_sub(1)) == Some(&b'"')
+            || projected.as_bytes().get(end) == Some(&b'"');
+        if joins_doubled_quote {
+            search_from = end;
+            continue;
+        }
+        projected.replace_range(start..end, replacement);
+        search_from = start + replacement.len();
+    }
+    projected
+}
+
 /// Preserve the three lowercase quoted special-role spellings through the lexer.
 ///
 /// `@` cannot occur in an unquoted PostgreSQL identifier, so these validation
@@ -67,9 +92,21 @@ fn preserve_quoted_special_role_specifications(sql: &str) -> String {
 /// inside comments or literal bodies remain non-structural because the shared
 /// lexical authority masks those regions afterwards.
 fn preserve_quoted_special_grantor_specifications(sql: &str) -> String {
-    sql.replace("\"current_role\"", QUOTED_CURRENT_ROLE_GRANTOR)
-        .replace("\"current_user\"", QUOTED_CURRENT_USER_GRANTOR)
-        .replace("\"session_user\"", QUOTED_SESSION_USER_GRANTOR)
+    let projected = replace_complete_quoted_spelling(
+        sql,
+        "\"current_role\"",
+        QUOTED_CURRENT_ROLE_GRANTOR,
+    );
+    let projected = replace_complete_quoted_spelling(
+        &projected,
+        "\"current_user\"",
+        QUOTED_CURRENT_USER_GRANTOR,
+    );
+    replace_complete_quoted_spelling(
+        &projected,
+        "\"session_user\"",
+        QUOTED_SESSION_USER_GRANTOR,
+    )
 }
 
 /// Keep quoted-role sentinels only in the PostgreSQL `GRANTED BY` grammar slot.
@@ -102,4 +139,19 @@ fn restore_non_grantor_special_role_sentinels(normalized_sql: &str) -> String {
         }
     }
     restored
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        QUOTED_CURRENT_USER_GRANTOR, preserve_quoted_special_grantor_specifications,
+    };
+
+    #[test]
+    fn grantor_projection_does_not_split_a_larger_doubled_quote_identifier() {
+        let sql = r#"GRANT reporting_owner TO tepp_app_runtime GRANTED BY "prefix""current_user""suffix";"#;
+        let projected = preserve_quoted_special_grantor_specifications(sql);
+        assert_eq!(projected, sql);
+        assert!(!projected.contains(QUOTED_CURRENT_USER_GRANTOR));
+    }
 }
