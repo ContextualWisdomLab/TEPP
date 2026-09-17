@@ -686,15 +686,19 @@ fn literal_is_atomic(literal: &[u8]) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'.'))
 }
 
-/// Return whether a quoted identifier can be represented by the bounded parser.
+/// Return whether a quoted identifier can be projected onto an unquoted token
+/// without changing PostgreSQL identity inside the bounded structural parser.
 ///
-/// Unsupported punctuation is replaced by an invalid sentinel rather than
-/// normalized into a different durable PostgreSQL object name.
+/// PostgreSQL folds unquoted identifiers to lower case but preserves quoted case.
+/// The lexical boundary strips quotes only for lowercase ASCII spellings whose
+/// quoted and unquoted identities are therefore equivalent. Mixed/uppercase or
+/// otherwise unsupported quoted identifiers fail closed through the invalid
+/// sentinel instead of aliasing a distinct PostgreSQL object or role.
 fn quoted_identifier_is_structurally_safe(identifier: &[u8]) -> bool {
     !identifier.is_empty()
-        && identifier
-            .iter()
-            .all(|byte| byte.is_ascii_alphanumeric() || *byte == b'_')
+        && identifier.iter().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'_'
+        })
 }
 
 /// Return whether a quoted identifier would collide with table-clause syntax.
@@ -766,12 +770,12 @@ mod tests {
     }
 
     #[test]
-    fn quoted_identifiers_preserve_safe_spelling_and_reject_unrepresentable_content() {
+    fn quoted_identifiers_preserve_equivalent_spelling_and_reject_case_distinct_content() {
         let normalized = normalize_migration_sql(
-            "CREATE INDEX \"Bad\" ON tenant_record (\"good_name\"); CREATE VIEW \"a\"\"b\" AS SELECT 1;",
+            "CREATE INDEX \"good_index\" ON tenant_record (\"good_name\"); CREATE VIEW \"Bad\" AS SELECT 1; CREATE VIEW \"a\"\"b\" AS SELECT 1;",
         )
         .expect("well-formed quoted identifiers");
-        assert!(normalized.contains("CREATE INDEX Bad ON tenant_record ( good_name )"));
+        assert!(normalized.contains("CREATE INDEX good_index ON tenant_record ( good_name )"));
         assert!(normalized.contains("CREATE VIEW INVALID_QUOTED_IDENTIFIER AS SELECT 1"));
     }
 
