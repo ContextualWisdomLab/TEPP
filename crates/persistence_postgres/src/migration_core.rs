@@ -248,7 +248,7 @@ fn validate_retention_legal_hold(up_sql: &str) -> Result<(), MigrationContractEr
 }
 
 fn validate_table_body(table: &str, body: &str) -> Result<(), MigrationContractError> {
-    if has_empty_table_element(body) {
+    if has_unbalanced_square_brackets(body) || has_empty_table_element(body) {
         return Err(MigrationContractError::EmptyMigrationSql);
     }
     let columns = parse_column_names(body);
@@ -494,19 +494,24 @@ fn parse_constraint_names(sql: &str) -> BTreeSet<String> {
     parse_names_after(sql, "CONSTRAINT")
 }
 
-/// Split one explicit `CREATE TABLE (...)` body at depth-one commas.
+/// Split one explicit `CREATE TABLE (...)` body at structural element commas.
 ///
 /// Parenthesized type arguments and table-constraint column lists remain within
-/// their owning element because their commas occur at depth two or deeper.
+/// their owning element because their commas occur below the outer table-body
+/// depth. Square-bracket array constructors/subscripts are tracked separately,
+/// so `ARRAY[1, 2]` cannot manufacture a pseudo table element.
 fn split_table_elements(body: &str) -> Vec<&str> {
     let mut depth = 0i32;
+    let mut bracket_depth = 0i32;
     let mut start = 0usize;
     let mut segments = Vec::new();
     for (index, ch) in body.char_indices() {
         match ch {
             '(' => depth += 1,
             ')' => depth -= 1,
-            ',' if depth == 1 => {
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth -= 1,
+            ',' if depth == 1 && bracket_depth == 0 => {
                 segments.push(&body[start..index]);
                 start = index + 1;
             }
@@ -515,6 +520,25 @@ fn split_table_elements(body: &str) -> Vec<&str> {
     }
     segments.push(&body[start..]);
     segments
+}
+
+/// Return whether square-bracket nesting is malformed in an explicit table body.
+///
+/// The lexical facade has already masked quoted/comment content, so remaining
+/// brackets are structural PostgreSQL array constructor, subscript, or type
+/// syntax. Rejecting underflow/unclosed nesting prevents a malformed `[` from
+/// swallowing later real table-element separators.
+fn has_unbalanced_square_brackets(body: &str) -> bool {
+    let mut depth = 0i32;
+    for ch in body.chars() {
+        match ch {
+            '[' => depth += 1,
+            ']' if depth == 0 => return true,
+            ']' => depth -= 1,
+            _ => {}
+        }
+    }
+    depth != 0
 }
 
 /// Return whether a comma-separated `CREATE TABLE` body contains an empty
