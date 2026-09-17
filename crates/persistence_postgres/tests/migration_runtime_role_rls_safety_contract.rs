@@ -168,9 +168,9 @@ fn runtime_role_cannot_gain_a_set_role_path_around_rls() {
 #[test]
 fn admin_membership_can_self_enable_set_role() {
     for role_sql in [
-        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH SET FALSE, ADMIN TRUE;",
-        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH ADMIN TRUE, SET FALSE;",
-        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH SET FALSE;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH ADMIN TRUE;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH ADMIN TRUE;",
     ] {
         let catalog = rls_catalog(role_sql);
         assert_eq!(
@@ -182,9 +182,9 @@ fn admin_membership_can_self_enable_set_role() {
 }
 
 #[test]
-fn set_false_membership_and_existing_grant_direction_remain_rls_safe() {
+fn explicit_noninherit_membership_and_existing_grant_direction_remain_rls_safe() {
     for role_sql in [
-        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH SET FALSE;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN FALSE;",
         "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT tepp_app_runtime TO CURRENT_USER;",
         "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT SELECT ON TABLE tenant_record TO tepp_app_runtime;",
     ] {
@@ -196,11 +196,11 @@ fn set_false_membership_and_existing_grant_direction_remain_rls_safe() {
 #[test]
 fn final_runtime_membership_state_may_explicitly_restore_rls_safety() {
     for role_sql in [
-        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nGRANT reporting_operator TO tepp_app_runtime WITH SET FALSE;",
-        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nREVOKE SET OPTION FOR reporting_operator FROM tepp_app_runtime;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nGRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN FALSE;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nREVOKE SET OPTION FOR reporting_operator FROM tepp_app_runtime;\nREVOKE INHERIT OPTION FOR reporting_operator FROM tepp_app_runtime;",
         "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nREVOKE reporting_operator FROM tepp_app_runtime;",
-        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH SET FALSE, ADMIN TRUE;\nREVOKE ADMIN OPTION FOR reporting_operator FROM tepp_app_runtime;",
-        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH SET FALSE, ADMIN TRUE;\nGRANT reporting_operator TO tepp_app_runtime WITH ADMIN FALSE;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;\nREVOKE ADMIN OPTION FOR reporting_operator FROM tepp_app_runtime;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;\nGRANT reporting_operator TO tepp_app_runtime WITH ADMIN FALSE;",
     ] {
         let catalog = rls_catalog(role_sql);
         assert_eq!(validate_migration_catalog(&catalog), Ok(()), "{role_sql}");
