@@ -18,18 +18,25 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     implementation::normalize_migration_sql_with_grantor_identity(sql)
 }
 
-/// Return whether the expected runtime role exists in the final migration state
-/// and remains subject to PostgreSQL row-level security.
+/// Return whether the expected runtime role exists in PostgreSQL's durable final migration state
+/// and remains subject to row-level security.
 ///
 /// Lowercase quoted spellings of PostgreSQL's special role specifications are
 /// projected to case-distinct quoted spellings only for this lifecycle scan.
 /// The existing lexical authority then maps them to its fail-closed quoted-name
 /// sentinel, keeping a named role such as `"current_user"` distinct from the
 /// unquoted `CURRENT_USER` pseudo-target without changing executable SQL or the
-/// general structural-normalization contract.
+/// general structural-normalization contract. Transaction outcome is applied
+/// after that shared lexical projection and before lifecycle folding, so a
+/// rolled-back `ALTER ROLE ... NOBYPASSRLS` cannot certify an actually unsafe
+/// runtime role.
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
     let lifecycle_sql = preserve_quoted_special_role_specifications(sql);
-    implementation::declares_created_role(&lifecycle_sql, expected_role)
+    let normalized_lifecycle = implementation::normalize_migration_sql_with_grantor_identity(
+        &lifecycle_sql,
+    )?;
+    let committed_lifecycle = super::core::project_committed_sql(&normalized_lifecycle)?;
+    implementation::declares_created_role(&committed_lifecycle, expected_role)
 }
 
 /// Detect whether normalized migration SQL declares an RLS surface.
@@ -59,6 +66,17 @@ mod tests {
             CREATE ROLE "current_user" BYPASSRLS;
             ALTER ROLE CURRENT_USER NOBYPASSRLS;
             ALTER ROLE "current_user" RENAME TO tepp_app_runtime;
+        "#;
+        assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
+    }
+
+    #[test]
+    fn rolled_back_runtime_role_hardening_does_not_change_final_lifecycle_state() {
+        let sql = r#"
+            CREATE ROLE tepp_app_runtime BYPASSRLS;
+            BEGIN;
+            ALTER ROLE tepp_app_runtime NOBYPASSRLS;
+            ROLLBACK;
         "#;
         assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
     }
