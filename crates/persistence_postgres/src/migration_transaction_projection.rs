@@ -7,36 +7,6 @@
 //! ambiguous savepoint/two-phase shapes fail closed instead of donating safety
 //! evidence to downstream runtime-role validators.
 
-/// Return whether normalized SQL contains top-level transaction-control syntax.
-///
-/// The legacy facade performs relational RLS checks before the committed-state
-/// core. When any transaction control is present, that precheck must defer to
-/// the core so rolled-back policy text can neither certify nor reject final
-/// state. This helper reuses the same statement/token authority as projection;
-/// callers do not grow a second BEGIN/COMMIT/ROLLBACK parser.
-#[must_use]
-pub(super) fn contains_transaction_control(sql: &str) -> bool {
-    let tokenized = sql.replace(';', " ; ");
-    let tokens = tokenized.split_whitespace().collect::<Vec<_>>();
-    let mut index = 0usize;
-
-    while index < tokens.len() {
-        let end = statement_end(&tokens, index);
-        let statement = &tokens[index..end];
-        index = end.saturating_add(1);
-        if statement.is_empty() {
-            continue;
-        }
-        if is_unsupported_transaction_control(statement)
-            || is_transaction_start(statement)
-            || transaction_end(statement).is_some()
-        {
-            return true;
-        }
-    }
-    false
-}
-
 /// Project normalized SQL onto statements whose effects survive transaction outcome.
 ///
 /// Statements outside an explicit transaction model PostgreSQL autocommit and
@@ -187,22 +157,7 @@ fn is_unsupported_transaction_control(statement: &[&str]) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{contains_transaction_control, project_committed_statements};
-
-    #[test]
-    fn transaction_control_detection_uses_the_same_statement_authority() {
-        assert!(!contains_transaction_control(
-            "CREATE TABLE tenant_record (tenant_record_id uuid);"
-        ));
-        for sql in [
-            "BEGIN; COMMIT;",
-            "START TRANSACTION; ROLLBACK;",
-            "SAVEPOINT safety;",
-            "PREPARE TRANSACTION 'tx';",
-        ] {
-            assert!(contains_transaction_control(sql));
-        }
-    }
+    use super::project_committed_statements;
 
     #[test]
     fn rollback_discards_transaction_statements() {
