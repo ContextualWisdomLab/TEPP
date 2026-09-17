@@ -43,6 +43,21 @@ fn runtime_role_cannot_bypass_rls_or_be_superuser() {
 }
 
 #[test]
+fn role_identifier_continuations_cannot_retarget_runtime_security_state() {
+    for role_sql in [
+        "CREATE ROLE tepp_app_runtime BYPASSRLS;\nALTER ROLE tepp_app_runtime$shadow NOSUPERUSER NOBYPASSRLS;",
+        "CREATE ROLE tepp_app_runtime BYPASSRLS;\nALTER ROLE tepp_app_runtime측정 NOSUPERUSER NOBYPASSRLS;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
 fn runtime_role_cannot_gain_a_set_role_path_around_rls() {
     for role_sql in [
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;",
