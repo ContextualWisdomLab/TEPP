@@ -30,7 +30,23 @@ fn runtime_role_cannot_bypass_rls_or_be_superuser() {
         "CREATE ROLE tepp_app_runtime SUPERUSER;",
         "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE tepp_app_runtime BYPASSRLS;",
         "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER USER tepp_app_runtime SUPERUSER;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER GROUP tepp_app_runtime BYPASSRLS;",
         "CREATE ROLE staged_runtime_role BYPASSRLS;\nALTER ROLE staged_runtime_role RENAME TO tepp_app_runtime;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn malformed_role_lifecycle_statements_fail_closed_without_panicking() {
+    for role_sql in [
+        "CREATE ROLE;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE;",
     ] {
         let catalog = rls_catalog(role_sql);
         assert_eq!(
