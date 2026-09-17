@@ -9,6 +9,8 @@
 
 #[path = "migration_core_impl.rs"]
 mod implementation;
+#[path = "migration_runtime_role_membership.rs"]
+mod runtime_role_membership;
 
 use crate::MigrationContractError;
 pub use implementation::MigrationCatalog;
@@ -19,14 +21,21 @@ pub use implementation::MigrationCatalog;
 /// `GLOBAL`/`LOCAL TEMP[TEMPORARY]` spellings must traverse the same table-name
 /// and table-body contracts as ordinary `CREATE TABLE`. The canonicalized copy
 /// exists only for validation; executable migration SQL is never rewritten.
+/// Runtime-role membership is checked on the same normalized validation copy so
+/// a SET-capable role grant cannot route around the direct RLS role-state proof.
 ///
 /// # Errors
 ///
 /// Returns the same naming, tenant, temporal, RLS, or structural contract
-/// errors as the underlying migration validator.
+/// errors as the underlying migration validator, plus `MissingAppRuntimeRole`
+/// when the application runtime can switch roles through PostgreSQL membership.
 pub fn validate_migration_catalog(
     catalog: &MigrationCatalog,
 ) -> Result<(), MigrationContractError> {
+    if !runtime_role_membership::runtime_membership_is_rls_safe(catalog.up_sql()) {
+        return Err(MigrationContractError::MissingAppRuntimeRole);
+    }
+
     let canonical_up = canonicalize_table_persistence_modifiers(catalog.up_sql());
     if canonical_up == catalog.up_sql() {
         return implementation::validate_migration_catalog(catalog);
