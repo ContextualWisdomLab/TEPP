@@ -93,8 +93,11 @@ fn apply_runtime_membership_grant(statement: &[&str], memberships: &mut BTreeMap
 /// Apply one PostgreSQL role-membership REVOKE that targets the application runtime.
 ///
 /// Plain membership REVOKE removes the edge. `REVOKE SET OPTION FOR` preserves
-/// membership but disables SET ROLE. ADMIN/INHERIT option revocation does not
-/// change SET state. Object privilege revokes are kept outside this state map.
+/// an existing membership but disables SET ROLE; it must not create a phantom
+/// SET-false entry when no membership exists, because a later bare GRANT would
+/// create a fresh membership whose PostgreSQL SET default is true. ADMIN/INHERIT
+/// option revocation does not change SET state. Object privilege revokes stay
+/// outside this state map.
 fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMap<String, bool>) {
     let Some(from_index) = statement
         .iter()
@@ -139,7 +142,9 @@ fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMa
 
     for role in membership_role_names(&statement[roles_start..from_index]) {
         if revoke_set_only {
-            memberships.insert(role, false);
+            if let Some(set_enabled) = memberships.get_mut(&role) {
+                *set_enabled = false;
+            }
         } else {
             memberships.remove(&role);
         }
@@ -282,6 +287,7 @@ mod tests {
             "GRANT reporting_operator , on TO tepp_app_runtime ;",
             "CREATE TYPE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN ROLE reporting_operator ;",
             "CREATE TYPE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP reporting_operator ;",
+            "REVOKE SET OPTION FOR reporting_operator FROM tepp_app_runtime ; GRANT reporting_operator TO tepp_app_runtime ;",
         ] {
             assert!(!runtime_membership_is_rls_safe(sql), "{sql}");
         }
