@@ -10,23 +10,21 @@
 #[path = "migration_validation_impl.rs"]
 mod implementation;
 
-/// Normalize migration SQL for bounded structural contract parsing.
-pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
-    implementation::normalize_migration_sql(sql)
-}
+const QUOTED_CURRENT_ROLE_GRANTOR: &str = "__tepp_quoted_grantor_current_role@";
+const QUOTED_CURRENT_USER_GRANTOR: &str = "__tepp_quoted_grantor_current_user@";
+const QUOTED_SESSION_USER_GRANTOR: &str = "__tepp_quoted_grantor_session_user@";
 
-/// Normalize the runtime-membership grantor evidence without aliasing named roles.
+/// Normalize migration SQL for bounded structural contract parsing.
 ///
-/// The general structural projection may safely dequote lowercase identifiers,
-/// but `GRANTED BY` gives unquoted `CURRENT_ROLE`, `CURRENT_USER`, and
-/// `SESSION_USER` pseudo-target meaning. The same spellings in quotes are named
-/// roles, so this grantor-only projection replaces those three quoted spellings
-/// with distinct validation sentinels that cannot be valid unquoted PostgreSQL
-/// role names, then reuses the shared lexer. Executable migration SQL and the
-/// general structural projection are unchanged.
-pub(super) fn normalize_runtime_membership_grantor_sql(sql: &str) -> Option<String> {
-    let grantor_sql = preserve_quoted_special_grantor_specifications(sql);
-    implementation::normalize_migration_sql(&grantor_sql)
+/// A grantor-only preprojection preserves the identity of lowercase quoted
+/// spellings that PostgreSQL otherwise distinguishes from unquoted special role
+/// specifications. After the shared lexical/structural pass, those sentinels are
+/// restored everywhere except the `GRANTED BY` role-specification slot, so the
+/// general object/lifecycle parser sees the same normalized names as before.
+pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
+    let projected = preserve_quoted_special_grantor_specifications(sql);
+    let normalized = implementation::normalize_migration_sql(&projected)?;
+    Some(restore_non_grantor_special_role_sentinels(&normalized))
 }
 
 /// Return whether the expected runtime role exists in the final migration state
@@ -62,23 +60,46 @@ fn preserve_quoted_special_role_specifications(sql: &str) -> String {
         .replace("\"session_user\"", "\"SESSION_USER\"")
 }
 
-/// Preserve the three quoted special-role spellings as distinct grantor tokens.
+/// Preserve the three lowercase quoted special-role spellings through the lexer.
 ///
 /// `@` cannot occur in an unquoted PostgreSQL identifier, so these validation
 /// sentinels cannot collide with a real unquoted role. Replacements performed
 /// inside comments or literal bodies remain non-structural because the shared
 /// lexical authority masks those regions afterwards.
 fn preserve_quoted_special_grantor_specifications(sql: &str) -> String {
-    sql.replace(
-        "\"current_role\"",
-        "__tepp_quoted_grantor_current_role@",
-    )
-    .replace(
-        "\"current_user\"",
-        "__tepp_quoted_grantor_current_user@",
-    )
-    .replace(
-        "\"session_user\"",
-        "__tepp_quoted_grantor_session_user@",
-    )
+    sql.replace("\"current_role\"", QUOTED_CURRENT_ROLE_GRANTOR)
+        .replace("\"current_user\"", QUOTED_CURRENT_USER_GRANTOR)
+        .replace("\"session_user\"", QUOTED_SESSION_USER_GRANTOR)
+}
+
+/// Keep quoted-role sentinels only in the PostgreSQL `GRANTED BY` grammar slot.
+///
+/// The shared structural normalizer has already collapsed whitespace and masked
+/// opaque bodies. A sentinel outside this exact slot represents an ordinary
+/// named role and is restored to the lowercase spelling that the general lexer
+/// historically produced. Grantor evidence retains the sentinel so it cannot
+/// alias the unquoted pseudo-target with the same spelling.
+fn restore_non_grantor_special_role_sentinels(normalized_sql: &str) -> String {
+    let mut restored = normalized_sql.to_owned();
+    for (sentinel, role_name) in [
+        (QUOTED_CURRENT_ROLE_GRANTOR, "current_role"),
+        (QUOTED_CURRENT_USER_GRANTOR, "current_user"),
+        (QUOTED_SESSION_USER_GRANTOR, "session_user"),
+    ] {
+        let mut search_from = 0usize;
+        while let Some(relative) = restored[search_from..].find(sentinel) {
+            let start = search_from + relative;
+            let is_explicit_grantor = restored[..start]
+                .trim_end()
+                .to_ascii_lowercase()
+                .ends_with("granted by");
+            if is_explicit_grantor {
+                search_from = start + sentinel.len();
+                continue;
+            }
+            restored.replace_range(start..start + sentinel.len(), role_name);
+            search_from = start + role_name.len();
+        }
+    }
+    restored
 }
