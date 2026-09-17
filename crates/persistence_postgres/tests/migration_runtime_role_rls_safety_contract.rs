@@ -72,6 +72,18 @@ fn set_false_membership_and_existing_grant_direction_remain_rls_safe() {
 }
 
 #[test]
+fn final_runtime_membership_state_may_explicitly_restore_rls_safety() {
+    for role_sql in [
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nGRANT reporting_operator TO tepp_app_runtime WITH SET FALSE;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nREVOKE SET OPTION FOR reporting_operator FROM tepp_app_runtime;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nREVOKE reporting_operator FROM tepp_app_runtime;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(validate_migration_catalog(&catalog), Ok(()), "{role_sql}");
+    }
+}
+
+#[test]
 fn malformed_role_lifecycle_statements_fail_closed_without_panicking() {
     for role_sql in [
         "CREATE ROLE;",
