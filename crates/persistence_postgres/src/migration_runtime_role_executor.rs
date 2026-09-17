@@ -9,6 +9,13 @@
 const EXECUTOR_GRANTOR_PREFIX: &str = "__tepp_executor_grantor_";
 const INVALID_QUOTED_IDENTIFIER: &str = "INVALID_QUOTED_IDENTIFIER";
 
+/// Effective PostgreSQL role identity visible to `CURRENT_USER` / `CURRENT_ROLE`.
+///
+/// Initial and session identities remain separate because PostgreSQL can start
+/// a connection with a role setting distinct from `SESSION_USER`. Named roles
+/// are exact normalized identities. Unknown targets are scoped to the `SET ROLE`
+/// statement that introduced them so later statements cannot accidentally
+/// alias them to a different executor role.
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum EffectiveRoleProjection {
     InitialCurrentUser,
@@ -82,6 +89,7 @@ pub(super) fn project_executor_relative_grantors(sql: &str) -> Option<String> {
     Some(output.join(" "))
 }
 
+/// Find the end of one already-normalized semicolon-delimited statement.
 fn statement_end(tokens: &[&str], start: usize) -> usize {
     tokens[start..]
         .iter()
