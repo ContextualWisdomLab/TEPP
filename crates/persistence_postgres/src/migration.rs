@@ -203,26 +203,72 @@ fn policy_binds_tenant_session_equality(policy_sql: &str) -> bool {
     false
 }
 
-fn policy_row_predicates_bind_tenant_session(policy_sql: &str) -> bool {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum PolicyCommand {
+    All,
+    Select,
+    Insert,
+    Update,
+    Delete,
+}
+
+fn policy_command(policy_sql: &str) -> Option<PolicyCommand> {
     const USING_CLAUSE: &str = " using ";
     const CHECK_CLAUSE: &str = " with check ";
 
     let lower = policy_sql.to_ascii_lowercase();
+    let header_end = [lower.find(USING_CLAUSE), lower.find(CHECK_CLAUSE)]
+        .into_iter()
+        .flatten()
+        .min()
+        .unwrap_or(policy_sql.len());
+    let tokens = policy_sql[..header_end].split_whitespace().collect::<Vec<_>>();
+    let Some(for_index) = tokens
+        .iter()
+        .position(|token| token.eq_ignore_ascii_case("FOR"))
+    else {
+        return Some(PolicyCommand::All);
+    };
+
+    match tokens.get(for_index + 1).map(|token| token.to_ascii_uppercase()) {
+        Some(command) if command == "ALL" => Some(PolicyCommand::All),
+        Some(command) if command == "SELECT" => Some(PolicyCommand::Select),
+        Some(command) if command == "INSERT" => Some(PolicyCommand::Insert),
+        Some(command) if command == "UPDATE" => Some(PolicyCommand::Update),
+        Some(command) if command == "DELETE" => Some(PolicyCommand::Delete),
+        _ => None,
+    }
+}
+
+fn policy_row_predicates_bind_tenant_session(policy_sql: &str) -> bool {
+    const USING_CLAUSE: &str = " using ";
+    const CHECK_CLAUSE: &str = " with check ";
+
+    let Some(command) = policy_command(policy_sql) else {
+        return false;
+    };
+    let lower = policy_sql.to_ascii_lowercase();
     let using_start = lower.find(USING_CLAUSE).map(|index| index + USING_CLAUSE.len());
     let check_start = lower.find(CHECK_CLAUSE).map(|index| index + CHECK_CLAUSE.len());
 
-    let using_binds = using_start.is_none_or(|start| {
+    let using_sql = using_start.map(|start| {
         let end = lower[start..]
             .find(CHECK_CLAUSE)
             .map(|index| start + index)
             .unwrap_or(policy_sql.len());
-        policy_binds_tenant_session_equality(&policy_sql[start..end])
+        &policy_sql[start..end]
     });
-    let check_binds = check_start.is_none_or(|start| {
-        policy_binds_tenant_session_equality(&policy_sql[start..])
-    });
+    let check_sql = check_start.map(|start| &policy_sql[start..]);
+    let using_binds = using_sql.is_some_and(policy_binds_tenant_session_equality);
+    let check_binds = check_sql.is_some_and(policy_binds_tenant_session_equality);
 
-    (using_start.is_some() || check_start.is_some()) && using_binds && check_binds
+    match command {
+        PolicyCommand::All | PolicyCommand::Update => {
+            using_binds && (check_sql.is_none() || check_binds)
+        }
+        PolicyCommand::Select | PolicyCommand::Delete => using_binds && check_sql.is_none(),
+        PolicyCommand::Insert => using_sql.is_none() && check_binds,
+    }
 }
 
 /// Return whether the normalized policy header explicitly declares
@@ -250,11 +296,11 @@ fn policy_is_restrictive(policy_sql: &str) -> bool {
 
 /// Bind tenant identity and tenant-session evidence to every policy that can
 /// independently admit rows. PostgreSQL permissive policies are OR-composed.
-/// Every explicit `USING` and `WITH CHECK` predicate therefore has to preserve
-/// the direct tenant/session equality: `USING` controls row visibility while an
-/// explicit `WITH CHECK` independently controls rows admitted by INSERT/UPDATE.
-/// Restrictive policies are AND-composed and may add narrower conditions
-/// without duplicating the tenant predicate.
+/// Command semantics determine which tenant-bound predicates are mandatory:
+/// read-capable policies require `USING`, insert requires `WITH CHECK`, and
+/// `ALL`/`UPDATE` reuse a valid `USING` for writes only when `WITH CHECK` is
+/// omitted. Restrictive policies are AND-composed and may add narrower
+/// conditions without duplicating the tenant predicate.
 fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
     const CREATE_POLICY: &str = "create policy";
 
@@ -344,8 +390,8 @@ fn canonicalize_concurrent_index_modifier(sql: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        canonicalize_concurrent_index_modifier, declares_tenant_session_guc,
-        policy_binds_tenant_identifier, policy_binds_tenant_session_equality,
+        PolicyCommand, canonicalize_concurrent_index_modifier, declares_tenant_session_guc,
+        policy_binds_tenant_identifier, policy_binds_tenant_session_equality, policy_command,
         policy_is_restrictive, policy_row_predicates_bind_tenant_session,
         tenant_policies_bind_session_guc,
     };
@@ -402,6 +448,67 @@ mod tests {
         assert!(!policy_binds_tenant_session_equality(
             "create policy document_record_tenant_isolation on document_record using (tenant_record_id::text = document_record_id::text and current_setting ( 'tepp.current_tenant_record_id' , true ) is not null)"
         ));
+    }
+
+    #[test]
+    fn policy_command_defaults_to_all_and_rejects_unknown_commands() {
+        assert_eq!(
+            policy_command("create policy tenant_policy on tenant_record using (true)"),
+            Some(PolicyCommand::All)
+        );
+        assert_eq!(
+            policy_command("create policy tenant_policy on tenant_record for all using (true)"),
+            Some(PolicyCommand::All)
+        );
+        assert_eq!(
+            policy_command("create policy tenant_policy on tenant_record for select using (true)"),
+            Some(PolicyCommand::Select)
+        );
+        assert_eq!(
+            policy_command("create policy tenant_policy on tenant_record for insert with check (true)"),
+            Some(PolicyCommand::Insert)
+        );
+        assert_eq!(
+            policy_command("create policy tenant_policy on tenant_record for update using (true)"),
+            Some(PolicyCommand::Update)
+        );
+        assert_eq!(
+            policy_command("create policy tenant_policy on tenant_record for delete using (true)"),
+            Some(PolicyCommand::Delete)
+        );
+        assert_eq!(
+            policy_command("create policy tenant_policy on tenant_record for merge using (true)"),
+            None
+        );
+    }
+
+    #[test]
+    fn explicit_policy_command_requires_the_correct_tenant_predicate() {
+        let binding = "tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )";
+        assert!(policy_row_predicates_bind_tenant_session(&format!(
+            "create policy tenant_policy on tenant_record for all using ({binding})"
+        )));
+        assert!(!policy_row_predicates_bind_tenant_session(&format!(
+            "create policy tenant_policy on tenant_record for all with check ({binding})"
+        )));
+        assert!(policy_row_predicates_bind_tenant_session(&format!(
+            "create policy tenant_policy on tenant_record for select using ({binding})"
+        )));
+        assert!(policy_row_predicates_bind_tenant_session(&format!(
+            "create policy tenant_policy on tenant_record for delete using ({binding})"
+        )));
+        assert!(policy_row_predicates_bind_tenant_session(&format!(
+            "create policy tenant_policy on tenant_record for insert with check ({binding})"
+        )));
+        assert!(!policy_row_predicates_bind_tenant_session(&format!(
+            "create policy tenant_policy on tenant_record for insert using ({binding}) with check ({binding})"
+        )));
+        assert!(policy_row_predicates_bind_tenant_session(&format!(
+            "create policy tenant_policy on tenant_record for update using ({binding})"
+        )));
+        assert!(!policy_row_predicates_bind_tenant_session(&format!(
+            "create policy tenant_policy on tenant_record for update with check ({binding})"
+        )));
     }
 
     #[test]
