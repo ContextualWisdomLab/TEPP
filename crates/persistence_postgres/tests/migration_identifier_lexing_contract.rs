@@ -85,6 +85,7 @@ fn dollar_quote_like_bytes_inside_identifiers_do_not_bypass_the_naming_contract(
         "CREATE INDEX good_index$tag$bad$tag$ ON tenant_record (tenant_record_id);",
         "CREATE INDEX bad_index$tag$ ON tenant_record (tenant_record_id);",
         "CREATE INDEX bad_index$$tag$ ON tenant_record (tenant_record_id);",
+        "CREATE INDEX bad_측정$tag$ ON tenant_record (tenant_record_id);",
     ] {
         let catalog = conforming_catalog(statement);
         assert_eq!(
