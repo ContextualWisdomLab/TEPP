@@ -9,6 +9,8 @@
 
 #[path = "migration_core_impl.rs"]
 mod implementation;
+#[path = "migration_rls_table_state.rs"]
+mod rls_table_state;
 #[path = "migration_runtime_role_executor.rs"]
 mod runtime_role_executor;
 #[path = "migration_runtime_role_grantor.rs"]
@@ -44,7 +46,9 @@ pub(super) fn project_committed_sql(sql: &str) -> Option<String> {
 /// later rollback cannot donate false membership or revocation evidence. The
 /// structural validator and facade-level RLS witnesses receive the same committed
 /// final-state projection, so rolled-back DDL or policy composition cannot
-/// satisfy naming, tenant, temporal, RLS, or governance contracts.
+/// satisfy naming, tenant, temporal, RLS, or governance contracts. RLS table
+/// enablement is additionally folded in statement order so a committed trailing
+/// `DISABLE` or `NO FORCE` cannot reuse stale positive evidence from earlier SQL.
 ///
 /// # Errors
 ///
@@ -72,6 +76,11 @@ pub fn validate_migration_catalog(
 
     let committed_requires_runtime_role =
         super::validation::declares_row_level_security(&committed_up);
+    if committed_requires_runtime_role
+        && !rls_table_state::final_rls_table_states_are_safe(&committed_up)
+    {
+        return Err(MigrationContractError::MissingRlsEnable);
+    }
     if committed_requires_runtime_role && !super::declares_tenant_session_guc(&committed_up) {
         return Err(MigrationContractError::MissingTenantSessionGuc);
     }
