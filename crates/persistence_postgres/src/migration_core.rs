@@ -23,10 +23,10 @@ pub use implementation::MigrationCatalog;
 /// `GLOBAL`/`LOCAL TEMP[TEMPORARY]` spellings must traverse the same table-name
 /// and table-body contracts as ordinary `CREATE TABLE`. The canonicalized copy
 /// exists only for validation; executable migration SQL is never rewritten.
-/// Runtime-role membership is checked on the general normalized validation copy.
-/// Grantor provenance is checked on a separate normalized copy whose only extra
-/// information is the identity distinction between PostgreSQL pseudo-targets and
-/// identically spelled quoted named roles.
+/// Runtime-role membership and grantor provenance are checked on the normalized
+/// validation copy. The lexical facade preserves quoted special-role identity
+/// only in the `GRANTED BY` slot, so grantor evidence remains distinct without
+/// changing general object or lifecycle parsing.
 ///
 /// # Errors
 ///
@@ -35,10 +35,9 @@ pub use implementation::MigrationCatalog;
 /// when the application runtime has an unsafe PostgreSQL membership path.
 pub fn validate_migration_catalog(
     catalog: &MigrationCatalog,
-    grantor_sql: &str,
 ) -> Result<(), MigrationContractError> {
     if !runtime_role_membership::runtime_membership_is_rls_safe(catalog.up_sql())
-        || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(grantor_sql)
+        || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(catalog.up_sql())
     {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     }
