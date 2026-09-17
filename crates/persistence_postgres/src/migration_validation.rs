@@ -522,7 +522,7 @@ fn dollar_quote_delimiter(bytes: &[u8], start: usize) -> Option<&[u8]> {
         return Some(&bytes[start..=index]);
     }
     let first = *bytes.get(index)?;
-    if first != b'_' && !first.is_ascii_alphabetic() {
+    if first != b'_' && !first.is_ascii_alphabetic() && first < 0x80 {
         return None;
     }
     index += 1;
@@ -530,7 +530,7 @@ fn dollar_quote_delimiter(bytes: &[u8], start: usize) -> Option<&[u8]> {
         if *byte == b'$' {
             return Some(&bytes[start..=index]);
         }
-        if *byte != b'_' && !byte.is_ascii_alphanumeric() {
+        if *byte != b'_' && !byte.is_ascii_alphanumeric() && *byte < 0x80 {
             return None;
         }
         index += 1;
