@@ -36,20 +36,24 @@ pub(super) fn project_committed_sql(sql: &str) -> Option<String> {
 /// Detect a committed policy-definition mutation not yet owned by the final-policy state model.
 ///
 /// PostgreSQL `ALTER POLICY` can independently replace the role list, `USING`,
-/// and `WITH CHECK` clauses while omitted clauses retain prior state. Until this
-/// bounded validator owns that policy identity/state fold, accepting historical
-/// `CREATE POLICY` evidence would be fail-open. The input is already lexically
-/// normalized and transaction-projected, so statement-first token matching is
-/// sufficient and comments/literals cannot manufacture this marker.
+/// and `WITH CHECK` clauses while omitted clauses retain prior state. `DROP POLICY`
+/// removes the policy definition entirely. Until this bounded validator owns the
+/// policy identity/state fold, accepting historical `CREATE POLICY` evidence after
+/// either mutation would be fail-open. The input is already lexically normalized
+/// and transaction-projected, so statement-first token matching is sufficient and
+/// comments/literals cannot manufacture these markers.
 fn contains_unsupported_policy_mutation(sql: &str) -> bool {
     sql.split(';').any(|statement| {
         let mut tokens = statement.split_whitespace();
-        tokens
+        let Some(verb) = tokens.next() else {
+            return false;
+        };
+        matches!(
+            verb.to_ascii_uppercase().as_str(),
+            "ALTER" | "DROP"
+        ) && tokens
             .next()
-            .is_some_and(|token| token.eq_ignore_ascii_case("ALTER"))
-            && tokens
-                .next()
-                .is_some_and(|token| token.eq_ignore_ascii_case("POLICY"))
+            .is_some_and(|token| token.eq_ignore_ascii_case("POLICY"))
     })
 }
 
@@ -69,9 +73,10 @@ fn contains_unsupported_policy_mutation(sql: &str) -> bool {
 /// satisfy naming, tenant, temporal, RLS, or governance contracts. RLS table
 /// enablement is additionally folded in statement order so a committed trailing
 /// `DISABLE` or `NO FORCE` cannot reuse stale positive evidence from earlier SQL.
-/// Committed `ALTER POLICY` is temporarily rejected until policy identity and
-/// clause replacement have their own final-state authority; a rolled-back ALTER
-/// is removed by the transaction projection before this boundary.
+/// Committed `ALTER POLICY` and `DROP POLICY` are temporarily rejected until
+/// policy identity, clause replacement, and removal have their own final-state
+/// authority; a rolled-back mutation is removed by the transaction projection
+/// before this boundary.
 ///
 /// # Errors
 ///
@@ -285,12 +290,15 @@ mod tests {
     }
 
     #[test]
-    fn alter_policy_detection_is_statement_and_token_bounded() {
+    fn policy_mutation_detection_is_statement_and_token_bounded() {
         assert!(contains_unsupported_policy_mutation(
             "ALTER\nPOLICY tenant_isolation ON tenant_record USING ( true ) ;"
         ));
+        assert!(contains_unsupported_policy_mutation(
+            "DROP\tPOLICY tenant_isolation ON tenant_record ;"
+        ));
         assert!(!contains_unsupported_policy_mutation(
-            "SELECT alter_policy_marker ; CREATE POLICY tenant_isolation ON tenant_record USING ( true ) ;"
+            "SELECT alter_policy_marker, drop_policy_marker ; CREATE POLICY tenant_isolation ON tenant_record USING ( true ) ;"
         ));
     }
 }
