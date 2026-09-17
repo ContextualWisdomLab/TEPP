@@ -7,6 +7,7 @@
 
 use std::collections::BTreeMap;
 
+/// Final RLS enablement flags tracked for one normalized relation identity.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 struct RlsTableState {
     enabled: bool,
@@ -96,6 +97,7 @@ fn direct_table_target<'a>(statement: &'a [&'a str]) -> Option<&'a str> {
     Some(table)
 }
 
+/// One PostgreSQL table-level RLS state mutation in execution order.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum RlsTableAction {
     Enable,
