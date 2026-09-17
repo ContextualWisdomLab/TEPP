@@ -42,9 +42,9 @@ pub(super) fn project_committed_sql(sql: &str) -> Option<String> {
 /// before that transaction filter so in-transaction `SET LOCAL ROLE` and session
 /// authorization still identify the grantor that PostgreSQL recorded, while a
 /// later rollback cannot donate false membership or revocation evidence. The
-/// structural validator receives the same committed final-state projection, so
-/// rolled-back DDL cannot satisfy naming, tenant, temporal, RLS, or governance
-/// contracts.
+/// structural validator and facade-level RLS witnesses receive the same committed
+/// final-state projection, so rolled-back DDL or policy composition cannot
+/// satisfy naming, tenant, temporal, RLS, or governance contracts.
 ///
 /// # Errors
 ///
@@ -69,6 +69,15 @@ pub fn validate_migration_catalog(
     let Some(committed_grantor_sql) = project_committed_sql(&grantor_sql) else {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
+
+    let committed_requires_runtime_role =
+        super::validation::declares_row_level_security(&committed_up);
+    if committed_requires_runtime_role && !super::declares_tenant_session_guc(&committed_up) {
+        return Err(MigrationContractError::MissingTenantSessionGuc);
+    }
+    if committed_requires_runtime_role && !super::tenant_policies_bind_session_guc(&committed_up) {
+        return Err(MigrationContractError::MissingRlsPolicy);
+    }
 
     if !runtime_role_membership::runtime_membership_is_rls_safe(&committed_up)
         || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(
