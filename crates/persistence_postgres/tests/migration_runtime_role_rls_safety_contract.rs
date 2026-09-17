@@ -82,6 +82,21 @@ fn quoted_lowercase_runtime_name_keeps_postgresql_identity() {
 }
 
 #[test]
+fn quoted_special_role_names_cannot_alias_unquoted_role_specifications() {
+    for special_role in ["current_user", "current_role", "session_user"] {
+        let role_sql = format!(
+            "CREATE ROLE \"{special_role}\" BYPASSRLS;\nALTER ROLE {special_role} NOBYPASSRLS;\nALTER ROLE \"{special_role}\" RENAME TO tepp_app_runtime;"
+        );
+        let catalog = rls_catalog(&role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
 fn quoted_membership_grantee_case_cannot_remove_runtime_escape_path() {
     let catalog = rls_catalog(
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;\nREVOKE rls_bypass_operator FROM \"TEPP_APP_RUNTIME\";",
