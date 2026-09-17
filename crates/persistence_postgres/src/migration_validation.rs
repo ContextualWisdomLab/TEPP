@@ -326,17 +326,43 @@ fn apply_role_security_attributes(tokens: &[&str], state: &mut RoleSecurityState
     }
 }
 
-/// Extract the bounded unquoted role identifier from one lifecycle token.
+/// Return whether `ch` may start a PostgreSQL unquoted role identifier.
 ///
-/// The lifecycle tokenizer has already separated commas and semicolons; this
-/// helper therefore accepts only the existing ASCII identifier subset instead
-/// of silently extending the role grammar beyond the validator's contract.
+/// PostgreSQL's scanner accepts ASCII letters, underscore, and high-bit bytes
+/// at identifier start. Rust presents valid UTF-8 high-bit sequences as
+/// non-ASCII `char`s, which is the representation this lexical boundary sees.
+fn is_postgresql_role_identifier_start(ch: char) -> bool {
+    ch.is_ascii_alphabetic() || ch == '_' || !ch.is_ascii()
+}
+
+/// Return whether `ch` may continue a PostgreSQL unquoted role identifier.
+///
+/// Dollar signs and non-ASCII continuations are part of the same PostgreSQL
+/// token. Preserving them here prevents a distinct role such as
+/// `tepp_app_runtime$shadow` from aliasing the protected runtime in lifecycle
+/// state. TEPP's stricter durable naming policy remains a separate authority.
+fn is_postgresql_role_identifier_continuation(ch: char) -> bool {
+    is_postgresql_role_identifier_start(ch) || ch.is_ascii_digit() || ch == '$'
+}
+
+/// Extract one complete PostgreSQL unquoted role identifier from a lifecycle token.
+///
+/// The lifecycle tokenizer has already separated commas and semicolons. This
+/// helper preserves PostgreSQL identifier continuations instead of truncating
+/// them to an ASCII prefix, so CREATE/ALTER/RENAME/DROP share the same exact
+/// role identity before TEPP applies any stricter naming policy elsewhere.
 fn role_identifier(fragment: &str) -> String {
-    fragment
-        .trim_start_matches(|ch: char| !ch.is_ascii_alphanumeric() && ch != '_')
-        .chars()
-        .take_while(|ch| ch.is_ascii_alphanumeric() || *ch == '_')
-        .collect()
+    let mut chars = fragment.chars();
+    let Some(first) = chars.next() else {
+        return String::new();
+    };
+    if !is_postgresql_role_identifier_start(first) {
+        return String::new();
+    }
+
+    let mut identifier = String::from(first);
+    identifier.extend(chars.take_while(|ch| is_postgresql_role_identifier_continuation(*ch)));
+    identifier
 }
 
 /// Extract and case-fold a role identifier for PostgreSQL lifecycle comparison.
@@ -763,7 +789,7 @@ mod tests {
             "CREATE USER MAPPING FOR CURRENT_USER SERVER foreign_server;",
         )
         .expect("well-formed user mapping");
-        assert!(user_mapping.starts_with("CREATE USER MAPPING "));
+        assert!(normalized.starts_with("CREATE USER MAPPING "));
     }
 
     #[test]
