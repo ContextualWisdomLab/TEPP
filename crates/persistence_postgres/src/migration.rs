@@ -85,22 +85,38 @@ fn declares_tenant_session_guc(normalized_sql: &str) -> bool {
     false
 }
 
+/// Byte span occupied by a top-level policy clause keyword.
+///
+/// Keeping start and end separately lets callers slice only the predicate body
+/// while excluding headers such as policy names, target tables, commands, and
+/// role lists from tenant-isolation evidence.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct PolicyClauseSpan {
     start: usize,
     end: usize,
 }
 
+/// Row-predicate clauses whose PostgreSQL command semantics differ.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PolicyClause {
     Using,
     WithCheck,
 }
 
+/// Return whether one ASCII byte can continue the bounded SQL identifiers used here.
+///
+/// This helper is intentionally narrower than the PostgreSQL lexer because it
+/// is used only for ASCII keyword and role-list boundary checks after lexical
+/// normalization; durable object-name parsing uses the core identifier authority.
 fn is_sql_identifier_byte(byte: u8) -> bool {
     byte.is_ascii_alphanumeric() || byte == b'_'
 }
 
+/// Match an ASCII SQL keyword only when both sides are identifier boundaries.
+///
+/// The returned index is immediately after the keyword. Prefixes embedded in a
+/// longer identifier are rejected so policy-clause and Boolean parsing cannot
+/// manufacture structure from names such as `using_flag` or `orphan`.
 fn bounded_ascii_keyword(bytes: &[u8], start: usize, keyword: &[u8]) -> Option<usize> {
     let end = start.checked_add(keyword.len())?;
     if end > bytes.len() || !bytes[start..end].eq_ignore_ascii_case(keyword) {
@@ -218,6 +234,11 @@ fn policy_binds_tenant_identifier(policy_sql: &str) -> bool {
     false
 }
 
+/// Return whether one equality operand is exactly TEPP's tenant row key.
+///
+/// Only the direct identifier and its shipped `::text` cast are admitted; more
+/// complex expressions fail closed so computed values cannot masquerade as the
+/// authoritative row tenant.
 fn direct_tenant_operand(side: &str) -> bool {
     let compact = strip_enclosing_predicate_parentheses(side)
         .chars()
@@ -249,6 +270,11 @@ fn direct_tenant_session_operand(side: &str) -> bool {
     )
 }
 
+/// Return whether a depth-zero equality directly binds row tenant to session tenant.
+///
+/// Comparison operators such as `<=`, `>=`, `!=`, and `==` are excluded. Both
+/// operand orders are supported, but each side must satisfy the bounded direct
+/// operand contracts rather than merely containing the relevant identifiers.
 fn predicate_contains_top_level_tenant_session_equality(predicate_sql: &str) -> bool {
     let bytes = predicate_sql.as_bytes();
     let mut depth = 0usize;
@@ -286,6 +312,11 @@ fn predicate_contains_top_level_tenant_session_equality(predicate_sql: &str) -> 
     false
 }
 
+/// Remove only parentheses that enclose the entire predicate expression.
+///
+/// Parentheses that close before trailing content are structural and therefore
+/// retained. Malformed nesting also stops stripping so later checks fail closed
+/// rather than accepting a widened or synthetically simplified expression.
 fn strip_enclosing_predicate_parentheses(mut predicate_sql: &str) -> &str {
     loop {
         let trimmed = predicate_sql.trim();
@@ -319,6 +350,11 @@ fn strip_enclosing_predicate_parentheses(mut predicate_sql: &str) -> &str {
     }
 }
 
+/// Split a predicate on one bounded Boolean keyword only at depth zero.
+///
+/// Returning `None` means the keyword is absent at top level, not that the
+/// predicate is malformed. Nested alternatives remain inside their owning
+/// segment for recursive evaluation by the Boolean-path contract.
 fn split_top_level_boolean<'a>(predicate_sql: &'a str, keyword: &[u8]) -> Option<Vec<&'a str>> {
     let bytes = predicate_sql.as_bytes();
     let mut depth = 0usize;
@@ -390,6 +426,7 @@ fn policy_binds_tenant_session_equality(policy_sql: &str) -> bool {
     all_top_level_or_paths_bind_tenant_session(policy_sql)
 }
 
+/// PostgreSQL row-level-security commands represented by the bounded validator.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum PolicyCommand {
     All,
@@ -399,6 +436,10 @@ enum PolicyCommand {
     Delete,
 }
 
+/// Parse the command scope of one normalized CREATE POLICY statement.
+///
+/// Omitted `FOR` defaults to PostgreSQL `ALL`; unsupported or malformed command
+/// tokens return `None` so they cannot inherit permissive coverage accidentally.
 fn policy_command(policy_sql: &str) -> Option<PolicyCommand> {
     let using_clause = policy_clause_span(policy_sql, PolicyClause::Using);
     let check_clause = policy_clause_span(policy_sql, PolicyClause::WithCheck);
@@ -426,6 +467,10 @@ fn policy_command(policy_sql: &str) -> Option<PolicyCommand> {
     }
 }
 
+/// Return the exact table token targeted by one normalized policy header.
+///
+/// Only the header before `USING`/`WITH CHECK` is searched, preventing `ON`
+/// inside row expressions from donating a false policy target.
 fn policy_target_table(policy_sql: &str) -> Option<&str> {
     let using_clause = policy_clause_span(policy_sql, PolicyClause::Using);
     let check_clause = policy_clause_span(policy_sql, PolicyClause::WithCheck);
@@ -444,6 +489,11 @@ fn policy_target_table(policy_sql: &str) -> Option<&str> {
     tokens.get(on_index + 1).copied()
 }
 
+/// Parse the policy's explicit `TO` role list, defaulting omission to `PUBLIC`.
+///
+/// The grammar is intentionally `role (, role)*`; leading, trailing, adjacent,
+/// or missing commas and unsupported role tokens return `None` rather than being
+/// compacted into a different authorization scope.
 fn policy_roles(policy_sql: &str) -> Option<Vec<String>> {
     let using_clause = policy_clause_span(policy_sql, PolicyClause::Using);
     let check_clause = policy_clause_span(policy_sql, PolicyClause::WithCheck);
@@ -481,10 +531,20 @@ fn policy_roles(policy_sql: &str) -> Option<Vec<String>> {
     (!roles.is_empty() && !expect_role).then_some(roles)
 }
 
+/// Return whether one policy command covers a requested concrete command.
+///
+/// PostgreSQL `FOR ALL` is the only wildcard in this bounded model; otherwise
+/// coverage requires exact command equality.
 fn policy_command_applies(policy_command: PolicyCommand, requested_command: PolicyCommand) -> bool {
     policy_command == PolicyCommand::All || policy_command == requested_command
 }
 
+/// Validate the row-predicate clauses required by one policy command.
+///
+/// SELECT/DELETE require `USING`, INSERT requires only `WITH CHECK`, and
+/// ALL/UPDATE require `USING` plus a tenant-bound `WITH CHECK` when that clause
+/// is explicitly present. Reversed clause order or command-incompatible clauses
+/// fail closed.
 fn policy_row_predicates_bind_tenant_session(policy_sql: &str) -> bool {
     let Some(command) = policy_command(policy_sql) else {
         return false;
@@ -654,6 +714,12 @@ fn normalize_catalog_sql(sql: &str) -> Option<String> {
     }
 }
 
+/// Remove PostgreSQL's `CONCURRENTLY` modifier from CREATE INDEX structural syntax.
+///
+/// The lexical pass has already masked quoted/comment semicolons, so exposing
+/// real statement delimiters as tokens is safe. Only the modifier is removed;
+/// `UNIQUE`, `IF NOT EXISTS`, and the declared index name retain their order for
+/// downstream naming and qualified-name checks.
 fn canonicalize_concurrent_index_modifier(sql: &str) -> String {
     // PostgreSQL does not require whitespace after a statement delimiter. The
     // lexical pass has already masked quoted/commented semicolons, so exposing
