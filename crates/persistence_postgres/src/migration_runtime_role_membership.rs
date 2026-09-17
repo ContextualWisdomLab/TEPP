@@ -2,11 +2,9 @@
 //!
 //! Direct role attributes and lifecycle remain owned by `migration_validation`.
 //! This module owns the complementary membership invariant: an RLS-protected
-//! application runtime must not be able to become another role with `SET ROLE`.
-//! PostgreSQL makes `SET` membership transitive and enables it by default, so a
-//! runtime with any SET-capable membership can escape the direct
-//! `NOSUPERUSER NOBYPASSRLS` proof if the target role is or later becomes
-//! privileged.
+//! application runtime must not be able to become another role with `SET ROLE`
+//! or hold `ADMIN` on that role, which would let it grant the role back to
+//! itself with `SET TRUE`.
 
 use std::collections::BTreeMap;
 
@@ -14,20 +12,53 @@ const RUNTIME_ROLE: &str = "tepp_app_runtime";
 const CREATE_IN_ROLE_SENTINEL: &str = "__create_in_role_membership__";
 const MALFORMED_GRANTEE_SENTINEL: &str = "__malformed_membership_grantee_list__";
 
-/// Return whether the normalized migration's final runtime memberships disable SET ROLE.
+/// Security-relevant options for one runtime membership edge.
+///
+/// `SET` is the direct `SET ROLE` capability. `ADMIN` is equally security
+/// relevant because PostgreSQL allows an ADMIN member to grant the role back
+/// to itself with a different SET value. A membership is therefore safe for the
+/// RLS runtime only when both options are false.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct MembershipSecurityState {
+    set_enabled: bool,
+    admin_enabled: bool,
+}
+
+impl MembershipSecurityState {
+    /// PostgreSQL defaults for a newly created role membership.
+    const fn new() -> Self {
+        Self {
+            set_enabled: true,
+            admin_enabled: false,
+        }
+    }
+
+    /// Return whether the runtime can reach or manufacture a SET ROLE path.
+    const fn can_escape_runtime_identity(self) -> bool {
+        self.set_enabled || self.admin_enabled
+    }
+}
+
+/// Explicit security-relevant options supplied by one membership GRANT.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct ExplicitMembershipOptions {
+    set_enabled: Option<bool>,
+    admin_enabled: Option<bool>,
+}
+
+/// Return whether the normalized migration's final runtime memberships disable SET ROLE escalation.
 ///
 /// Object-privilege grants/revokes fall outside the bounded membership grammar
 /// because their privilege/object tokens do not form a comma-separated role
-/// list before `TO`/`FROM`. For role membership, PostgreSQL defaults SET to true
-/// on creation but retains the current option when a later GRANT omits SET; the
-/// small state map mirrors that ordering so an explicit later `WITH SET FALSE`
-/// can restore safety. `CREATE ROLE ... IN ROLE ...` and its deprecated
-/// PostgreSQL `IN GROUP` alias are represented as `CREATE TYPE` by the existing
-/// structural alias canonicalizer and are conservatively SET-capable.
+/// list before `TO`/`FROM`. New memberships default to `SET TRUE, ADMIN FALSE`;
+/// later GRANTs retain omitted options. Both SET and ADMIN must be false in the
+/// final state: PostgreSQL documents that ADMIN can be used to grant the role
+/// back to oneself with SET enabled. `CREATE ROLE ... IN ROLE ...` and its
+/// deprecated `IN GROUP` alias remain conservatively SET-capable.
 pub(super) fn runtime_membership_is_rls_safe(sql: &str) -> bool {
     let tokenized = sql.replace(';', " ; ").replace(',', " , ");
     let tokens = tokenized.split_whitespace().collect::<Vec<_>>();
-    let mut memberships = BTreeMap::<String, bool>::new();
+    let mut memberships = BTreeMap::<String, MembershipSecurityState>::new();
     let mut index = 0usize;
 
     while index < tokens.len() {
@@ -44,12 +75,17 @@ pub(super) fn runtime_membership_is_rls_safe(sql: &str) -> bool {
         {
             apply_runtime_membership_revoke(statement, &mut memberships);
         } else if create_runtime_role_in_role(statement) {
-            memberships.insert(CREATE_IN_ROLE_SENTINEL.to_owned(), true);
+            memberships.insert(
+                CREATE_IN_ROLE_SENTINEL.to_owned(),
+                MembershipSecurityState::new(),
+            );
         }
         index = end.saturating_add(1);
     }
 
-    memberships.values().all(|set_enabled| !set_enabled)
+    memberships
+        .values()
+        .all(|state| !state.can_escape_runtime_identity())
 }
 
 /// Return the exclusive end of the semicolon-delimited statement containing `start`.
@@ -139,43 +175,70 @@ fn runtime_grantee_list(statement: &[&str], delimiter: usize) -> Option<(bool, u
 /// Apply one PostgreSQL role-membership GRANT that targets the application runtime.
 ///
 /// The granted-role and grantee lists are parsed positionally before optional
-/// clauses are inspected. New memberships default SET to true; on an existing
-/// membership, an omitted SET option retains the previous value.
-fn apply_runtime_membership_grant(statement: &[&str], memberships: &mut BTreeMap<String, bool>) {
+/// clauses are inspected. New memberships use PostgreSQL's SET-true/ADMIN-false
+/// defaults; later GRANTs update only explicitly supplied security options.
+fn apply_runtime_membership_grant(
+    statement: &[&str],
+    memberships: &mut BTreeMap<String, MembershipSecurityState>,
+) {
     let Some(to_index) = membership_delimiter(statement, 1, "TO") else {
         return;
     };
     let Some((targets_runtime, trailing_start)) = runtime_grantee_list(statement, to_index) else {
-        memberships.insert(MALFORMED_GRANTEE_SENTINEL.to_owned(), true);
+        memberships.insert(
+            MALFORMED_GRANTEE_SENTINEL.to_owned(),
+            MembershipSecurityState::new(),
+        );
         return;
     };
     if !targets_runtime {
         return;
     }
 
-    let set_option = explicit_set_option(statement, trailing_start);
+    let options = explicit_membership_options(statement, trailing_start);
     for role in membership_role_names(&statement[1..to_index]) {
-        match set_option {
-            Some(set_enabled) => {
-                memberships.insert(role, set_enabled);
+        match memberships.get_mut(&role) {
+            Some(state) => {
+                if let Some(set_enabled) = options.set_enabled {
+                    state.set_enabled = set_enabled;
+                }
+                if let Some(admin_enabled) = options.admin_enabled {
+                    state.admin_enabled = admin_enabled;
+                }
             }
             None => {
-                memberships.entry(role).or_insert(true);
+                let mut state = MembershipSecurityState::new();
+                if let Some(set_enabled) = options.set_enabled {
+                    state.set_enabled = set_enabled;
+                }
+                if let Some(admin_enabled) = options.admin_enabled {
+                    state.admin_enabled = admin_enabled;
+                }
+                memberships.insert(role, state);
             }
         }
     }
 }
 
+/// Security-relevant option targeted by a membership-option REVOKE.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RevokedMembershipOption {
+    Set,
+    Admin,
+}
+
 /// Apply one PostgreSQL role-membership REVOKE that targets the application runtime.
 ///
-/// Plain membership REVOKE removes the edge. `REVOKE SET OPTION FOR` preserves
-/// an existing membership but disables SET ROLE; it must not create a phantom
-/// SET-false entry when no membership exists, because a later bare GRANT would
-/// create a fresh membership whose PostgreSQL SET default is true. ADMIN/INHERIT
-/// option revocation does not change SET state. Object privilege revokes stay
-/// outside this state map because they do not match the bounded role-list grammar.
-fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMap<String, bool>) {
-    let (roles_start, revoke_set_only) = if statement
+/// Plain membership REVOKE removes the edge. `REVOKE SET OPTION FOR` and
+/// `REVOKE ADMIN OPTION FOR` mutate only existing memberships; neither creates a
+/// phantom safe state. INHERIT-option revocation is outside the SET/ADMIN escape
+/// invariant and leaves this map unchanged. Object privilege revokes stay
+/// outside the state map because they do not match the bounded role-list grammar.
+fn apply_runtime_membership_revoke(
+    statement: &[&str],
+    memberships: &mut BTreeMap<String, MembershipSecurityState>,
+) {
+    let (roles_start, revoked_option) = if statement
         .get(1)
         .is_some_and(|token| token.eq_ignore_ascii_case("SET"))
         && statement
@@ -185,12 +248,21 @@ fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMa
             .get(3)
             .is_some_and(|token| token.eq_ignore_ascii_case("FOR"))
     {
-        (4usize, true)
+        (4usize, Some(RevokedMembershipOption::Set))
     } else if statement
         .get(1)
-        .is_some_and(|token| {
-            token.eq_ignore_ascii_case("ADMIN") || token.eq_ignore_ascii_case("INHERIT")
-        })
+        .is_some_and(|token| token.eq_ignore_ascii_case("ADMIN"))
+        && statement
+            .get(2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("OPTION"))
+        && statement
+            .get(3)
+            .is_some_and(|token| token.eq_ignore_ascii_case("FOR"))
+    {
+        (4usize, Some(RevokedMembershipOption::Admin))
+    } else if statement
+        .get(1)
+        .is_some_and(|token| token.eq_ignore_ascii_case("INHERIT"))
         && statement
             .get(2)
             .is_some_and(|token| token.eq_ignore_ascii_case("OPTION"))
@@ -200,14 +272,17 @@ fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMa
     {
         return;
     } else {
-        (1usize, false)
+        (1usize, None)
     };
 
     let Some(from_index) = membership_delimiter(statement, roles_start, "FROM") else {
         return;
     };
     let Some((targets_runtime, _trailing_start)) = runtime_grantee_list(statement, from_index) else {
-        memberships.insert(MALFORMED_GRANTEE_SENTINEL.to_owned(), true);
+        memberships.insert(
+            MALFORMED_GRANTEE_SENTINEL.to_owned(),
+            MembershipSecurityState::new(),
+        );
         return;
     };
     if !targets_runtime {
@@ -215,12 +290,20 @@ fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMa
     }
 
     for role in membership_role_names(&statement[roles_start..from_index]) {
-        if revoke_set_only {
-            if let Some(set_enabled) = memberships.get_mut(&role) {
-                *set_enabled = false;
+        match revoked_option {
+            Some(RevokedMembershipOption::Set) => {
+                if let Some(state) = memberships.get_mut(&role) {
+                    state.set_enabled = false;
+                }
             }
-        } else {
-            memberships.remove(&role);
+            Some(RevokedMembershipOption::Admin) => {
+                if let Some(state) = memberships.get_mut(&role) {
+                    state.admin_enabled = false;
+                }
+            }
+            None => {
+                memberships.remove(&role);
+            }
         }
     }
 }
@@ -239,33 +322,47 @@ fn membership_role_names(tokens: &[&str]) -> Vec<String> {
         .collect()
 }
 
-/// Return an explicitly stated SET membership option, or `None` when omitted.
+/// Return explicitly supplied SET and ADMIN membership options.
 ///
 /// `trailing_start` is the first token after the complete grantee list, so role
 /// names projected from quoted keywords cannot impersonate the `WITH` clause.
-/// PostgreSQL accepts `OPTION` as the true spelling. Malformed SET values map to
-/// true so the validation boundary fails closed rather than treating an
-/// unrecognized membership clause as a safety restoration.
-fn explicit_set_option(statement: &[&str], trailing_start: usize) -> Option<bool> {
-    let with_index = statement[trailing_start..]
+/// PostgreSQL accepts `OPTION` as the true spelling. Malformed or missing values
+/// after a recognized security option map to true so the boundary fails closed.
+fn explicit_membership_options(
+    statement: &[&str],
+    trailing_start: usize,
+) -> ExplicitMembershipOptions {
+    let Some(with_index) = statement[trailing_start..]
         .iter()
         .position(|token| token.eq_ignore_ascii_case("WITH"))
-        .map(|relative| trailing_start + relative)?;
+        .map(|relative| trailing_start + relative)
+    else {
+        return ExplicitMembershipOptions::default();
+    };
+
+    let mut options = ExplicitMembershipOptions::default();
     let mut index = with_index + 1;
     while index < statement.len() {
-        if statement[index].eq_ignore_ascii_case("SET") {
-            return Some(
-                !statement
-                    .get(index + 1)
-                    .is_some_and(|value| value.eq_ignore_ascii_case("FALSE")),
-            );
-        }
         if statement[index].eq_ignore_ascii_case("GRANTED") {
             break;
         }
+        let value = statement
+            .get(index + 1)
+            .map(|token| !token.eq_ignore_ascii_case("FALSE"))
+            .unwrap_or(true);
+        if statement[index].eq_ignore_ascii_case("SET") {
+            options.set_enabled = Some(value);
+            index += 2;
+            continue;
+        }
+        if statement[index].eq_ignore_ascii_case("ADMIN") {
+            options.admin_enabled = Some(value);
+            index += 2;
+            continue;
+        }
         index += 1;
     }
-    None
+    options
 }
 
 /// Return whether canonicalized role creation adds the runtime to another role.
@@ -307,11 +404,14 @@ mod tests {
     }
 
     #[test]
-    fn set_capable_runtime_memberships_fail_closed() {
+    fn set_or_admin_capable_runtime_memberships_fail_closed() {
         for sql in [
             "GRANT reporting_operator TO tepp_app_runtime ;",
             "GRANT reporting_operator TO tepp_app_runtime WITH SET TRUE ;",
             "GRANT reporting_operator TO tepp_app_runtime WITH SET OPTION ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE , ADMIN TRUE ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH ADMIN TRUE , SET FALSE ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE ; GRANT reporting_operator TO tepp_app_runtime WITH ADMIN TRUE ;",
             "GRANT on TO tepp_app_runtime ;",
             "GRANT reporting_operator , on TO tepp_app_runtime ;",
             "GRANT to TO tepp_app_runtime ;",
@@ -327,7 +427,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_set_false_or_later_revoke_restores_membership_safety() {
+    fn explicit_security_option_repair_or_later_revoke_restores_membership_safety() {
         for sql in [
             "GRANT reporting_operator TO tepp_app_runtime WITH INHERIT TRUE , SET FALSE ;",
             "GRANT reporting_operator TO with , tepp_app_runtime WITH SET FALSE ;",
@@ -335,6 +435,8 @@ mod tests {
             "GRANT reporting_operator TO tepp_app_runtime ; REVOKE reporting_operator FROM tepp_app_runtime ;",
             "GRANT reporting_operator TO tepp_app_runtime ; REVOKE reporting_operator FROM cascade , tepp_app_runtime ;",
             "GRANT reporting_operator TO tepp_app_runtime ; GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE , ADMIN TRUE ; REVOKE ADMIN OPTION FOR reporting_operator FROM tepp_app_runtime ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE , ADMIN TRUE ; GRANT reporting_operator TO tepp_app_runtime WITH ADMIN FALSE ;",
         ] {
             assert!(runtime_membership_is_rls_safe(sql), "{sql}");
         }
