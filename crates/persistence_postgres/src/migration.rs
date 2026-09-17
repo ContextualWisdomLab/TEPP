@@ -426,6 +426,28 @@ fn policy_command(policy_sql: &str) -> Option<PolicyCommand> {
     }
 }
 
+fn policy_target_table(policy_sql: &str) -> Option<&str> {
+    let using_clause = policy_clause_span(policy_sql, PolicyClause::Using);
+    let check_clause = policy_clause_span(policy_sql, PolicyClause::WithCheck);
+    let header_end = [using_clause, check_clause]
+        .into_iter()
+        .flatten()
+        .map(|span| span.start)
+        .min()
+        .unwrap_or(policy_sql.len());
+    let tokens = policy_sql[..header_end].split_whitespace().collect::<Vec<_>>();
+    let on_index = tokens
+        .iter()
+        .enumerate()
+        .skip(2)
+        .find_map(|(index, token)| token.eq_ignore_ascii_case("ON").then_some(index))?;
+    tokens.get(on_index + 1).copied()
+}
+
+fn policy_command_applies(policy_command: PolicyCommand, requested_command: PolicyCommand) -> bool {
+    policy_command == PolicyCommand::All || policy_command == requested_command
+}
+
 fn policy_row_predicates_bind_tenant_session(policy_sql: &str) -> bool {
     let Some(command) = policy_command(policy_sql) else {
         return false;
@@ -482,34 +504,75 @@ fn policy_is_restrictive(policy_sql: &str) -> bool {
 }
 
 /// Bind tenant identity and tenant-session evidence to every policy that can
-/// independently admit rows. PostgreSQL permissive policies are OR-composed.
+/// independently admit rows. PostgreSQL permissive policies are OR-composed;
+/// restrictive policies are AND-composed only after a permissive policy grants
+/// access. A restrictive policy therefore requires permissive coverage for each
+/// command it can constrain, otherwise PostgreSQL's default-deny composition
+/// makes that command path operationally inaccessible.
+///
 /// Command semantics determine which tenant-bound predicates are mandatory:
-/// read-capable policies require `USING`, insert requires `WITH CHECK`, and
-/// `ALL`/`UPDATE` reuse a valid `USING` for writes only when `WITH CHECK` is
-/// omitted. Restrictive policies are AND-composed and may add narrower
-/// conditions without duplicating the tenant predicate.
+/// read-capable permissive policies require `USING`, insert requires
+/// `WITH CHECK`, and `ALL`/`UPDATE` reuse a valid `USING` for writes only when
+/// `WITH CHECK` is omitted. Restrictive policies may add narrower conditions
+/// without duplicating the tenant predicate once matching permissive coverage
+/// exists.
 fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
     const CREATE_POLICY: &str = "create policy";
+    const CONCRETE_COMMANDS: [PolicyCommand; 4] = [
+        PolicyCommand::Select,
+        PolicyCommand::Insert,
+        PolicyCommand::Update,
+        PolicyCommand::Delete,
+    ];
 
     let lower = normalized_sql.to_ascii_lowercase();
     let mut search_from = 0usize;
     let mut saw_policy = false;
+    let mut permissive_coverage = Vec::new();
+    let mut restrictive_requirements = Vec::new();
+
     while let Some(relative) = lower[search_from..].find(CREATE_POLICY) {
         saw_policy = true;
         let start = search_from + relative;
         let statement_tail = &normalized_sql[start..];
         let statement_end = statement_tail.find(';').unwrap_or(statement_tail.len());
         let statement = &statement_tail[..statement_end];
-        if !policy_is_restrictive(statement)
-            && (!declares_tenant_session_guc(statement)
-                || !policy_binds_tenant_identifier(statement)
-                || !policy_row_predicates_bind_tenant_session(statement))
-        {
+        let Some(table) = policy_target_table(statement) else {
             return false;
+        };
+        let Some(command) = policy_command(statement) else {
+            return false;
+        };
+
+        if policy_is_restrictive(statement) {
+            restrictive_requirements.push((table.to_ascii_lowercase(), command));
+        } else {
+            if !declares_tenant_session_guc(statement)
+                || !policy_binds_tenant_identifier(statement)
+                || !policy_row_predicates_bind_tenant_session(statement)
+            {
+                return false;
+            }
+            permissive_coverage.push((table.to_ascii_lowercase(), command));
         }
         search_from = start + CREATE_POLICY.len();
     }
-    saw_policy
+
+    if !saw_policy {
+        return false;
+    }
+
+    restrictive_requirements.into_iter().all(|(table, restrictive_command)| {
+        CONCRETE_COMMANDS
+            .into_iter()
+            .filter(|command| policy_command_applies(restrictive_command, *command))
+            .all(|command| {
+                permissive_coverage.iter().any(|(permissive_table, permissive_command)| {
+                    permissive_table == &table
+                        && policy_command_applies(*permissive_command, command)
+                })
+            })
+    })
 }
 
 /// Normalize SQL and then remove PostgreSQL's `CONCURRENTLY` index modifier
@@ -773,6 +836,12 @@ mod tests {
         ));
         assert!(tenant_policies_bind_session_guc(
             "create policy document_record_tenant_isolation on document_record using(tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_visibility_guard on document_record as restrictive for select using(document_record_id is not null);"
+        ));
+        assert!(!tenant_policies_bind_session_guc(
+            "create policy document_record_visibility_guard on document_record as restrictive for select using(document_record_id is not null);"
+        ));
+        assert!(!tenant_policies_bind_session_guc(
+            "create policy document_record_insert_isolation on document_record as permissive for insert with check(tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_visibility_guard on document_record as restrictive for select using(document_record_id is not null);"
         ));
         assert!(policy_is_restrictive(
             "create policy document_record_visibility_guard on document_record AS RESTRICTIVE for select using(true)"
