@@ -1,8 +1,8 @@
 use persistence_postgres::{MigrationCatalog, MigrationContractError, validate_migration_catalog};
 
-#[test]
-fn rolled_back_permissive_policy_cannot_cover_surviving_restrictive_policy() {
-    let up_sql = r#"
+fn policy_catalog(transaction_outcome: &str) -> MigrationCatalog {
+    let up_sql = format!(
+        r#"
         CREATE TABLE tenant_record (
             tenant_record_id uuid PRIMARY KEY,
             system_time timestamptz NOT NULL
@@ -25,13 +25,24 @@ fn rolled_back_permissive_policy_cannot_cover_surviving_restrictive_policy() {
             USING (
                 tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
             );
-        ROLLBACK;
-    "#;
-    let catalog = MigrationCatalog::from_sql(up_sql, "DROP TABLE tenant_record;");
+        {transaction_outcome};
+        "#
+    );
+    MigrationCatalog::from_sql(&up_sql, "DROP TABLE tenant_record;")
+}
 
+#[test]
+fn rolled_back_permissive_policy_cannot_cover_surviving_restrictive_policy() {
+    let catalog = policy_catalog("ROLLBACK");
     assert_eq!(
         validate_migration_catalog(&catalog),
         Err(MigrationContractError::MissingRlsPolicy),
         "rolled-back permissive policy must not satisfy final restrictive-policy composition"
     );
+}
+
+#[test]
+fn committed_permissive_policy_can_cover_surviving_restrictive_policy() {
+    let catalog = policy_catalog("COMMIT");
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
 }
