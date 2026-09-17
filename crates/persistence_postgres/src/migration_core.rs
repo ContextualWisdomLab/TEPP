@@ -1307,7 +1307,7 @@ mod tests {
         let missing_membership = r"
             CONSTRAINT document_record_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
             CONSTRAINT document_record_system_order CHECK (system_to IS NULL OR system_from <= system_to)
-            CONSTRAINT document_record_revision_positive CHECK (true)
+            CONSTRAINT document_record_revision_positive CHECK (revision_number > 0)
             CONSTRAINT event_instance_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
             CONSTRAINT event_instance_system_order CHECK (system_to IS NULL OR system_from <= system_to)
         ";
@@ -1470,8 +1470,7 @@ mod tests {
                 system_time timestamptz NOT NULL,
                 available_time timestamptz NOT NULL,
                 CONSTRAINT document_record_positive CHECK (revision_number > 0)
-            );
-            ",
+            );",
             "DROP TABLE document_record;",
         );
         validate_migration_catalog(&nested).expect("nested parentheses");
