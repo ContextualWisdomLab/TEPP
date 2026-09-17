@@ -248,6 +248,9 @@ fn validate_retention_legal_hold(up_sql: &str) -> Result<(), MigrationContractEr
 }
 
 fn validate_table_body(table: &str, body: &str) -> Result<(), MigrationContractError> {
+    if has_empty_table_element(body) {
+        return Err(MigrationContractError::EmptyMigrationSql);
+    }
     let columns = parse_column_names(body);
     for column in &columns {
         if !is_multi_word_snake_case(column) {
@@ -491,11 +494,11 @@ fn parse_constraint_names(sql: &str) -> BTreeSet<String> {
     parse_names_after(sql, "CONSTRAINT")
 }
 
-/// Return the column names declared directly in a `CREATE TABLE` body.
+/// Split one explicit `CREATE TABLE (...)` body at depth-one commas.
 ///
-/// Table-level constraint clauses name no column and are skipped.
-fn parse_column_names(body: &str) -> BTreeSet<String> {
-    let mut names = BTreeSet::new();
+/// Parenthesized type arguments and table-constraint column lists remain within
+/// their owning element because their commas occur at depth two or deeper.
+fn split_table_elements(body: &str) -> Vec<&str> {
     let mut depth = 0i32;
     let mut start = 0usize;
     let mut segments = Vec::new();
@@ -511,7 +514,41 @@ fn parse_column_names(body: &str) -> BTreeSet<String> {
         }
     }
     segments.push(&body[start..]);
-    for segment in segments {
+    segments
+}
+
+/// Return whether a comma-separated `CREATE TABLE` body contains an empty
+/// element rather than a column, table constraint, or `LIKE` clause.
+///
+/// PostgreSQL permits an entirely empty element list (`CREATE TABLE x ()`), but
+/// once a comma is present each side must contain an element. Stripping only the
+/// single outer table-body parenthesis from the first/last segment preserves
+/// nested type and constraint parentheses while exposing leading, interior, and
+/// trailing comma gaps.
+fn has_empty_table_element(body: &str) -> bool {
+    let segments = split_table_elements(body);
+    if segments.len() < 2 {
+        return false;
+    }
+    let last = segments.len() - 1;
+    segments.iter().enumerate().any(|(index, segment)| {
+        let mut payload = segment.trim();
+        if index == 0 {
+            payload = payload.strip_prefix('(').unwrap_or(payload).trim_start();
+        }
+        if index == last {
+            payload = payload.strip_suffix(')').unwrap_or(payload).trim_end();
+        }
+        payload.is_empty()
+    })
+}
+
+/// Return the column names declared directly in a `CREATE TABLE` body.
+///
+/// Table-level constraint clauses name no column and are skipped.
+fn parse_column_names(body: &str) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    for segment in split_table_elements(body) {
         let segment = segment.trim_start_matches(['(', ')']).trim();
         let name = leading_identifier(segment);
         let lowered = name.to_ascii_lowercase();
@@ -725,7 +762,6 @@ mod tests {
                 run_cost numeric(12, 4) NOT NULL,
                 system_time timestamptz NOT NULL,
                 PRIMARY KEY (tenant_record_id),
-                ,
                 CHECK (run_cost > 0)
             );",
             "DROP TABLE tenant_record;",
