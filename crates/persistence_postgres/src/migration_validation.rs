@@ -43,10 +43,9 @@ pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bo
             );
             declared_roles.insert(name, state);
         } else if is_role_drop_alias(&tokens, index) {
-            let names = drop_statement_role_names(&tokens, index);
-            if names.is_empty() {
+            let Some(names) = drop_statement_role_names(&tokens, index) else {
                 return Some(false);
-            }
+            };
             for name in names {
                 declared_roles.remove(&name);
             }
@@ -297,7 +296,13 @@ fn normalized_role_identifier(fragment: &str) -> String {
     role_identifier(fragment).to_ascii_lowercase()
 }
 
-fn drop_statement_role_names(tokens: &[&str], drop_index: usize) -> Vec<String> {
+/// Parse the `DROP ROLE|USER|GROUP [IF EXISTS] name [, ...]` target list.
+///
+/// The lifecycle validator must reject malformed separators instead of silently
+/// compacting them: PostgreSQL requires an alternating `name (, name)*` list,
+/// and accepting leading, trailing, adjacent, or missing commas would let an
+/// invalid migration retain a previously safe runtime-role state in evidence.
+fn drop_statement_role_names(tokens: &[&str], drop_index: usize) -> Option<Vec<String>> {
     let mut name_index = drop_index + 2;
     if tokens
         .get(name_index)
@@ -310,19 +315,34 @@ fn drop_statement_role_names(tokens: &[&str], drop_index: usize) -> Vec<String> 
     }
 
     let mut names = Vec::new();
+    let mut expects_name = true;
     while let Some(token) = tokens.get(name_index) {
         if *token == ";" {
             break;
         }
-        if *token != "," {
-            let name = normalized_role_identifier(token);
-            if !name.is_empty() {
-                names.push(name);
+        if expects_name {
+            if *token == "," {
+                return None;
             }
+            let name = role_identifier(token);
+            if name.is_empty() || name.len() != token.len() {
+                return None;
+            }
+            names.push(name.to_ascii_lowercase());
+            expects_name = false;
+        } else {
+            if *token != "," {
+                return None;
+            }
+            expects_name = true;
         }
         name_index += 1;
     }
-    names
+    if names.is_empty() || expects_name {
+        None
+    } else {
+        Some(names)
+    }
 }
 
 fn canonicalize_structural_keywords(sql: &str) -> String {
