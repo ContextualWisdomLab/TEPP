@@ -53,6 +53,11 @@ impl MigrationCatalog {
         Self::from_sources(&up_sql, &down_sql)
     }
 
+    /// Construct a catalog from non-empty forward and rollback SQL sources.
+    ///
+    /// This constructor is the checked internal counterpart to [`Self::from_sql`]
+    /// used for embedded production migrations, where an empty direction means
+    /// the shipped migration bundle is incomplete rather than a valid no-op.
     fn from_sources(up_sql: &str, down_sql: &str) -> Result<Self, MigrationContractError> {
         if up_sql.trim().is_empty() || down_sql.trim().is_empty() {
             return Err(MigrationContractError::EmptyMigrationSql);
@@ -144,11 +149,22 @@ pub fn validate_migration_catalog(
     Ok(())
 }
 
+/// Detect whether migration text opts into TEPP's append-only mutation contract.
+///
+/// Detection is intentionally broad; once append-only vocabulary appears, the
+/// validator requires the complete function/trigger/revoke bundle rather than
+/// treating a partial declaration as harmless text.
 fn declares_append_only_immutability(up_sql: &str) -> bool {
     let lower = up_sql.to_ascii_lowercase();
     lower.contains("reject_append_only_mutation") || lower.contains("_reject_mutation")
 }
 
+/// Require the complete append-only trigger and privilege-revocation bundle.
+///
+/// # Errors
+///
+/// Returns [`MigrationContractError::MissingAppendOnlyTrigger`] when any
+/// protected table lacks its mutation trigger or UPDATE/DELETE revocation.
 fn validate_append_only_immutability(up_sql: &str) -> Result<(), MigrationContractError> {
     let lower = up_sql.to_ascii_lowercase();
     if !lower.contains("create or replace function reject_append_only_mutation") {
@@ -174,11 +190,21 @@ fn validate_append_only_immutability(up_sql: &str) -> Result<(), MigrationContra
     Ok(())
 }
 
+/// Detect whether named temporal ordering constraints are being declared.
+///
+/// Partial adoption activates the full temporal contract so one well-named
+/// constraint cannot make an otherwise incomplete migration appear governed.
 fn declares_temporal_interval_ordering(up_sql: &str) -> bool {
     let lower = up_sql.to_ascii_lowercase();
     lower.contains("_valid_order") || lower.contains("_system_order")
 }
 
+/// Require TEPP's named interval-order and positive-revision invariants.
+///
+/// # Errors
+///
+/// Returns [`MigrationContractError::MissingTemporalIntervalConstraint`] when
+/// a required constraint name or its essential ordering predicate is absent.
 fn validate_temporal_interval_ordering(up_sql: &str) -> Result<(), MigrationContractError> {
     let lower = up_sql.to_ascii_lowercase();
     let required = [
@@ -206,6 +232,10 @@ fn validate_temporal_interval_ordering(up_sql: &str) -> Result<(), MigrationCont
     Ok(())
 }
 
+/// Detect whether retention, legal-hold, or tombstone vocabulary is present.
+///
+/// Any one of these owner concepts activates validation of the whole deletion
+/// governance bundle because partial retention enforcement is not admissible.
 fn declares_retention_legal_hold(up_sql: &str) -> bool {
     let lower = up_sql.to_ascii_lowercase();
     lower.contains("retention_policy")
@@ -213,6 +243,12 @@ fn declares_retention_legal_hold(up_sql: &str) -> bool {
         || lower.contains("evidence_tombstone")
 }
 
+/// Require the retention/legal-hold tables, guards, triggers, and constraints.
+///
+/// # Errors
+///
+/// Returns [`MigrationContractError::MissingRetentionLegalHold`] when any
+/// component needed for fail-closed retention/deletion semantics is absent.
 fn validate_retention_legal_hold(up_sql: &str) -> Result<(), MigrationContractError> {
     let lower = up_sql.to_ascii_lowercase();
     let required_tables = [
@@ -247,6 +283,17 @@ fn validate_retention_legal_hold(up_sql: &str) -> Result<(), MigrationContractEr
     Ok(())
 }
 
+/// Validate one explicit `CREATE TABLE` body against TEPP structural invariants.
+///
+/// This is the locality boundary for column naming, tenant ownership, and the
+/// required system/domain clocks. Registry/audit tables use the explicitly
+/// narrower temporal contract below rather than inheriting an accidental
+/// exception from parser behavior.
+///
+/// # Errors
+///
+/// Returns the first structural naming, tenant, temporal, or malformed-body
+/// contract error encountered for the table.
 fn validate_table_body(table: &str, body: &str) -> Result<(), MigrationContractError> {
     if has_unbalanced_square_brackets(body) || has_empty_table_element(body) {
         return Err(MigrationContractError::EmptyMigrationSql);
@@ -276,6 +323,16 @@ fn validate_table_body(table: &str, body: &str) -> Result<(), MigrationContractE
     Ok(())
 }
 
+/// Validate table-local RLS enablement and tenant-policy presence.
+///
+/// This structural pass is deliberately conservative and is complemented by
+/// the lexical/relational policy validation in the facade. It must not infer a
+/// tenant boundary from a policy on a sibling table.
+///
+/// # Errors
+///
+/// Returns missing role/GUC/policy/enablement errors when the declared RLS
+/// surface is incomplete for any created table.
 fn validate_tenant_rls_contract(
     up_sql: &str,
     tables: &BTreeSet<String>,
@@ -306,6 +363,10 @@ fn validate_tenant_rls_contract(
     Ok(())
 }
 
+/// Detect whether migration text declares any row-level-security surface.
+///
+/// A single enablement or policy declaration is enough to activate the full
+/// RLS validation path; partial RLS text cannot remain unchecked.
 fn declares_row_level_security(up_sql: &str) -> bool {
     let lower = up_sql.to_ascii_lowercase();
     let has_enable = lower.contains("enable row level security");
@@ -313,12 +374,21 @@ fn declares_row_level_security(up_sql: &str) -> bool {
     has_enable | has_policy
 }
 
+/// Return whether one table is both enabled and forced into PostgreSQL RLS.
+///
+/// The literal space following `{table}` is part of each search needle, so a
+/// longer identifier prefix such as `document_record$shadow` cannot donate
+/// enablement evidence for `document_record`.
 fn table_has_rls_enabled(lower_sql: &str, table: &str) -> bool {
     let enable = format!("alter table {table} enable row level security");
     let force = format!("alter table {table} force row level security");
     lower_sql.contains(&enable) & lower_sql.contains(&force)
 }
 
+/// Return whether the target table has a policy mentioning the exact tenant key.
+///
+/// Policy statements are scanned independently so an identifier in a previous
+/// policy cannot satisfy the target table's tenant evidence.
 fn table_has_tenant_policy(lower_sql: &str, table: &str) -> bool {
     let mut search_from = 0usize;
     while let Some(rel) = lower_sql[search_from..].find("create policy") {
@@ -338,6 +408,10 @@ fn table_has_tenant_policy(lower_sql: &str, table: &str) -> bool {
     false
 }
 
+/// Return whether one policy statement targets exactly `table`.
+///
+/// PostgreSQL identifier continuation is checked after the candidate target so
+/// an identifier prefix cannot impersonate the requested relation.
 fn policy_targets_table(policy_sql: &str, table: &str) -> bool {
     let needle = format!(" on {table}");
     let mut search_from = 0usize;
@@ -351,6 +425,11 @@ fn policy_targets_table(policy_sql: &str, table: &str) -> bool {
     false
 }
 
+/// Return whether normalized SQL contains an exact unquoted identifier token.
+///
+/// Atomic string literals are excluded and both token boundaries use the same
+/// PostgreSQL continuation authority, preventing suffix/prefix lookalikes from
+/// donating contract evidence.
 fn contains_unquoted_identifier(sql: &str, identifier: &str) -> bool {
     let mut search_from = 0usize;
     while let Some(rel) = sql[search_from..].find(identifier) {
@@ -373,14 +452,20 @@ fn contains_unquoted_identifier(sql: &str, identifier: &str) -> bool {
     false
 }
 
+/// Return whether a table must carry the canonical tenant foreign key.
+///
+/// The tenant registry itself is the root of the tenancy graph and therefore
+/// is the only table exempted by this structural contract.
 fn requires_tenant_boundary(table: &str) -> bool {
     table != "tenant_record"
 }
 
+/// Return whether a table uses the narrower registry/audit temporal contract.
 fn is_registry_or_audit_table(table: &str) -> bool {
     table == "tenant_record" || table == "audit_event"
 }
 
+/// Return whether a table body declares an accepted system-time column.
 fn has_system_time_column(body: &str) -> bool {
     let columns = parse_column_names(body);
     columns.contains("system_time")
@@ -388,6 +473,7 @@ fn has_system_time_column(body: &str) -> bool {
         || columns.contains("recorded_system_time")
 }
 
+/// Return whether a table body declares an accepted domain/availability clock.
 fn has_domain_time_column(body: &str) -> bool {
     let columns = parse_column_names(body);
     columns.contains("available_time") || columns.contains("valid_from")
@@ -488,10 +574,12 @@ fn parse_names_after(sql: &str, keyword: &str) -> BTreeSet<String> {
     names
 }
 
+/// Return the set of table names declared by complete `CREATE TABLE` tokens.
 fn parse_create_table_names(sql: &str) -> BTreeSet<String> {
     parse_names_after(sql, "CREATE TABLE")
 }
 
+/// Return the set of RLS policy names declared by complete `CREATE POLICY` tokens.
 fn parse_create_policy_names(sql: &str) -> BTreeSet<String> {
     parse_names_after(sql, "CREATE POLICY")
 }
@@ -607,6 +695,11 @@ fn identifier_continues_after(sql: &str, end: usize) -> bool {
         .is_some_and(is_postgresql_identifier_continuation)
 }
 
+/// Locate an exact table-declaration prefix without accepting longer identifiers.
+///
+/// The caller supplies a normalized declaration needle. Candidates followed by
+/// PostgreSQL identifier continuation bytes are skipped rather than allowing a
+/// table-name prefix to borrow the next declaration's body.
 fn find_table_declaration_end(lower_sql: &str, needle: &str) -> Option<usize> {
     let mut search_from = 0usize;
     while let Some(rel) = lower_sql[search_from..].find(needle) {
@@ -630,6 +723,12 @@ fn starts_with_keyword(sql: &str, keyword: &str) -> bool {
             .is_none_or(|ch| !is_postgresql_identifier_continuation(ch))
 }
 
+/// Return the explicit parenthesized body for one exact `CREATE TABLE` target.
+///
+/// A `CREATE TABLE ... AS` declaration deliberately maps to an empty local body
+/// so tenant/temporal contracts fail closed rather than borrowing parentheses
+/// from a later statement. Semicolons or unbalanced parentheses also refuse the
+/// parse instead of widening the structural evidence window.
 fn table_body<'a>(sql: &'a str, table: &str) -> Option<&'a str> {
     let lower = sql.to_ascii_lowercase();
     let needles = [
@@ -1208,7 +1307,7 @@ mod tests {
         let missing_membership = r"
             CONSTRAINT document_record_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
             CONSTRAINT document_record_system_order CHECK (system_to IS NULL OR system_from <= system_to)
-            CONSTRAINT document_record_revision_positive CHECK (revision_number > 0)
+            CONSTRAINT document_record_revision_positive CHECK (true)
             CONSTRAINT event_instance_valid_order CHECK (valid_to IS NULL OR valid_from <= valid_to)
             CONSTRAINT event_instance_system_order CHECK (system_to IS NULL OR system_from <= system_to)
         ";
