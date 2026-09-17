@@ -33,33 +33,48 @@ pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bo
     while index < tokens.len() {
         if is_role_creation_alias(&tokens, index) {
             let name = normalized_role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
-            if !name.is_empty() {
-                let mut state = RoleSecurityState::default();
-                apply_role_security_attributes(
-                    &tokens[index + 3..statement_end(&tokens, index + 3)],
-                    &mut state,
-                );
-                declared_roles.insert(name, state);
+            if name.is_empty() {
+                return Some(false);
             }
+            let mut state = RoleSecurityState::default();
+            apply_role_security_attributes(
+                &tokens[index + 3..statement_end(&tokens, index + 3)],
+                &mut state,
+            );
+            declared_roles.insert(name, state);
         } else if is_role_drop_alias(&tokens, index) {
-            for name in drop_statement_role_names(&tokens, index) {
+            let names = drop_statement_role_names(&tokens, index);
+            if names.is_empty() {
+                return Some(false);
+            }
+            for name in names {
                 declared_roles.remove(&name);
             }
         } else if is_role_rename_alias(&tokens, index) {
             let source = normalized_role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
             let target = normalized_role_identifier(tokens.get(index + 5).copied().unwrap_or_default());
+            if source.is_empty() || target.is_empty() {
+                return Some(false);
+            }
             if let Some(state) = declared_roles.remove(&source) {
-                if !target.is_empty() {
-                    declared_roles.insert(target, state);
-                }
+                declared_roles.insert(target, state);
             }
         } else if is_role_alter_alias(&tokens, index) {
             let name = normalized_role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
+            if name.is_empty() {
+                return Some(false);
+            }
+            let end = statement_end(&tokens, index + 3);
+            let attributes = &tokens[index + 3..end];
+            if attributes.is_empty()
+                || attributes
+                    .first()
+                    .is_some_and(|token| token.eq_ignore_ascii_case("RENAME"))
+            {
+                return Some(false);
+            }
             if let Some(state) = declared_roles.get_mut(&name) {
-                apply_role_security_attributes(
-                    &tokens[index + 3..statement_end(&tokens, index + 3)],
-                    state,
-                );
+                apply_role_security_attributes(attributes, state);
             }
         }
         index += 1;
@@ -734,7 +749,7 @@ mod tests {
             "ALTER USER MAPPING FOR CURRENT_USER SERVER foreign_server OPTIONS (SET user 'x');",
         )
         .expect("well-formed user mapping alteration");
-        assert!(user_mapping.starts_with("ALTER USER MAPPING "));
+        assert!(normalized.starts_with("ALTER USER MAPPING "));
     }
 
     #[test]
