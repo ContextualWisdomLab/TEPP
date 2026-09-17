@@ -15,7 +15,7 @@ const CREATE_IN_ROLE_SENTINEL: &str = "__create_in_role_membership__";
 
 /// Return whether the normalized migration's final runtime memberships disable SET ROLE.
 ///
-/// Object-privilege grants/revokes are excluded by the structural `ON` token.
+/// Object-privilege grants/revokes are excluded by their structural `ON` token.
 /// For role membership, PostgreSQL defaults SET to true on creation but retains
 /// the current option when a later GRANT omits SET; the small state map mirrors
 /// that ordering so an explicit later `WITH SET FALSE` can restore safety.
@@ -59,9 +59,9 @@ fn statement_end(tokens: &[&str], start: usize) -> usize {
 
 /// Apply one PostgreSQL role-membership GRANT that targets the application runtime.
 ///
-/// A structural `ON` before `TO` identifies object privileges and leaves role
-/// membership state untouched. New memberships default SET to true; on an
-/// existing membership, an omitted SET option retains the previous value.
+/// A structural object-privilege `ON` before `TO` leaves role membership state
+/// untouched. New memberships default SET to true; on an existing membership,
+/// an omitted SET option retains the previous value.
 fn apply_runtime_membership_grant(statement: &[&str], memberships: &mut BTreeMap<String, bool>) {
     let Some(to_index) = statement
         .iter()
@@ -69,10 +69,7 @@ fn apply_runtime_membership_grant(statement: &[&str], memberships: &mut BTreeMap
     else {
         return;
     };
-    if statement[..to_index]
-        .iter()
-        .any(|token| token.eq_ignore_ascii_case("ON"))
-    {
+    if has_object_privilege_on(statement, to_index) {
         return;
     }
     if !runtime_is_grantee(statement, to_index, &["WITH", "GRANTED"]) {
@@ -96,7 +93,7 @@ fn apply_runtime_membership_grant(statement: &[&str], memberships: &mut BTreeMap
 ///
 /// Plain membership REVOKE removes the edge. `REVOKE SET OPTION FOR` preserves
 /// membership but disables SET ROLE. ADMIN/INHERIT option revocation does not
-/// change SET state. Object privilege revokes contain `ON` and are ignored.
+/// change SET state. Object privilege revokes are kept outside this state map.
 fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMap<String, bool>) {
     let Some(from_index) = statement
         .iter()
@@ -104,10 +101,7 @@ fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMa
     else {
         return;
     };
-    if statement[..from_index]
-        .iter()
-        .any(|token| token.eq_ignore_ascii_case("ON"))
-    {
+    if has_object_privilege_on(statement, from_index) {
         return;
     }
     if !runtime_is_grantee(statement, from_index, &["GRANTED", "CASCADE", "RESTRICT"]) {
@@ -149,6 +143,44 @@ fn apply_runtime_membership_revoke(statement: &[&str], memberships: &mut BTreeMa
             memberships.remove(&role);
         }
     }
+}
+
+/// Return whether `ON` is acting as the object-privilege separator before a grantee delimiter.
+///
+/// Quoted role identifiers are intentionally projected to bare text by the
+/// lexical boundary. A role literally named `"on"` must therefore not be
+/// mistaken for the object-grant separator. In a role-name list `on` is either
+/// the first target or follows a comma; a real object-privilege `ON` follows a
+/// privilege token. Membership-option REVOKE forms are also excluded explicitly.
+fn has_object_privilege_on(statement: &[&str], delimiter: usize) -> bool {
+    let membership_option_revoke = statement
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("REVOKE"))
+        && statement
+            .get(1)
+            .is_some_and(|token| {
+                token.eq_ignore_ascii_case("ADMIN")
+                    || token.eq_ignore_ascii_case("INHERIT")
+                    || token.eq_ignore_ascii_case("SET")
+            })
+        && statement
+            .get(2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("OPTION"))
+        && statement
+            .get(3)
+            .is_some_and(|token| token.eq_ignore_ascii_case("FOR"));
+    if membership_option_revoke {
+        return false;
+    }
+
+    statement[..delimiter]
+        .iter()
+        .enumerate()
+        .any(|(index, token)| {
+            index > 1
+                && token.eq_ignore_ascii_case("ON")
+                && statement.get(index.wrapping_sub(1)) != Some(&",")
+        })
 }
 
 /// Return whether `tepp_app_runtime` appears in the bounded grantee list.
@@ -241,6 +273,8 @@ mod tests {
             "GRANT reporting_operator TO tepp_app_runtime ;",
             "GRANT reporting_operator TO tepp_app_runtime WITH SET TRUE ;",
             "GRANT reporting_operator TO tepp_app_runtime WITH SET OPTION ;",
+            "GRANT on TO tepp_app_runtime ;",
+            "GRANT reporting_operator , on TO tepp_app_runtime ;",
             "CREATE TYPE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN ROLE reporting_operator ;",
         ] {
             assert!(!runtime_membership_is_rls_safe(sql), "{sql}");
