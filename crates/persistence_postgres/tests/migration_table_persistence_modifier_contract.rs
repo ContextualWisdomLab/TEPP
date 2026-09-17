@@ -45,3 +45,44 @@ fn unlogged_table_still_traverses_table_local_tenant_contracts() {
         Err(MigrationContractError::MissingTenantBoundary)
     );
 }
+
+#[test]
+fn valid_modifier_bearing_tables_reuse_the_existing_table_contract() {
+    for modifier in [
+        "UNLOGGED",
+        "TEMP",
+        "TEMPORARY",
+        "GLOBAL TEMP",
+        "GLOBAL TEMPORARY",
+        "LOCAL TEMP",
+        "LOCAL TEMPORARY",
+    ] {
+        let statement = format!(
+            "CREATE {modifier} TABLE derived_cache (\n\
+                 derived_cache_id uuid PRIMARY KEY,\n\
+                 tenant_record_id uuid NOT NULL,\n\
+                 system_time timestamptz NOT NULL,\n\
+                 available_time timestamptz NOT NULL\n\
+             );"
+        );
+        let catalog = catalog_with(&statement);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Ok(()),
+            "valid modifier-bearing table was not routed through the shared contract: {modifier}"
+        );
+    }
+}
+
+#[test]
+fn lexical_spacing_before_a_modifier_is_preserved_as_structure() {
+    let catalog = catalog_with(
+        "CREATE /* persistence class */\nUNLOGGED\tTABLE derived_cache (\n\
+             derived_cache_id uuid PRIMARY KEY,\n\
+             tenant_record_id uuid NOT NULL,\n\
+             system_time timestamptz NOT NULL,\n\
+             available_time timestamptz NOT NULL\n\
+         );",
+    );
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
