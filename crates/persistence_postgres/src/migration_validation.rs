@@ -749,7 +749,7 @@ mod tests {
             "ALTER USER MAPPING FOR CURRENT_USER SERVER foreign_server OPTIONS (SET user 'x');",
         )
         .expect("well-formed user mapping alteration");
-        assert!(normalized.starts_with("ALTER USER MAPPING "));
+        assert!(user_mapping.starts_with("ALTER USER MAPPING "));
     }
 
     #[test]
