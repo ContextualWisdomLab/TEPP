@@ -1,8 +1,8 @@
-use persistence_postgres::{MigrationCatalog, validate_migration_catalog};
+use persistence_postgres::{MigrationCatalog, MigrationContractError, validate_migration_catalog};
 
-#[test]
-fn rolled_back_invalid_policy_cannot_reject_valid_final_rls_state() {
-    let up_sql = r#"
+fn policy_catalog(transaction_outcome: &str) -> MigrationCatalog {
+    let up_sql = format!(
+        r#"
         CREATE TABLE tenant_record (
             tenant_record_id uuid PRIMARY KEY,
             system_time timestamptz NOT NULL
@@ -18,17 +18,32 @@ fn rolled_back_invalid_policy_cannot_reject_valid_final_rls_state() {
             );
 
         BEGIN;
-        CREATE POLICY tenant_record_rolled_back_bad_policy ON tenant_record
+        CREATE POLICY tenant_record_transactional_bad_policy ON tenant_record
             AS PERMISSIVE
             FOR SELECT
             USING (tenant_record_id IS NOT NULL);
-        ROLLBACK;
-    "#;
-    let catalog = MigrationCatalog::from_sql(up_sql, "DROP TABLE tenant_record;");
+        {transaction_outcome};
+        "#
+    );
+    MigrationCatalog::from_sql(&up_sql, "DROP TABLE tenant_record;")
+}
 
+#[test]
+fn rolled_back_invalid_policy_cannot_reject_valid_final_rls_state() {
+    let catalog = policy_catalog("ROLLBACK");
     assert_eq!(
         validate_migration_catalog(&catalog),
         Ok(()),
         "policy evidence that PostgreSQL rolls back must not reject a valid final tenant-isolation policy set"
+    );
+}
+
+#[test]
+fn committed_invalid_policy_still_rejects_the_final_rls_state() {
+    let catalog = policy_catalog("COMMIT");
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy),
+        "the committed-state projection must not hide an invalid permissive policy that PostgreSQL keeps"
     );
 }
