@@ -506,9 +506,6 @@ fn scan_block_comment(bytes: &[u8], start: usize) -> Option<usize> {
     None
 }
 
-/// Return the exact PostgreSQL dollar-quote delimiter starting at `start`.
-/// Tags follow unquoted-identifier rules, while an opening `$` attached to a
-/// preceding identifier remains part of that identifier rather than a quote.
 fn dollar_quote_delimiter(bytes: &[u8], start: usize) -> Option<&[u8]> {
     if bytes.get(start) != Some(&b'$') {
         return None;
@@ -520,26 +517,23 @@ fn dollar_quote_delimiter(bytes: &[u8], start: usize) -> Option<&[u8]> {
     {
         return None;
     }
-    let tag_start = start + 1;
-    if bytes.get(tag_start) == Some(&b'$') {
-        return Some(&bytes[start..=tag_start]);
+    let mut index = start + 1;
+    if bytes.get(index) == Some(&b'$') {
+        return Some(&bytes[start..=index]);
     }
-
-    let tag_suffix = std::str::from_utf8(bytes.get(tag_start..)?).ok()?;
-    let mut characters = tag_suffix.char_indices();
-    let (_, first) = characters.next()?;
-    if first != '_' && !first.is_alphabetic() {
+    let first = *bytes.get(index)?;
+    if first != b'_' && !first.is_ascii_alphabetic() && first < 0x80 {
         return None;
     }
-
-    for (offset, character) in characters {
-        if character == '$' {
-            let delimiter_end = tag_start + offset;
-            return Some(&bytes[start..=delimiter_end]);
+    index += 1;
+    while let Some(byte) = bytes.get(index) {
+        if *byte == b'$' {
+            return Some(&bytes[start..=index]);
         }
-        if character != '_' && !character.is_alphabetic() && !character.is_ascii_digit() {
+        if *byte != b'_' && !byte.is_ascii_alphanumeric() && *byte < 0x80 {
             return None;
         }
+        index += 1;
     }
     None
 }
