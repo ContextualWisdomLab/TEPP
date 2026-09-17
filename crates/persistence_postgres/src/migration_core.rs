@@ -21,6 +21,16 @@ mod transaction_projection;
 use crate::MigrationContractError;
 pub use implementation::MigrationCatalog;
 
+/// Project already-normalized SQL onto the statements that survive PostgreSQL transaction outcome.
+///
+/// This is the shared transaction authority for the facade lifecycle/RLS checks
+/// and the structural core. Returning `None` means final durable state cannot be
+/// proven locally because the input contains savepoint/two-phase ambiguity or an
+/// unterminated explicit transaction.
+pub(super) fn project_committed_sql(sql: &str) -> Option<String> {
+    transaction_projection::project_committed_statements(sql)
+}
+
 /// Validate migration SQL after canonicalizing PostgreSQL table persistence modifiers.
 ///
 /// `UNLOGGED`, `TEMP`/`TEMPORARY`, and PostgreSQL's compatibility
@@ -31,7 +41,10 @@ pub use implementation::MigrationCatalog;
 /// explicit transaction outcome. Executor-relative grantor identity is projected
 /// before that transaction filter so in-transaction `SET LOCAL ROLE` and session
 /// authorization still identify the grantor that PostgreSQL recorded, while a
-/// later rollback cannot donate false membership or revocation evidence.
+/// later rollback cannot donate false membership or revocation evidence. The
+/// structural validator receives the same committed final-state projection, so
+/// rolled-back DDL cannot satisfy naming, tenant, temporal, RLS, or governance
+/// contracts.
 ///
 /// # Errors
 ///
@@ -47,18 +60,17 @@ pub fn validate_migration_catalog(
     else {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
-    let Some(committed_membership_sql) =
-        transaction_projection::project_committed_statements(catalog.up_sql())
-    else {
+    let Some(committed_up) = project_committed_sql(catalog.up_sql()) else {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
-    let Some(committed_grantor_sql) =
-        transaction_projection::project_committed_statements(&grantor_sql)
-    else {
+    let Some(committed_down) = project_committed_sql(catalog.down_sql()) else {
+        return Err(MigrationContractError::MissingAppRuntimeRole);
+    };
+    let Some(committed_grantor_sql) = project_committed_sql(&grantor_sql) else {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
 
-    if !runtime_role_membership::runtime_membership_is_rls_safe(&committed_membership_sql)
+    if !runtime_role_membership::runtime_membership_is_rls_safe(&committed_up)
         || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(
             &committed_grantor_sql,
         )
@@ -66,11 +78,8 @@ pub fn validate_migration_catalog(
         return Err(MigrationContractError::MissingAppRuntimeRole);
     }
 
-    let canonical_up = canonicalize_table_persistence_modifiers(catalog.up_sql());
-    if canonical_up == catalog.up_sql() {
-        return implementation::validate_migration_catalog(catalog);
-    }
-    let canonical_catalog = MigrationCatalog::from_sql(&canonical_up, catalog.down_sql());
+    let canonical_up = canonicalize_table_persistence_modifiers(&committed_up);
+    let canonical_catalog = MigrationCatalog::from_sql(&canonical_up, &committed_down);
     implementation::validate_migration_catalog(&canonical_catalog)
 }
 
@@ -196,7 +205,7 @@ fn canonicalize_table_persistence_modifiers(sql: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::canonicalize_table_persistence_modifiers;
+    use super::{canonicalize_table_persistence_modifiers, project_committed_sql};
 
     #[test]
     fn table_modifier_canonicalization_preserves_the_declared_name_and_body() {
@@ -216,5 +225,15 @@ mod tests {
         ] {
             assert_eq!(canonicalize_table_persistence_modifiers(sql), sql);
         }
+    }
+
+    #[test]
+    fn rolled_back_structural_statement_is_absent_from_committed_projection() {
+        let projected = project_committed_sql(
+            "CREATE TABLE durable_record (durable_record_id uuid); BEGIN; CREATE TABLE rolled_back_record (rolled_back_record_id uuid); ROLLBACK;",
+        )
+        .expect("simple rollback outcome must project");
+        assert!(projected.contains("CREATE TABLE durable_record"));
+        assert!(!projected.contains("rolled_back_record"));
     }
 }
