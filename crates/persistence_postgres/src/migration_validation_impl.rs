@@ -277,6 +277,22 @@ fn decode_quoted_grantor_identity(token: &str) -> Option<Vec<u8>> {
     Some(decoded)
 }
 
+/// Return whether the normalized prefix ends at a `GRANTED BY` grantor slot.
+///
+/// PostgreSQL treats spaces, tabs, newlines, and comments as token separators.
+/// The shared lexical pass has already replaced comments with whitespace and
+/// masked literal/dollar-quoted bodies, so inspecting the final two normalized
+/// tokens is whitespace-insensitive without letting trivia manufacture syntax.
+fn is_explicit_grantor_position(normalized_prefix: &str) -> bool {
+    let mut tokens = normalized_prefix.split_whitespace().rev();
+    tokens
+        .next()
+        .is_some_and(|token| token.eq_ignore_ascii_case("BY"))
+        && tokens
+            .next()
+            .is_some_and(|token| token.eq_ignore_ascii_case("GRANTED"))
+}
+
 /// Restore shared quoted-identity tokens outside an explicit grantor position.
 ///
 /// Lowercase ASCII quoted role names that are identity-equivalent to ordinary
@@ -297,10 +313,7 @@ fn restore_quoted_identifier_projection(normalized_sql: &str) -> Option<String> 
         let end = suffix_start + relative_end + 1;
         let token = &restored[start..end];
         let identifier = decode_quoted_grantor_identity(token)?;
-        let is_explicit_grantor = restored[..start]
-            .trim_end()
-            .to_ascii_lowercase()
-            .ends_with("granted by");
+        let is_explicit_grantor = is_explicit_grantor_position(&restored[..start]);
         let is_special_role_specification = [b"current_role".as_slice(), b"current_user".as_slice(), b"session_user".as_slice()]
             .iter()
             .any(|special| identifier.eq_ignore_ascii_case(special));
