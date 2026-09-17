@@ -53,6 +53,7 @@ fn runtime_role_cannot_gain_a_set_role_path_around_rls() {
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP rls_bypass_operator;",
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE USER tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP rls_bypass_operator;",
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE GROUP tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP rls_bypass_operator;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nREVOKE SET OPTION FOR rls_bypass_operator FROM tepp_app_runtime;\nGRANT rls_bypass_operator TO tepp_app_runtime;",
     ] {
         let catalog = rls_catalog(role_sql);
         assert_eq!(
