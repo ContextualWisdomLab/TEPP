@@ -358,7 +358,7 @@ fn transaction_end(statement: &[String]) -> Option<(bool, bool)> {
         true
     } else if first.eq_ignore_ascii_case("END") {
         true
-    } else if first.eq_ignore_ascii_case("ROLLBACK") {
+    } else if first.eq_ignore_ascii_case("ROLLBACK") || first.eq_ignore_ascii_case("ABORT") {
         if statement.get(1).is_some_and(|token| {
             token.eq_ignore_ascii_case("TO") || token.eq_ignore_ascii_case("PREPARED")
         }) {
@@ -371,12 +371,7 @@ fn transaction_end(statement: &[String]) -> Option<(bool, bool)> {
 
     let and_chain = statement
         .windows(2)
-        .any(|pair| pair[0].eq_ignore_ascii_case("AND") && pair[1].eq_ignore_ascii_case("CHAIN"))
-        || statement.windows(3).any(|triple| {
-            triple[0].eq_ignore_ascii_case("AND")
-                && triple[1].eq_ignore_ascii_case("NO")
-                && triple[2].eq_ignore_ascii_case("CHAIN")
-        });
+        .any(|pair| pair[0].eq_ignore_ascii_case("AND") && pair[1].eq_ignore_ascii_case("CHAIN"));
     Some((commit, and_chain))
 }
 
@@ -597,6 +592,17 @@ mod tests {
 
         assert!(projected.contains("GRANTED BY grantor_b"));
         assert!(projected.contains("GRANTED BY grantor_a"));
+    }
+
+    #[test]
+    fn and_no_chain_ends_transaction_before_later_local_role() {
+        let projected = project_executor_relative_grantors(
+            "SET ROLE grantor_a; BEGIN; COMMIT AND NO CHAIN; SET LOCAL ROLE grantor_b; GRANT reporting_owner TO tepp_app_runtime GRANTED BY CURRENT_USER;",
+        )
+        .expect("NO CHAIN must leave explicit transaction scope");
+
+        assert!(projected.contains("GRANTED BY grantor_a"));
+        assert!(!projected.contains("GRANTED BY grantor_b"));
     }
 
     #[test]
