@@ -9,6 +9,8 @@
 
 #[path = "migration_core_impl.rs"]
 mod implementation;
+#[path = "migration_runtime_role_executor.rs"]
+mod runtime_role_executor;
 #[path = "migration_runtime_role_grantor.rs"]
 mod runtime_role_grantor;
 #[path = "migration_runtime_role_membership.rs"]
@@ -24,20 +26,27 @@ pub use implementation::MigrationCatalog;
 /// and table-body contracts as ordinary `CREATE TABLE`. The canonicalized copy
 /// exists only for validation; executable migration SQL is never rewritten.
 /// Runtime-role membership and grantor provenance are checked on the normalized
-/// validation copy. The lexical facade preserves quoted special-role identity
-/// only in the `GRANTED BY` slot, so grantor evidence remains distinct without
-/// changing general object or lifecycle parsing.
+/// validation copy. Executor-relative `GRANTED BY CURRENT_USER` / `CURRENT_ROLE`
+/// evidence is first projected through normalized `SET ROLE` state so identical
+/// pseudo-target spellings cannot collapse distinct PostgreSQL grantor rows.
 ///
 /// # Errors
 ///
 /// Returns the same naming, tenant, temporal, RLS, or structural contract
 /// errors as the underlying migration validator, plus `MissingAppRuntimeRole`
-/// when the application runtime has an unsafe PostgreSQL membership path.
+/// when the application runtime has an unsafe or unprovable PostgreSQL
+/// membership path.
 pub fn validate_migration_catalog(
     catalog: &MigrationCatalog,
 ) -> Result<(), MigrationContractError> {
+    let Some(grantor_sql) =
+        runtime_role_executor::project_executor_relative_grantors(catalog.up_sql())
+    else {
+        return Err(MigrationContractError::MissingAppRuntimeRole);
+    };
+
     if !runtime_role_membership::runtime_membership_is_rls_safe(catalog.up_sql())
-        || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(catalog.up_sql())
+        || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(&grantor_sql)
     {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     }
