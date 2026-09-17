@@ -47,6 +47,10 @@ fn malformed_role_lifecycle_statements_fail_closed_without_panicking() {
     for role_sql in [
         "CREATE ROLE;",
         "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE , other_role;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE other_role,;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE other_role,,another_role;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE other_role another_role;",
         "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE;",
         "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE tepp_app_runtime;",
         "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE tepp_app_runtime RENAME;",
