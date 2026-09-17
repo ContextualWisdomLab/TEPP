@@ -33,6 +33,26 @@ pub(super) fn project_committed_sql(sql: &str) -> Option<String> {
     transaction_projection::project_committed_statements(sql)
 }
 
+/// Detect a committed policy-definition mutation not yet owned by the final-policy state model.
+///
+/// PostgreSQL `ALTER POLICY` can independently replace the role list, `USING`,
+/// and `WITH CHECK` clauses while omitted clauses retain prior state. Until this
+/// bounded validator owns that policy identity/state fold, accepting historical
+/// `CREATE POLICY` evidence would be fail-open. The input is already lexically
+/// normalized and transaction-projected, so statement-first token matching is
+/// sufficient and comments/literals cannot manufacture this marker.
+fn contains_unsupported_policy_mutation(sql: &str) -> bool {
+    sql.split(';').any(|statement| {
+        let mut tokens = statement.split_whitespace();
+        tokens
+            .next()
+            .is_some_and(|token| token.eq_ignore_ascii_case("ALTER"))
+            && tokens
+                .next()
+                .is_some_and(|token| token.eq_ignore_ascii_case("POLICY"))
+    })
+}
+
 /// Validate migration SQL after canonicalizing PostgreSQL table persistence modifiers.
 ///
 /// `UNLOGGED`, `TEMP`/`TEMPORARY`, and PostgreSQL's compatibility
@@ -49,6 +69,9 @@ pub(super) fn project_committed_sql(sql: &str) -> Option<String> {
 /// satisfy naming, tenant, temporal, RLS, or governance contracts. RLS table
 /// enablement is additionally folded in statement order so a committed trailing
 /// `DISABLE` or `NO FORCE` cannot reuse stale positive evidence from earlier SQL.
+/// Committed `ALTER POLICY` is temporarily rejected until policy identity and
+/// clause replacement have their own final-state authority; a rolled-back ALTER
+/// is removed by the transaction projection before this boundary.
 ///
 /// # Errors
 ///
@@ -74,6 +97,9 @@ pub fn validate_migration_catalog(
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
 
+    if contains_unsupported_policy_mutation(&committed_up) {
+        return Err(MigrationContractError::MissingRlsPolicy);
+    }
     let committed_requires_runtime_role =
         super::validation::declares_row_level_security(&committed_up);
     if committed_requires_runtime_role
@@ -223,7 +249,10 @@ fn canonicalize_table_persistence_modifiers(sql: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{canonicalize_table_persistence_modifiers, project_committed_sql};
+    use super::{
+        canonicalize_table_persistence_modifiers, contains_unsupported_policy_mutation,
+        project_committed_sql,
+    };
 
     #[test]
     fn table_modifier_canonicalization_preserves_the_declared_name_and_body() {
@@ -253,5 +282,15 @@ mod tests {
         .expect("simple rollback outcome must project");
         assert!(projected.contains("CREATE TABLE durable_record"));
         assert!(!projected.contains("rolled_back_record"));
+    }
+
+    #[test]
+    fn alter_policy_detection_is_statement_and_token_bounded() {
+        assert!(contains_unsupported_policy_mutation(
+            "ALTER\nPOLICY tenant_isolation ON tenant_record USING ( true ) ;"
+        ));
+        assert!(!contains_unsupported_policy_mutation(
+            "SELECT alter_policy_marker ; CREATE POLICY tenant_isolation ON tenant_record USING ( true ) ;"
+        ));
     }
 }
