@@ -1,15 +1,25 @@
 //! PostgreSQL lexical normalization for migration contract parsing.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 const INVALID_QUOTED_IDENTIFIER: &[u8] = b"INVALID_QUOTED_IDENTIFIER";
 const INVALID_QUALIFIED_IDENTIFIER: &str = "INVALID_QUALIFIED_IDENTIFIER";
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct RoleSecurityState {
+    is_superuser: bool,
+    bypasses_rls: bool,
+}
 
 pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     let normalized = lexically_normalize_migration_sql(sql)?;
     Some(canonicalize_structural_keywords(&normalized))
 }
 
+/// Return whether the expected runtime role exists in the final migration state
+/// and remains subject to PostgreSQL row-level security. Role creation aliases,
+/// drops, renames, and later ALTER ROLE/USER/GROUP attribute changes share this
+/// lifecycle scan so SUPERUSER/BYPASSRLS cannot survive under the expected name.
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
     let normalized = lexically_normalize_migration_sql(sql)?;
     // The lexical pass has already masked literals/comments and converted
@@ -18,13 +28,18 @@ pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bo
     // scanning; whitespace is not required around either delimiter.
     let role_tokens = normalized.replace(';', " ; ").replace(',', " , ");
     let tokens = role_tokens.split_whitespace().collect::<Vec<_>>();
-    let mut declared_roles = BTreeSet::new();
+    let mut declared_roles = BTreeMap::new();
     let mut index = 0usize;
     while index < tokens.len() {
         if is_role_creation_alias(&tokens, index) {
             let name = normalized_role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
             if !name.is_empty() {
-                declared_roles.insert(name);
+                let mut state = RoleSecurityState::default();
+                apply_role_security_attributes(
+                    &tokens[index + 3..statement_end(&tokens, index + 3)],
+                    &mut state,
+                );
+                declared_roles.insert(name, state);
             }
         } else if is_role_drop_alias(&tokens, index) {
             for name in drop_statement_role_names(&tokens, index) {
@@ -33,13 +48,27 @@ pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bo
         } else if is_role_rename_alias(&tokens, index) {
             let source = normalized_role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
             let target = normalized_role_identifier(tokens.get(index + 5).copied().unwrap_or_default());
-            if declared_roles.remove(&source) && !target.is_empty() {
-                declared_roles.insert(target);
+            if let Some(state) = declared_roles.remove(&source) {
+                if !target.is_empty() {
+                    declared_roles.insert(target, state);
+                }
+            }
+        } else if is_role_alter_alias(&tokens, index) {
+            let name = normalized_role_identifier(tokens.get(index + 2).copied().unwrap_or_default());
+            if let Some(state) = declared_roles.get_mut(&name) {
+                apply_role_security_attributes(
+                    &tokens[index + 3..statement_end(&tokens, index + 3)],
+                    state,
+                );
             }
         }
         index += 1;
     }
-    Some(declared_roles.contains(&expected_role.to_ascii_lowercase()))
+    Some(
+        declared_roles
+            .get(&expected_role.to_ascii_lowercase())
+            .is_some_and(|state| !state.is_superuser && !state.bypasses_rls),
+    )
 }
 
 pub(super) fn declares_row_level_security(normalized_sql: &str) -> bool {
@@ -196,6 +225,49 @@ fn is_role_rename_alias(tokens: &[&str], alter_index: usize) -> bool {
             .get(alter_index + 4)
             .is_some_and(|token| token.eq_ignore_ascii_case("TO"))
         && tokens.get(alter_index + 5).is_some()
+}
+
+fn is_role_alter_alias(tokens: &[&str], alter_index: usize) -> bool {
+    if !tokens
+        .get(alter_index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("ALTER"))
+    {
+        return false;
+    }
+    let Some(kind) = tokens.get(alter_index + 1) else {
+        return false;
+    };
+    if kind.eq_ignore_ascii_case("USER")
+        && tokens
+            .get(alter_index + 2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("MAPPING"))
+    {
+        return false;
+    }
+    kind.eq_ignore_ascii_case("ROLE")
+        || kind.eq_ignore_ascii_case("USER")
+        || kind.eq_ignore_ascii_case("GROUP")
+}
+
+fn statement_end(tokens: &[&str], start: usize) -> usize {
+    tokens[start..]
+        .iter()
+        .position(|token| *token == ";")
+        .map_or(tokens.len(), |relative| start + relative)
+}
+
+fn apply_role_security_attributes(tokens: &[&str], state: &mut RoleSecurityState) {
+    for token in tokens {
+        if token.eq_ignore_ascii_case("SUPERUSER") {
+            state.is_superuser = true;
+        } else if token.eq_ignore_ascii_case("NOSUPERUSER") {
+            state.is_superuser = false;
+        } else if token.eq_ignore_ascii_case("BYPASSRLS") {
+            state.bypasses_rls = true;
+        } else if token.eq_ignore_ascii_case("NOBYPASSRLS") {
+            state.bypasses_rls = false;
+        }
+    }
 }
 
 fn role_identifier(fragment: &str) -> String {
