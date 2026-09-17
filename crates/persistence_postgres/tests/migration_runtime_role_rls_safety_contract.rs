@@ -82,6 +82,27 @@ fn quoted_lowercase_runtime_name_keeps_postgresql_identity() {
 }
 
 #[test]
+fn quoted_membership_grantee_case_cannot_remove_runtime_escape_path() {
+    let catalog = rls_catalog(
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;\nREVOKE rls_bypass_operator FROM \"TEPP_APP_RUNTIME\";",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingAppRuntimeRole)
+    );
+}
+
+#[test]
+fn quoted_lowercase_membership_grantee_keeps_postgresql_identity() {
+    let catalog = rls_catalog(
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;\nREVOKE rls_bypass_operator FROM \"tepp_app_runtime\";",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
+
+#[test]
 fn runtime_role_cannot_gain_a_set_role_path_around_rls() {
     for role_sql in [
         "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;",
