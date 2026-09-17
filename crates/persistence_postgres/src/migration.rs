@@ -219,13 +219,34 @@ fn policy_binds_tenant_identifier(policy_sql: &str) -> bool {
 }
 
 fn direct_tenant_operand(side: &str) -> bool {
-    let compact = side
+    let compact = strip_enclosing_predicate_parentheses(side)
         .chars()
         .filter(|ch| !ch.is_whitespace())
         .collect::<String>()
         .to_ascii_lowercase();
-    let trimmed = compact.trim_matches(|ch: char| matches!(ch, '(' | ')'));
-    matches!(trimmed, "tenant_record_id" | "tenant_record_id::text")
+    matches!(compact.as_str(), "tenant_record_id" | "tenant_record_id::text")
+}
+
+/// Accept only the bounded session-side expressions used by TEPP's tenant RLS
+/// contract. Merely containing `current_setting(...)` is insufficient: wrappers
+/// such as `coalesce(current_setting(...), tenant_record_id::text)` can fall
+/// back to the row's own tenant value and turn the equality into a tautology.
+/// Empty string literals are removed by lexical normalization, so the shipped
+/// `nullif(current_setting(..., true), '')` form appears with an empty second
+/// argument here.
+fn direct_tenant_session_operand(side: &str) -> bool {
+    let compact = strip_enclosing_predicate_parentheses(side)
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    matches!(
+        compact.as_str(),
+        "current_setting('tepp.current_tenant_record_id')"
+            | "current_setting('tepp.current_tenant_record_id',true)"
+            | "nullif(current_setting('tepp.current_tenant_record_id'),)"
+            | "nullif(current_setting('tepp.current_tenant_record_id',true),)"
+    )
 }
 
 fn predicate_contains_top_level_tenant_session_equality(predicate_sql: &str) -> bool {
@@ -256,8 +277,8 @@ fn predicate_contains_top_level_tenant_session_equality(predicate_sql: &str) -> 
 
         let left = &predicate_sql[..equality];
         let right = &predicate_sql[equality + 1..];
-        if (direct_tenant_operand(left) && declares_tenant_session_guc(right))
-            || (declares_tenant_session_guc(left) && direct_tenant_operand(right))
+        if (direct_tenant_operand(left) && direct_tenant_session_operand(right))
+            || (direct_tenant_session_operand(left) && direct_tenant_operand(right))
         {
             return true;
         }
@@ -558,9 +579,10 @@ mod tests {
     use super::{
         PolicyClause, PolicyCommand, all_top_level_or_paths_bind_tenant_session,
         canonicalize_concurrent_index_modifier, declares_tenant_session_guc,
-        policy_binds_tenant_identifier, policy_binds_tenant_session_equality,
-        policy_clause_span, policy_command, policy_is_restrictive,
-        policy_row_predicates_bind_tenant_session, tenant_policies_bind_session_guc,
+        direct_tenant_session_operand, policy_binds_tenant_identifier,
+        policy_binds_tenant_session_equality, policy_clause_span, policy_command,
+        policy_is_restrictive, policy_row_predicates_bind_tenant_session,
+        tenant_policies_bind_session_guc,
     };
 
     #[test]
@@ -614,12 +636,31 @@ mod tests {
     }
 
     #[test]
+    fn tenant_session_operand_is_bounded_to_the_supported_contract_shape() {
+        assert!(direct_tenant_session_operand(
+            "current_setting ( 'tepp.current_tenant_record_id' , true )"
+        ));
+        assert!(direct_tenant_session_operand(
+            "nullif ( current_setting ( 'tepp.current_tenant_record_id' , true ) , )"
+        ));
+        assert!(!direct_tenant_session_operand(
+            "coalesce ( current_setting ( 'tepp.current_tenant_record_id' , true ) , tenant_record_id::text )"
+        ));
+        assert!(!direct_tenant_session_operand(
+            "other_current_setting ( 'tepp.current_tenant_record_id' , true )"
+        ));
+    }
+
+    #[test]
     fn tenant_session_witness_must_be_relationally_bound() {
         assert!(policy_binds_tenant_session_equality(
             "tenant_record_id::text = nullif ( current_setting ( 'tepp.current_tenant_record_id' , true ) , )"
         ));
         assert!(policy_binds_tenant_session_equality(
             "current_setting ( 'tepp.current_tenant_record_id' , true ) = tenant_record_id::text"
+        ));
+        assert!(!policy_binds_tenant_session_equality(
+            "tenant_record_id::text = coalesce ( current_setting ( 'tepp.current_tenant_record_id' , true ) , tenant_record_id::text )"
         ));
         assert!(!policy_binds_tenant_session_equality(
             "tenant_record_id is not null and current_setting ( 'tepp.current_tenant_record_id' , true ) is not null"
