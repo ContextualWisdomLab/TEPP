@@ -17,28 +17,46 @@ mod runtime_role_membership;
 use crate::MigrationContractError;
 pub use implementation::MigrationCatalog;
 
+/// Validate the grantor-preserving runtime-membership projection.
+///
+/// The caller supplies a separately normalized copy because PostgreSQL special
+/// role specifications such as unquoted `CURRENT_USER` are semantically distinct
+/// from quoted named roles such as `"current_user"`. Keeping this check separate
+/// prevents the general structural projection from collapsing those grantors.
+///
+/// # Errors
+///
+/// Returns `MissingAppRuntimeRole` while any explicit grantor-attributed
+/// membership row retains SET, ADMIN, or INHERIT escape capability.
+pub(super) fn validate_runtime_membership_grantors(
+    grantor_sql: &str,
+) -> Result<(), MigrationContractError> {
+    if runtime_role_grantor::runtime_membership_grantors_are_rls_safe(grantor_sql) {
+        Ok(())
+    } else {
+        Err(MigrationContractError::MissingAppRuntimeRole)
+    }
+}
+
 /// Validate migration SQL after canonicalizing PostgreSQL table persistence modifiers.
 ///
 /// `UNLOGGED`, `TEMP`/`TEMPORARY`, and PostgreSQL's compatibility
 /// `GLOBAL`/`LOCAL TEMP[TEMPORARY]` spellings must traverse the same table-name
 /// and table-body contracts as ordinary `CREATE TABLE`. The canonicalized copy
 /// exists only for validation; executable migration SQL is never rewritten.
-/// Runtime-role membership is checked on the same normalized validation copy.
-/// The aggregate membership authority proves effective SET/ADMIN/INHERIT state,
-/// while the grantor-provenance authority separately prevents a REVOKE from one
-/// PostgreSQL grantor from erasing an unsafe membership row recorded by another.
+/// Aggregate runtime-role membership proves final SET/ADMIN/INHERIT state here;
+/// grantor-provenance evidence is validated separately from its identity-preserving
+/// lexical projection before the caller enters this structural boundary.
 ///
 /// # Errors
 ///
 /// Returns the same naming, tenant, temporal, RLS, or structural contract
 /// errors as the underlying migration validator, plus `MissingAppRuntimeRole`
-/// when the application runtime has an unsafe PostgreSQL membership path.
+/// when the aggregate application-runtime membership state is unsafe.
 pub fn validate_migration_catalog(
     catalog: &MigrationCatalog,
 ) -> Result<(), MigrationContractError> {
-    if !runtime_role_membership::runtime_membership_is_rls_safe(catalog.up_sql())
-        || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(catalog.up_sql())
-    {
+    if !runtime_role_membership::runtime_membership_is_rls_safe(catalog.up_sql()) {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     }
 
