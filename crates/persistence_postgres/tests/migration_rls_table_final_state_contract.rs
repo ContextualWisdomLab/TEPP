@@ -42,6 +42,14 @@ fn committed_no_force_row_level_security_removes_final_owner_enforcement() {
 }
 
 #[test]
+fn rolled_back_disable_does_not_change_the_durable_rls_state() {
+    let catalog = rls_catalog(
+        "BEGIN; ALTER TABLE tenant_record DISABLE ROW LEVEL SECURITY; ROLLBACK;",
+    );
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
+
+#[test]
 fn later_enable_and_force_restore_the_required_final_state() {
     let catalog = rls_catalog(
         r#"
