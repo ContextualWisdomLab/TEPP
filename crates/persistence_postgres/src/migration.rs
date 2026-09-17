@@ -463,17 +463,22 @@ fn policy_roles(policy_sql: &str) -> Option<Vec<String>> {
     };
 
     let mut roles = Vec::new();
+    let mut expect_role = true;
     for token in tokens.iter().skip(to_index + 1) {
-        let role = *token;
-        if role == "," {
-            continue;
+        if expect_role {
+            if *token == "," || !token.bytes().all(is_sql_identifier_byte) {
+                return None;
+            }
+            roles.push(token.to_ascii_lowercase());
+            expect_role = false;
+        } else {
+            if *token != "," {
+                return None;
+            }
+            expect_role = true;
         }
-        if role.is_empty() || !role.bytes().all(is_sql_identifier_byte) {
-            return None;
-        }
-        roles.push(role.to_ascii_lowercase());
     }
-    (!roles.is_empty()).then_some(roles)
+    (!roles.is_empty() && !expect_role).then_some(roles)
 }
 
 fn policy_command_applies(policy_command: PolicyCommand, requested_command: PolicyCommand) -> bool {
@@ -859,6 +864,26 @@ mod tests {
         assert_eq!(
             policy_roles(
                 "create policy tenant_policy on tenant_record for select to reader-role using(true)"
+            ),
+            None
+        );
+        assert_eq!(
+            policy_roles("create policy tenant_policy on tenant_record for select to ,reader_role using(true)"),
+            None
+        );
+        assert_eq!(
+            policy_roles("create policy tenant_policy on tenant_record for select to reader_role, using(true)"),
+            None
+        );
+        assert_eq!(
+            policy_roles(
+                "create policy tenant_policy on tenant_record for select to reader_role,,writer_role using(true)"
+            ),
+            None
+        );
+        assert_eq!(
+            policy_roles(
+                "create policy tenant_policy on tenant_record for select to reader_role writer_role using(true)"
             ),
             None
         );
