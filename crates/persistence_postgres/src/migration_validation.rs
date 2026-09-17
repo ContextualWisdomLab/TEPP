@@ -1,12 +1,11 @@
-//! PostgreSQL lexical normalization facade and role-lifecycle identity guard.
+//! PostgreSQL lexical normalization facade and role-identity guards.
 //!
 //! The implementation remains the single lexical/structural authority. This
-//! facade preserves one piece of PostgreSQL grammar information that would
+//! facade preserves bounded pieces of PostgreSQL grammar information that would
 //! otherwise be lost when identity-equivalent lowercase quoted identifiers are
-//! projected onto bare tokens: `CURRENT_ROLE`, `CURRENT_USER`, and
-//! `SESSION_USER` are special unquoted `role_specification` values for role
-//! attribute changes, while the same lowercase spellings in double quotes are
-//! ordinary named roles.
+//! projected onto bare tokens. `CURRENT_ROLE`, `CURRENT_USER`, and
+//! `SESSION_USER` are special unquoted `role_specification` values, while the
+//! same lowercase spellings in double quotes are ordinary named roles.
 
 #[path = "migration_validation_impl.rs"]
 mod implementation;
@@ -14,6 +13,20 @@ mod implementation;
 /// Normalize migration SQL for bounded structural contract parsing.
 pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     implementation::normalize_migration_sql(sql)
+}
+
+/// Normalize the runtime-membership grantor evidence without aliasing named roles.
+///
+/// The general structural projection may safely dequote lowercase identifiers,
+/// but `GRANTED BY` gives unquoted `CURRENT_ROLE`, `CURRENT_USER`, and
+/// `SESSION_USER` pseudo-target meaning. The same spellings in quotes are named
+/// roles, so this grantor-only projection replaces those three quoted spellings
+/// with distinct validation sentinels that cannot be valid unquoted PostgreSQL
+/// role names, then reuses the shared lexer. Executable migration SQL and the
+/// general structural projection are unchanged.
+pub(super) fn normalize_runtime_membership_grantor_sql(sql: &str) -> Option<String> {
+    let grantor_sql = preserve_quoted_special_grantor_specifications(sql);
+    implementation::normalize_migration_sql(&grantor_sql)
 }
 
 /// Return whether the expected runtime role exists in the final migration state
@@ -47,4 +60,25 @@ fn preserve_quoted_special_role_specifications(sql: &str) -> String {
     sql.replace("\"current_role\"", "\"CURRENT_ROLE\"")
         .replace("\"current_user\"", "\"CURRENT_USER\"")
         .replace("\"session_user\"", "\"SESSION_USER\"")
+}
+
+/// Preserve the three quoted special-role spellings as distinct grantor tokens.
+///
+/// `@` cannot occur in an unquoted PostgreSQL identifier, so these validation
+/// sentinels cannot collide with a real unquoted role. Replacements performed
+/// inside comments or literal bodies remain non-structural because the shared
+/// lexical authority masks those regions afterwards.
+fn preserve_quoted_special_grantor_specifications(sql: &str) -> String {
+    sql.replace(
+        "\"current_role\"",
+        "__tepp_quoted_grantor_current_role@",
+    )
+    .replace(
+        "\"current_user\"",
+        "__tepp_quoted_grantor_current_user@",
+    )
+    .replace(
+        "\"session_user\"",
+        "__tepp_quoted_grantor_session_user@",
+    )
 }
