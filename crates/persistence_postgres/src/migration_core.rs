@@ -15,6 +15,8 @@ mod runtime_role_executor;
 mod runtime_role_grantor;
 #[path = "migration_runtime_role_membership.rs"]
 mod runtime_role_membership;
+#[path = "migration_transaction_projection.rs"]
+mod transaction_projection;
 
 use crate::MigrationContractError;
 pub use implementation::MigrationCatalog;
@@ -25,17 +27,18 @@ pub use implementation::MigrationCatalog;
 /// `GLOBAL`/`LOCAL TEMP[TEMPORARY]` spellings must traverse the same table-name
 /// and table-body contracts as ordinary `CREATE TABLE`. The canonicalized copy
 /// exists only for validation; executable migration SQL is never rewritten.
-/// Runtime-role membership and grantor provenance are checked on the normalized
-/// validation copy. Executor-relative `GRANTED BY CURRENT_USER` / `CURRENT_ROLE`
-/// evidence is first projected through normalized `SET ROLE` state so identical
-/// pseudo-target spellings cannot collapse distinct PostgreSQL grantor rows.
+/// Runtime-role membership safety consumes only statements whose effects survive
+/// explicit transaction outcome. Executor-relative grantor identity is projected
+/// before that transaction filter so in-transaction `SET LOCAL ROLE` and session
+/// authorization still identify the grantor that PostgreSQL recorded, while a
+/// later rollback cannot donate false membership or revocation evidence.
 ///
 /// # Errors
 ///
 /// Returns the same naming, tenant, temporal, RLS, or structural contract
 /// errors as the underlying migration validator, plus `MissingAppRuntimeRole`
 /// when the application runtime has an unsafe or unprovable PostgreSQL
-/// membership path.
+/// membership path or transaction outcome.
 pub fn validate_migration_catalog(
     catalog: &MigrationCatalog,
 ) -> Result<(), MigrationContractError> {
@@ -44,9 +47,21 @@ pub fn validate_migration_catalog(
     else {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
+    let Some(committed_membership_sql) =
+        transaction_projection::project_committed_statements(catalog.up_sql())
+    else {
+        return Err(MigrationContractError::MissingAppRuntimeRole);
+    };
+    let Some(committed_grantor_sql) =
+        transaction_projection::project_committed_statements(&grantor_sql)
+    else {
+        return Err(MigrationContractError::MissingAppRuntimeRole);
+    };
 
-    if !runtime_role_membership::runtime_membership_is_rls_safe(catalog.up_sql())
-        || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(&grantor_sql)
+    if !runtime_role_membership::runtime_membership_is_rls_safe(&committed_membership_sql)
+        || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(
+            &committed_grantor_sql,
+        )
     {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     }
