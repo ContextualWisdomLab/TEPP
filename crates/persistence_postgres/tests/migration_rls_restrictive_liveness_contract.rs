@@ -8,6 +8,8 @@ CREATE TABLE document_record (
     available_time timestamptz NOT NULL
 );
 CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE writer_role NOSUPERUSER NOBYPASSRLS;
+CREATE ROLE reader_role NOSUPERUSER NOBYPASSRLS;
 ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
 ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
 ";
