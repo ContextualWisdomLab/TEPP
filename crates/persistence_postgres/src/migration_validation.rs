@@ -789,7 +789,7 @@ mod tests {
             "CREATE USER MAPPING FOR CURRENT_USER SERVER foreign_server;",
         )
         .expect("well-formed user mapping");
-        assert!(normalized.starts_with("CREATE USER MAPPING "));
+        assert!(user_mapping.starts_with("CREATE USER MAPPING "));
     }
 
     #[test]
