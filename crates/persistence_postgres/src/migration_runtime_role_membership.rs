@@ -19,8 +19,9 @@ const CREATE_IN_ROLE_SENTINEL: &str = "__create_in_role_membership__";
 /// For role membership, PostgreSQL defaults SET to true on creation but retains
 /// the current option when a later GRANT omits SET; the small state map mirrors
 /// that ordering so an explicit later `WITH SET FALSE` can restore safety.
-/// `CREATE ROLE ... IN ROLE ...` is represented as `CREATE TYPE` by the existing
-/// structural alias canonicalizer and is conservatively SET-capable.
+/// `CREATE ROLE ... IN ROLE ...` and its deprecated PostgreSQL `IN GROUP` alias
+/// are represented as `CREATE TYPE` by the existing structural alias
+/// canonicalizer and are conservatively SET-capable.
 pub(super) fn runtime_membership_is_rls_safe(sql: &str) -> bool {
     let tokenized = sql.replace(';', " ; ").replace(',', " , ");
     let tokens = tokenized.split_whitespace().collect::<Vec<_>>();
@@ -233,12 +234,14 @@ fn explicit_set_option(statement: &[&str]) -> Option<bool> {
     None
 }
 
-/// Return whether canonicalized role creation adds the runtime `IN ROLE`.
+/// Return whether canonicalized role creation adds the runtime to another role.
 ///
 /// `migration_validation` maps CREATE ROLE/USER/GROUP to CREATE TYPE for the
 /// shared object-name parser while leaving role attributes in place. PostgreSQL
-/// creates `IN ROLE` memberships with SET enabled, so the runtime cannot use
-/// that creation shortcut under the RLS contract.
+/// creates both `IN ROLE` and deprecated `IN GROUP` memberships with SET
+/// enabled, so either creation shortcut violates the RLS contract. `ROLE` and
+/// `ADMIN` clauses point in the opposite membership direction and are not
+/// treated as runtime escape paths here.
 fn create_runtime_role_in_role(statement: &[&str]) -> bool {
     if statement.len() < 3
         || !statement[0].eq_ignore_ascii_case("CREATE")
@@ -248,7 +251,9 @@ fn create_runtime_role_in_role(statement: &[&str]) -> bool {
         return false;
     }
     statement[3..].windows(2).any(|window| {
-        window[0].eq_ignore_ascii_case("IN") && window[1].eq_ignore_ascii_case("ROLE")
+        window[0].eq_ignore_ascii_case("IN")
+            && (window[1].eq_ignore_ascii_case("ROLE")
+                || window[1].eq_ignore_ascii_case("GROUP"))
     })
 }
 
@@ -276,6 +281,7 @@ mod tests {
             "GRANT on TO tepp_app_runtime ;",
             "GRANT reporting_operator , on TO tepp_app_runtime ;",
             "CREATE TYPE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN ROLE reporting_operator ;",
+            "CREATE TYPE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP reporting_operator ;",
         ] {
             assert!(!runtime_membership_is_rls_safe(sql), "{sql}");
         }
