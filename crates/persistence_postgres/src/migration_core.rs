@@ -9,6 +9,8 @@
 
 #[path = "migration_core_impl.rs"]
 mod implementation;
+#[path = "migration_runtime_role_grantor.rs"]
+mod runtime_role_grantor;
 #[path = "migration_runtime_role_membership.rs"]
 mod runtime_role_membership;
 
@@ -21,18 +23,22 @@ pub use implementation::MigrationCatalog;
 /// `GLOBAL`/`LOCAL TEMP[TEMPORARY]` spellings must traverse the same table-name
 /// and table-body contracts as ordinary `CREATE TABLE`. The canonicalized copy
 /// exists only for validation; executable migration SQL is never rewritten.
-/// Runtime-role membership is checked on the same normalized validation copy so
-/// a SET-capable role grant cannot route around the direct RLS role-state proof.
+/// Runtime-role membership is checked on the same normalized validation copy.
+/// The aggregate membership authority proves effective SET/ADMIN/INHERIT state,
+/// while the grantor-provenance authority separately prevents a REVOKE from one
+/// PostgreSQL grantor from erasing an unsafe membership row recorded by another.
 ///
 /// # Errors
 ///
 /// Returns the same naming, tenant, temporal, RLS, or structural contract
 /// errors as the underlying migration validator, plus `MissingAppRuntimeRole`
-/// when the application runtime can switch roles through PostgreSQL membership.
+/// when the application runtime has an unsafe PostgreSQL membership path.
 pub fn validate_migration_catalog(
     catalog: &MigrationCatalog,
 ) -> Result<(), MigrationContractError> {
-    if !runtime_role_membership::runtime_membership_is_rls_safe(catalog.up_sql()) {
+    if !runtime_role_membership::runtime_membership_is_rls_safe(catalog.up_sql())
+        || !runtime_role_grantor::runtime_membership_grantors_are_rls_safe(catalog.up_sql())
+    {
         return Err(MigrationContractError::MissingAppRuntimeRole);
     }
 
