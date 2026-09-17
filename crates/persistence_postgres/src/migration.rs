@@ -444,6 +444,38 @@ fn policy_target_table(policy_sql: &str) -> Option<&str> {
     tokens.get(on_index + 1).copied()
 }
 
+fn policy_roles(policy_sql: &str) -> Option<Vec<String>> {
+    let using_clause = policy_clause_span(policy_sql, PolicyClause::Using);
+    let check_clause = policy_clause_span(policy_sql, PolicyClause::WithCheck);
+    let header_end = [using_clause, check_clause]
+        .into_iter()
+        .flatten()
+        .map(|span| span.start)
+        .min()
+        .unwrap_or(policy_sql.len());
+    let tokenizable = policy_sql[..header_end].replace(',', " , ");
+    let tokens = tokenizable.split_whitespace().collect::<Vec<_>>();
+    let Some(to_index) = tokens
+        .iter()
+        .position(|token| token.eq_ignore_ascii_case("TO"))
+    else {
+        return Some(vec!["public".to_owned()]);
+    };
+
+    let mut roles = Vec::new();
+    for token in tokens.iter().skip(to_index + 1) {
+        let role = *token;
+        if role == "," {
+            continue;
+        }
+        if role.is_empty() || !role.bytes().all(is_sql_identifier_byte) {
+            return None;
+        }
+        roles.push(role.to_ascii_lowercase());
+    }
+    (!roles.is_empty()).then_some(roles)
+}
+
 fn policy_command_applies(policy_command: PolicyCommand, requested_command: PolicyCommand) -> bool {
     policy_command == PolicyCommand::All || policy_command == requested_command
 }
@@ -507,8 +539,11 @@ fn policy_is_restrictive(policy_sql: &str) -> bool {
 /// independently admit rows. PostgreSQL permissive policies are OR-composed;
 /// restrictive policies are AND-composed only after a permissive policy grants
 /// access. A restrictive policy therefore requires permissive coverage for each
-/// command it can constrain, otherwise PostgreSQL's default-deny composition
-/// makes that command path operationally inaccessible.
+/// command and target role it can constrain, otherwise PostgreSQL's default-deny
+/// composition makes that policy path operationally inaccessible. `PUBLIC`
+/// coverage is universal; otherwise role coverage is matched conservatively by
+/// exact declared role because role-membership grants are outside this bounded
+/// migration parser.
 ///
 /// Command semantics determine which tenant-bound predicates are mandatory:
 /// read-capable permissive policies require `USING`, insert requires
@@ -543,9 +578,12 @@ fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
         let Some(command) = policy_command(statement) else {
             return false;
         };
+        let Some(roles) = policy_roles(statement) else {
+            return false;
+        };
 
         if policy_is_restrictive(statement) {
-            restrictive_requirements.push((table.to_ascii_lowercase(), command));
+            restrictive_requirements.push((table.to_ascii_lowercase(), command, roles));
         } else {
             if !declares_tenant_session_guc(statement)
                 || !policy_binds_tenant_identifier(statement)
@@ -553,7 +591,7 @@ fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
             {
                 return false;
             }
-            permissive_coverage.push((table.to_ascii_lowercase(), command));
+            permissive_coverage.push((table.to_ascii_lowercase(), command, roles));
         }
         search_from = start + CREATE_POLICY.len();
     }
@@ -562,17 +600,37 @@ fn tenant_policies_bind_session_guc(normalized_sql: &str) -> bool {
         return false;
     }
 
-    restrictive_requirements.into_iter().all(|(table, restrictive_command)| {
-        CONCRETE_COMMANDS
-            .into_iter()
-            .filter(|command| policy_command_applies(restrictive_command, *command))
-            .all(|command| {
-                permissive_coverage.iter().any(|(permissive_table, permissive_command)| {
-                    permissive_table == &table
-                        && policy_command_applies(*permissive_command, command)
+    restrictive_requirements.into_iter().all(
+        |(table, restrictive_command, restrictive_roles)| {
+            CONCRETE_COMMANDS
+                .into_iter()
+                .filter(|command| policy_command_applies(restrictive_command, *command))
+                .all(|command| {
+                    if restrictive_roles.iter().any(|role| role == "public") {
+                        return permissive_coverage.iter().any(
+                            |(permissive_table, permissive_command, permissive_roles)| {
+                                permissive_table == &table
+                                    && policy_command_applies(*permissive_command, command)
+                                    && permissive_roles.iter().any(|role| role == "public")
+                            },
+                        );
+                    }
+
+                    restrictive_roles.iter().all(|restrictive_role| {
+                        permissive_coverage.iter().any(
+                            |(permissive_table, permissive_command, permissive_roles)| {
+                                permissive_table == &table
+                                    && policy_command_applies(*permissive_command, command)
+                                    && permissive_roles.iter().any(|permissive_role| {
+                                        permissive_role == "public"
+                                            || permissive_role == restrictive_role
+                                    })
+                            },
+                        )
+                    })
                 })
-            })
-    })
+        },
+    )
 }
 
 /// Normalize SQL and then remove PostgreSQL's `CONCURRENTLY` index modifier
@@ -644,7 +702,7 @@ mod tests {
         canonicalize_concurrent_index_modifier, declares_tenant_session_guc,
         direct_tenant_session_operand, policy_binds_tenant_identifier,
         policy_binds_tenant_session_equality, policy_clause_span, policy_command,
-        policy_is_restrictive, policy_row_predicates_bind_tenant_session,
+        policy_is_restrictive, policy_roles, policy_row_predicates_bind_tenant_session,
         tenant_policies_bind_session_guc,
     };
 
@@ -783,6 +841,30 @@ mod tests {
     }
 
     #[test]
+    fn policy_roles_default_to_public_and_preserve_explicit_targets() {
+        assert_eq!(
+            policy_roles("create policy tenant_policy on tenant_record using(true)"),
+            Some(vec!["public".to_owned()])
+        );
+        assert_eq!(
+            policy_roles(
+                "create policy tenant_policy on tenant_record for select to Reader_Role, writer_role using(true)"
+            ),
+            Some(vec!["reader_role".to_owned(), "writer_role".to_owned()])
+        );
+        assert_eq!(
+            policy_roles("create policy tenant_policy on tenant_record for select to using(true)"),
+            None
+        );
+        assert_eq!(
+            policy_roles(
+                "create policy tenant_policy on tenant_record for select to reader-role using(true)"
+            ),
+            None
+        );
+    }
+
+    #[test]
     fn explicit_policy_command_requires_the_correct_tenant_predicate() {
         let binding = "tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )";
         assert!(policy_row_predicates_bind_tenant_session(&format!(
@@ -842,6 +924,18 @@ mod tests {
         ));
         assert!(!tenant_policies_bind_session_guc(
             "create policy document_record_insert_isolation on document_record as permissive for insert with check(tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_visibility_guard on document_record as restrictive for select using(document_record_id is not null);"
+        ));
+        assert!(!tenant_policies_bind_session_guc(
+            "create policy document_record_writer_isolation on document_record as permissive for select to writer_role using(tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_reader_guard on document_record as restrictive for select to reader_role using(document_record_id is not null);"
+        ));
+        assert!(tenant_policies_bind_session_guc(
+            "create policy document_record_reader_isolation on document_record as permissive for select to reader_role using(tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_reader_guard on document_record as restrictive for select to reader_role using(document_record_id is not null);"
+        ));
+        assert!(tenant_policies_bind_session_guc(
+            "create policy document_record_public_isolation on document_record as permissive for select using(tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_reader_guard on document_record as restrictive for select to reader_role using(document_record_id is not null);"
+        ));
+        assert!(!tenant_policies_bind_session_guc(
+            "create policy document_record_reader_isolation on document_record as permissive for select to reader_role using(tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )); create policy document_record_public_guard on document_record as restrictive for select using(document_record_id is not null);"
         ));
         assert!(policy_is_restrictive(
             "create policy document_record_visibility_guard on document_record AS RESTRICTIVE for select using(true)"
