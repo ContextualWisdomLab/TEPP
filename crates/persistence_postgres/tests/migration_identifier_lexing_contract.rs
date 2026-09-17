@@ -80,6 +80,22 @@ fn quoted_column_named_like_a_table_constraint_keyword_is_still_an_identifier() 
 }
 
 #[test]
+fn dollar_quote_like_bytes_inside_identifiers_do_not_bypass_the_naming_contract() {
+    for statement in [
+        "CREATE INDEX good_index$tag$bad$tag$ ON tenant_record (tenant_record_id);",
+        "CREATE INDEX bad_index$tag$ ON tenant_record (tenant_record_id);",
+        "CREATE INDEX bad_index$$tag$ ON tenant_record (tenant_record_id);",
+    ] {
+        let catalog = conforming_catalog(statement);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::SingleWordObjectName),
+            "{statement}"
+        );
+    }
+}
+
+#[test]
 fn declaration_shaped_text_inside_sql_trivia_is_not_an_object() {
     let catalog = conforming_catalog(
         "-- CREATE INDEX Bad ON tenant_record (tenant_record_id);\n\
