@@ -510,6 +510,13 @@ fn dollar_quote_delimiter(bytes: &[u8], start: usize) -> Option<&[u8]> {
     if bytes.get(start) != Some(&b'$') {
         return None;
     }
+    if start > 0
+        && bytes.get(start - 1).is_some_and(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(*byte, b'_' | b'$') || *byte >= 0x80
+        })
+    {
+        return None;
+    }
     let mut index = start + 1;
     if bytes.get(index) == Some(&b'$') {
         return Some(&bytes[start..=index]);
