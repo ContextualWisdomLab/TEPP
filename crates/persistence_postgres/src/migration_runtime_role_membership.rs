@@ -2,9 +2,9 @@
 //!
 //! Direct role attributes and lifecycle remain owned by `migration_validation`.
 //! This module owns the complementary membership invariant: an RLS-protected
-//! application runtime must not be able to become another role with `SET ROLE`
-//! or hold `ADMIN` on that role, which would let it grant the role back to
-//! itself with `SET TRUE`.
+//! application runtime must not be able to become another role with `SET ROLE`,
+//! hold `ADMIN` on that role, or inherit privileges from a role whose SQL-object
+//! ownership is not proven safe by this bounded validator.
 
 use std::collections::BTreeMap;
 
@@ -16,26 +16,36 @@ const MALFORMED_GRANTEE_SENTINEL: &str = "__malformed_membership_grantee_list__"
 ///
 /// `SET` is the direct `SET ROLE` capability. `ADMIN` is equally security
 /// relevant because PostgreSQL allows an ADMIN member to grant the role back
-/// to itself with a different SET value. A membership is therefore safe for the
-/// RLS runtime only when both options are false.
+/// to itself with a different SET value. `INHERIT` is also security relevant:
+/// PostgreSQL warns that a member which inherits a role but cannot SET ROLE may
+/// still gain full access by manipulating SQL objects owned by that role. TEPP's
+/// bounded migration validator has no global ownership proof, so all three
+/// options must be false before a runtime membership is certified RLS-safe.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct MembershipSecurityState {
     set_enabled: bool,
     admin_enabled: bool,
+    inherit_enabled: bool,
 }
 
 impl MembershipSecurityState {
-    /// PostgreSQL defaults for a newly created role membership.
+    /// Fail-closed defaults for a newly created runtime membership.
+    ///
+    /// PostgreSQL defaults SET to true and ADMIN to false. Omitted INHERIT uses
+    /// the member role's role-level inheritance attribute; PostgreSQL roles are
+    /// INHERIT by default, and this membership authority does not prove a
+    /// runtime-level NOINHERIT state, so missing INHERIT evidence remains true.
     const fn new() -> Self {
         Self {
             set_enabled: true,
             admin_enabled: false,
+            inherit_enabled: true,
         }
     }
 
-    /// Return whether the runtime can reach or manufacture a SET ROLE path.
+    /// Return whether the membership can cross the bounded runtime RLS identity boundary.
     const fn can_escape_runtime_identity(self) -> bool {
-        self.set_enabled || self.admin_enabled
+        self.set_enabled || self.admin_enabled || self.inherit_enabled
     }
 }
 
@@ -44,17 +54,20 @@ impl MembershipSecurityState {
 struct ExplicitMembershipOptions {
     set_enabled: Option<bool>,
     admin_enabled: Option<bool>,
+    inherit_enabled: Option<bool>,
 }
 
-/// Return whether the normalized migration's final runtime memberships disable SET ROLE escalation.
+/// Return whether the normalized migration's final runtime memberships are RLS-safe.
 ///
 /// Object-privilege grants/revokes fall outside the bounded membership grammar
 /// because their privilege/object tokens do not form a comma-separated role
-/// list before `TO`/`FROM`. New memberships default to `SET TRUE, ADMIN FALSE`;
-/// later GRANTs retain omitted options. Both SET and ADMIN must be false in the
-/// final state: PostgreSQL documents that ADMIN can be used to grant the role
-/// back to oneself with SET enabled. `CREATE ROLE ... IN ROLE ...` and its
-/// deprecated `IN GROUP` alias remain conservatively SET-capable.
+/// list before `TO`/`FROM`. New memberships conservatively begin as
+/// `SET TRUE, ADMIN FALSE, INHERIT TRUE`; later GRANTs retain omitted options.
+/// SET, ADMIN, and INHERIT must all be false in the final state. PostgreSQL
+/// documents that ADMIN can manufacture a SET path and that INHERIT without SET
+/// can still expose an owning role through manipulation of its existing SQL
+/// objects. `CREATE ROLE ... IN ROLE ...` and deprecated `IN GROUP` therefore
+/// remain conservatively unsafe as well.
 pub(super) fn runtime_membership_is_rls_safe(sql: &str) -> bool {
     let tokenized = sql.replace(';', " ; ").replace(',', " , ");
     let tokens = tokenized.split_whitespace().collect::<Vec<_>>();
@@ -175,8 +188,8 @@ fn runtime_grantee_list(statement: &[&str], delimiter: usize) -> Option<(bool, u
 /// Apply one PostgreSQL role-membership GRANT that targets the application runtime.
 ///
 /// The granted-role and grantee lists are parsed positionally before optional
-/// clauses are inspected. New memberships use PostgreSQL's SET-true/ADMIN-false
-/// defaults; later GRANTs update only explicitly supplied security options.
+/// clauses are inspected. New memberships use fail-closed PostgreSQL defaults;
+/// later GRANTs update only explicitly supplied security options.
 fn apply_runtime_membership_grant(
     statement: &[&str],
     memberships: &mut BTreeMap<String, MembershipSecurityState>,
@@ -205,6 +218,9 @@ fn apply_runtime_membership_grant(
                 if let Some(admin_enabled) = options.admin_enabled {
                     state.admin_enabled = admin_enabled;
                 }
+                if let Some(inherit_enabled) = options.inherit_enabled {
+                    state.inherit_enabled = inherit_enabled;
+                }
             }
             None => {
                 let mut state = MembershipSecurityState::new();
@@ -213,6 +229,9 @@ fn apply_runtime_membership_grant(
                 }
                 if let Some(admin_enabled) = options.admin_enabled {
                     state.admin_enabled = admin_enabled;
+                }
+                if let Some(inherit_enabled) = options.inherit_enabled {
+                    state.inherit_enabled = inherit_enabled;
                 }
                 memberships.insert(role, state);
             }
@@ -225,15 +244,17 @@ fn apply_runtime_membership_grant(
 enum RevokedMembershipOption {
     Set,
     Admin,
+    Inherit,
 }
 
 /// Apply one PostgreSQL role-membership REVOKE that targets the application runtime.
 ///
-/// Plain membership REVOKE removes the edge. `REVOKE SET OPTION FOR` and
-/// `REVOKE ADMIN OPTION FOR` mutate only existing memberships; neither creates a
-/// phantom safe state. INHERIT-option revocation is outside the SET/ADMIN escape
-/// invariant and leaves this map unchanged. Object privilege revokes stay
-/// outside the state map because they do not match the bounded role-list grammar.
+/// Plain membership REVOKE removes the edge. Option-specific REVOKEs mutate only
+/// an already-tracked membership and therefore cannot create the phantom-safe
+/// state repaired by #546. PostgreSQL defines SET, ADMIN, and INHERIT option
+/// revocation as setting that membership option to false. Object privilege
+/// revokes stay outside this state map because they do not match the bounded
+/// role-list grammar.
 fn apply_runtime_membership_revoke(
     statement: &[&str],
     memberships: &mut BTreeMap<String, MembershipSecurityState>,
@@ -270,7 +291,7 @@ fn apply_runtime_membership_revoke(
             .get(3)
             .is_some_and(|token| token.eq_ignore_ascii_case("FOR"))
     {
-        return;
+        (4usize, Some(RevokedMembershipOption::Inherit))
     } else {
         (1usize, None)
     };
@@ -301,6 +322,11 @@ fn apply_runtime_membership_revoke(
                     state.admin_enabled = false;
                 }
             }
+            Some(RevokedMembershipOption::Inherit) => {
+                if let Some(state) = memberships.get_mut(&role) {
+                    state.inherit_enabled = false;
+                }
+            }
             None => {
                 memberships.remove(&role);
             }
@@ -322,7 +348,7 @@ fn membership_role_names(tokens: &[&str]) -> Vec<String> {
         .collect()
 }
 
-/// Return explicitly supplied SET and ADMIN membership options.
+/// Return explicitly supplied SET, ADMIN, and INHERIT membership options.
 ///
 /// `trailing_start` is the first token after the complete grantee list, so role
 /// names projected from quoted keywords cannot impersonate the `WITH` clause.
@@ -360,6 +386,11 @@ fn explicit_membership_options(
             index += 2;
             continue;
         }
+        if statement[index].eq_ignore_ascii_case("INHERIT") {
+            options.inherit_enabled = Some(value);
+            index += 2;
+            continue;
+        }
         index += 1;
     }
     options
@@ -370,9 +401,10 @@ fn explicit_membership_options(
 /// `migration_validation` maps CREATE ROLE/USER/GROUP to CREATE TYPE for the
 /// shared object-name parser while leaving role attributes in place. PostgreSQL
 /// creates both `IN ROLE` and deprecated `IN GROUP` memberships with SET
-/// enabled, so either creation shortcut violates the RLS contract. `ROLE` and
-/// `ADMIN` clauses point in the opposite membership direction and are not
-/// treated as runtime escape paths here.
+/// enabled; the runtime is also normally INHERIT unless created NOINHERIT, so
+/// either shortcut violates this bounded RLS contract. `ROLE` and `ADMIN`
+/// clauses point in the opposite membership direction and are not treated as
+/// runtime escape paths here.
 fn create_runtime_role_in_role(statement: &[&str]) -> bool {
     if statement.len() < 3
         || !statement[0].eq_ignore_ascii_case("CREATE")
@@ -393,7 +425,7 @@ mod tests {
     use super::runtime_membership_is_rls_safe;
 
     #[test]
-    fn object_grants_and_inverse_membership_do_not_give_runtime_set_role() {
+    fn object_grants_and_inverse_membership_do_not_give_runtime_membership_escape() {
         for sql in [
             "GRANT SELECT ON TABLE tenant_record TO tepp_app_runtime ;",
             "GRANT SET ON PARAMETER work_mem TO tepp_app_runtime ;",
@@ -404,14 +436,15 @@ mod tests {
     }
 
     #[test]
-    fn set_or_admin_capable_runtime_memberships_fail_closed() {
+    fn set_admin_or_inherit_capable_runtime_memberships_fail_closed() {
         for sql in [
             "GRANT reporting_operator TO tepp_app_runtime ;",
             "GRANT reporting_operator TO tepp_app_runtime WITH SET TRUE ;",
             "GRANT reporting_operator TO tepp_app_runtime WITH SET OPTION ;",
-            "GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE , ADMIN TRUE ;",
-            "GRANT reporting_operator TO tepp_app_runtime WITH ADMIN TRUE , SET FALSE ;",
-            "GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE ; GRANT reporting_operator TO tepp_app_runtime WITH ADMIN TRUE ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH INHERIT TRUE , SET FALSE , ADMIN FALSE ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE , SET FALSE , ADMIN TRUE ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH ADMIN TRUE , INHERIT FALSE , SET FALSE ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE , SET FALSE ; GRANT reporting_operator TO tepp_app_runtime WITH ADMIN TRUE ;",
             "GRANT on TO tepp_app_runtime ;",
             "GRANT reporting_operator , on TO tepp_app_runtime ;",
             "GRANT to TO tepp_app_runtime ;",
@@ -421,6 +454,7 @@ mod tests {
             "CREATE TYPE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN ROLE reporting_operator ;",
             "CREATE TYPE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP reporting_operator ;",
             "REVOKE SET OPTION FOR reporting_operator FROM tepp_app_runtime ; GRANT reporting_operator TO tepp_app_runtime ;",
+            "REVOKE INHERIT OPTION FOR reporting_operator FROM tepp_app_runtime ; GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE , ADMIN FALSE ;",
         ] {
             assert!(!runtime_membership_is_rls_safe(sql), "{sql}");
         }
@@ -429,14 +463,14 @@ mod tests {
     #[test]
     fn explicit_security_option_repair_or_later_revoke_restores_membership_safety() {
         for sql in [
-            "GRANT reporting_operator TO tepp_app_runtime WITH INHERIT TRUE , SET FALSE ;",
-            "GRANT reporting_operator TO with , tepp_app_runtime WITH SET FALSE ;",
-            "GRANT reporting_operator TO tepp_app_runtime ; REVOKE SET OPTION FOR reporting_operator FROM tepp_app_runtime ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE , SET FALSE , ADMIN FALSE ;",
+            "GRANT reporting_operator TO with , tepp_app_runtime WITH INHERIT FALSE , SET FALSE , ADMIN FALSE ;",
+            "GRANT reporting_operator TO tepp_app_runtime ; REVOKE SET OPTION FOR reporting_operator FROM tepp_app_runtime ; REVOKE INHERIT OPTION FOR reporting_operator FROM tepp_app_runtime ;",
             "GRANT reporting_operator TO tepp_app_runtime ; REVOKE reporting_operator FROM tepp_app_runtime ;",
             "GRANT reporting_operator TO tepp_app_runtime ; REVOKE reporting_operator FROM cascade , tepp_app_runtime ;",
-            "GRANT reporting_operator TO tepp_app_runtime ; GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE ;",
-            "GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE , ADMIN TRUE ; REVOKE ADMIN OPTION FOR reporting_operator FROM tepp_app_runtime ;",
-            "GRANT reporting_operator TO tepp_app_runtime WITH SET FALSE , ADMIN TRUE ; GRANT reporting_operator TO tepp_app_runtime WITH ADMIN FALSE ;",
+            "GRANT reporting_operator TO tepp_app_runtime ; GRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE , SET FALSE , ADMIN FALSE ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE , SET FALSE , ADMIN TRUE ; REVOKE ADMIN OPTION FOR reporting_operator FROM tepp_app_runtime ;",
+            "GRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE , SET FALSE , ADMIN TRUE ; GRANT reporting_operator TO tepp_app_runtime WITH ADMIN FALSE ;",
         ] {
             assert!(runtime_membership_is_rls_safe(sql), "{sql}");
         }
