@@ -254,15 +254,9 @@ fn next_predicate_boundary(lower_sql: &str, start: usize) -> usize {
         .unwrap_or(lower_sql.len())
 }
 
-/// Require the tenant column and tenant session key to participate in the same
-/// equality comparison. Co-presence in unrelated boolean terms is not tenant
-/// isolation evidence. This bounded recognizer intentionally accepts only the
-/// direct tenant identifier (optionally cast to text) on one side; the other
-/// side may wrap the exact `current_setting(...)` call, as the shipped migration
-/// does with `nullif`.
-fn policy_binds_tenant_session_equality(policy_sql: &str) -> bool {
-    let lower = policy_sql.to_ascii_lowercase();
-    let bytes = policy_sql.as_bytes();
+fn predicate_contains_tenant_session_equality(predicate_sql: &str) -> bool {
+    let lower = predicate_sql.to_ascii_lowercase();
+    let bytes = predicate_sql.as_bytes();
 
     for equality in 0..bytes.len() {
         if bytes[equality] != b'=' {
@@ -278,8 +272,8 @@ fn policy_binds_tenant_session_equality(policy_sql: &str) -> bool {
 
         let left_start = previous_predicate_boundary(&lower, equality);
         let right_end = next_predicate_boundary(&lower, equality + 1);
-        let left = &policy_sql[left_start..equality];
-        let right = &policy_sql[equality + 1..right_end];
+        let left = &predicate_sql[left_start..equality];
+        let right = &predicate_sql[equality + 1..right_end];
         if (direct_tenant_operand(left) && declares_tenant_session_guc(right))
             || (declares_tenant_session_guc(left) && direct_tenant_operand(right))
         {
@@ -287,6 +281,87 @@ fn policy_binds_tenant_session_equality(policy_sql: &str) -> bool {
         }
     }
     false
+}
+
+fn strip_enclosing_predicate_parentheses(mut predicate_sql: &str) -> &str {
+    loop {
+        let trimmed = predicate_sql.trim();
+        let bytes = trimmed.as_bytes();
+        if bytes.first() != Some(&b'(') || bytes.last() != Some(&b')') {
+            return trimmed;
+        }
+
+        let mut depth = 0usize;
+        let mut encloses_entire_expression = true;
+        for (index, byte) in bytes.iter().enumerate() {
+            match *byte {
+                b'(' => depth = depth.saturating_add(1),
+                b')' => {
+                    if depth == 0 {
+                        return trimmed;
+                    }
+                    depth -= 1;
+                    if depth == 0 && index + 1 != bytes.len() {
+                        encloses_entire_expression = false;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if depth != 0 || !encloses_entire_expression {
+            return trimmed;
+        }
+        predicate_sql = &trimmed[1..trimmed.len() - 1];
+    }
+}
+
+fn all_top_level_or_paths_bind_tenant_session(predicate_sql: &str) -> bool {
+    let predicate_sql = strip_enclosing_predicate_parentheses(predicate_sql);
+    let bytes = predicate_sql.as_bytes();
+    let mut depth = 0usize;
+    let mut branch_start = 0usize;
+    let mut index = 0usize;
+
+    while index < bytes.len() {
+        match bytes[index] {
+            b'(' => {
+                depth = depth.saturating_add(1);
+                index += 1;
+                continue;
+            }
+            b')' => {
+                depth = depth.saturating_sub(1);
+                index += 1;
+                continue;
+            }
+            _ => {}
+        }
+        if depth == 0 {
+            if let Some(or_end) = bounded_ascii_keyword(bytes, index, b"or") {
+                if !predicate_contains_tenant_session_equality(
+                    &predicate_sql[branch_start..index],
+                ) {
+                    return false;
+                }
+                branch_start = or_end;
+                index = or_end;
+                continue;
+            }
+        }
+        index += 1;
+    }
+
+    predicate_contains_tenant_session_equality(&predicate_sql[branch_start..])
+}
+
+/// Require the tenant column and tenant session key to participate in the same
+/// equality comparison on every top-level row-admitting OR path. A tenant-bound
+/// conjunct may safely guard nested alternatives such as
+/// `tenant_binding AND (role_a OR role_b)`, while `tenant_binding OR true`
+/// fails closed because one disjunct can admit rows without tenant equality.
+fn policy_binds_tenant_session_equality(policy_sql: &str) -> bool {
+    all_top_level_or_paths_bind_tenant_session(policy_sql)
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -476,11 +551,11 @@ fn canonicalize_concurrent_index_modifier(sql: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        PolicyClause, PolicyCommand, canonicalize_concurrent_index_modifier,
-        declares_tenant_session_guc, policy_binds_tenant_identifier,
-        policy_binds_tenant_session_equality, policy_clause_span, policy_command,
-        policy_is_restrictive, policy_row_predicates_bind_tenant_session,
-        tenant_policies_bind_session_guc,
+        PolicyClause, PolicyCommand, all_top_level_or_paths_bind_tenant_session,
+        canonicalize_concurrent_index_modifier, declares_tenant_session_guc,
+        policy_binds_tenant_identifier, policy_binds_tenant_session_equality,
+        policy_clause_span, policy_command, policy_is_restrictive,
+        policy_row_predicates_bind_tenant_session, tenant_policies_bind_session_guc,
     };
 
     #[test]
@@ -547,6 +622,20 @@ mod tests {
         assert!(!policy_binds_tenant_session_equality(
             "tenant_record_id::text = document_record_id::text and current_setting ( 'tepp.current_tenant_record_id' , true ) is not null"
         ));
+    }
+
+    #[test]
+    fn every_top_level_or_path_requires_tenant_equality() {
+        let binding = "tenant_record_id::text = current_setting ( 'tepp.current_tenant_record_id' , true )";
+        assert!(!all_top_level_or_paths_bind_tenant_session(&format!(
+            "({binding} or true)"
+        )));
+        assert!(all_top_level_or_paths_bind_tenant_session(&format!(
+            "(({binding} and document_record_id is not null) or ({binding} and document_record_id is null))"
+        )));
+        assert!(all_top_level_or_paths_bind_tenant_session(&format!(
+            "({binding} and (document_record_id is null or document_record_id is not null))"
+        )));
     }
 
     #[test]
