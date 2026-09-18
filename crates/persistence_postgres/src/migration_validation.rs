@@ -438,18 +438,26 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
     false
 }
 
-/// Detect committed PostgreSQL replica execution mode that suppresses ordinary triggers.
+/// Detect committed PostgreSQL execution modes that cannot prove ordinary triggers stayed enabled.
 ///
 /// The input has already crossed the shared lexical authority and committed-state
-/// projection, so comments, opaque bodies, and rolled-back local settings cannot
-/// manufacture this state. PostgreSQL permits optional `LOCAL`/`SESSION`, `TO` or
-/// `=`, a quoted enum value, the equivalent `set_config` function, and equivalent
-/// writes through `pg_settings.setting`, including CTE-wrapped UPDATE commands.
-/// This bounded fold rejects execution modes that are directly `replica` or cannot
-/// be statically proven safe while allowing the ordinary-trigger-safe `origin`
-/// and `local` atoms.
+/// projection. Comments and data literals are therefore opaque, while rolled-back
+/// statements are absent. PostgreSQL `DO` executes an anonymous procedural body
+/// immediately; because that body is intentionally opaque to this bounded SQL
+/// validator, a committed top-level `DO` fails closed rather than being assumed
+/// not to mutate `session_replication_role` or protected data. Direct SQL settings,
+/// `set_config`, and writable `pg_settings.setting` retain their existing bounded
+/// handling; `origin` and `local` remain the statically proven safe direct modes.
 fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
     sql.split(';').any(|statement| {
+        if statement
+            .split_whitespace()
+            .next()
+            .is_some_and(|token| token.eq_ignore_ascii_case("DO"))
+        {
+            return true;
+        }
+
         if statement_calls_unsafe_set_config(statement)
             || statement_updates_unsafe_replication_role_via_pg_settings(statement)
         {
