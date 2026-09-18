@@ -235,10 +235,10 @@ fn admit_scores_at_cutoff(
         if score.snapshot_id != snapshot_id {
             return Err(AnalysisEngineError::SnapshotMismatch);
         }
-        if !evidence_ids.insert(score.evidence_id.as_str()) {
-            return Err(AnalysisEngineError::DuplicateEvidence);
-        }
         if score.available_time.instant() <= knowledge_cutoff.instant() {
+            if !evidence_ids.insert(score.evidence_id.as_str()) {
+                return Err(AnalysisEngineError::DuplicateEvidence);
+            }
             eligible.push(ClusteredScore {
                 cluster_key: score.cluster_key,
                 predictor: score.predictor,
@@ -275,14 +275,15 @@ fn require_causal_refusal(
 /// Execute cutoff-safe CWC within/between composition as one analysis-run profile.
 ///
 /// The caller supplies already-mapped clustered coordinates. Each row carries its immutable
-/// evidence identity, source snapshot, and availability provenance. Duplicate evidence is
-/// rejected before cutoff filtering so replay cannot alter row weighting or scientific output.
+/// evidence identity, source snapshot, and availability provenance. Future-unavailable rows are
+/// censored before evidence-identity admission, so they cannot alter a historical replay;
+/// duplicate identities among cutoff-visible evidence fail closed before scientific composition.
 /// This executor does not invent an ESEM/DSEM estimator, persist rows, or treat the recovered
 /// slopes as a causal effect.
 ///
 /// # Errors
 ///
-/// Returns a request/receipt/snapshot/cutoff/profile error, duplicate-evidence refusal,
+/// Returns a request/receipt/snapshot/cutoff/profile error, duplicate-visible-evidence refusal,
 /// psychometric recovery failure, or invalid artifact error.
 pub fn execute_longitudinal_cwc_run(
     request: &AnalysisRunRequest,
