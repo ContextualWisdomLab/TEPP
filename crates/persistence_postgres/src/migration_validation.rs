@@ -569,7 +569,11 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
 /// procedural code or a procedure whose effects are not proven by this bounded
 /// validator, so committed top-level forms fail closed. Direct SQL settings,
 /// `set_config`, and writable `pg_settings.setting` retain their existing bounded
-/// handling; `origin` and `local` remain the statically proven safe direct modes.
+/// handling. Unicode-escaped direct `SET` parameter names reuse the shared quoted
+/// projection: canonical `session_replication_role` is protected, an invalid
+/// escaped projection is treated as potentially protected, and a safely projected
+/// unrelated identifier remains unrelated. Direct `origin` and `local` retain
+/// their statically safe ordinary-trigger semantics.
 fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
     sql.split(';').any(|statement| {
         if statement
@@ -603,13 +607,40 @@ fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
         }) {
             index += 1;
         }
-        if !tokens
+
+        if tokens
             .get(index)
             .is_some_and(|token| token.eq_ignore_ascii_case("session_replication_role"))
         {
+            index += 1;
+        } else if tokens
+            .get(index)
+            .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+        {
+            let Some(projected_name) = tokens.get(index + 1) else {
+                return true;
+            };
+            if !projected_name.eq_ignore_ascii_case("session_replication_role")
+                && !projected_name.eq_ignore_ascii_case("INVALID_QUOTED_IDENTIFIER")
+            {
+                return false;
+            }
+            index += 2;
+            if tokens
+                .get(index)
+                .is_some_and(|token| token.eq_ignore_ascii_case("UESCAPE"))
+            {
+                index += 1;
+                if tokens.get(index).is_some_and(|token| {
+                    token.len() >= 2 && token.starts_with('\'') && token.ends_with('\'')
+                }) {
+                    index += 1;
+                }
+            }
+        } else {
             return false;
         }
-        index += 1;
+
         if !tokens.get(index).is_some_and(|token| {
             *token == "=" || token.eq_ignore_ascii_case("TO")
         }) {
