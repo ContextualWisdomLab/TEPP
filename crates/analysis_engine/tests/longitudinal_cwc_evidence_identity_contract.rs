@@ -62,7 +62,7 @@ fn baseline_rows() -> Vec<LongitudinalClusterScore> {
 }
 
 #[test]
-fn duplicate_evidence_identity_fails_closed_before_cwc_composition() {
+fn duplicate_visible_evidence_identity_fails_closed_before_cwc_composition() {
     let request = request();
     let accepted = accepted(&request);
     let mut rows = baseline_rows();
@@ -88,9 +88,19 @@ fn duplicate_evidence_identity_fails_closed_before_cwc_composition() {
 }
 
 #[test]
-fn duplicate_identity_after_cutoff_is_still_a_snapshot_contract_failure() {
+fn future_unavailable_duplicate_identity_does_not_change_historical_replay() {
     let request = request();
     let accepted = accepted(&request);
+    let baseline = execute_longitudinal_cwc_run(
+        &request,
+        &accepted,
+        SNAPSHOT_ID,
+        cutoff(),
+        &baseline_rows(),
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("baseline");
+
     let mut rows = baseline_rows();
     rows.push(row(
         "evidence-2",
@@ -99,18 +109,18 @@ fn duplicate_identity_after_cutoff_is_still_a_snapshot_contract_failure() {
         100.0,
         "2026-08-15T00:00:00Z",
     ));
+    let replay = execute_longitudinal_cwc_run(
+        &request,
+        &accepted,
+        SNAPSHOT_ID,
+        cutoff(),
+        &rows,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("future-unavailable replay must stay outside the historical census");
 
-    assert_eq!(
-        execute_longitudinal_cwc_run(
-            &request,
-            &accepted,
-            SNAPSHOT_ID,
-            cutoff(),
-            &rows,
-            "2026-08-02T00:00:00Z",
-        ),
-        Err(AnalysisEngineError::DuplicateEvidence)
-    );
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
 }
 
 #[test]
