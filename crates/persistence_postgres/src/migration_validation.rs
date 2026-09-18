@@ -250,11 +250,11 @@ fn top_level_keyword_index(tokens: &[&str], start: usize, keyword: &str) -> Opti
 /// `SET`. The input has already crossed the shared lexical authority, so this
 /// bounded parser resolves only the canonical unqualified or `pg_catalog`
 /// relation identity plus PostgreSQL's optional `ONLY`, `*`, and target alias
-/// forms. The target `WHERE` is selected only at expression depth zero, so a
-/// scalar-subquery predicate cannot hide the actual `pg_settings` row predicate.
-/// Atomic `origin` and `local` values are proven safe for ordinary triggers;
-/// `replica` and any non-atomic value fail closed because the validator cannot
-/// prove that protected DML did not execute while triggers were suppressed.
+/// forms. Direct `origin` and `local` assignment atoms are always safe for
+/// ordinary triggers. For any other value, only a complete direct equality to
+/// one unrelated quoted setting name proves that `session_replication_role` is
+/// excluded; protected equality is recognized in either operand order, and any
+/// unsupported predicate shape fails closed instead of being treated as unrelated.
 fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str) -> bool {
     let delimited = update_statement
         .replace('.', " . ")
@@ -327,43 +327,90 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
     {
         return false;
     }
+
     let value_start = index + 3;
-    let Some(where_index) = top_level_keyword_index(&tokens, value_start, "WHERE") else {
-        return false;
-    };
-
-    let mut name_index = where_index + 1;
-    if tokens.get(name_index + 1) == Some(&".") {
-        let qualifier = tokens[name_index];
-        let qualifier_matches = alias
-            .is_some_and(|expected| qualifier.eq_ignore_ascii_case(expected))
-            || alias.is_none() && qualifier.eq_ignore_ascii_case("pg_settings");
-        if !qualifier_matches {
-            return false;
-        }
-        name_index += 2;
-    }
-    if !tokens
-        .get(name_index)
-        .is_some_and(|token| token.eq_ignore_ascii_case("name"))
-        || tokens.get(name_index + 1) != Some(&"=")
-        || !tokens.get(name_index + 2).is_some_and(|value| {
-            value
-                .trim_matches('\'')
-                .eq_ignore_ascii_case("session_replication_role")
-        })
-    {
-        return false;
-    }
-
-    let value_tokens = &tokens[value_start..where_index];
-    value_tokens.len() != 1
-        || !value_tokens[0]
+    let where_index = top_level_keyword_index(&tokens, value_start, "WHERE");
+    let value_end = where_index
+        .or_else(|| top_level_keyword_index(&tokens, value_start, "RETURNING"))
+        .unwrap_or(tokens.len());
+    let value_tokens = &tokens[value_start..value_end];
+    let value_is_safe = value_tokens.len() == 1
+        && (value_tokens[0]
             .trim_matches('\'')
             .eq_ignore_ascii_case("origin")
-            && !value_tokens[0]
+            || value_tokens[0]
                 .trim_matches('\'')
-                .eq_ignore_ascii_case("local")
+                .eq_ignore_ascii_case("local"));
+    if value_is_safe {
+        return false;
+    }
+
+    let Some(where_index) = where_index else {
+        return true;
+    };
+    let predicate_end = top_level_keyword_index(&tokens, where_index + 1, "RETURNING")
+        .unwrap_or(tokens.len());
+
+    let name_operand_end = |start: usize| -> Option<usize> {
+        if tokens.get(start + 1) == Some(&".") {
+            let qualifier = *tokens.get(start)?;
+            let qualifier_matches = alias
+                .is_some_and(|expected| qualifier.eq_ignore_ascii_case(expected))
+                || alias.is_none() && qualifier.eq_ignore_ascii_case("pg_settings");
+            if !qualifier_matches
+                || !tokens
+                    .get(start + 2)
+                    .is_some_and(|token| token.eq_ignore_ascii_case("name"))
+            {
+                return None;
+            }
+            Some(start + 3)
+        } else if tokens
+            .get(start)
+            .is_some_and(|token| token.eq_ignore_ascii_case("name"))
+        {
+            Some(start + 1)
+        } else {
+            None
+        }
+    };
+
+    let quoted_setting_name = |token: &str| -> Option<&str> {
+        if token.len() >= 2
+            && token.starts_with('\'')
+            && token.ends_with('\'')
+            && !token[1..token.len() - 1].contains('\'')
+        {
+            Some(&token[1..token.len() - 1])
+        } else {
+            None
+        }
+    };
+
+    let predicate_start = where_index + 1;
+    if let Some(after_name) = name_operand_end(predicate_start) {
+        if tokens.get(after_name) == Some(&"=")
+            && after_name + 2 == predicate_end
+            && let Some(setting_name) = tokens
+                .get(after_name + 1)
+                .and_then(|token| quoted_setting_name(token))
+        {
+            return setting_name.eq_ignore_ascii_case("session_replication_role");
+        }
+        return true;
+    }
+
+    if let Some(setting_name) = tokens
+        .get(predicate_start)
+        .and_then(|token| quoted_setting_name(token))
+        && tokens.get(predicate_start + 1) == Some(&"=")
+        && let Some(after_name) = name_operand_end(predicate_start + 2)
+        && after_name == predicate_end
+    {
+        return setting_name.eq_ignore_ascii_case("session_replication_role");
+    }
+
+    true
 }
 
 /// Detect an unsafe `pg_settings` update anywhere in one normalized statement.
