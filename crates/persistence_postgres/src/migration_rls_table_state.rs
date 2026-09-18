@@ -79,14 +79,22 @@ fn is_alter_table(statement: &[&str]) -> bool {
 
 /// Extract the direct unqualified table target owned by the existing structural validator.
 ///
-/// `ONLY`, `IF EXISTS`, qualification, and quoted-identity sentinels remain
-/// outside this bounded grammar. If such a statement carries an RLS state action,
-/// the caller fails closed rather than guessing which durable relation changed.
+/// `ONLY`, `IF EXISTS`, schema qualification, and quoted-identity sentinels remain
+/// outside this bounded grammar. PostgreSQL may separate a schema-qualification
+/// period with whitespace, so both a period inside the target token and a period
+/// beginning the following token are rejected. Otherwise two qualified sibling
+/// relations could be collapsed into the schema name and overwrite each other's
+/// final RLS state. If unsupported target grammar carries an RLS action, the
+/// caller fails closed rather than guessing which durable relation changed.
 fn direct_table_target<'a>(statement: &'a [&'a str]) -> Option<&'a str> {
     let table = *statement.get(2)?;
+    let next_begins_qualification = statement
+        .get(3)
+        .is_some_and(|token| token.starts_with('.'));
     if table.eq_ignore_ascii_case("ONLY")
         || table.eq_ignore_ascii_case("IF")
         || table.contains('.')
+        || next_begins_qualification
         || table == ","
         || !table
             .chars()
@@ -174,5 +182,15 @@ mod tests {
         assert!(!final_rls_table_states_are_safe(
             "ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY; ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY; ALTER TABLE tenant_record_shadow ENABLE ROW LEVEL SECURITY; ALTER TABLE tenant_record_shadow FORCE ROW LEVEL SECURITY; ALTER TABLE tenant_record DISABLE ROW LEVEL SECURITY;"
         ));
+    }
+
+    #[test]
+    fn schema_qualified_targets_fail_closed_instead_of_aliasing_the_schema() {
+        for sql in [
+            "ALTER TABLE public . tenant_record DISABLE ROW LEVEL SECURITY; ALTER TABLE public . event_instance ENABLE ROW LEVEL SECURITY; ALTER TABLE public . event_instance FORCE ROW LEVEL SECURITY;",
+            "ALTER TABLE public .tenant_record DISABLE ROW LEVEL SECURITY; ALTER TABLE public .event_instance ENABLE ROW LEVEL SECURITY; ALTER TABLE public .event_instance FORCE ROW LEVEL SECURITY;",
+        ] {
+            assert!(!final_rls_table_states_are_safe(sql));
+        }
     }
 }
