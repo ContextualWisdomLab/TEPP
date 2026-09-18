@@ -18,17 +18,52 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     implementation::normalize_migration_sql_with_grantor_identity(sql)
 }
 
+/// Return whether one normalized statement calls PostgreSQL's unqualified `set_config`
+/// with the direct `session_replication_role = replica` contract atoms.
+///
+/// Whitespace is erased only after the shared lexical pass has made strings and
+/// comments safe to inspect. The function-name boundary excludes identifier
+/// prefixes and schema-qualified lookalikes such as `audit_support.set_config`.
+/// More dynamic configuration expressions remain outside this bounded matcher
+/// and must be owned by a future execution-context aggregate rather than guessed.
+fn statement_calls_replica_set_config(statement: &str) -> bool {
+    const CALL: &str = "set_config('session_replication_role','replica',";
+    let compact = statement
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect::<String>()
+        .to_ascii_lowercase();
+    let mut search_from = 0usize;
+
+    while let Some(relative) = compact[search_from..].find(CALL) {
+        let start = search_from + relative;
+        let previous = compact[..start].chars().next_back();
+        let is_identifier_continuation = previous.is_some_and(|ch| {
+            ch.is_ascii_alphanumeric() || ch == '_' || ch == '$' || !ch.is_ascii()
+        });
+        if !is_identifier_continuation && previous != Some('.') {
+            return true;
+        }
+        search_from = start + CALL.len();
+    }
+    false
+}
+
 /// Detect committed PostgreSQL replica execution mode that suppresses ordinary triggers.
 ///
 /// The input has already crossed the shared lexical authority and committed-state
-/// projection, so comments, opaque bodies, and rolled-back `SET LOCAL` statements
-/// cannot manufacture this state. PostgreSQL permits optional `LOCAL`/`SESSION`,
-/// `TO` or `=`, and a quoted enum value; this bounded token fold recognizes those
-/// forms without reparsing raw SQL. Entering `replica` is treated as unsafe runtime
-/// state because ordinary TEPP append-only and retention triggers do not fire in
-/// that mode.
+/// projection, so comments, opaque bodies, and rolled-back local settings cannot
+/// manufacture this state. PostgreSQL permits optional `LOCAL`/`SESSION`, `TO` or
+/// `=`, a quoted enum value, and the equivalent `set_config` function. This
+/// bounded fold recognizes direct forms without reparsing raw SQL. Entering
+/// `replica` is treated as unsafe runtime state because ordinary TEPP append-only
+/// and retention triggers do not fire in that mode.
 fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
     sql.split(';').any(|statement| {
+        if statement_calls_replica_set_config(statement) {
+            return true;
+        }
+
         let delimited = statement.replace('=', " = ");
         let tokens = delimited.split_whitespace().collect::<Vec<_>>();
         if !tokens
@@ -77,7 +112,8 @@ fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
 /// general structural-normalization contract. Transaction outcome is applied
 /// after that shared lexical projection and before lifecycle folding, so a
 /// rolled-back `ALTER ROLE ... NOBYPASSRLS` cannot certify an actually unsafe
-/// runtime role. A committed `session_replication_role = replica` also fails the
+/// runtime role. A committed `session_replication_role = replica`, whether via
+/// `SET` or the direct unqualified `set_config` equivalent, also fails the
 /// runtime-role contract because it suppresses ordinary enforcement triggers
 /// even when their durable catalog definitions remain enabled.
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
@@ -140,6 +176,8 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET session_replication_role=replica;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET SESSION session_replication_role TO 'replica';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SET LOCAL session_replication_role = replica; COMMIT;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT set_config('session_replication_role', 'replica', false);",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SELECT set_config('session_replication_role', 'replica', true); COMMIT;",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
         }
@@ -149,8 +187,11 @@ mod tests {
     fn rolled_back_replica_mode_and_safe_modes_preserve_runtime_role_safety() {
         for sql in [
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SET LOCAL session_replication_role = replica; ROLLBACK;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SELECT set_config('session_replication_role', 'replica', true); ROLLBACK;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET session_replication_role = origin;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET SESSION session_replication_role TO local;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT set_config('session_replication_role', 'origin', false);",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT audit_support.set_config('session_replication_role', 'replica', false);",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(true));
         }
