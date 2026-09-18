@@ -25,7 +25,13 @@ fn score(
     outcome: f64,
     available_at: &str,
 ) -> LongitudinalClusterScore {
+    let evidence_id = format!(
+        "evidence-{cluster_key}-{:016x}-{:016x}-{available_at}",
+        predictor.to_bits(),
+        outcome.to_bits()
+    );
     LongitudinalClusterScore::new(
+        evidence_id,
         SNAPSHOT_ID,
         cluster_key,
         predictor,
@@ -102,6 +108,7 @@ fn noiseless_cwc_emits_digest_bound_within_between_and_contextual() {
         execution.terminal_result.result_schema_version.as_deref(),
         Some(LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION)
     );
+    assert!(!rows[0].evidence_id().is_empty());
     assert_eq!(rows[0].snapshot_id(), SNAPSHOT_ID);
     assert_eq!(rows[0].cluster_key(), 1);
     assert!((rows[0].predictor() - 0.0).abs() < f64::EPSILON);
@@ -184,6 +191,7 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
     let accepted = accepted(&request);
     assert_eq!(
         LongitudinalClusterScore::new(
+            "evidence-invalid-predictor",
             SNAPSHOT_ID,
             1,
             f64::NAN,
@@ -194,6 +202,7 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
     );
     assert_eq!(
         LongitudinalClusterScore::new(
+            "evidence-invalid-outcome",
             SNAPSHOT_ID,
             1,
             1.0,
@@ -204,6 +213,7 @@ fn execution_refuses_empty_cutoff_one_cluster_and_receipt_mismatch() {
     );
     assert_eq!(
         LongitudinalClusterScore::new(
+            "evidence-invalid-snapshot",
             "",
             1,
             1.0,
