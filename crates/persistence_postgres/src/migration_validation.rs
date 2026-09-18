@@ -681,9 +681,10 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
 ///
 /// The statement has already crossed the shared lexical authority and committed
 /// transaction projection. This fold therefore handles only normalized `ALTER`
-/// configuration commands; it does not re-lex raw SQL. Role-specific defaults are
+/// configuration commands; it does not re-lex raw SQL. `ALTER USER` is treated as
+/// PostgreSQL's documented alias for `ALTER ROLE`; role-specific defaults are
 /// relevant for `tepp_app_runtime`, PostgreSQL pseudo-current-role targets, and
-/// `ALL`; database and system defaults are conservatively relevant because this
+/// `ALL`. Database and system defaults are conservatively relevant because this
 /// validator does not own deployment database/cluster identity. Direct `origin`
 /// and `local` are the only values that prove ordinary triggers remain enabled.
 /// `FROM CURRENT`, `DEFAULT`, and `RESET` fail closed because the inherited/current
@@ -702,7 +703,9 @@ fn statement_sets_unsafe_persistent_replication_role_default(statement: &str) ->
 
     let mut index = 1usize;
     let scope = tokens.get(index).copied();
-    let role_scoped = scope.is_some_and(|token| token.eq_ignore_ascii_case("ROLE"));
+    let role_scoped = scope.is_some_and(|token| {
+        token.eq_ignore_ascii_case("ROLE") || token.eq_ignore_ascii_case("USER")
+    });
     let database_scoped = scope.is_some_and(|token| token.eq_ignore_ascii_case("DATABASE"));
     let system_scoped = scope.is_some_and(|token| token.eq_ignore_ascii_case("SYSTEM"));
     if !role_scoped && !database_scoped && !system_scoped {
