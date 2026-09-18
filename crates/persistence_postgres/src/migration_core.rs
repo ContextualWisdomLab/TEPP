@@ -88,6 +88,144 @@ fn token_span_eq(sql: &str, span: (usize, usize), keyword: &str) -> bool {
         .is_some_and(|token| token.eq_ignore_ascii_case(keyword))
 }
 
+/// Return whether one normalized token denotes TEPP's append-only guard routine.
+///
+/// The shared lexical authority has already handled quoted identifiers. This
+/// helper only strips a schema qualifier and attached argument-list punctuation
+/// so the final-state guard can recognize both `reject_append_only_mutation()`
+/// and schema-qualified spellings without reparsing SQL bodies.
+fn token_span_names_append_only_guard_routine(sql: &str, span: (usize, usize)) -> bool {
+    let Some(token) = sql.get(span.0..span.1) else {
+        return false;
+    };
+    let name = token.split_once('(').map_or(token, |(name, _)| name);
+    name.rsplit('.')
+        .next()
+        .is_some_and(|part| part.eq_ignore_ascii_case("reject_append_only_mutation"))
+}
+
+/// Return whether one committed DROP FUNCTION statement targets the append-only guard routine.
+///
+/// PostgreSQL permits multiple function targets separated by top-level commas;
+/// commas inside function signatures are not target boundaries. Malformed
+/// parenthesis structure fails closed because this bounded authority cannot prove
+/// that the append-only guard is absent from an ambiguous DROP statement.
+fn statement_drops_append_only_guard_routine(statement: &str) -> bool {
+    let Some(drop_keyword) = next_sql_token_span(statement, 0) else {
+        return false;
+    };
+    let Some(function_keyword) = next_sql_token_span(statement, drop_keyword.1) else {
+        return false;
+    };
+    if !token_span_eq(statement, drop_keyword, "DROP")
+        || !token_span_eq(statement, function_keyword, "FUNCTION")
+    {
+        return false;
+    }
+
+    let mut cursor = function_keyword.1;
+    let Some(mut first_target) = next_sql_token_span(statement, cursor) else {
+        return true;
+    };
+    if token_span_eq(statement, first_target, "IF") {
+        let Some(exists_keyword) = next_sql_token_span(statement, first_target.1) else {
+            return true;
+        };
+        if !token_span_eq(statement, exists_keyword, "EXISTS") {
+            return true;
+        }
+        cursor = exists_keyword.1;
+        first_target = match next_sql_token_span(statement, cursor) {
+            Some(target) => target,
+            None => return true,
+        };
+    }
+    cursor = first_target.0;
+
+    let Some(targets) = statement.get(cursor..) else {
+        return true;
+    };
+    let mut parenthesis_depth = 0usize;
+    let mut target_start = 0usize;
+    for (index, ch) in targets.char_indices() {
+        match ch {
+            '(' => parenthesis_depth += 1,
+            ')' => {
+                if parenthesis_depth == 0 {
+                    return true;
+                }
+                parenthesis_depth -= 1;
+            }
+            ',' if parenthesis_depth == 0 => {
+                let target = &targets[target_start..index];
+                if next_sql_token_span(target, 0)
+                    .is_some_and(|span| token_span_names_append_only_guard_routine(target, span))
+                {
+                    return true;
+                }
+                target_start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+    if parenthesis_depth != 0 {
+        return true;
+    }
+    let final_target = &targets[target_start..];
+    next_sql_token_span(final_target, 0)
+        .is_some_and(|span| token_span_names_append_only_guard_routine(final_target, span))
+}
+
+/// Return whether one committed statement defines TEPP's append-only guard routine.
+fn statement_defines_append_only_guard_routine(statement: &str) -> bool {
+    let Some(create_keyword) = next_sql_token_span(statement, 0) else {
+        return false;
+    };
+    let Some(or_keyword) = next_sql_token_span(statement, create_keyword.1) else {
+        return false;
+    };
+    let Some(replace_keyword) = next_sql_token_span(statement, or_keyword.1) else {
+        return false;
+    };
+    let Some(function_keyword) = next_sql_token_span(statement, replace_keyword.1) else {
+        return false;
+    };
+    let Some(routine) = next_sql_token_span(statement, function_keyword.1) else {
+        return false;
+    };
+
+    token_span_eq(statement, create_keyword, "CREATE")
+        && token_span_eq(statement, or_keyword, "OR")
+        && token_span_eq(statement, replace_keyword, "REPLACE")
+        && token_span_eq(statement, function_keyword, "FUNCTION")
+        && token_span_names_append_only_guard_routine(statement, routine)
+}
+
+/// Detect committed mutations that make historical append-only guard evidence stale.
+///
+/// PostgreSQL `DROP FUNCTION ... CASCADE` can remove dependent triggers, while a
+/// later `CREATE OR REPLACE FUNCTION` can replace the routine body without
+/// changing the function identity referenced by those triggers. Until TEPP owns
+/// final routine-body and dependency state, the first canonical guard definition
+/// is accepted but a later replacement or committed removal fails closed. Input
+/// is already lexically normalized and transaction-projected, so rolled-back
+/// mutations and marker text in comments/literals/dollar bodies are absent here.
+fn contains_unsupported_append_only_guard_routine_mutation(sql: &str) -> bool {
+    let mut seen_guard_definition = false;
+    for statement in sql.split(';') {
+        if statement_drops_append_only_guard_routine(statement) {
+            return true;
+        }
+        if statement_defines_append_only_guard_routine(statement) {
+            if seen_guard_definition {
+                return true;
+            }
+            seen_guard_definition = true;
+        }
+    }
+    false
+}
+
 /// Return whether one ALTER TABLE action begins with destructive `DROP`.
 fn alter_table_action_starts_with_drop(action: &str) -> bool {
     next_sql_token_span(action, 0).is_some_and(|span| token_span_eq(action, span, "DROP"))
@@ -380,14 +518,15 @@ fn contains_unsupported_table_final_state_mutation(sql: &str) -> bool {
 /// Committed `ALTER POLICY` and `DROP POLICY` are temporarily rejected until
 /// policy identity, clause replacement, and removal have their own final-state
 /// authority. Committed `DROP TABLE` / `DROP TRIGGER`, standalone table/column
-/// rename forms, destructive ALTER TABLE DROP actions, and trigger modes that
-/// disable normal application-path enforcement are likewise rejected until
-/// table, trigger, column, constraint, removal/recreation, and dependent-object
-/// effects are represented by first-class final-state aggregates. Committed
-/// ADD-column actions remain supported only when each introduced durable column
-/// satisfies the same multi-word `snake_case` authority as CREATE TABLE columns.
-/// Mutations removed by the transaction projection never reach either bounded
-/// boundary.
+/// rename forms, destructive ALTER TABLE DROP actions, trigger modes that disable
+/// normal application-path enforcement, append-only guard-routine removal, and
+/// a second committed `CREATE OR REPLACE FUNCTION reject_append_only_mutation`
+/// are likewise rejected until table, trigger, routine, column, constraint,
+/// removal/recreation, dependent-object, and routine-body effects are represented
+/// by first-class final-state aggregates. Committed ADD-column actions remain
+/// supported only when each introduced durable column satisfies the same
+/// multi-word `snake_case` authority as CREATE TABLE columns. Mutations removed
+/// by the transaction projection never reach either bounded boundary.
 ///
 /// # Errors
 ///
@@ -413,7 +552,9 @@ pub fn validate_migration_catalog(
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
 
-    if contains_unsupported_table_final_state_mutation(&committed_up) {
+    if contains_unsupported_append_only_guard_routine_mutation(&committed_up)
+        || contains_unsupported_table_final_state_mutation(&committed_up)
+    {
         return Err(MigrationContractError::UnsupportedTableFinalStateMutation);
     }
     if contains_invalid_alter_table_added_column_name(&committed_up) {
@@ -573,8 +714,10 @@ fn canonicalize_table_persistence_modifiers(sql: &str) -> String {
 mod tests {
     use super::{
         canonicalize_table_persistence_modifiers,
-        contains_invalid_alter_table_added_column_name, contains_unsupported_policy_mutation,
-        contains_unsupported_table_final_state_mutation, project_committed_sql,
+        contains_invalid_alter_table_added_column_name,
+        contains_unsupported_append_only_guard_routine_mutation,
+        contains_unsupported_policy_mutation, contains_unsupported_table_final_state_mutation,
+        project_committed_sql,
     };
 
     #[test]
@@ -605,6 +748,24 @@ mod tests {
         .expect("simple rollback outcome must project");
         assert!(projected.contains("CREATE TABLE durable_record"));
         assert!(!projected.contains("rolled_back_record"));
+    }
+
+    #[test]
+    fn append_only_guard_routine_final_state_detection_is_target_bounded() {
+        let canonical = "CREATE OR REPLACE FUNCTION reject_append_only_mutation() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NULL END  ;";
+        assert!(!contains_unsupported_append_only_guard_routine_mutation(canonical));
+        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
+            "{canonical} CREATE OR REPLACE FUNCTION reject_append_only_mutation() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NULL END  ;"
+        )));
+        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
+            "{canonical} DROP FUNCTION reject_append_only_mutation() CASCADE ;"
+        )));
+        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
+            "{canonical} DROP FUNCTION other_guard(), public.reject_append_only_mutation() CASCADE ;"
+        )));
+        assert!(!contains_unsupported_append_only_guard_routine_mutation(&format!(
+            "{canonical} DROP FUNCTION reject_append_only_mutation_shadow() CASCADE ;"
+        )));
     }
 
     #[test]
