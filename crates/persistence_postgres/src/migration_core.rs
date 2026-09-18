@@ -123,7 +123,7 @@ pub fn validate_migration_catalog(
     };
 
     if contains_unsupported_table_removal(&committed_up) {
-        return Err(MigrationContractError::EmptyMigrationSql);
+        return Err(MigrationContractError::UnsupportedTableFinalStateMutation);
     }
     if contains_unsupported_policy_mutation(&committed_up) {
         return Err(MigrationContractError::MissingRlsPolicy);
