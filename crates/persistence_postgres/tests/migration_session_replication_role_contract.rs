@@ -177,3 +177,29 @@ fn dynamic_unrelated_set_config_identity_or_parameter_remains_unrelated() {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
 }
+
+#[test]
+fn named_and_mixed_set_config_notation_cannot_bypass_replication_role_guard() {
+    for final_sql in [
+        "SELECT set_config(setting_name => 'session_replication_role', new_value => lower('REPLICA'), is_local => false);",
+        "SELECT pg_catalog . set_config(new_value => 'replica', is_local => false, setting_name => 'session_replication_role');",
+        "SELECT set_config('session_replication_role', new_value := (SELECT 'replica'), is_local := false);",
+    ] {
+        assert_eq!(
+            validate_migration_catalog(&embedded_with(final_sql)),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "named or mixed set_config notation must not bypass session_replication_role enforcement: {final_sql}",
+        );
+    }
+}
+
+#[test]
+fn named_set_config_safe_atoms_and_unrelated_parameter_remain_accepted() {
+    for final_sql in [
+        "SELECT set_config(setting_name => 'session_replication_role', new_value => 'origin', is_local => false);",
+        "SELECT set_config(new_value => 'local', setting_name => 'session_replication_role', is_local => true);",
+        "SELECT set_config(setting_name => 'application_name', new_value => lower('REPLICA'), is_local => false);",
+    ] {
+        assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    }
+}
