@@ -1028,12 +1028,44 @@ pub(super) fn declares_row_level_security(normalized_sql: &str) -> bool {
 ///
 /// The replacement is deliberately limited to lowercase quoted spellings, the
 /// only form that the lifecycle projection would otherwise dequote as
-/// identity-equivalent. Replacements inside comments, literals, or dollar bodies
-/// remain inert because the shared lexical pass still owns those regions.
+/// identity-equivalent. A quoted identifier carrying PostgreSQL's immediate
+/// `U&` Unicode prefix is already a named-role identity and is left untouched;
+/// converting its payload to uppercase would turn a safely projected unrelated
+/// Unicode role into the lexer's invalid-identifier sentinel. Replacements
+/// inside comments, literals, or dollar bodies remain inert because the shared
+/// lexical pass still owns those regions.
 fn preserve_quoted_special_role_specifications(sql: &str) -> String {
-    sql.replace("\"current_role\"", "\"CURRENT_ROLE\"")
-        .replace("\"current_user\"", "\"CURRENT_USER\"")
-        .replace("\"session_user\"", "\"SESSION_USER\"")
+    let replace_unless_unicode_prefixed = |input: String, from: &str, to: &str| -> String {
+        let mut output = String::with_capacity(input.len());
+        let mut cursor = 0usize;
+        for (start, _) in input.match_indices(from) {
+            output.push_str(&input[cursor..start]);
+            let bytes = input.as_bytes();
+            let unicode_prefixed = start >= 2
+                && (bytes[start - 2] == b'U' || bytes[start - 2] == b'u')
+                && bytes[start - 1] == b'&';
+            output.push_str(if unicode_prefixed { from } else { to });
+            cursor = start + from.len();
+        }
+        output.push_str(&input[cursor..]);
+        output
+    };
+
+    let preserved = replace_unless_unicode_prefixed(
+        sql.to_owned(),
+        "\"current_role\"",
+        "\"CURRENT_ROLE\"",
+    );
+    let preserved = replace_unless_unicode_prefixed(
+        preserved,
+        "\"current_user\"",
+        "\"CURRENT_USER\"",
+    );
+    replace_unless_unicode_prefixed(
+        preserved,
+        "\"session_user\"",
+        "\"SESSION_USER\"",
+    )
 }
 
 #[cfg(test)]
