@@ -13,6 +13,7 @@ fn unicode_escaped_pg_settings_identity_cannot_bypass_replication_role_guard() {
     for final_sql in [
         r#"UPDATE U&"pg_settings" SET setting = 'replica' WHERE name = 'session_replication_role';"#,
         r#"UPDATE U&"pg_\0073ettings" SET setting = 'replica' WHERE name = 'session_replication_role';"#,
+        r#"UPDATE U&"pg_!0073ettings" UESCAPE '!' SET setting = 'replica' WHERE name = 'session_replication_role';"#,
         r#"UPDATE pg_catalog . U&"pg_settings" SET setting = 'replica' WHERE name = 'session_replication_role';"#,
     ] {
         assert_eq!(
