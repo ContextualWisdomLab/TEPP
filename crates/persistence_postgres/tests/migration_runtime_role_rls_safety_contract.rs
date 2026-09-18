@@ -1,0 +1,240 @@
+use persistence_postgres::{MigrationCatalog, MigrationContractError, validate_migration_catalog};
+
+fn rls_catalog(role_sql: &str) -> MigrationCatalog {
+    let up_sql = format!(
+        r#"
+        CREATE TABLE tenant_record (
+            tenant_record_id uuid PRIMARY KEY,
+            system_time timestamptz NOT NULL
+        );
+        {role_sql}
+        ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE tenant_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY tenant_record_tenant_isolation ON tenant_record
+            FOR ALL
+            USING (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            )
+            WITH CHECK (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            );
+        "#
+    );
+    MigrationCatalog::from_sql(&up_sql, "DROP TABLE tenant_record;")
+}
+
+#[test]
+fn runtime_role_cannot_bypass_rls_or_be_superuser() {
+    for role_sql in [
+        "CREATE ROLE tepp_app_runtime BYPASSRLS;",
+        "CREATE ROLE tepp_app_runtime SUPERUSER;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE tepp_app_runtime BYPASSRLS;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER USER tepp_app_runtime SUPERUSER;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER GROUP tepp_app_runtime BYPASSRLS;",
+        "CREATE ROLE staged_runtime_role BYPASSRLS;\nALTER ROLE staged_runtime_role RENAME TO tepp_app_runtime;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn role_identifier_continuations_cannot_retarget_runtime_security_state() {
+    for role_sql in [
+        "CREATE ROLE tepp_app_runtime BYPASSRLS;\nALTER ROLE tepp_app_runtime$shadow NOSUPERUSER NOBYPASSRLS;",
+        "CREATE ROLE tepp_app_runtime BYPASSRLS;\nALTER ROLE tepp_app_runtime측정 NOSUPERUSER NOBYPASSRLS;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn quoted_role_case_cannot_retarget_runtime_security_state() {
+    for role_sql in [
+        "CREATE ROLE tepp_app_runtime BYPASSRLS;\nALTER ROLE \"TEPP_APP_RUNTIME\" NOSUPERUSER NOBYPASSRLS;",
+        "CREATE ROLE tepp_app_runtime BYPASSRLS;\nALTER ROLE \"tepp_app_Runtime\" NOSUPERUSER NOBYPASSRLS;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn quoted_lowercase_runtime_name_keeps_postgresql_identity() {
+    let catalog = rls_catalog(
+        "CREATE ROLE tepp_app_runtime BYPASSRLS;\nALTER ROLE \"tepp_app_runtime\" NOSUPERUSER NOBYPASSRLS;",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
+
+#[test]
+fn quoted_special_role_names_cannot_alias_unquoted_role_specifications() {
+    for special_role in ["current_user", "current_role", "session_user"] {
+        let role_sql = format!(
+            "CREATE ROLE \"{special_role}\" BYPASSRLS;\nALTER ROLE {special_role} NOBYPASSRLS;\nALTER ROLE \"{special_role}\" RENAME TO tepp_app_runtime;"
+        );
+        let catalog = rls_catalog(&role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn quoted_membership_grantee_case_cannot_remove_runtime_escape_path() {
+    let catalog = rls_catalog(
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;\nREVOKE rls_bypass_operator FROM \"TEPP_APP_RUNTIME\";",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingAppRuntimeRole)
+    );
+}
+
+#[test]
+fn quoted_lowercase_membership_grantee_keeps_postgresql_identity() {
+    let catalog = rls_catalog(
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;\nREVOKE rls_bypass_operator FROM \"tepp_app_runtime\";",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
+
+#[test]
+fn quoted_membership_keywords_do_not_hide_runtime_set_paths() {
+    for role_sql in [
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO \"with\", tepp_app_runtime;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO \"granted\", tepp_app_runtime;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT \"to\" TO tepp_app_runtime;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT \"group\" TO tepp_app_runtime;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn quoted_revoke_clause_keyword_before_runtime_still_removes_membership() {
+    let catalog = rls_catalog(
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;\nREVOKE rls_bypass_operator FROM \"cascade\", tepp_app_runtime;",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
+
+#[test]
+fn runtime_role_cannot_gain_a_set_role_path_around_rls() {
+    for role_sql in [
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH SET TRUE;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH SET OPTION;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT \"on\" TO tepp_app_runtime;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN ROLE rls_bypass_operator;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP rls_bypass_operator;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE USER tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP rls_bypass_operator;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE GROUP tepp_app_runtime NOSUPERUSER NOBYPASSRLS IN GROUP rls_bypass_operator;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nREVOKE SET OPTION FOR rls_bypass_operator FROM tepp_app_runtime;\nGRANT rls_bypass_operator TO tepp_app_runtime;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn admin_membership_can_self_enable_set_role() {
+    for role_sql in [
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;",
+        "CREATE ROLE rls_bypass_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE;\nGRANT rls_bypass_operator TO tepp_app_runtime WITH ADMIN TRUE;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn explicit_noninherit_membership_and_existing_grant_direction_remain_rls_safe() {
+    for role_sql in [
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN FALSE;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT tepp_app_runtime TO CURRENT_USER;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT SELECT ON TABLE tenant_record TO tepp_app_runtime;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(validate_migration_catalog(&catalog), Ok(()), "{role_sql}");
+    }
+}
+
+#[test]
+fn final_runtime_membership_state_may_explicitly_restore_rls_safety() {
+    for role_sql in [
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nGRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN FALSE;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nREVOKE SET OPTION FOR reporting_operator FROM tepp_app_runtime;\nREVOKE INHERIT OPTION FOR reporting_operator FROM tepp_app_runtime;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime;\nREVOKE reporting_operator FROM tepp_app_runtime;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;\nREVOKE ADMIN OPTION FOR reporting_operator FROM tepp_app_runtime;",
+        "CREATE ROLE reporting_operator BYPASSRLS;\nCREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nGRANT reporting_operator TO tepp_app_runtime WITH INHERIT FALSE, SET FALSE, ADMIN TRUE;\nGRANT reporting_operator TO tepp_app_runtime WITH ADMIN FALSE;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(validate_migration_catalog(&catalog), Ok(()), "{role_sql}");
+    }
+}
+
+#[test]
+fn malformed_role_lifecycle_statements_fail_closed_without_panicking() {
+    for role_sql in [
+        "CREATE ROLE;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE , other_role;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE other_role,;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE other_role,,another_role;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nDROP ROLE other_role another_role;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE tepp_app_runtime;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE tepp_app_runtime RENAME;",
+        "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;\nALTER ROLE tepp_app_runtime RENAME TO;",
+    ] {
+        let catalog = rls_catalog(role_sql);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "{role_sql}"
+        );
+    }
+}
+
+#[test]
+fn final_runtime_role_state_may_explicitly_restore_rls_safety() {
+    let catalog = rls_catalog(
+        "CREATE ROLE tepp_app_runtime SUPERUSER BYPASSRLS;\nALTER ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;",
+    );
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
