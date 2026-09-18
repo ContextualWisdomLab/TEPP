@@ -48,12 +48,30 @@ fn contains_unsupported_policy_mutation(sql: &str) -> bool {
         let Some(verb) = tokens.next() else {
             return false;
         };
-        matches!(
-            verb.to_ascii_uppercase().as_str(),
-            "ALTER" | "DROP"
-        ) && tokens
+        matches!(verb.to_ascii_uppercase().as_str(), "ALTER" | "DROP")
+            && tokens
+                .next()
+                .is_some_and(|token| token.eq_ignore_ascii_case("POLICY"))
+    })
+}
+
+/// Detect a committed table removal not yet owned by the final-table state model.
+///
+/// A committed PostgreSQL `DROP TABLE` invalidates the durable table itself and
+/// its dependent table-local evidence. Until this bounded validator owns a full
+/// create/drop/recreate aggregate, retaining an earlier `CREATE TABLE` as proof
+/// would be fail-open. The input has already crossed lexical normalization and
+/// transaction projection, so a statement-first `DROP TABLE` token pair is the
+/// smallest causal fail-closed boundary; rolled-back removals never reach it.
+fn contains_unsupported_table_removal(sql: &str) -> bool {
+    sql.split(';').any(|statement| {
+        let mut tokens = statement.split_whitespace();
+        tokens
             .next()
-            .is_some_and(|token| token.eq_ignore_ascii_case("POLICY"))
+            .is_some_and(|token| token.eq_ignore_ascii_case("DROP"))
+            && tokens
+                .next()
+                .is_some_and(|token| token.eq_ignore_ascii_case("TABLE"))
     })
 }
 
@@ -75,8 +93,10 @@ fn contains_unsupported_policy_mutation(sql: &str) -> bool {
 /// `DISABLE` or `NO FORCE` cannot reuse stale positive evidence from earlier SQL.
 /// Committed `ALTER POLICY` and `DROP POLICY` are temporarily rejected until
 /// policy identity, clause replacement, and removal have their own final-state
-/// authority; a rolled-back mutation is removed by the transaction projection
-/// before this boundary.
+/// authority. Committed `DROP TABLE` is likewise rejected until table identity,
+/// removal/recreation, multi-target drops, and dependent-object effects are
+/// represented by a first-class final-table aggregate. Mutations removed by the
+/// transaction projection never reach either bounded fail-closed boundary.
 ///
 /// # Errors
 ///
@@ -102,6 +122,9 @@ pub fn validate_migration_catalog(
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
 
+    if contains_unsupported_table_removal(&committed_up) {
+        return Err(MigrationContractError::EmptyMigrationSql);
+    }
     if contains_unsupported_policy_mutation(&committed_up) {
         return Err(MigrationContractError::MissingRlsPolicy);
     }
@@ -256,7 +279,7 @@ fn canonicalize_table_persistence_modifiers(sql: &str) -> String {
 mod tests {
     use super::{
         canonicalize_table_persistence_modifiers, contains_unsupported_policy_mutation,
-        project_committed_sql,
+        contains_unsupported_table_removal, project_committed_sql,
     };
 
     #[test]
@@ -287,6 +310,19 @@ mod tests {
         .expect("simple rollback outcome must project");
         assert!(projected.contains("CREATE TABLE durable_record"));
         assert!(!projected.contains("rolled_back_record"));
+    }
+
+    #[test]
+    fn table_removal_detection_is_statement_and_token_bounded() {
+        assert!(contains_unsupported_table_removal(
+            "DROP\nTABLE tenant_record ;"
+        ));
+        assert!(contains_unsupported_table_removal(
+            "DROP TABLE IF EXISTS tenant_record CASCADE ;"
+        ));
+        assert!(!contains_unsupported_table_removal(
+            "SELECT drop_table_marker ; CREATE TABLE tenant_record ( tenant_record_id uuid ) ;"
+        ));
     }
 
     #[test]
