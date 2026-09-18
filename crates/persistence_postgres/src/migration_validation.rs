@@ -89,18 +89,100 @@ fn statement_calls_replica_set_config(statement: &str) -> bool {
     false
 }
 
+/// Detect an unsafe `pg_settings` update of PostgreSQL's trigger execution mode.
+///
+/// PostgreSQL documents `UPDATE pg_settings SET setting = ...` as equivalent to
+/// `SET`. The input has already crossed the shared lexical authority, so this
+/// bounded parser only resolves the canonical unqualified or `pg_catalog`
+/// relation identity and a direct `WHERE name = 'session_replication_role'`
+/// target. Atomic `origin` and `local` values are proven safe for ordinary
+/// triggers; `replica` and any non-atomic value fail closed because the validator
+/// cannot prove that protected DML did not execute while triggers were suppressed.
+fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) -> bool {
+    let delimited = statement.replace('.', " . ").replace('=', " = ");
+    let tokens = delimited.split_whitespace().collect::<Vec<_>>();
+    if !tokens
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("UPDATE"))
+    {
+        return false;
+    }
+
+    let mut index = 1usize;
+    if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("pg_settings"))
+    {
+        index += 1;
+    } else if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("pg_catalog"))
+        && tokens.get(index + 1) == Some(&".")
+        && tokens
+            .get(index + 2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("pg_settings"))
+    {
+        index += 3;
+    } else {
+        return false;
+    }
+
+    if !tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("SET"))
+        || !tokens
+            .get(index + 1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("setting"))
+        || tokens.get(index + 2) != Some(&"=")
+    {
+        return false;
+    }
+    let value_start = index + 3;
+    let Some(where_index) = tokens[value_start..]
+        .iter()
+        .position(|token| token.eq_ignore_ascii_case("WHERE"))
+        .map(|relative| value_start + relative)
+    else {
+        return false;
+    };
+
+    if !tokens
+        .get(where_index + 1)
+        .is_some_and(|token| token.eq_ignore_ascii_case("name"))
+        || tokens.get(where_index + 2) != Some(&"=")
+        || !tokens.get(where_index + 3).is_some_and(|value| {
+            value
+                .trim_matches('\'')
+                .eq_ignore_ascii_case("session_replication_role")
+        })
+    {
+        return false;
+    }
+
+    let value_tokens = &tokens[value_start..where_index];
+    value_tokens.len() != 1
+        || !value_tokens[0]
+            .trim_matches('\'')
+            .eq_ignore_ascii_case("origin")
+            && !value_tokens[0]
+                .trim_matches('\'')
+                .eq_ignore_ascii_case("local")
+}
+
 /// Detect committed PostgreSQL replica execution mode that suppresses ordinary triggers.
 ///
 /// The input has already crossed the shared lexical authority and committed-state
 /// projection, so comments, opaque bodies, and rolled-back local settings cannot
 /// manufacture this state. PostgreSQL permits optional `LOCAL`/`SESSION`, `TO` or
-/// `=`, a quoted enum value, and the equivalent `set_config` function. This
-/// bounded fold recognizes direct forms without reparsing raw SQL. Entering
-/// `replica` is treated as unsafe runtime state because ordinary TEPP append-only
-/// and retention triggers do not fire in that mode.
+/// `=`, a quoted enum value, the equivalent `set_config` function, and equivalent
+/// writes through `pg_settings.setting`. This bounded fold rejects execution modes
+/// that are directly `replica` or cannot be statically proven safe while allowing
+/// the ordinary-trigger-safe `origin` and `local` atoms.
 fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
     sql.split(';').any(|statement| {
-        if statement_calls_replica_set_config(statement) {
+        if statement_calls_replica_set_config(statement)
+            || statement_updates_unsafe_replication_role_via_pg_settings(statement)
+        {
             return true;
         }
 
@@ -152,10 +234,10 @@ fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
 /// general structural-normalization contract. Transaction outcome is applied
 /// after that shared lexical projection and before lifecycle folding, so a
 /// rolled-back `ALTER ROLE ... NOBYPASSRLS` cannot certify an actually unsafe
-/// runtime role. A committed `session_replication_role = replica`, whether via
-/// `SET` or PostgreSQL's direct `set_config` equivalent, also fails the runtime-
-/// role contract because it suppresses ordinary enforcement triggers even when
-/// their durable catalog definitions remain enabled.
+/// runtime role. A committed unsafe `session_replication_role` mutation through
+/// `SET`, PostgreSQL's `set_config` equivalent, or canonical `pg_settings` update
+/// also fails the runtime-role contract because it can suppress ordinary
+/// enforcement triggers while durable catalog definitions remain enabled.
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
     let lifecycle_sql = preserve_quoted_special_role_specifications(sql);
     let normalized_lifecycle = implementation::normalize_migration_sql_with_grantor_identity(
@@ -219,6 +301,8 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT set_config('session_replication_role', 'replica', false);",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT pg_catalog . set_config('session_replication_role', 'replica', false);",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SELECT set_config('session_replication_role', 'replica', true); COMMIT;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_catalog . pg_settings SET setting = lower('REPLICA') WHERE name = 'session_replication_role';",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
         }
@@ -229,10 +313,13 @@ mod tests {
         for sql in [
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SET LOCAL session_replication_role = replica; ROLLBACK;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SELECT set_config('session_replication_role', 'replica', true); ROLLBACK;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role'; ROLLBACK;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET session_replication_role = origin;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET SESSION session_replication_role TO local;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT set_config('session_replication_role', 'origin', false);",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT audit_support.set_config('session_replication_role', 'replica', false);",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET setting = 'origin' WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE audit_support.pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(true));
         }
