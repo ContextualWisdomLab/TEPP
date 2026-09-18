@@ -18,60 +18,73 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     implementation::normalize_migration_sql_with_grantor_identity(sql)
 }
 
-/// Return whether a byte-position starts an unqualified or canonical `pg_catalog` function call.
+/// Return whether one character can continue PostgreSQL's bounded unquoted function identity.
+fn is_function_identifier_continuation(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || ch == '_' || ch == '$' || !ch.is_ascii()
+}
+
+/// Return whether a `set_config` occurrence is PostgreSQL's unqualified or `pg_catalog` builtin.
 ///
-/// The compact SQL fragment has already crossed the shared PostgreSQL lexical
-/// authority. Identifier continuations and arbitrary schema qualifiers cannot
-/// donate builtin-function identity; explicit `pg_catalog.` is accepted because
-/// it names PostgreSQL's canonical system implementation.
-fn is_builtin_function_start(compact: &str, start: usize) -> bool {
-    const PG_CATALOG_PREFIX: &str = "pg_catalog.";
-    let previous = compact[..start].chars().next_back();
-    let is_identifier_continuation = previous.is_some_and(|ch| {
-        ch.is_ascii_alphanumeric() || ch == '_' || ch == '$' || !ch.is_ascii()
-    });
-    if !is_identifier_continuation && previous != Some('.') {
-        return true;
+/// Whitespace before the function name is preserved for identity boundaries;
+/// arbitrary schema qualification fails closed as unrelated, while explicit
+/// `pg_catalog . set_config` resolves to PostgreSQL's canonical implementation.
+fn is_builtin_set_config_occurrence(statement: &str, start: usize) -> bool {
+    let before = &statement[..start];
+    let trimmed = before.trim_end();
+    let had_whitespace_boundary = trimmed.len() != before.len();
+    let previous = trimmed.chars().next_back();
+
+    if previous != Some('.') {
+        return had_whitespace_boundary
+            || previous.is_none_or(|ch| !is_function_identifier_continuation(ch));
     }
-    if start < PG_CATALOG_PREFIX.len() {
+
+    let before_dot = trimmed[..trimmed.len() - 1].trim_end();
+    let schema_end = before_dot.len();
+    let schema_start = before_dot
+        .char_indices()
+        .rev()
+        .find(|(_, ch)| !is_function_identifier_continuation(*ch))
+        .map_or(0, |(index, ch)| index + ch.len_utf8());
+    let schema = &before_dot[schema_start..schema_end];
+    if !schema.eq_ignore_ascii_case("pg_catalog") {
         return false;
     }
-    let schema_start = start - PG_CATALOG_PREFIX.len();
-    if !compact[schema_start..start].eq_ignore_ascii_case(PG_CATALOG_PREFIX) {
-        return false;
-    }
-    compact[..schema_start]
+    before_dot[..schema_start]
         .chars()
         .next_back()
-        .is_none_or(|ch| {
-            !ch.is_ascii_alphanumeric() && ch != '_' && ch != '$' && ch != '.' && ch.is_ascii()
-        })
+        .is_none_or(|ch| ch != '.' && !is_function_identifier_continuation(ch))
 }
 
 /// Return whether one normalized statement calls PostgreSQL's `set_config`
 /// with the direct `session_replication_role = replica` contract atoms.
 ///
-/// Whitespace is erased only after the shared lexical pass has made strings and
-/// comments safe to inspect. The function-name boundary accepts the unqualified
-/// builtin and explicit `pg_catalog.set_config`, while excluding identifier
-/// prefixes and unrelated schemas such as `audit_support.set_config`. More
-/// dynamic configuration expressions remain outside this bounded matcher and
-/// must be owned by a future execution-context aggregate rather than guessed.
+/// Argument whitespace is erased only after the shared lexical pass has made
+/// strings and comments safe to inspect. Function identity is resolved before
+/// compaction so statement whitespace cannot merge `SELECT` with `set_config`.
+/// The bounded matcher accepts the unqualified builtin and explicit
+/// `pg_catalog.set_config`, while excluding identifier prefixes and unrelated
+/// schemas such as `audit_support.set_config`. More dynamic configuration
+/// expressions remain for a future execution-context aggregate.
 fn statement_calls_replica_set_config(statement: &str) -> bool {
+    const FUNCTION_NAME: &str = "set_config";
     const CALL: &str = "set_config('session_replication_role','replica',";
-    let compact = statement
-        .chars()
-        .filter(|ch| !ch.is_whitespace())
-        .collect::<String>()
-        .to_ascii_lowercase();
+    let lower = statement.to_ascii_lowercase();
     let mut search_from = 0usize;
 
-    while let Some(relative) = compact[search_from..].find(CALL) {
+    while let Some(relative) = lower[search_from..].find(FUNCTION_NAME) {
         let start = search_from + relative;
-        if is_builtin_function_start(&compact, start) {
-            return true;
+        if is_builtin_set_config_occurrence(statement, start) {
+            let compact_call = statement[start..]
+                .chars()
+                .filter(|ch| !ch.is_whitespace())
+                .collect::<String>()
+                .to_ascii_lowercase();
+            if compact_call.starts_with(CALL) {
+                return true;
+            }
         }
-        search_from = start + CALL.len();
+        search_from = start + FUNCTION_NAME.len();
     }
     false
 }
