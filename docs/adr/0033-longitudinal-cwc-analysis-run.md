@@ -2,7 +2,7 @@
 
 **Decision status:** Proposed
 **Implementation maturity:** active-PR — composed on this branch; not implemented-main
-**Date:** 2026-08-31
+**Date:** 2026-08-31; reviewed 2026-09-19
 **Supersedes:** None; complements ADR 0005 (ESEM/DSEM interpretation) and ADR 0022 (cutoff-safe analysis-run execution).
 **Figma File ID:** N/A — this increment changes a Rust service crate and has no user-interface surface.
 **Storybook inventory:** N/A — no reusable web object or interaction changed.
@@ -11,7 +11,7 @@
 
 Protected main already recovers Enders and Tofighi (2007) cluster-mean-centered within/between OLS and the CWC contextual effect inside `psychometric_core`. Operators still cannot request that composition as a digest-bound analysis-run output. Recovery primitives alone are not the ESEM/DSEM engine (GAP-006 / #169), and branch-local implementation does not make this ADR protected-main authority.
 
-The first profile implementation also exposed four contract defects during review: equivalent RFC 3339 spellings of one cutoff instant were rejected, completed artifacts did not enforce `contextual_effect = between_slope - within_slope`, artifact evidence counts could exceed the executor population bound, and the causal-refusal provider result was discarded. A fresh scientific review additionally found that rows carried availability but no immutable source snapshot identity, so a caller could attribute another snapshot's coordinates to the requested snapshot.
+Review found several application-boundary defects: equivalent RFC 3339 spellings of one cutoff instant were rejected; completed artifacts did not enforce `contextual_effect = between_slope - within_slope`; artifact evidence counts could exceed the executor population bound; the causal-refusal provider result was discarded; clustered rows lacked immutable source snapshot and evidence identities; and a public `excluded_after_cutoff_count` caused later-only corpus existence to alter an earlier digest-bound result.
 
 ## Decision
 
@@ -19,10 +19,14 @@ Add the `longitudinal_cwc_v1` analysis-run output profile to `analysis_engine`, 
 
 The executor:
 
-- requires every clustered score to carry immutable `snapshot_id` and `AvailableTime` provenance;
-- rejects cross-snapshot evidence before scientific composition and excludes same-snapshot rows whose availability is later than the requested knowledge cutoff;
+- requires every clustered score to carry bounded opaque `evidence_id`, immutable `snapshot_id`, and `AvailableTime` provenance;
+- preserves the raw `MAX_EVIDENCE_UNITS` operational admission ceiling;
+- rejects cross-snapshot input as a provenance violation;
+- excludes rows with `AvailableTime > knowledge_cutoff` before the historical evidence-identity/domain census;
+- rejects duplicate `evidence_id` among cutoff-visible evidence so one observation cannot acquire extra scientific weight;
+- does not infer identity from cluster/predictor/outcome/time tuples, so numerically equal observations with distinct identities remain distinct evidence;
+- keeps future-unavailable evidence out of public historical counts, artifact digest, and terminal result; it does not emit an excluded-future counter;
 - binds request and executor cutoffs by parsed `KnowledgeCutoff::instant()` equality rather than RFC 3339 text;
-- preserves the raw `MAX_EVIDENCE_UNITS` admission ceiling and validates completed row/exclusion counts against the same executable population bound;
 - invokes `recover_cluster_mean_within_between_slopes` without reimplementing CWC arithmetic;
 - requires the exact `claim_causal_effect(CausalHeuristic::TemporalPrecedence)` refusal and fails closed if that provider contract drifts;
 - validates the contextual-effect identity exactly against the recovered within/between slopes;
@@ -35,19 +39,21 @@ This is two-level OLS composition, not DSEM, RI-CLPM, a random-effects sampler, 
 
 1. Restore another Driver p.16 standardised matrix — rejected because those recoveries do not bind composition to an analysis run.
 2. Put CWC execution into `tepp_api` — rejected because transport contracts and scientific composition would become one service boundary.
-3. Trust the run-level snapshot label without per-row provenance — rejected because it cannot prove that supplied coordinates belong to the requested immutable snapshot.
-4. Treat equivalent RFC 3339 text as different cutoffs — rejected because textual representation is not temporal identity.
-5. Reimplement CWC arithmetic in the adapter — rejected; `psychometric_core` remains the canonical numerical owner.
+3. Trust a run-level snapshot without per-row snapshot/evidence provenance — rejected because replay and cross-snapshot misattribution would be indistinguishable from legitimate scientific weight.
+4. Deduplicate by predictor/outcome/cluster/time tuple — rejected because equal observed values do not imply the same evidence unit.
+5. Count rows excluded after the historical cutoff in the public artifact — rejected because later corpus existence would change an earlier replay and its digest.
+6. Treat equivalent RFC 3339 text as different cutoffs — rejected because textual representation is not temporal identity.
+7. Reimplement CWC arithmetic in the adapter — rejected; `psychometric_core` remains the canonical numerical owner.
 
 ## Scientific acceptance boundary
 
-A noiseless fixture and existing owner-level known-truth tests are regression evidence, not commercial scientific acceptance for this profile. Issue #501 owns the remaining profile-level recovery evidence: repeated true-parameter recovery for within, between and contextual slopes; RMSE/bias with Monte Carlo uncertainty; attempted/recovered/failed denominators; cluster-size and signal/noise variation; and leakage-safe temporal evaluation where availability changes over time.
+The identity and leakage repairs establish input/output integrity, not commercial scientific acceptance. Issue #501 owns repeated true-parameter recovery for within, between and contextual slopes; RMSE/bias with Monte Carlo uncertainty; attempted/recovered/failed denominators; cluster-size and signal/noise variation; unequal follow-up/time-varying availability; and leakage-safe rolling-origin evaluation.
 
 The profile must not be described as scientifically accepted or release-ready while #501 remains open without equivalent checked-in evidence.
 
 ## Consequences
 
-Operators can eventually request a historical, snapshot-bound within/between/contextual composition without allowing future evidence, another snapshot, or a provider-contract drift to silently change the scientific result. The artifact remains associational and explicitly separates provider validation from the scientific claim boundary.
+A historical CWC run is invariant to evidence that was unavailable at its cutoff. Duplicate identities in the evidence population that was actually observable then fail closed before CWC arithmetic, while distinct evidence with equal values remains admissible. The artifact exposes only cutoff-visible scientific counts and slopes; future-only census information is not part of the digest-bound historical result.
 
 Shared ADR index, TRACEABILITY and product-gap currentization belong to the canonical documentation/consolidation lane. This branch-local ADR remains `Proposed` until the implementation is inherited by protected-main authority and its merge/release gates are satisfied.
 
@@ -60,8 +66,8 @@ cargo clippy -p analysis_engine --all-targets -- -D warnings
 python3 scripts/validate_documentation.py
 ```
 
-Regression contracts cover equivalent cutoff instants, snapshot provenance, cross-snapshot refusal, impossible artifact counts, contextual-effect tampering, provider/domain status separation and causal-refusal fail-closed behavior. Scientific acceptance remains #501.
+Regression contracts cover equivalent cutoff instants, snapshot/evidence provenance, cutoff-visible duplicate refusal, future-unavailable replay invariance, equal-value distinct identities, contextual-effect tampering, impossible visible counts, provider/domain status separation, and causal-refusal fail-closed behavior. Scientific acceptance remains #501.
 
 ## Rollback and supersession
 
-Rollback removes the `longitudinal_cwc_v1` profile. No persisted schema migration is introduced. Supersede only with an ADR that keeps CWC distinct from between-cluster effects and causal identification, preserves immutable snapshot/availability provenance, and retains leakage-safe historical replay semantics.
+Rollback removes the `longitudinal_cwc_v1` profile. No persisted schema migration is introduced. Supersede only with an ADR that keeps CWC distinct from between-cluster effects and causal identification, preserves immutable evidence/snapshot/availability provenance, and retains cutoff-visible historical replay invariance.
