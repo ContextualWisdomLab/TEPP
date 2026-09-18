@@ -64,10 +64,12 @@ fn is_builtin_set_config_occurrence(statement: &str, start: usize) -> bool {
 /// identifier prefixes and unrelated schemas cannot impersonate PostgreSQL's
 /// builtin. Positional, named (`=>` / `:=`), and mixed notation are folded into
 /// the canonical `setting_name` / `new_value` slots. A direct quoted setting name
-/// can prove an unrelated target. A dynamic setting-name expression cannot, so it
-/// fails closed. For direct `session_replication_role`, only direct `origin` and
-/// `local` values are proven safe; other or dynamic values fail closed because
-/// `set_config` is PostgreSQL's function equivalent of `SET`.
+/// can prove an unrelated target only when it is one lexical atom; compacted
+/// adjacent string constants retain an interior quote and therefore fail closed.
+/// A dynamic setting-name expression cannot prove an unrelated target either.
+/// For direct `session_replication_role`, only direct `origin` and `local` values
+/// are proven safe; other or dynamic values fail closed because `set_config` is
+/// PostgreSQL's function equivalent of `SET`.
 fn statement_calls_unsafe_set_config(statement: &str) -> bool {
     const FUNCTION_NAME: &str = "set_config";
     const CALL_PREFIX: &str = "set_config(";
@@ -179,7 +181,8 @@ fn statement_calls_unsafe_set_config(statement: &str) -> bool {
                         Some(name)
                             if name.len() >= 2
                                 && name.starts_with('\'')
-                                && name.ends_with('\'') => {}
+                                && name.ends_with('\'')
+                                && !name[1..name.len() - 1].contains('\'') => {}
                         Some(_) | None => return true,
                     }
                 }
