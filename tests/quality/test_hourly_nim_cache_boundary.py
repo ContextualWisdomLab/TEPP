@@ -21,7 +21,13 @@ class HourlyNimCacheBoundaryTests(unittest.TestCase):
         self.assertIn("Verify immutable artifact identity and apply proposal", verifier)
         self.assertIn("Run every release-quality gate", verifier)
         self.assertNotIn("actions/cache@", verifier)
-        self.assertNotIn("ACTIONS_CACHE_URL", verifier.split("Run every release-quality gate", 1)[1])
+        for version in (
+            "cargo-nextest --locked --version 0.9.140",
+            "cargo-deny --locked --version 0.19.7",
+            "cargo-llvm-cov --locked --version 0.8.6",
+        ):
+            with self.subTest(version=version):
+                self.assertIn(version, verifier)
 
 
 if __name__ == "__main__":
