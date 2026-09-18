@@ -51,6 +51,28 @@ $tepp$;
 }
 
 #[test]
+fn unrelated_schema_routine_mutations_do_not_target_public_retention_guards() {
+    let dropped = embedded_with(
+        "DROP FUNCTION audit_support.reject_held_evidence_deletion() CASCADE;",
+    );
+    assert_eq!(validate_migration_catalog(&dropped), Ok(()));
+
+    let replaced = embedded_with(
+        r#"
+CREATE OR REPLACE FUNCTION audit_support . reject_tombstoned_evidence_restore()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $tepp$
+BEGIN
+    RETURN NEW;
+END
+$tepp$;
+"#,
+    );
+    assert_eq!(validate_migration_catalog(&replaced), Ok(()));
+}
+
+#[test]
 fn rolled_back_retention_guard_mutations_do_not_change_durable_enforcement() {
     for final_sql in [
         "BEGIN; DROP FUNCTION reject_held_evidence_deletion() CASCADE; ROLLBACK;",
