@@ -93,11 +93,12 @@ fn statement_calls_replica_set_config(statement: &str) -> bool {
 ///
 /// PostgreSQL documents `UPDATE pg_settings SET setting = ...` as equivalent to
 /// `SET`. The input has already crossed the shared lexical authority, so this
-/// bounded parser only resolves the canonical unqualified or `pg_catalog`
-/// relation identity and a direct `WHERE name = 'session_replication_role'`
-/// target. Atomic `origin` and `local` values are proven safe for ordinary
-/// triggers; `replica` and any non-atomic value fail closed because the validator
-/// cannot prove that protected DML did not execute while triggers were suppressed.
+/// bounded parser resolves only the canonical unqualified or `pg_catalog`
+/// relation identity plus PostgreSQL's optional `ONLY`, `*`, and target alias
+/// forms. A direct equality predicate must target `session_replication_role`.
+/// Atomic `origin` and `local` values are proven safe for ordinary triggers;
+/// `replica` and any non-atomic value fail closed because the validator cannot
+/// prove that protected DML did not execute while triggers were suppressed.
 fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) -> bool {
     let delimited = statement.replace('.', " . ").replace('=', " = ");
     let tokens = delimited.split_whitespace().collect::<Vec<_>>();
@@ -109,6 +110,12 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
     }
 
     let mut index = 1usize;
+    if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("ONLY"))
+    {
+        index += 1;
+    }
     if tokens
         .get(index)
         .is_some_and(|token| token.eq_ignore_ascii_case("pg_settings"))
@@ -126,6 +133,27 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
     } else {
         return false;
     }
+
+    if tokens.get(index) == Some(&"*") {
+        index += 1;
+    }
+    let alias = if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("AS"))
+    {
+        let alias = tokens.get(index + 1).copied();
+        index += 2;
+        alias
+    } else if tokens
+        .get(index)
+        .is_some_and(|token| !token.eq_ignore_ascii_case("SET"))
+    {
+        let alias = tokens.get(index).copied();
+        index += 1;
+        alias
+    } else {
+        None
+    };
 
     if !tokens
         .get(index)
@@ -146,11 +174,22 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
         return false;
     };
 
+    let mut name_index = where_index + 1;
+    if tokens.get(name_index + 1) == Some(&".") {
+        let qualifier = tokens[name_index];
+        let qualifier_matches = alias
+            .is_some_and(|expected| qualifier.eq_ignore_ascii_case(expected))
+            || alias.is_none() && qualifier.eq_ignore_ascii_case("pg_settings");
+        if !qualifier_matches {
+            return false;
+        }
+        name_index += 2;
+    }
     if !tokens
-        .get(where_index + 1)
+        .get(name_index)
         .is_some_and(|token| token.eq_ignore_ascii_case("name"))
-        || tokens.get(where_index + 2) != Some(&"=")
-        || !tokens.get(where_index + 3).is_some_and(|value| {
+        || tokens.get(name_index + 1) != Some(&"=")
+        || !tokens.get(name_index + 2).is_some_and(|value| {
             value
                 .trim_matches('\'')
                 .eq_ignore_ascii_case("session_replication_role")
@@ -303,6 +342,7 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SELECT set_config('session_replication_role', 'replica', true); COMMIT;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_catalog . pg_settings SET setting = lower('REPLICA') WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE ONLY pg_settings AS p SET setting = 'replica' WHERE p.name = 'session_replication_role';",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
         }
@@ -319,6 +359,7 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT set_config('session_replication_role', 'origin', false);",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT audit_support.set_config('session_replication_role', 'replica', false);",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET setting = 'origin' WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings AS p SET setting = 'local' WHERE p.name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE audit_support.pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(true));
