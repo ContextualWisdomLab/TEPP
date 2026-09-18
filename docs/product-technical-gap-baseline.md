@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-18T20:13:53Z  
+**Snapshot:** 2026-09-18T22:12:19Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
@@ -20,6 +20,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | #492 central admission consumer | `794ba9e6dda9f043aa499920fdf609b81b075d7e`, Draft, base `main` | Preserved schedule/parser repair remains valid, but immutable `.github` worker policy and contextual-orchestrator `orchestrator/free` release authority must exist before consumer migration and new exact-head evidence. |
 | #538 foundation successor | `f335624cea977fea7d7fe6f36871868557fe2bb7`, Ready, base `main` | #594 removes the post-proposal writable cache surface found by exact-head Actions CodeQL. New exact-head checks must reacquire evidence; #498 Dependency Graph support, `.github#2276` authenticated GHAS identity reads, and qualifying independent approval remain promotion prerequisites. |
 | #521 persistence successor | `0fa4b71c0e8cd88d95c70c806af648e853ea7b08`, Draft, base #538, ahead 314 / behind 0 | #538's three new ordinary-forward commits briefly left #521 behind and non-mergeable. Merge commit `0fa4b71c...` preserves all #521 history while inheriting the #594 workflow/test deltas without rebase or force push. #590 remains the last accepted persistence production repair; #591 remains retired. |
+| #416 Analysis Run survivor / #372 CWC child | #416 `03f8de2ed0a0fb842d2022d411814e440df7cfb4`, Draft; #372 `c9a99ff5116c1b974535498d98d6731066b371ac`, Draft, retargeted to #416 and currently non-mergeable | #372 carries #592/#593/#595 evidence-population integrity. Shared lock/source/docs conflicts must be resolved ordinary-forward into #416 without replacing unrelated profile history or #435-owned shared documentation. #501 remains separate scientific recovery acceptance. |
 | #488 Validation Evidence | `520df488fd86ba48008af8ee5a2e112b4587fc22`, Draft, base #492 | Current exact head remains short of owned-production 100% authored line/branch evidence and qualifying approval. |
 | #310 Longitudinal Modeling | `ba10820e0d28cc33d1b91ef37f6f6d163b3d91e9`, Draft, base `main` | TEPP-owned temporal/longitudinal semantics remain mutable and unreleased; reusable static arithmetic must arrive only through immutable fast-mlsirm releases. |
 
@@ -52,7 +53,7 @@ The clock contract separates event/valid time, assertion time, document time, sy
 - Rasch remains distinct from generic 1PL; formulation-qualified 2PLM–5PLM, MIRT, ideal-point/GGUM, testlet/rater/facet/generalized-mixed identity is preserved.
 - A nominal unit identifier is not repeated-measures evidence. Stable `Between` known truth is unit-level with canonical `occasion_index = 0`; `Within` retains actual `(unit, occasion)` identity.
 - Row arrival order is not scientific evidence. Fixed admitted observations must produce bit-identical results under permutation wherever the deterministic CPU `f64` contract claims it.
-- Historical-cutoff admission occurs before duplicate-identity checks. Future-unavailable evidence cannot change an earlier run's conflicts, counts, or terminal state.
+- Historical-cutoff admission occurs before snapshot/domain and duplicate-identity checks. A cutoff-visible foreign-snapshot row fails closed; future-unavailable evidence, including a foreign-snapshot or duplicate-identity row, cannot change an earlier run's conflicts, counts, artifacts, or terminal state.
 - Supported temporal estimators require state/trajectory and claimed-structure recovery, bias/RMSE, interval coverage, convergence, uncertainty calibration, reproducibility, Monte Carlo uncertainty, and leakage-safe rolling-origin evidence. Synthetic fixtures are unit-level evidence only and do not replace realistic scientific acceptance.
 - Mean signed bias and bias SE are Validation Evidence measures. The bounded exact route remains `neutral_zero_linear -> pairwise_reference -> generic_fallback`; pairwise is a fail-closed comparison path, not the represented-input admission definition.
 - The `n=16` Validation Evidence cutoff is an implementation/resource boundary, not a scientific boundary. Wider fixtures are characterization unless a buyer-path cardinality contract and measured resource evidence promote them.
@@ -67,7 +68,15 @@ The clock contract separates event/valid time, assertion time, document time, sy
 
 The first branch is scientifically/source-domain reachable but resource-extreme; it must be closed through a typed buyer-path evidence-to-metric cardinality/resource contract rather than a giant fixture or arbitrary public-library cutoff. The second has exact-real dispersion separation `D >= n/2`, but implemented floating positivity still requires an implementation-matched forward-error proof or a compact caller-valid counterexample. No current-head full GREEN, protected merge, release, or qualifying independent approval is claimed.
 
-Canonical `docs/TRACEABILITY.md` must index the current #491/#488 resource/cardinality obligation and the immutable fast-mlsirm #1717/#1816 -> TEPP #310 owner chain before this documentation lane can claim fully code-current traceability. This file records that debt rather than silently treating stale rows as current authority.
+Canonical `docs/TRACEABILITY.md` must index the current #491/#488 resource/cardinality obligation, the immutable fast-mlsirm #1717/#1816 -> TEPP #310 owner chain, and the #595 cutoff-before-snapshot CWC historical-population contract before this documentation lane can claim fully code-current traceability. `docs/traceability-current-owner-boundaries.md` preserves those three obligations until the safe canonical fold is complete.
+
+## Longitudinal CWC historical-population boundary
+
+#372 is now retargeted directly to surviving Analysis Run vehicle #416. Current child head `c9a99ff5116c1b974535498d98d6731066b371ac` remains Draft and non-mergeable because both branches changed shared lock/source/documentation surfaces; this is a conflict-resolution obligation, not grounds for closing the child or replacing survivor history.
+
+#592 established opaque evidence identity and cutoff-visible duplicate refusal. #593 removed future-only census state from the digest-bound historical artifact. #595 found the remaining provenance side channel: `admit_scores_at_cutoff` checked `snapshot_id` before `AvailableTime`, so a future-unavailable foreign-snapshot row could turn a successful historical replay into `SnapshotMismatch`. Public RED `0ea8f6573d8519762e3ef9038ec4c4892c8e3a8b` preserves visible foreign-snapshot refusal while requiring future-unavailable foreign-snapshot invariance; causal repair `07360220cf8e7018107b271dc8e6e2c2f49b0c58` moves availability admission ahead of snapshot and identity admission, while retaining the raw `MAX_EVIDENCE_UNITS` ceiling. ADR 0033 and doctoring are current at `b4edede35ef26e7445fce94883de918b46c962f2` and `c9a99ff5116c1b974535498d98d6731066b371ac`.
+
+These integrity repairs do not satisfy scientific acceptance. #501 still requires repeated true-parameter recovery for within, between, and contextual slopes with bias/RMSE and Monte Carlo uncertainty; attempted/recovered/failed denominators; cluster-size/imbalance/noise/signal variation; unequal follow-up/time-varying availability; reproducibility; and leakage-safe rolling-origin evaluation. The child may close only after #416 or a verified successor inherits all valid #592/#593/#595 source/test/ADR/doctoring deltas, #435 folds shared traceability without losing unrelated history, and fresh surviving-head evidence is reacquired.
 
 ## Persistence / execution-context boundary
 
@@ -93,6 +102,8 @@ The same canonical dispatch proved a separate owner-path failure: Python SARIF w
 | #492 | Central admission consumer migration is incomplete | Wait for immutable `.github` worker and contextual-orchestrator `orchestrator/free` authority, then migrate leaf workflow/guidance and reacquire exact-head gates. |
 | #538 / #594 | Foundation successor security repair is implemented but not yet promoted | Exact-head `f335624...` must reacquire Rust/docs/security/Semgrep/CodeQL evidence proving the cache-poisoning findings are gone. #498 Dependency Graph, `.github#2276` GHAS analyses-read authority, and qualifying independent approval remain prerequisites. |
 | #521 | Persistence successor verification pending | Open stack is coherent at `0fa4b71c...` (ahead 314 / behind 0). After #538 lands normally, non-force restack surviving persistence delta from protected main, then reacquire Rust/Python/docs/security/CodeQL, Live PostgreSQL, rustdoc and authored line/branch/edge evidence. |
+| #416 / #372 / #592 / #593 / #595 | Longitudinal CWC Analysis Run population-integrity delta awaits conflict-resolving successor fold | #372 `c9a99ff5...` is retargeted to #416; preserve cutoff-before-snapshot/identity admission, visible provenance refusal, future-only invariance, no future census field, tests, ADR Proposed state and doctoring while resolving shared survivor conflicts ordinary-forward. |
+| #501 | Longitudinal CWC commercial scientific acceptance remains open | Add realistic repeated true-parameter trajectory/state recovery evidence with RMSE/bias/MC uncertainty, explicit failure denominators, cluster/follow-up/time variation, reproducibility and leakage-safe rolling-origin evaluation. Deterministic unit fixtures are insufficient. |
 | #310 | Longitudinal consumer blocked on released static arithmetic | Consume only a new immutable fast-mlsirm release after #1717 then #1816 land with owner acceptance. |
 
 ## Release gate
