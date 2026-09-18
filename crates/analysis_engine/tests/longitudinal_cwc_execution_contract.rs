@@ -88,7 +88,6 @@ fn noiseless_cwc_emits_digest_bound_within_between_and_contextual() {
     );
     assert_eq!(execution.artifact.row_count, 4);
     assert_eq!(execution.artifact.cluster_count, 2);
-    assert_eq!(execution.artifact.excluded_after_cutoff_count, 0);
     assert!((execution.artifact.within_slope - 0.5).abs() < 1e-12);
     assert!((execution.artifact.between_slope - 2.0).abs() < 1e-12);
     assert!((execution.artifact.contextual_effect - 1.5).abs() < 1e-12);
@@ -117,25 +116,34 @@ fn noiseless_cwc_emits_digest_bound_within_between_and_contextual() {
 }
 
 #[test]
-fn execution_excludes_rows_unavailable_at_the_request_cutoff() {
+fn execution_excludes_future_rows_without_changing_historical_output() {
     let request = request();
     let accepted = accepted(&request);
-    let mut rows = noiseless_rows();
-    rows.push(score(3, 8.0, 20.0, "2026-08-15T00:00:00Z"));
-    let execution = execute_longitudinal_cwc_run(
+    let baseline_rows = noiseless_rows();
+    let baseline = execute_longitudinal_cwc_run(
         &request,
         &accepted,
         SNAPSHOT_ID,
         cutoff(),
-        &rows,
+        &baseline_rows,
         "2026-08-02T00:00:00Z",
     )
-    .expect("execution");
-    assert_eq!(execution.artifact.row_count, 4);
-    assert_eq!(execution.artifact.cluster_count, 2);
-    assert_eq!(execution.artifact.excluded_after_cutoff_count, 1);
-    assert!((execution.artifact.within_slope - 0.5).abs() < 1e-12);
-    assert!((execution.artifact.between_slope - 2.0).abs() < 1e-12);
+    .expect("baseline");
+
+    let mut replay_rows = baseline_rows;
+    replay_rows.push(score(3, 8.0, 20.0, "2026-08-15T00:00:00Z"));
+    let replay = execute_longitudinal_cwc_run(
+        &request,
+        &accepted,
+        SNAPSHOT_ID,
+        cutoff(),
+        &replay_rows,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("replay");
+
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
 }
 
 #[test]
