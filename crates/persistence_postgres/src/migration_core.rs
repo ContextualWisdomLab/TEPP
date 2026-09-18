@@ -311,13 +311,13 @@ fn contains_invalid_alter_table_added_column_name(sql: &str) -> bool {
 
 /// Return whether one committed statement mutates table final state beyond the bounded model.
 ///
-/// `DROP TABLE` removes the durable relation. Standalone PostgreSQL `RENAME`
-/// forms make historical table/column identities stale. The ordinary
-/// `ALTER TABLE ... action [, ...]` form can also contain destructive `DROP`
-/// actions such as `DROP COLUMN` or `DROP CONSTRAINT`, plus trigger firing-state
-/// changes that can disable ordinary application-path enforcement. Every
-/// top-level action is inspected so a safe first action cannot hide a later
-/// unsupported mutation.
+/// `DROP TABLE` removes the durable relation and `DROP TRIGGER` removes durable
+/// trigger enforcement. Standalone PostgreSQL `RENAME` forms make historical
+/// table/column identities stale. The ordinary `ALTER TABLE ... action [, ...]`
+/// form can also contain destructive `DROP` actions such as `DROP COLUMN` or
+/// `DROP CONSTRAINT`, plus trigger firing-state changes that can disable ordinary
+/// application-path enforcement. Every top-level action is inspected so a safe
+/// first action cannot hide a later unsupported mutation.
 /// Target parsing is positional, which keeps a table literally named `rename`
 /// or `drop` from being confused with an action after lexical normalization.
 fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool {
@@ -328,7 +328,10 @@ fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool
         return false;
     };
 
-    if token_span_eq(statement, first, "DROP") && token_span_eq(statement, second, "TABLE") {
+    if token_span_eq(statement, first, "DROP")
+        && (token_span_eq(statement, second, "TABLE")
+            || token_span_eq(statement, second, "TRIGGER"))
+    {
         return true;
     }
 
@@ -376,14 +379,15 @@ fn contains_unsupported_table_final_state_mutation(sql: &str) -> bool {
 /// `DISABLE` or `NO FORCE` cannot reuse stale positive evidence from earlier SQL.
 /// Committed `ALTER POLICY` and `DROP POLICY` are temporarily rejected until
 /// policy identity, clause replacement, and removal have their own final-state
-/// authority. Committed `DROP TABLE`, standalone table/column rename forms,
-/// destructive ALTER TABLE DROP actions, and trigger modes that disable normal
-/// application-path enforcement are likewise rejected until table, trigger,
-/// column, constraint, removal/recreation, and dependent-object effects are
-/// represented by first-class final-state aggregates. Committed ADD-column
-/// actions remain supported only when each introduced durable column satisfies
-/// the same multi-word `snake_case` authority as CREATE TABLE columns. Mutations
-/// removed by the transaction projection never reach either bounded boundary.
+/// authority. Committed `DROP TABLE` / `DROP TRIGGER`, standalone table/column
+/// rename forms, destructive ALTER TABLE DROP actions, and trigger modes that
+/// disable normal application-path enforcement are likewise rejected until
+/// table, trigger, column, constraint, removal/recreation, and dependent-object
+/// effects are represented by first-class final-state aggregates. Committed
+/// ADD-column actions remain supported only when each introduced durable column
+/// satisfies the same multi-word `snake_case` authority as CREATE TABLE columns.
+/// Mutations removed by the transaction projection never reach either bounded
+/// boundary.
 ///
 /// # Errors
 ///
@@ -608,6 +612,8 @@ mod tests {
         for sql in [
             "DROP\nTABLE tenant_record ;",
             "DROP TABLE IF EXISTS tenant_record CASCADE ;",
+            "DROP TRIGGER source_artifact_reject_mutation ON source_artifact ;",
+            "DROP TRIGGER IF EXISTS source_artifact_reject_mutation ON source_artifact RESTRICT ;",
             "ALTER TABLE tenant_record RENAME TO tenant_record_archive ;",
             "ALTER TABLE IF EXISTS ONLY tenant_record RENAME COLUMN tenant_record_id TO tenant_key ;",
             "ALTER TABLE tenant_record DROP COLUMN tenant_record_id CASCADE ;",
