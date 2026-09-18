@@ -38,7 +38,13 @@ fn row(
     outcome: f64,
     available_time: &str,
 ) -> LongitudinalClusterScore {
+    let evidence_id = format!(
+        "evidence-{snapshot_id}-{cluster_key}-{:016x}-{:016x}-{available_time}",
+        predictor.to_bits(),
+        outcome.to_bits()
+    );
     LongitudinalClusterScore::new(
+        evidence_id,
         snapshot_id,
         cluster_key,
         predictor,
