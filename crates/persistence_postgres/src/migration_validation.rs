@@ -684,14 +684,19 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
 /// configuration commands; it does not re-lex raw SQL. `ALTER USER` is treated as
 /// PostgreSQL's documented alias for `ALTER ROLE`; role-specific defaults are
 /// relevant for `tepp_app_runtime`, PostgreSQL pseudo-current-role targets, and
-/// `ALL`. Database and system defaults are conservatively relevant because this
-/// validator does not own deployment database/cluster identity. Direct `origin`
-/// and `local` are the only values that prove ordinary triggers remain enabled.
-/// `FROM CURRENT`, `DEFAULT`, and `RESET` fail closed because the inherited/current
-/// value and precedence chain are not yet represented by a first-class default-
-/// state aggregate. `ALTER SYSTEM` is evaluated here only as durable SQL state;
-/// PostgreSQL itself forbids running it inside a transaction block.
+/// `ALL`. Unicode-escaped quoted role/parameter identities reuse the shared
+/// lexical projection: exact protected spellings are canonical, invalid quoted
+/// projections fail closed only in the protected identity slot, and safely
+/// projected unrelated names remain unrelated. Database and system defaults are
+/// conservatively relevant because this validator does not own deployment
+/// database/cluster identity. Direct `origin` and `local` are the only values
+/// that prove ordinary triggers remain enabled. `FROM CURRENT`, `DEFAULT`, and
+/// `RESET` fail closed because the inherited/current value and precedence chain
+/// are not yet represented by a first-class default-state aggregate. `ALTER
+/// SYSTEM` is evaluated here only as durable SQL state; PostgreSQL itself forbids
+/// running it inside a transaction block.
 fn statement_sets_unsafe_persistent_replication_role_default(statement: &str) -> bool {
+    const INVALID_IDENTIFIER: &str = "INVALID_QUOTED_IDENTIFIER";
     let delimited = statement.replace('=', " = ");
     let tokens = delimited.split_whitespace().collect::<Vec<_>>();
     if !tokens
@@ -700,6 +705,38 @@ fn statement_sets_unsafe_persistent_replication_role_default(statement: &str) ->
     {
         return false;
     }
+
+    let unicode_identifier_end = |start: usize| -> Option<usize> {
+        if !tokens
+            .get(start)
+            .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+        {
+            return None;
+        }
+        tokens.get(start + 1)?;
+        let mut end = start + 2;
+        if tokens
+            .get(end)
+            .is_some_and(|token| token.eq_ignore_ascii_case("UESCAPE"))
+        {
+            end += 1;
+            if tokens.get(end).is_some_and(|escape| {
+                escape.len() >= 2 && escape.starts_with('\'') && escape.ends_with('\'')
+            }) {
+                end += 1;
+            }
+        }
+        Some(end)
+    };
+    let unicode_identifier_may_match = |start: usize, expected: &str| -> Option<(bool, usize)> {
+        let end = unicode_identifier_end(start)?;
+        let projected = *tokens.get(start + 1)?;
+        Some((
+            projected.eq_ignore_ascii_case(expected)
+                || projected.eq_ignore_ascii_case(INVALID_IDENTIFIER),
+            end,
+        ))
+    };
 
     let mut index = 1usize;
     let scope = tokens.get(index).copied();
@@ -714,18 +751,34 @@ fn statement_sets_unsafe_persistent_replication_role_default(statement: &str) ->
     index += 1;
 
     if role_scoped {
-        let Some(target) = tokens.get(index).copied() else {
-            return false;
-        };
-        let target_may_be_runtime = target.eq_ignore_ascii_case("tepp_app_runtime")
-            || target.eq_ignore_ascii_case("ALL")
-            || target.eq_ignore_ascii_case("CURRENT_ROLE")
-            || target.eq_ignore_ascii_case("CURRENT_USER")
-            || target.eq_ignore_ascii_case("SESSION_USER");
-        if !target_may_be_runtime {
-            return false;
+        if tokens
+            .get(index)
+            .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+        {
+            let Some((target_may_be_runtime, target_end)) =
+                unicode_identifier_may_match(index, "tepp_app_runtime")
+            else {
+                return true;
+            };
+            if !target_may_be_runtime {
+                return false;
+            }
+            index = target_end;
+        } else {
+            let Some(target) = tokens.get(index).copied() else {
+                return false;
+            };
+            let target_may_be_runtime = target.eq_ignore_ascii_case("tepp_app_runtime")
+                || target.eq_ignore_ascii_case("ALL")
+                || target.eq_ignore_ascii_case("CURRENT_ROLE")
+                || target.eq_ignore_ascii_case("CURRENT_USER")
+                || target.eq_ignore_ascii_case("SESSION_USER");
+            if !target_may_be_runtime {
+                return false;
+            }
+            index += 1;
         }
-        index += 1;
+
         if tokens
             .get(index)
             .is_some_and(|token| token.eq_ignore_ascii_case("IN"))
@@ -733,26 +786,60 @@ fn statement_sets_unsafe_persistent_replication_role_default(statement: &str) ->
             if !tokens
                 .get(index + 1)
                 .is_some_and(|token| token.eq_ignore_ascii_case("DATABASE"))
-                || tokens.get(index + 2).is_none()
             {
                 return true;
             }
-            index += 3;
+            let database_start = index + 2;
+            if tokens
+                .get(database_start)
+                .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+            {
+                let Some(database_end) = unicode_identifier_end(database_start) else {
+                    return true;
+                };
+                index = database_end;
+            } else if tokens.get(database_start).is_some() {
+                index = database_start + 1;
+            } else {
+                return true;
+            }
         }
     } else if database_scoped {
-        if tokens.get(index).is_none() {
+        if tokens
+            .get(index)
+            .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+        {
+            let Some(database_end) = unicode_identifier_end(index) else {
+                return true;
+            };
+            index = database_end;
+        } else if tokens.get(index).is_some() {
+            index += 1;
+        } else {
             return false;
         }
-        index += 1;
     }
 
     if tokens
         .get(index)
         .is_some_and(|token| token.eq_ignore_ascii_case("RESET"))
     {
-        return tokens.get(index + 1).is_some_and(|parameter| {
+        index += 1;
+        if tokens
+            .get(index)
+            .is_some_and(|parameter| parameter.eq_ignore_ascii_case("ALL"))
+        {
+            return true;
+        }
+        if tokens
+            .get(index)
+            .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+        {
+            return unicode_identifier_may_match(index, "session_replication_role")
+                .is_none_or(|(matches, _)| matches);
+        }
+        return tokens.get(index).is_some_and(|parameter| {
             parameter.eq_ignore_ascii_case("session_replication_role")
-                || parameter.eq_ignore_ascii_case("ALL")
         });
     }
     if !tokens
@@ -763,13 +850,27 @@ fn statement_sets_unsafe_persistent_replication_role_default(statement: &str) ->
     }
     index += 1;
 
-    if !tokens
+    if tokens
         .get(index)
         .is_some_and(|token| token.eq_ignore_ascii_case("session_replication_role"))
     {
+        index += 1;
+    } else if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+    {
+        let Some((parameter_may_be_protected, parameter_end)) =
+            unicode_identifier_may_match(index, "session_replication_role")
+        else {
+            return true;
+        };
+        if !parameter_may_be_protected {
+            return false;
+        }
+        index = parameter_end;
+    } else {
         return false;
     }
-    index += 1;
 
     if tokens
         .get(index)
