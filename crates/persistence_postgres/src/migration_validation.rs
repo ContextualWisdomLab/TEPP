@@ -250,11 +250,13 @@ fn top_level_keyword_index(tokens: &[&str], start: usize, keyword: &str) -> Opti
 /// `SET`. The input has already crossed the shared lexical authority, so this
 /// bounded parser resolves only the canonical unqualified or `pg_catalog`
 /// relation identity plus PostgreSQL's optional `ONLY`, `*`, and target alias
-/// forms. Direct `origin` and `local` assignment atoms are always safe for
-/// ordinary triggers. For any other value, only a complete direct equality to
-/// one unrelated quoted setting name proves that `session_replication_role` is
-/// excluded; protected equality is recognized in either operand order, and any
-/// unsupported predicate shape fails closed instead of being treated as unrelated.
+/// forms. Both scalar `setting = value` and PostgreSQL's single-column row
+/// assignment `(setting) = [ROW] (value)` cross the same boundary. Direct
+/// `origin` and `local` assignment atoms are always safe for ordinary triggers.
+/// For any other value, only a complete direct equality to one unrelated quoted
+/// setting name proves that `session_replication_role` is excluded; protected
+/// equality is recognized in either operand order, and any unsupported predicate
+/// shape fails closed instead of being treated as unrelated.
 fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str) -> bool {
     let delimited = update_statement
         .replace('.', " . ")
@@ -320,27 +322,53 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
     if !tokens
         .get(index)
         .is_some_and(|token| token.eq_ignore_ascii_case("SET"))
-        || !tokens
-            .get(index + 1)
-            .is_some_and(|token| token.eq_ignore_ascii_case("setting"))
-        || tokens.get(index + 2) != Some(&"=")
     {
         return false;
     }
 
-    let value_start = index + 3;
+    let value_start = if tokens
+        .get(index + 1)
+        .is_some_and(|token| token.eq_ignore_ascii_case("setting"))
+        && tokens.get(index + 2) == Some(&"=")
+    {
+        index + 3
+    } else if tokens.get(index + 1) == Some(&"(")
+        && tokens
+            .get(index + 2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("setting"))
+        && tokens.get(index + 3) == Some(&")")
+        && tokens.get(index + 4) == Some(&"=")
+    {
+        index + 5
+    } else {
+        return false;
+    };
+
     let where_index = top_level_keyword_index(&tokens, value_start, "WHERE");
     let value_end = where_index
         .or_else(|| top_level_keyword_index(&tokens, value_start, "RETURNING"))
         .unwrap_or(tokens.len());
     let value_tokens = &tokens[value_start..value_end];
-    let value_is_safe = value_tokens.len() == 1
-        && (value_tokens[0]
-            .trim_matches('\'')
-            .eq_ignore_ascii_case("origin")
-            || value_tokens[0]
-                .trim_matches('\'')
-                .eq_ignore_ascii_case("local"));
+    let direct_value_atom = if value_tokens.len() == 1 {
+        Some(value_tokens[0])
+    } else if value_tokens.len() == 3
+        && value_tokens[0] == "("
+        && value_tokens[2] == ")"
+    {
+        Some(value_tokens[1])
+    } else if value_tokens.len() == 4
+        && value_tokens[0].eq_ignore_ascii_case("ROW")
+        && value_tokens[1] == "("
+        && value_tokens[3] == ")"
+    {
+        Some(value_tokens[2])
+    } else {
+        None
+    };
+    let value_is_safe = direct_value_atom.is_some_and(|value| {
+        value.trim_matches('\'').eq_ignore_ascii_case("origin")
+            || value.trim_matches('\'').eq_ignore_ascii_case("local")
+    });
     if value_is_safe {
         return false;
     }
@@ -587,6 +615,8 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH changed_setting AS (UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = (SELECT 'replica' WHERE true) WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH changed_setting AS (UPDATE pg_settings SET setting = (SELECT 'replica' WHERE true) WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET (setting) = ('replica') WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_catalog . pg_settings AS p SET (setting) = ROW('replica') WHERE p.name = 'session_replication_role';",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
         }
@@ -604,6 +634,8 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT audit_support.set_config('session_replication_role', 'replica', false);",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET setting = 'origin' WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings AS p SET setting = 'local' WHERE p.name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET (setting) = ('origin') WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings AS p SET (setting) = ROW('local') WHERE p.name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE audit_support.pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = 'origin' WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH changed_setting AS (UPDATE pg_settings SET setting = 'local' WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
