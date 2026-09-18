@@ -55,67 +55,160 @@ fn contains_unsupported_policy_mutation(sql: &str) -> bool {
     })
 }
 
-/// Return whether one committed statement mutates table identity beyond the bounded final-state model.
+/// Return the next whitespace-delimited token span beginning at or after `from`.
 ///
-/// `DROP TABLE` removes the durable relation outright. PostgreSQL table- and
-/// column-level `RENAME` operations also invalidate historical identity evidence
-/// even though the relation survives. The parser intentionally consumes only the
-/// statement prefix, optional `IF EXISTS` / `ONLY`, the exact table target, and
-/// the following action token. This positional boundary keeps a table literally
-/// named `rename` from being mistaken for a rename action after lexical quote
-/// normalization.
-fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool {
-    let tokens = statement.split_whitespace().collect::<Vec<_>>();
-    if tokens.len() < 2 {
-        return false;
+/// Input has already crossed the shared PostgreSQL lexical authority. This
+/// cursor exists only to retain the exact byte boundary after an ALTER TABLE
+/// target; it does not interpret comments, quoted bodies, or identifiers again.
+fn next_sql_token_span(sql: &str, from: usize) -> Option<(usize, usize)> {
+    let tail = sql.get(from..)?;
+    let mut token_start = None;
+
+    for (offset, ch) in tail.char_indices() {
+        if token_start.is_none() {
+            if !ch.is_whitespace() {
+                token_start = Some(from + offset);
+            }
+            continue;
+        }
+        if ch.is_whitespace() {
+            if let Some(start) = token_start {
+                return Some((start, from + offset));
+            }
+        }
     }
 
-    if tokens[0].eq_ignore_ascii_case("DROP") && tokens[1].eq_ignore_ascii_case("TABLE") {
-        return true;
-    }
-    if !tokens[0].eq_ignore_ascii_case("ALTER") || !tokens[1].eq_ignore_ascii_case("TABLE") {
-        return false;
-    }
-
-    let mut index = 2usize;
-    if tokens
-        .get(index)
-        .is_some_and(|token| token.eq_ignore_ascii_case("IF"))
-        && tokens
-            .get(index + 1)
-            .is_some_and(|token| token.eq_ignore_ascii_case("EXISTS"))
-    {
-        index += 2;
-    }
-    if tokens
-        .get(index)
-        .is_some_and(|token| token.eq_ignore_ascii_case("ONLY"))
-    {
-        index += 1;
-    }
-
-    if tokens.get(index).is_none() {
-        return false;
-    }
-    index += 1;
-    if tokens.get(index) == Some(&"*") {
-        index += 1;
-    }
-
-    tokens
-        .get(index)
-        .is_some_and(|token| token.eq_ignore_ascii_case("RENAME"))
+    token_start.map(|start| (start, sql.len()))
 }
 
-/// Detect committed table removal or identity mutation not yet owned by the final-table state model.
+/// Compare one normalized token span with an ASCII PostgreSQL keyword.
+fn token_span_eq(sql: &str, span: (usize, usize), keyword: &str) -> bool {
+    sql.get(span.0..span.1)
+        .is_some_and(|token| token.eq_ignore_ascii_case(keyword))
+}
+
+/// Return whether one ALTER TABLE action begins with destructive `DROP`.
+fn alter_table_action_starts_with_drop(action: &str) -> bool {
+    next_sql_token_span(action, 0).is_some_and(|span| token_span_eq(action, span, "DROP"))
+}
+
+/// Detect destructive DROP actions in PostgreSQL's comma-separated ALTER TABLE action list.
 ///
-/// A committed PostgreSQL `DROP TABLE` invalidates the durable table itself and
-/// its dependent table-local evidence. A committed table or column rename makes
-/// historical names stale even though the underlying relation remains. Until
-/// this bounded validator owns a full create/drop/rename/recreate aggregate,
-/// retaining earlier `CREATE TABLE` text as proof would be fail-open. The input
-/// has already crossed lexical normalization and transaction projection, so
-/// rolled-back mutations never reach this boundary.
+/// Action commas are recognized only outside expression parentheses and
+/// array/subscript brackets. That keeps commas inside CHECK/function expressions
+/// or `ARRAY[...]` from manufacturing action boundaries. Unbalanced delimiters
+/// fail closed because malformed structure cannot prove the absence of a later
+/// destructive action.
+fn alter_table_actions_include_drop(actions: &str) -> bool {
+    let mut parenthesis_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut action_start = 0usize;
+
+    for (index, ch) in actions.char_indices() {
+        match ch {
+            '(' => parenthesis_depth += 1,
+            ')' => {
+                if parenthesis_depth == 0 {
+                    return true;
+                }
+                parenthesis_depth -= 1;
+            }
+            '[' => bracket_depth += 1,
+            ']' => {
+                if bracket_depth == 0 {
+                    return true;
+                }
+                bracket_depth -= 1;
+            }
+            ',' if parenthesis_depth == 0 && bracket_depth == 0 => {
+                if alter_table_action_starts_with_drop(&actions[action_start..index]) {
+                    return true;
+                }
+                action_start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+
+    if parenthesis_depth != 0 || bracket_depth != 0 {
+        return true;
+    }
+    alter_table_action_starts_with_drop(&actions[action_start..])
+}
+
+/// Return whether one committed statement mutates table final state beyond the bounded model.
+///
+/// `DROP TABLE` removes the durable relation. Standalone PostgreSQL `RENAME`
+/// forms make historical table/column identities stale. The ordinary
+/// `ALTER TABLE ... action [, ...]` form can also contain destructive `DROP`
+/// actions such as `DROP COLUMN` or `DROP CONSTRAINT`; every top-level action is
+/// inspected so an additive first action cannot hide a later destructive one.
+/// Target parsing is positional, which keeps a table literally named `rename`
+/// or `drop` from being confused with an action after lexical normalization.
+fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool {
+    let Some(first) = next_sql_token_span(statement, 0) else {
+        return false;
+    };
+    let Some(second) = next_sql_token_span(statement, first.1) else {
+        return false;
+    };
+
+    if token_span_eq(statement, first, "DROP") && token_span_eq(statement, second, "TABLE") {
+        return true;
+    }
+    if !token_span_eq(statement, first, "ALTER") || !token_span_eq(statement, second, "TABLE") {
+        return false;
+    }
+
+    let mut cursor = second.1;
+    let Some(mut target) = next_sql_token_span(statement, cursor) else {
+        return false;
+    };
+    if token_span_eq(statement, target, "IF") {
+        let Some(exists) = next_sql_token_span(statement, target.1) else {
+            return true;
+        };
+        if !token_span_eq(statement, exists, "EXISTS") {
+            return true;
+        }
+        target = match next_sql_token_span(statement, exists.1) {
+            Some(span) => span,
+            None => return true,
+        };
+    }
+    if token_span_eq(statement, target, "ONLY") {
+        target = match next_sql_token_span(statement, target.1) {
+            Some(span) => span,
+            None => return true,
+        };
+    }
+
+    cursor = target.1;
+    if let Some(star) = next_sql_token_span(statement, cursor) {
+        if statement.get(star.0..star.1) == Some("*") {
+            cursor = star.1;
+        }
+    }
+
+    let Some(actions) = statement.get(cursor..) else {
+        return true;
+    };
+    let Some(first_action) = next_sql_token_span(actions, 0) else {
+        return true;
+    };
+    if token_span_eq(actions, first_action, "RENAME") {
+        return true;
+    }
+    alter_table_actions_include_drop(actions)
+}
+
+/// Detect committed table removals or identity/destructive mutations not yet owned by final-table state.
+///
+/// The input has already crossed lexical normalization and transaction outcome,
+/// so rolled-back mutations never reach this boundary. Until a first-class
+/// table aggregate owns create/drop/rename/recreate plus column/constraint state,
+/// accepting historical `CREATE TABLE` evidence after these mutations would be
+/// fail-open and is therefore rejected explicitly.
 fn contains_unsupported_table_final_state_mutation(sql: &str) -> bool {
     sql.split(';')
         .any(statement_has_unsupported_table_final_state_mutation)
@@ -139,9 +232,9 @@ fn contains_unsupported_table_final_state_mutation(sql: &str) -> bool {
 /// `DISABLE` or `NO FORCE` cannot reuse stale positive evidence from earlier SQL.
 /// Committed `ALTER POLICY` and `DROP POLICY` are temporarily rejected until
 /// policy identity, clause replacement, and removal have their own final-state
-/// authority. Committed `DROP TABLE` and `ALTER TABLE ... RENAME ...` identity
-/// mutations are likewise rejected until table identity, column identity,
-/// removal/recreation, multi-target drops, and dependent-object effects are
+/// authority. Committed `DROP TABLE`, standalone table/column rename forms, and
+/// destructive ALTER TABLE DROP actions are likewise rejected until table,
+/// column, constraint, removal/recreation, and dependent-object effects are
 /// represented by a first-class final-table aggregate. Mutations removed by the
 /// transaction projection never reach either bounded fail-closed boundary.
 ///
@@ -360,12 +453,14 @@ mod tests {
     }
 
     #[test]
-    fn table_final_state_mutation_detection_is_statement_token_and_position_bounded() {
+    fn table_final_state_mutation_detection_is_statement_token_and_action_bounded() {
         for sql in [
             "DROP\nTABLE tenant_record ;",
             "DROP TABLE IF EXISTS tenant_record CASCADE ;",
             "ALTER TABLE tenant_record RENAME TO tenant_record_archive ;",
             "ALTER TABLE IF EXISTS ONLY tenant_record RENAME COLUMN tenant_record_id TO tenant_key ;",
+            "ALTER TABLE tenant_record DROP COLUMN tenant_record_id CASCADE ;",
+            "ALTER TABLE tenant_record ADD COLUMN auxiliary_flag boolean, DROP COLUMN tenant_record_id CASCADE ;",
         ] {
             assert!(contains_unsupported_table_final_state_mutation(sql));
         }
@@ -373,6 +468,9 @@ mod tests {
             "SELECT drop_table_marker ; CREATE TABLE tenant_record ( tenant_record_id uuid ) ;",
             "ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY ;",
             "ALTER TABLE rename ENABLE ROW LEVEL SECURITY ;",
+            "ALTER TABLE tenant_record ADD COLUMN drop_flag boolean ;",
+            "ALTER TABLE tenant_record ADD CONSTRAINT tenant_record_shape CHECK (some_func(a, drop_flag)) ;",
+            "ALTER TABLE tenant_record ADD CONSTRAINT tenant_record_array_shape CHECK (some_func(ARRAY[a, drop_flag])) ;",
         ] {
             assert!(!contains_unsupported_table_final_state_mutation(sql));
         }
