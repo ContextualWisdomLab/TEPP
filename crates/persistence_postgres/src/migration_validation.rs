@@ -345,10 +345,16 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
             .get(index)
             .is_some_and(|token| token.eq_ignore_ascii_case("UESCAPE"))
     {
-        // The shared lexer has already consumed the one-character UESCAPE
-        // literal. The identifier has no escapes if it projected to the exact
-        // lowercase `pg_settings` atom, so the clause does not change identity.
+        // The shared lexer may preserve an atomic one-character UESCAPE
+        // literal (for example `_`) or mask a punctuation escape such as `!`.
+        // Neither changes an identifier that already projected to the exact
+        // lowercase `pg_settings` atom, so consume the optional preserved atom.
         index += 1;
+        if tokens.get(index).is_some_and(|token| {
+            token.len() >= 2 && token.starts_with('\'') && token.ends_with('\'')
+        }) {
+            index += 1;
+        }
     }
 
     if tokens.get(index) == Some(&"*") {
