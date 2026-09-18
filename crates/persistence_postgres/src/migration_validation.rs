@@ -65,8 +65,10 @@ fn is_builtin_set_config_occurrence(statement: &str, start: usize) -> bool {
 /// projections are canonical; an invalid projection is conservatively treated
 /// as potentially canonical only when it occupies the corresponding function or
 /// schema position. Safely projected unrelated names remain unrelated. Optional
-/// `UESCAPE` syntax is consumed as part of that already-normalized identifier
-/// representation, so this helper does not become a second raw-SQL lexer.
+/// `UESCAPE` syntax is consumed from the already-normalized representation; its
+/// one-character literal may already have been masked by the shared lexer when
+/// it is not a preserved atomic literal. This helper therefore does not become a
+/// second raw-SQL lexer.
 fn project_potential_unicode_set_config_identity(statement: &str) -> String {
     const INVALID_IDENTIFIER: &str = "INVALID_QUOTED_IDENTIFIER";
     let delimited = statement.replace('.', " . ").replace('(', " ( ");
@@ -87,11 +89,12 @@ fn project_potential_unicode_set_config_identity(statement: &str) -> String {
             .get(end)
             .is_some_and(|token| token.eq_ignore_ascii_case("UESCAPE"))
         {
-            let escape = tokens.get(end + 1)?;
-            if escape.len() < 2 || !escape.starts_with('\'') || !escape.ends_with('\'') {
-                return None;
+            end += 1;
+            if tokens.get(end).is_some_and(|escape| {
+                escape.len() >= 2 && escape.starts_with('\'') && escape.ends_with('\'')
+            }) {
+                end += 1;
             }
-            end += 2;
         }
         Some(end)
     };
