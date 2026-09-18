@@ -61,6 +61,20 @@ fn baseline_rows() -> Vec<LongitudinalClusterScore> {
     ]
 }
 
+fn execute(rows: &[LongitudinalClusterScore]) -> analysis_engine::LongitudinalCwcExecution {
+    let request = request();
+    let accepted = accepted(&request);
+    execute_longitudinal_cwc_run(
+        &request,
+        &accepted,
+        SNAPSHOT_ID,
+        cutoff(),
+        rows,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("execution")
+}
+
 #[test]
 fn duplicate_visible_evidence_identity_fails_closed_before_cwc_composition() {
     let request = request();
@@ -88,36 +102,36 @@ fn duplicate_visible_evidence_identity_fails_closed_before_cwc_composition() {
 }
 
 #[test]
-fn future_unavailable_duplicate_identity_does_not_change_historical_replay() {
-    let request = request();
-    let accepted = accepted(&request);
-    let baseline = execute_longitudinal_cwc_run(
-        &request,
-        &accepted,
-        SNAPSHOT_ID,
-        cutoff(),
-        &baseline_rows(),
-        "2026-08-02T00:00:00Z",
-    )
-    .expect("baseline");
+fn future_unavailable_distinct_evidence_does_not_change_historical_replay() {
+    let baseline_rows = baseline_rows();
+    let baseline = execute(&baseline_rows);
+    let mut replay_rows = baseline_rows;
+    replay_rows.push(row(
+        "evidence-future",
+        3,
+        100.0,
+        100.0,
+        "2026-08-15T00:00:00Z",
+    ));
+    let replay = execute(&replay_rows);
 
-    let mut rows = baseline_rows();
-    rows.push(row(
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
+}
+
+#[test]
+fn future_unavailable_duplicate_identity_does_not_change_historical_replay() {
+    let baseline_rows = baseline_rows();
+    let baseline = execute(&baseline_rows);
+    let mut replay_rows = baseline_rows;
+    replay_rows.push(row(
         "evidence-2",
         3,
         100.0,
         100.0,
         "2026-08-15T00:00:00Z",
     ));
-    let replay = execute_longitudinal_cwc_run(
-        &request,
-        &accepted,
-        SNAPSHOT_ID,
-        cutoff(),
-        &rows,
-        "2026-08-02T00:00:00Z",
-    )
-    .expect("future-unavailable replay must stay outside the historical census");
+    let replay = execute(&replay_rows);
 
     assert_eq!(replay.artifact, baseline.artifact);
     assert_eq!(replay.terminal_result, baseline.terminal_result);
@@ -125,8 +139,6 @@ fn future_unavailable_duplicate_identity_does_not_change_historical_replay() {
 
 #[test]
 fn numerically_equal_rows_with_distinct_identity_remain_distinct_evidence() {
-    let request = request();
-    let accepted = accepted(&request);
     let mut rows = baseline_rows();
     rows.push(row(
         "evidence-5",
@@ -136,15 +148,7 @@ fn numerically_equal_rows_with_distinct_identity_remain_distinct_evidence() {
         "2026-07-01T00:00:00Z",
     ));
 
-    let execution = execute_longitudinal_cwc_run(
-        &request,
-        &accepted,
-        SNAPSHOT_ID,
-        cutoff(),
-        &rows,
-        "2026-08-02T00:00:00Z",
-    )
-    .expect("distinct evidence identity must not be tuple-deduplicated");
+    let execution = execute(&rows);
 
     assert_eq!(execution.artifact.row_count, 5);
     assert_eq!(rows[1].evidence_id(), "evidence-2");
