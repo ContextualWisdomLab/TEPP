@@ -55,24 +55,70 @@ fn contains_unsupported_policy_mutation(sql: &str) -> bool {
     })
 }
 
-/// Detect a committed table removal not yet owned by the final-table state model.
+/// Return whether one committed statement mutates table identity beyond the bounded final-state model.
+///
+/// `DROP TABLE` removes the durable relation outright. PostgreSQL table- and
+/// column-level `RENAME` operations also invalidate historical identity evidence
+/// even though the relation survives. The parser intentionally consumes only the
+/// statement prefix, optional `IF EXISTS` / `ONLY`, the exact table target, and
+/// the following action token. This positional boundary keeps a table literally
+/// named `rename` from being mistaken for a rename action after lexical quote
+/// normalization.
+fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool {
+    let tokens = statement.split_whitespace().collect::<Vec<_>>();
+    if tokens.len() < 2 {
+        return false;
+    }
+
+    if tokens[0].eq_ignore_ascii_case("DROP") && tokens[1].eq_ignore_ascii_case("TABLE") {
+        return true;
+    }
+    if !tokens[0].eq_ignore_ascii_case("ALTER") || !tokens[1].eq_ignore_ascii_case("TABLE") {
+        return false;
+    }
+
+    let mut index = 2usize;
+    if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("IF"))
+        && tokens
+            .get(index + 1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("EXISTS"))
+    {
+        index += 2;
+    }
+    if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("ONLY"))
+    {
+        index += 1;
+    }
+
+    if tokens.get(index).is_none() {
+        return false;
+    }
+    index += 1;
+    if tokens.get(index) == Some(&"*") {
+        index += 1;
+    }
+
+    tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("RENAME"))
+}
+
+/// Detect committed table removal or identity mutation not yet owned by the final-table state model.
 ///
 /// A committed PostgreSQL `DROP TABLE` invalidates the durable table itself and
-/// its dependent table-local evidence. Until this bounded validator owns a full
-/// create/drop/recreate aggregate, retaining an earlier `CREATE TABLE` as proof
-/// would be fail-open. The input has already crossed lexical normalization and
-/// transaction projection, so a statement-first `DROP TABLE` token pair is the
-/// smallest causal fail-closed boundary; rolled-back removals never reach it.
-fn contains_unsupported_table_removal(sql: &str) -> bool {
-    sql.split(';').any(|statement| {
-        let mut tokens = statement.split_whitespace();
-        tokens
-            .next()
-            .is_some_and(|token| token.eq_ignore_ascii_case("DROP"))
-            && tokens
-                .next()
-                .is_some_and(|token| token.eq_ignore_ascii_case("TABLE"))
-    })
+/// its dependent table-local evidence. A committed table or column rename makes
+/// historical names stale even though the underlying relation remains. Until
+/// this bounded validator owns a full create/drop/rename/recreate aggregate,
+/// retaining earlier `CREATE TABLE` text as proof would be fail-open. The input
+/// has already crossed lexical normalization and transaction projection, so
+/// rolled-back mutations never reach this boundary.
+fn contains_unsupported_table_final_state_mutation(sql: &str) -> bool {
+    sql.split(';')
+        .any(statement_has_unsupported_table_final_state_mutation)
 }
 
 /// Validate migration SQL after canonicalizing PostgreSQL table persistence modifiers.
@@ -93,7 +139,8 @@ fn contains_unsupported_table_removal(sql: &str) -> bool {
 /// `DISABLE` or `NO FORCE` cannot reuse stale positive evidence from earlier SQL.
 /// Committed `ALTER POLICY` and `DROP POLICY` are temporarily rejected until
 /// policy identity, clause replacement, and removal have their own final-state
-/// authority. Committed `DROP TABLE` is likewise rejected until table identity,
+/// authority. Committed `DROP TABLE` and `ALTER TABLE ... RENAME ...` identity
+/// mutations are likewise rejected until table identity, column identity,
 /// removal/recreation, multi-target drops, and dependent-object effects are
 /// represented by a first-class final-table aggregate. Mutations removed by the
 /// transaction projection never reach either bounded fail-closed boundary.
@@ -122,7 +169,7 @@ pub fn validate_migration_catalog(
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
 
-    if contains_unsupported_table_removal(&committed_up) {
+    if contains_unsupported_table_final_state_mutation(&committed_up) {
         return Err(MigrationContractError::UnsupportedTableFinalStateMutation);
     }
     if contains_unsupported_policy_mutation(&committed_up) {
@@ -279,7 +326,7 @@ fn canonicalize_table_persistence_modifiers(sql: &str) -> String {
 mod tests {
     use super::{
         canonicalize_table_persistence_modifiers, contains_unsupported_policy_mutation,
-        contains_unsupported_table_removal, project_committed_sql,
+        contains_unsupported_table_final_state_mutation, project_committed_sql,
     };
 
     #[test]
@@ -313,16 +360,22 @@ mod tests {
     }
 
     #[test]
-    fn table_removal_detection_is_statement_and_token_bounded() {
-        assert!(contains_unsupported_table_removal(
-            "DROP\nTABLE tenant_record ;"
-        ));
-        assert!(contains_unsupported_table_removal(
-            "DROP TABLE IF EXISTS tenant_record CASCADE ;"
-        ));
-        assert!(!contains_unsupported_table_removal(
-            "SELECT drop_table_marker ; CREATE TABLE tenant_record ( tenant_record_id uuid ) ;"
-        ));
+    fn table_final_state_mutation_detection_is_statement_token_and_position_bounded() {
+        for sql in [
+            "DROP\nTABLE tenant_record ;",
+            "DROP TABLE IF EXISTS tenant_record CASCADE ;",
+            "ALTER TABLE tenant_record RENAME TO tenant_record_archive ;",
+            "ALTER TABLE IF EXISTS ONLY tenant_record RENAME COLUMN tenant_record_id TO tenant_key ;",
+        ] {
+            assert!(contains_unsupported_table_final_state_mutation(sql));
+        }
+        for sql in [
+            "SELECT drop_table_marker ; CREATE TABLE tenant_record ( tenant_record_id uuid ) ;",
+            "ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY ;",
+            "ALTER TABLE rename ENABLE ROW LEVEL SECURITY ;",
+        ] {
+            assert!(!contains_unsupported_table_final_state_mutation(sql));
+        }
     }
 
     #[test]
