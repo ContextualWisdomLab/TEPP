@@ -44,6 +44,8 @@ fn committed_pg_settings_replica_mode_cannot_bypass_runtime_trigger_enforcement(
         "UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
         "UPDATE pg_catalog . pg_settings SET setting='replica' WHERE name='session_replication_role';",
         "UPDATE pg_settings SET setting = lower('REPLICA') WHERE name = 'session_replication_role';",
+        "UPDATE pg_settings AS p SET setting = 'replica' WHERE p . name = 'session_replication_role';",
+        "UPDATE ONLY pg_catalog . pg_settings AS p SET setting = lower('REPLICA') WHERE p.name = 'session_replication_role';",
     ] {
         assert_eq!(
             validate_migration_catalog(&embedded_with(final_sql)),
@@ -59,6 +61,7 @@ fn rolled_back_replica_execution_mode_does_not_change_durable_migration_effects(
         "BEGIN; SET LOCAL session_replication_role = replica; TRUNCATE TABLE source_artifact; ROLLBACK;",
         "BEGIN; SELECT set_config('session_replication_role', 'replica', true); TRUNCATE TABLE source_artifact; ROLLBACK;",
         "BEGIN; UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role'; TRUNCATE TABLE source_artifact; ROLLBACK;",
+        "BEGIN; UPDATE pg_settings AS p SET setting = 'replica' WHERE p.name = 'session_replication_role'; ROLLBACK;",
     ] {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
@@ -73,6 +76,7 @@ fn origin_and_local_execution_modes_preserve_ordinary_trigger_enforcement() {
         "SELECT set_config('session_replication_role', 'local', false);",
         "UPDATE pg_settings SET setting = 'origin' WHERE name = 'session_replication_role';",
         "UPDATE pg_catalog . pg_settings SET setting = 'local' WHERE name = 'session_replication_role';",
+        "UPDATE pg_settings AS p SET setting = 'origin' WHERE p.name = 'session_replication_role';",
     ] {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
