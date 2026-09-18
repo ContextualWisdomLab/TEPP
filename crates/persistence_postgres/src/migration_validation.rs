@@ -102,18 +102,63 @@ fn is_update_command_token(statement: &str, start: usize) -> bool {
         && after.is_none_or(|ch| !is_function_identifier_continuation(ch))
 }
 
+/// Find a keyword token outside nested parenthesized or bracketed expressions.
+///
+/// This helper operates only after lexical normalization and punctuation
+/// delimiting, so quoted/comment/dollar-body text cannot contribute keyword
+/// tokens. It is used to distinguish the UPDATE target `WHERE` from a `WHERE`
+/// inside a scalar subquery or array expression in the assignment value.
+fn top_level_keyword_index(tokens: &[&str], start: usize, keyword: &str) -> Option<usize> {
+    let mut parenthesis_depth = 0usize;
+    let mut bracket_depth = 0usize;
+
+    for (index, token) in tokens.iter().enumerate().skip(start) {
+        match *token {
+            "(" => parenthesis_depth = parenthesis_depth.saturating_add(1),
+            ")" => {
+                if parenthesis_depth == 0 {
+                    return None;
+                }
+                parenthesis_depth -= 1;
+            }
+            "[" => bracket_depth = bracket_depth.saturating_add(1),
+            "]" => {
+                if bracket_depth == 0 {
+                    return None;
+                }
+                bracket_depth -= 1;
+            }
+            _ if parenthesis_depth == 0
+                && bracket_depth == 0
+                && token.eq_ignore_ascii_case(keyword) =>
+            {
+                return Some(index);
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 /// Detect one unsafe `pg_settings` update from an exact normalized `UPDATE` token.
 ///
 /// PostgreSQL documents `UPDATE pg_settings SET setting = ...` as equivalent to
 /// `SET`. The input has already crossed the shared lexical authority, so this
 /// bounded parser resolves only the canonical unqualified or `pg_catalog`
 /// relation identity plus PostgreSQL's optional `ONLY`, `*`, and target alias
-/// forms. A direct equality predicate must target `session_replication_role`.
+/// forms. The target `WHERE` is selected only at expression depth zero, so a
+/// scalar-subquery predicate cannot hide the actual `pg_settings` row predicate.
 /// Atomic `origin` and `local` values are proven safe for ordinary triggers;
 /// `replica` and any non-atomic value fail closed because the validator cannot
 /// prove that protected DML did not execute while triggers were suppressed.
 fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str) -> bool {
-    let delimited = update_statement.replace('.', " . ").replace('=', " = ");
+    let delimited = update_statement
+        .replace('.', " . ")
+        .replace('=', " = ")
+        .replace('(', " ( ")
+        .replace(')', " ) ")
+        .replace('[', " [ ")
+        .replace(']', " ] ");
     let tokens = delimited.split_whitespace().collect::<Vec<_>>();
     if !tokens
         .first()
@@ -179,11 +224,7 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
         return false;
     }
     let value_start = index + 3;
-    let Some(where_index) = tokens[value_start..]
-        .iter()
-        .position(|token| token.eq_ignore_ascii_case("WHERE"))
-        .map(|relative| value_start + relative)
-    else {
+    let Some(where_index) = top_level_keyword_index(&tokens, value_start, "WHERE") else {
         return false;
     };
 
@@ -384,6 +425,8 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE ONLY pg_settings AS p SET setting = 'replica' WHERE p.name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH changed_setting AS (UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = (SELECT 'replica' WHERE true) WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH changed_setting AS (UPDATE pg_settings SET setting = (SELECT 'replica' WHERE true) WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
         }
