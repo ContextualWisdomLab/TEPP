@@ -24,11 +24,27 @@ fn committed_replica_execution_mode_cannot_bypass_runtime_trigger_enforcement() 
 }
 
 #[test]
+fn committed_set_config_replica_mode_cannot_bypass_runtime_trigger_enforcement() {
+    for final_sql in [
+        "SELECT set_config('session_replication_role', 'replica', false);",
+        "BEGIN; SELECT set_config('session_replication_role', 'replica', true); COMMIT;",
+    ] {
+        assert_eq!(
+            validate_migration_catalog(&embedded_with(final_sql)),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "committed set_config replica mode must invalidate runtime-role safety: {final_sql}",
+        );
+    }
+}
+
+#[test]
 fn rolled_back_replica_execution_mode_does_not_change_durable_migration_effects() {
-    let catalog = embedded_with(
+    for final_sql in [
         "BEGIN; SET LOCAL session_replication_role = replica; TRUNCATE TABLE source_artifact; ROLLBACK;",
-    );
-    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+        "BEGIN; SELECT set_config('session_replication_role', 'replica', true); TRUNCATE TABLE source_artifact; ROLLBACK;",
+    ] {
+        assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    }
 }
 
 #[test]
@@ -36,9 +52,19 @@ fn origin_and_local_execution_modes_preserve_ordinary_trigger_enforcement() {
     for final_sql in [
         "SET session_replication_role = origin;",
         "SET SESSION session_replication_role TO local;",
+        "SELECT set_config('session_replication_role', 'origin', false);",
+        "SELECT set_config('session_replication_role', 'local', false);",
     ] {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
+}
+
+#[test]
+fn unrelated_schema_set_config_does_not_impersonate_the_postgresql_builtin() {
+    let catalog = embedded_with(
+        "SELECT audit_support.set_config('session_replication_role', 'replica', false);",
+    );
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
 }
 
 #[test]
@@ -48,6 +74,8 @@ fn marker_like_replication_role_text_is_not_an_execution_mode_change() {
 SELECT 'SET session_replication_role = replica';
 -- SET session_replication_role = replica;
 SELECT $$SET LOCAL session_replication_role TO replica$$;
+SELECT 'set_config(session_replication_role, replica, false)';
+-- SELECT set_config('session_replication_role', 'replica', false);
 "#,
     );
     assert_eq!(validate_migration_catalog(&catalog), Ok(()));
