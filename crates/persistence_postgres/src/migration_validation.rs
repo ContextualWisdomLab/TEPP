@@ -18,6 +18,54 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     implementation::normalize_migration_sql_with_grantor_identity(sql)
 }
 
+/// Detect committed PostgreSQL replica execution mode that suppresses ordinary triggers.
+///
+/// The input has already crossed the shared lexical authority and committed-state
+/// projection, so comments, opaque bodies, and rolled-back `SET LOCAL` statements
+/// cannot manufacture this state. PostgreSQL permits optional `LOCAL`/`SESSION`,
+/// `TO` or `=`, and a quoted enum value; this bounded token fold recognizes those
+/// forms without reparsing raw SQL. Entering `replica` is treated as unsafe runtime
+/// state because ordinary TEPP append-only and retention triggers do not fire in
+/// that mode.
+fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
+    sql.split(';').any(|statement| {
+        let delimited = statement.replace('=', " = ");
+        let tokens = delimited.split_whitespace().collect::<Vec<_>>();
+        if !tokens
+            .first()
+            .is_some_and(|token| token.eq_ignore_ascii_case("SET"))
+        {
+            return false;
+        }
+
+        let mut index = 1usize;
+        if tokens.get(index).is_some_and(|token| {
+            token.eq_ignore_ascii_case("LOCAL") || token.eq_ignore_ascii_case("SESSION")
+        }) {
+            index += 1;
+        }
+        if !tokens
+            .get(index)
+            .is_some_and(|token| token.eq_ignore_ascii_case("session_replication_role"))
+        {
+            return false;
+        }
+        index += 1;
+        if !tokens.get(index).is_some_and(|token| {
+            *token == "=" || token.eq_ignore_ascii_case("TO")
+        }) {
+            return false;
+        }
+        index += 1;
+
+        tokens.get(index).is_some_and(|value| {
+            value
+                .trim_matches('\'')
+                .eq_ignore_ascii_case("replica")
+        })
+    })
+}
+
 /// Return whether the expected runtime role exists in PostgreSQL's durable final migration state
 /// and remains subject to row-level security.
 ///
@@ -29,13 +77,18 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
 /// general structural-normalization contract. Transaction outcome is applied
 /// after that shared lexical projection and before lifecycle folding, so a
 /// rolled-back `ALTER ROLE ... NOBYPASSRLS` cannot certify an actually unsafe
-/// runtime role.
+/// runtime role. A committed `session_replication_role = replica` also fails the
+/// runtime-role contract because it suppresses ordinary enforcement triggers
+/// even when their durable catalog definitions remain enabled.
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
     let lifecycle_sql = preserve_quoted_special_role_specifications(sql);
     let normalized_lifecycle = implementation::normalize_migration_sql_with_grantor_identity(
         &lifecycle_sql,
     )?;
     let committed_lifecycle = super::core::project_committed_sql(&normalized_lifecycle)?;
+    if committed_replica_trigger_execution_mode(&committed_lifecycle) {
+        return Some(false);
+    }
     implementation::declares_created_role(&committed_lifecycle, expected_role)
 }
 
@@ -79,6 +132,28 @@ mod tests {
             ROLLBACK;
         "#;
         assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
+    }
+
+    #[test]
+    fn committed_replica_mode_invalidates_runtime_role_safety_after_projection() {
+        for sql in [
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET session_replication_role=replica;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET SESSION session_replication_role TO 'replica';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SET LOCAL session_replication_role = replica; COMMIT;",
+        ] {
+            assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
+        }
+    }
+
+    #[test]
+    fn rolled_back_replica_mode_and_safe_modes_preserve_runtime_role_safety() {
+        for sql in [
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SET LOCAL session_replication_role = replica; ROLLBACK;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET session_replication_role = origin;",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET SESSION session_replication_role TO local;",
+        ] {
+            assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(true));
+        }
     }
 
     #[test]
