@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-18T20:11:10Z  
+**Snapshot:** 2026-09-18T20:13:53Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
@@ -19,7 +19,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | #435 documentation authority | open / Draft / mergeable; branch `chore/queue-authority-ddd-20260901` | Canonical operator/TRACEABILITY updates belong here; this file intentionally does not self-pin #435's mutable head. |
 | #492 central admission consumer | `794ba9e6dda9f043aa499920fdf609b81b075d7e`, Draft, base `main` | Preserved schedule/parser repair remains valid, but immutable `.github` worker policy and contextual-orchestrator `orchestrator/free` release authority must exist before consumer migration and new exact-head evidence. |
 | #538 foundation successor | `f335624cea977fea7d7fe6f36871868557fe2bb7`, Ready, base `main` | #594 removes the post-proposal writable cache surface found by exact-head Actions CodeQL. New exact-head checks must reacquire evidence; #498 Dependency Graph support, `.github#2276` authenticated GHAS identity reads, and qualifying independent approval remain promotion prerequisites. |
-| #521 persistence successor | `2e3c57bcabff660a69c2ce5fcae45ffd1424bbd9`, Draft, base #538 | #590 is the last accepted production repair. #591 was an invalid `SET SCHEMA` safety hypothesis and was retired ordinary-forward without production repair. |
+| #521 persistence successor | `0fa4b71c0e8cd88d95c70c806af648e853ea7b08`, Draft, base #538, ahead 314 / behind 0 | #538's three new ordinary-forward commits briefly left #521 behind and non-mergeable. Merge commit `0fa4b71c...` preserves all #521 history while inheriting the #594 workflow/test deltas without rebase or force push. #590 remains the last accepted persistence production repair; #591 remains retired. |
 | #488 Validation Evidence | `520df488fd86ba48008af8ee5a2e112b4587fc22`, Draft, base #492 | Current exact head remains short of owned-production 100% authored line/branch evidence and qualifying approval. |
 | #310 Longitudinal Modeling | `ba10820e0d28cc33d1b91ef37f6f6d163b3d91e9`, Draft, base `main` | TEPP-owned temporal/longitudinal semantics remain mutable and unreleased; reusable static arithmetic must arrive only through immutable fast-mlsirm releases. |
 
@@ -75,6 +75,8 @@ Canonical `docs/TRACEABILITY.md` must index the current #491/#488 resource/cardi
 
 #590 is the last accepted production repair: whitespace around schema qualification could alias sibling relation RLS final state, so unsupported qualified identities fail closed. #591 then proposed rejecting `ALTER TABLE ... SET SCHEMA`; review showed TEPP has no schema-bound owner/ACL/search_path invariant and relation-attached RLS/policy/trigger state survives schema movement. That hypothesis was therefore retired ordinary-forward without a production fix. The architectural endpoint remains canonical relation identity, a shared PostgreSQL Unicode identifier decoder, and first-class final RLS/execution/default-state aggregates with explicit RESET/DEFAULT/FROM CURRENT precedence.
 
+The foundation advance for #594 created an ordinary stack-maintenance obligation rather than a new persistence finding. Before repair #521 compared as ahead 313 / behind 3 and GitHub reported it non-mergeable. `0fa4b71c...` is a two-parent ordinary-forward merge of prior #521 head `2e3c57bc...` and current #538 `f335624...`; the resulting compare is ahead 314 / behind 0. This keeps the open stack coherent but is not the later post-#538 protected-main restack or acceptance evidence.
+
 ## Foundation / CI security boundary
 
 #538's predecessor head exposed two exact CodeQL Actions findings in the hourly generated-proposal verifier. After the immutable proposal patch was applied, two `actions/cache@v5` steps restored Rust quality binaries into `~/.cargo/bin`; cache post-actions could persist proposal-mutated bytes under stable default-branch keys. #594 records RED `af3e0bc...`, corrected RED `24241780...`, and causal repair `f335624...`: the verifier now has a structural regression forbidding `actions/cache@` in that trust boundary and installs the same version-pinned `cargo-nextest`, `cargo-deny`, and `cargo-llvm-cov` directly before proposal code runs. The repair does not suppress CodeQL or weaken artifact identity, credential stripping, quality gates, coverage, or publication separation.
@@ -90,7 +92,7 @@ The same canonical dispatch proved a separate owner-path failure: Python SARIF w
 | #491 / #488 | Resource/cardinality and translated-dispersion floating-proof obligations remain open | Buyer-path metric cardinality must be typed/versioned before Analysis Run admission can narrow public-library resource proofs; exact-real separation alone does not remove the floating positivity guard. |
 | #492 | Central admission consumer migration is incomplete | Wait for immutable `.github` worker and contextual-orchestrator `orchestrator/free` authority, then migrate leaf workflow/guidance and reacquire exact-head gates. |
 | #538 / #594 | Foundation successor security repair is implemented but not yet promoted | Exact-head `f335624...` must reacquire Rust/docs/security/Semgrep/CodeQL evidence proving the cache-poisoning findings are gone. #498 Dependency Graph, `.github#2276` GHAS analyses-read authority, and qualifying independent approval remain prerequisites. |
-| #521 | Persistence successor verification pending | Land #538 normally, non-force restack surviving delta, then reacquire Rust/Python/docs/security/CodeQL, Live PostgreSQL, rustdoc and authored line/branch/edge evidence. |
+| #521 | Persistence successor verification pending | Open stack is coherent at `0fa4b71c...` (ahead 314 / behind 0). After #538 lands normally, non-force restack surviving persistence delta from protected main, then reacquire Rust/Python/docs/security/CodeQL, Live PostgreSQL, rustdoc and authored line/branch/edge evidence. |
 | #310 | Longitudinal consumer blocked on released static arithmetic | Consume only a new immutable fast-mlsirm release after #1717 then #1816 land with owner acceptance. |
 
 ## Release gate
