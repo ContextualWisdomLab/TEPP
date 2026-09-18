@@ -48,6 +48,8 @@ fn committed_pg_settings_replica_mode_cannot_bypass_runtime_trigger_enforcement(
         "UPDATE ONLY pg_catalog . pg_settings AS p SET setting = lower('REPLICA') WHERE p.name = 'session_replication_role';",
         "WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
         "WITH changed_setting AS (UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
+        "WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = (SELECT 'replica' WHERE true) WHERE name = 'session_replication_role';",
+        "WITH changed_setting AS (UPDATE pg_settings SET setting = (SELECT 'replica' WHERE true) WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
     ] {
         assert_eq!(
             validate_migration_catalog(&embedded_with(final_sql)),
@@ -66,6 +68,7 @@ fn rolled_back_replica_execution_mode_does_not_change_durable_migration_effects(
         "BEGIN; UPDATE pg_settings AS p SET setting = 'replica' WHERE p.name = 'session_replication_role'; ROLLBACK;",
         "BEGIN; WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role'; ROLLBACK;",
         "BEGIN; WITH changed_setting AS (UPDATE pg_settings SET setting = 'replica' WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting; ROLLBACK;",
+        "BEGIN; WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = (SELECT 'replica' WHERE true) WHERE name = 'session_replication_role'; ROLLBACK;",
     ] {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
