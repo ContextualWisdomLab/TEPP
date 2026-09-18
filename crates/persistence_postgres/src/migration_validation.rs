@@ -56,23 +56,135 @@ fn is_builtin_set_config_occurrence(statement: &str, start: usize) -> bool {
         .is_none_or(|ch| ch != '.' && !is_function_identifier_continuation(ch))
 }
 
+/// Project Unicode-escaped builtin identity onto the bounded `set_config` authority.
+///
+/// This runs only after the shared PostgreSQL lexical pass. At that point a
+/// Unicode-escaped quoted identifier is represented by the structural `U&`
+/// marker plus either a safely projected lowercase identifier or the
+/// `INVALID_QUOTED_IDENTIFIER` sentinel. Exact `set_config` / `pg_catalog`
+/// projections are canonical; an invalid projection is conservatively treated
+/// as potentially canonical only when it occupies the corresponding function or
+/// schema position. Safely projected unrelated names remain unrelated. Optional
+/// `UESCAPE` syntax is consumed as part of that already-normalized identifier
+/// representation, so this helper does not become a second raw-SQL lexer.
+fn project_potential_unicode_set_config_identity(statement: &str) -> String {
+    const INVALID_IDENTIFIER: &str = "INVALID_QUOTED_IDENTIFIER";
+    let delimited = statement.replace('.', " . ").replace('(', " ( ");
+    let tokens = delimited.split_whitespace().collect::<Vec<_>>();
+    let mut projected = Vec::with_capacity(tokens.len());
+    let mut index = 0usize;
+
+    let unicode_identifier_end = |start: usize| -> Option<usize> {
+        if !tokens
+            .get(start)
+            .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+        {
+            return None;
+        }
+        tokens.get(start + 1)?;
+        let mut end = start + 2;
+        if tokens
+            .get(end)
+            .is_some_and(|token| token.eq_ignore_ascii_case("UESCAPE"))
+        {
+            let escape = tokens.get(end + 1)?;
+            if escape.len() < 2 || !escape.starts_with('\'') || !escape.ends_with('\'') {
+                return None;
+            }
+            end += 2;
+        }
+        Some(end)
+    };
+    let is_possible_identity = |token: &str, expected: &str| {
+        token.eq_ignore_ascii_case(expected)
+            || token.eq_ignore_ascii_case(INVALID_IDENTIFIER)
+    };
+
+    while index < tokens.len() {
+        if !tokens[index].eq_ignore_ascii_case("U&") {
+            projected.push(tokens[index].to_owned());
+            index += 1;
+            continue;
+        }
+
+        let Some(identity) = tokens.get(index + 1).copied() else {
+            projected.push(tokens[index].to_owned());
+            index += 1;
+            continue;
+        };
+        let Some(identity_end) = unicode_identifier_end(index) else {
+            projected.push(tokens[index].to_owned());
+            index += 1;
+            continue;
+        };
+
+        if tokens.get(identity_end) == Some(&"(")
+            && is_possible_identity(identity, "set_config")
+        {
+            projected.push("set_config".to_owned());
+            index = identity_end;
+            continue;
+        }
+
+        if tokens.get(identity_end) == Some(&".")
+            && is_possible_identity(identity, "pg_catalog")
+        {
+            let function_start = identity_end + 1;
+            let plain_function = tokens
+                .get(function_start)
+                .is_some_and(|token| token.eq_ignore_ascii_case("set_config"));
+            let unicode_function = if tokens
+                .get(function_start)
+                .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+            {
+                unicode_identifier_end(function_start).is_some_and(|function_end| {
+                    tokens.get(function_start + 1).is_some_and(|function_identity| {
+                        is_possible_identity(function_identity, "set_config")
+                    }) && tokens.get(function_end) == Some(&"(")
+                })
+            } else {
+                false
+            };
+
+            if plain_function || unicode_function {
+                projected.push("pg_catalog".to_owned());
+                index = identity_end;
+                continue;
+            }
+        }
+
+        projected.extend(
+            tokens[index..identity_end]
+                .iter()
+                .map(|token| (*token).to_owned()),
+        );
+        index = identity_end;
+    }
+
+    projected.join(" ")
+}
+
 /// Return whether one normalized statement can set `session_replication_role`
 /// to a value that is not statically proven safe for ordinary triggers.
 ///
 /// The shared lexical pass already made comments, quoted marker text, and dollar
 /// bodies opaque. Function identity is resolved before whitespace compaction so
 /// identifier prefixes and unrelated schemas cannot impersonate PostgreSQL's
-/// builtin. Positional, named (`=>` / `:=`), and mixed notation are folded into
-/// the canonical `setting_name` / `new_value` slots. A direct quoted setting name
-/// can prove an unrelated target only when it is one lexical atom; compacted
-/// adjacent string constants retain an interior quote and therefore fail closed.
-/// A dynamic setting-name expression cannot prove an unrelated target either.
-/// For direct `session_replication_role`, only direct `origin` and `local` values
-/// are proven safe; other or dynamic values fail closed because `set_config` is
-/// PostgreSQL's function equivalent of `SET`.
+/// builtin. Unicode-escaped builtin spellings first cross a bounded projection
+/// that recognizes exact or still-ambiguous canonical `set_config` / `pg_catalog`
+/// identity without decoding raw SQL again. Positional, named (`=>` / `:=`), and
+/// mixed notation are folded into the canonical `setting_name` / `new_value`
+/// slots. A direct quoted setting name can prove an unrelated target only when
+/// it is one lexical atom; compacted adjacent string constants retain an interior
+/// quote and therefore fail closed. A dynamic setting-name expression cannot
+/// prove an unrelated target either. For direct `session_replication_role`, only
+/// direct `origin` and `local` values are proven safe; other or dynamic values
+/// fail closed because `set_config` is PostgreSQL's function equivalent of `SET`.
 fn statement_calls_unsafe_set_config(statement: &str) -> bool {
     const FUNCTION_NAME: &str = "set_config";
     const CALL_PREFIX: &str = "set_config(";
+    let unicode_projected = project_potential_unicode_set_config_identity(statement);
+    let statement = unicode_projected.as_str();
     let lower = statement.to_ascii_lowercase();
     let mut search_from = 0usize;
 
