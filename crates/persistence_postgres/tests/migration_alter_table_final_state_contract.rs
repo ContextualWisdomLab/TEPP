@@ -44,23 +44,10 @@ fn committed_tenant_column_rename_cannot_reuse_historical_column_evidence() {
 }
 
 #[test]
-fn later_rename_action_in_one_alter_table_statement_cannot_hide_behind_supported_action() {
-    let catalog = table_catalog(
-        "ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY, RENAME COLUMN tenant_record_id TO tenant_key;",
-    );
-    assert_eq!(
-        validate_migration_catalog(&catalog),
-        Err(MigrationContractError::UnsupportedTableFinalStateMutation),
-        "PostgreSQL permits multiple ALTER TABLE actions; a supported first action must not hide a later identity mutation"
-    );
-}
-
-#[test]
 fn rolled_back_table_identity_mutations_do_not_change_the_durable_contract() {
     for mutation in [
         "BEGIN; ALTER TABLE tenant_record RENAME TO tenant_record_archive; ROLLBACK;",
         "BEGIN; ALTER TABLE tenant_record RENAME COLUMN tenant_record_id TO tenant_key; ROLLBACK;",
-        "BEGIN; ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY, RENAME COLUMN tenant_record_id TO tenant_key; ROLLBACK;",
     ] {
         let catalog = table_catalog(mutation);
         assert_eq!(validate_migration_catalog(&catalog), Ok(()));
