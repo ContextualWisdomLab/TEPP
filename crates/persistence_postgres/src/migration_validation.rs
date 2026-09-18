@@ -253,12 +253,15 @@ fn top_level_keyword_index(tokens: &[&str], start: usize, keyword: &str) -> Opti
 /// forms. Both scalar `setting = value` and PostgreSQL's single-column row
 /// assignment `(setting) = [ROW] (value)` cross the same boundary. Direct
 /// `origin` and `local` assignment atoms are always safe for ordinary triggers.
-/// PostgreSQL Unicode-escaped quoted relation names currently reach this layer as
-/// a structural `U&` marker followed by the shared quoted-identifier projection.
-/// A directly equivalent lowercase `pg_settings` spelling is folded into this
-/// same authority, while an invalid/escaped projection fails closed because its
-/// decoded identity is not yet owned. Safe projected unrelated names remain
-/// unrelated; no second raw-SQL lexer is introduced here.
+/// PostgreSQL Unicode-escaped quoted identifiers currently reach this layer as a
+/// structural `U&` marker followed by the shared quoted-identifier projection.
+/// Directly equivalent lowercase `pg_catalog` / `pg_settings` spellings reuse the
+/// same authority, while an invalid escaped projection fails closed because its
+/// decoded identity is not yet owned. Safe projected unrelated relation names
+/// remain unrelated. Once canonical `pg_settings` is established, any remaining
+/// `U&` structural marker fails closed rather than letting an escaped alias or
+/// assignment-column identity bypass the setting/value fold. No second raw-SQL
+/// lexer is introduced here.
 /// For any other value, only a complete direct equality to one unrelated quoted
 /// setting name proves that `session_replication_role` is excluded; protected
 /// equality is recognized in either operand order, and any unsupported predicate
@@ -287,7 +290,21 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
         index += 1;
     }
 
-    let mut unicode_escaped_target = false;
+    let skip_unicode_uescape = |mut end: usize| -> usize {
+        if tokens
+            .get(end)
+            .is_some_and(|token| token.eq_ignore_ascii_case("UESCAPE"))
+        {
+            end += 1;
+            if tokens.get(end).is_some_and(|token| {
+                token.len() >= 2 && token.starts_with('\'') && token.ends_with('\'')
+            }) {
+                end += 1;
+            }
+        }
+        end
+    };
+
     if tokens
         .get(index)
         .is_some_and(|token| token.eq_ignore_ascii_case("pg_settings"))
@@ -300,11 +317,39 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
         let Some(projected_name) = tokens.get(index + 1) else {
             return true;
         };
-        if projected_name.eq_ignore_ascii_case("pg_settings") {
-            unicode_escaped_target = true;
-            index += 2;
-        } else if projected_name.eq_ignore_ascii_case("INVALID_QUOTED_IDENTIFIER") {
+        if projected_name.eq_ignore_ascii_case("INVALID_QUOTED_IDENTIFIER") {
             return true;
+        }
+        if projected_name.eq_ignore_ascii_case("pg_settings") {
+            index = skip_unicode_uescape(index + 2);
+        } else if projected_name.eq_ignore_ascii_case("pg_catalog") {
+            let schema_end = skip_unicode_uescape(index + 2);
+            if tokens.get(schema_end) != Some(&".") {
+                return false;
+            }
+            let relation_start = schema_end + 1;
+            if tokens
+                .get(relation_start)
+                .is_some_and(|token| token.eq_ignore_ascii_case("pg_settings"))
+            {
+                index = relation_start + 1;
+            } else if tokens
+                .get(relation_start)
+                .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+            {
+                let Some(relation_name) = tokens.get(relation_start + 1) else {
+                    return true;
+                };
+                if relation_name.eq_ignore_ascii_case("INVALID_QUOTED_IDENTIFIER") {
+                    return true;
+                }
+                if !relation_name.eq_ignore_ascii_case("pg_settings") {
+                    return false;
+                }
+                index = skip_unicode_uescape(relation_start + 2);
+            } else {
+                return false;
+            }
         } else {
             return false;
         }
@@ -313,26 +358,26 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
         .is_some_and(|token| token.eq_ignore_ascii_case("pg_catalog"))
         && tokens.get(index + 1) == Some(&".")
     {
+        let relation_start = index + 2;
         if tokens
-            .get(index + 2)
+            .get(relation_start)
             .is_some_and(|token| token.eq_ignore_ascii_case("pg_settings"))
         {
-            index += 3;
+            index = relation_start + 1;
         } else if tokens
-            .get(index + 2)
+            .get(relation_start)
             .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
         {
-            let Some(projected_name) = tokens.get(index + 3) else {
+            let Some(projected_name) = tokens.get(relation_start + 1) else {
                 return true;
             };
-            if projected_name.eq_ignore_ascii_case("pg_settings") {
-                unicode_escaped_target = true;
-                index += 4;
-            } else if projected_name.eq_ignore_ascii_case("INVALID_QUOTED_IDENTIFIER") {
+            if projected_name.eq_ignore_ascii_case("INVALID_QUOTED_IDENTIFIER") {
                 return true;
-            } else {
+            }
+            if !projected_name.eq_ignore_ascii_case("pg_settings") {
                 return false;
             }
+            index = skip_unicode_uescape(relation_start + 2);
         } else {
             return false;
         }
@@ -340,21 +385,12 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
         return false;
     }
 
-    if unicode_escaped_target
-        && tokens
-            .get(index)
-            .is_some_and(|token| token.eq_ignore_ascii_case("UESCAPE"))
+    if tokens
+        .iter()
+        .skip(index)
+        .any(|token| token.eq_ignore_ascii_case("U&"))
     {
-        // The shared lexer may preserve an atomic one-character UESCAPE
-        // literal (for example `_`) or mask a punctuation escape such as `!`.
-        // Neither changes an identifier that already projected to the exact
-        // lowercase `pg_settings` atom, so consume the optional preserved atom.
-        index += 1;
-        if tokens.get(index).is_some_and(|token| {
-            token.len() >= 2 && token.starts_with('\'') && token.ends_with('\'')
-        }) {
-            index += 1;
-        }
+        return true;
     }
 
     if tokens.get(index) == Some(&"*") {
