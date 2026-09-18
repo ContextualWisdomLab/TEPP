@@ -88,13 +88,16 @@ fn token_span_eq(sql: &str, span: (usize, usize), keyword: &str) -> bool {
         .is_some_and(|token| token.eq_ignore_ascii_case(keyword))
 }
 
-/// Return whether one normalized SQL span denotes `routine_name`.
+/// Return whether one normalized SQL span denotes `routine_name` in the canonical schema.
 ///
 /// PostgreSQL permits whitespace around the period in a schema-qualified name
 /// and between a routine name and its argument list. The shared lexical authority
 /// has already removed comments and opaque bodies, so this bounded identity check
 /// only joins whitespace-separated name punctuation until the signature or DROP
-/// behavior keyword. It does not reparse executable SQL.
+/// behavior keyword. TEPP's embedded guards are created in `public`; therefore
+/// the unqualified form and an explicit `public.` qualification identify the
+/// protected routine, while the same local name in another schema is unrelated.
+/// This does not reparse executable SQL.
 fn sql_span_names_guard_routine(
     sql: &str,
     span: (usize, usize),
@@ -114,9 +117,18 @@ fn sql_span_names_guard_routine(
         }
         name.push_str(token);
     }
-    name.rsplit('.')
-        .next()
-        .is_some_and(|part| part.eq_ignore_ascii_case(routine_name))
+
+    let mut parts = name.split('.');
+    let first = parts.next();
+    let second = parts.next();
+    let third = parts.next();
+    match (first, second, third) {
+        (Some(local), None, None) => local.eq_ignore_ascii_case(routine_name),
+        (Some(schema), Some(local), None) => {
+            schema.eq_ignore_ascii_case("public") && local.eq_ignore_ascii_case(routine_name)
+        }
+        _ => false,
+    }
 }
 
 /// Return whether one committed DROP FUNCTION / DROP ROUTINE statement targets `routine_name`.
@@ -814,6 +826,10 @@ mod tests {
             &format!("{canonical} DROP FUNCTION reject_append_only_mutation_shadow() CASCADE ;"),
             "reject_append_only_mutation"
         ));
+        assert!(!contains_unsupported_guard_routine_mutation(
+            &format!("{canonical} DROP FUNCTION audit_support.reject_append_only_mutation() CASCADE ;"),
+            "reject_append_only_mutation"
+        ));
 
         let retention = "CREATE OR REPLACE FUNCTION reject_held_evidence_deletion() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NEW END  ;";
         assert!(!contains_unsupported_guard_routine_mutation(
@@ -823,6 +839,12 @@ mod tests {
         assert!(contains_unsupported_guard_routine_mutation(
             &format!(
                 "{retention} DROP ROUTINE IF EXISTS public . reject_held_evidence_deletion() CASCADE ;"
+            ),
+            "reject_held_evidence_deletion"
+        ));
+        assert!(!contains_unsupported_guard_routine_mutation(
+            &format!(
+                "{retention} CREATE OR REPLACE FUNCTION audit_support.reject_held_evidence_deletion() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NEW END  ;"
             ),
             "reject_held_evidence_deletion"
         ));
