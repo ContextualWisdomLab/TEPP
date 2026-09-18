@@ -14,6 +14,8 @@ fn unicode_escaped_set_config_builtin_identity_cannot_bypass_replication_role_gu
         r#"SELECT U&"set_\0063onfig"('session_replication_role', 'replica', false);"#,
         r#"SELECT U&"pg_\0063atalog".set_config('session_replication_role', 'replica', false);"#,
         r#"SELECT pg_catalog.U&"set_\0063onfig"('session_replication_role', 'replica', false);"#,
+        r#"SELECT U&"pg_\0063atalog".U&"set_\0063onfig"('session_replication_role', 'replica', false);"#,
+        r#"SELECT U&"set_!0063onfig" UESCAPE '!'(setting_name => 'session_replication_role', new_value => 'replica', is_local => false);"#,
     ] {
         assert_eq!(
             validate_migration_catalog(&embedded_with(final_sql)),
@@ -28,6 +30,7 @@ fn unicode_escaped_set_config_safe_values_remain_allowed() {
     for final_sql in [
         r#"SELECT U&"set_\0063onfig"('session_replication_role', 'origin', false);"#,
         r#"SELECT U&"pg_\0063atalog".set_config('session_replication_role', 'local', false);"#,
+        r#"SELECT U&"set_!0063onfig" UESCAPE '!'(setting_name => 'session_replication_role', new_value => 'origin', is_local => false);"#,
     ] {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
@@ -38,6 +41,7 @@ fn unrelated_unicode_escaped_function_identity_remains_unrelated() {
     for final_sql in [
         r#"SELECT U&"audit_set_config"('session_replication_role', 'replica', false);"#,
         r#"SELECT U&"audit_support".set_config('session_replication_role', 'replica', false);"#,
+        r#"SELECT U&"audit_support".U&"set_config"('session_replication_role', 'replica', false);"#,
     ] {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
