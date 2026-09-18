@@ -21,6 +21,7 @@ mod runtime_role_membership;
 mod transaction_projection;
 
 use crate::MigrationContractError;
+use crate::naming::is_multi_word_snake_case;
 pub use implementation::MigrationCatalog;
 
 /// Project already-normalized SQL onto the statements that survive PostgreSQL transaction outcome.
@@ -136,6 +137,147 @@ fn alter_table_actions_include_drop(actions: &str) -> bool {
     alter_table_action_starts_with_drop(&actions[action_start..])
 }
 
+/// Return the committed ALTER TABLE action list after its target relation.
+///
+/// `None` means the statement is not an ALTER TABLE statement. `Err(())` means
+/// an ALTER TABLE prefix was present but its target grammar was incomplete, so
+/// callers that certify final-state safety must fail closed rather than treating
+/// malformed SQL as an unrelated statement.
+fn alter_table_action_list(statement: &str) -> Result<Option<&str>, ()> {
+    let Some(first) = next_sql_token_span(statement, 0) else {
+        return Ok(None);
+    };
+    let Some(second) = next_sql_token_span(statement, first.1) else {
+        return Ok(None);
+    };
+    if !token_span_eq(statement, first, "ALTER") || !token_span_eq(statement, second, "TABLE") {
+        return Ok(None);
+    }
+
+    let mut cursor = second.1;
+    let Some(mut target) = next_sql_token_span(statement, cursor) else {
+        return Err(());
+    };
+    if token_span_eq(statement, target, "IF") {
+        let Some(exists) = next_sql_token_span(statement, target.1) else {
+            return Err(());
+        };
+        if !token_span_eq(statement, exists, "EXISTS") {
+            return Err(());
+        }
+        target = next_sql_token_span(statement, exists.1).ok_or(())?;
+    }
+    if token_span_eq(statement, target, "ONLY") {
+        target = next_sql_token_span(statement, target.1).ok_or(())?;
+    }
+
+    cursor = target.1;
+    if let Some(star) = next_sql_token_span(statement, cursor) {
+        if statement.get(star.0..star.1) == Some("*") {
+            cursor = star.1;
+        }
+    }
+
+    let actions = statement.get(cursor..).ok_or(())?;
+    if next_sql_token_span(actions, 0).is_none() {
+        return Err(());
+    }
+    Ok(Some(actions))
+}
+
+/// Return whether one ALTER TABLE ADD action introduces a nonconforming column name.
+///
+/// PostgreSQL permits both `ADD [COLUMN] name ...` and table-constraint forms
+/// such as `ADD CONSTRAINT`, `ADD CHECK`, and `ADD FOREIGN KEY`. Only the column
+/// form is subject to the durable column-name contract here. The action has
+/// already crossed the shared lexical authority, so quoted-identifier handling
+/// remains owned by that authority rather than being reparsed locally.
+fn alter_table_add_action_has_invalid_column_name(action: &str) -> bool {
+    let Some(add) = next_sql_token_span(action, 0) else {
+        return false;
+    };
+    if !token_span_eq(action, add, "ADD") {
+        return false;
+    }
+
+    let Some(mut candidate) = next_sql_token_span(action, add.1) else {
+        return true;
+    };
+    let explicit_column = token_span_eq(action, candidate, "COLUMN");
+    if explicit_column {
+        candidate = match next_sql_token_span(action, candidate.1) {
+            Some(span) => span,
+            None => return true,
+        };
+    }
+
+    if token_span_eq(action, candidate, "IF") {
+        let Some(not) = next_sql_token_span(action, candidate.1) else {
+            return true;
+        };
+        let Some(exists) = next_sql_token_span(action, not.1) else {
+            return true;
+        };
+        if !token_span_eq(action, not, "NOT") || !token_span_eq(action, exists, "EXISTS") {
+            return true;
+        }
+        candidate = match next_sql_token_span(action, exists.1) {
+            Some(span) => span,
+            None => return true,
+        };
+    } else if !explicit_column
+        && ["CONSTRAINT", "CHECK", "NOT", "UNIQUE", "PRIMARY", "EXCLUDE", "FOREIGN"]
+            .iter()
+            .any(|keyword| token_span_eq(action, candidate, keyword))
+    {
+        return false;
+    }
+
+    action
+        .get(candidate.0..candidate.1)
+        .is_none_or(|name| !is_multi_word_snake_case(name))
+}
+
+/// Detect invalid ADD-column names in PostgreSQL's top-level ALTER TABLE action list.
+///
+/// The delimiter rules mirror the destructive-action scan: commas nested in
+/// expressions or array/subscript brackets stay inside one action. Structural
+/// imbalance is already rejected by the final-state mutation boundary before
+/// this naming check runs.
+fn alter_table_actions_include_invalid_added_column_name(actions: &str) -> bool {
+    let mut parenthesis_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut action_start = 0usize;
+
+    for (index, ch) in actions.char_indices() {
+        match ch {
+            '(' => parenthesis_depth += 1,
+            ')' => parenthesis_depth = parenthesis_depth.saturating_sub(1),
+            '[' => bracket_depth += 1,
+            ']' => bracket_depth = bracket_depth.saturating_sub(1),
+            ',' if parenthesis_depth == 0 && bracket_depth == 0 => {
+                if alter_table_add_action_has_invalid_column_name(&actions[action_start..index]) {
+                    return true;
+                }
+                action_start = index + ch.len_utf8();
+            }
+            _ => {}
+        }
+    }
+
+    alter_table_add_action_has_invalid_column_name(&actions[action_start..])
+}
+
+/// Detect committed ALTER TABLE additions that bypass the durable column-name contract.
+fn contains_invalid_alter_table_added_column_name(sql: &str) -> bool {
+    sql.split(';').any(|statement| {
+        alter_table_action_list(statement)
+            .ok()
+            .flatten()
+            .is_some_and(alter_table_actions_include_invalid_added_column_name)
+    })
+}
+
 /// Return whether one committed statement mutates table final state beyond the bounded model.
 ///
 /// `DROP TABLE` removes the durable relation. Standalone PostgreSQL `RENAME`
@@ -156,42 +298,11 @@ fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool
     if token_span_eq(statement, first, "DROP") && token_span_eq(statement, second, "TABLE") {
         return true;
     }
-    if !token_span_eq(statement, first, "ALTER") || !token_span_eq(statement, second, "TABLE") {
-        return false;
-    }
 
-    let mut cursor = second.1;
-    let Some(mut target) = next_sql_token_span(statement, cursor) else {
-        return false;
-    };
-    if token_span_eq(statement, target, "IF") {
-        let Some(exists) = next_sql_token_span(statement, target.1) else {
-            return true;
-        };
-        if !token_span_eq(statement, exists, "EXISTS") {
-            return true;
-        }
-        target = match next_sql_token_span(statement, exists.1) {
-            Some(span) => span,
-            None => return true,
-        };
-    }
-    if token_span_eq(statement, target, "ONLY") {
-        target = match next_sql_token_span(statement, target.1) {
-            Some(span) => span,
-            None => return true,
-        };
-    }
-
-    cursor = target.1;
-    if let Some(star) = next_sql_token_span(statement, cursor) {
-        if statement.get(star.0..star.1) == Some("*") {
-            cursor = star.1;
-        }
-    }
-
-    let Some(actions) = statement.get(cursor..) else {
-        return true;
+    let actions = match alter_table_action_list(statement) {
+        Ok(Some(actions)) => actions,
+        Ok(None) => return false,
+        Err(()) => return true,
     };
     let Some(first_action) = next_sql_token_span(actions, 0) else {
         return true;
@@ -235,8 +346,10 @@ fn contains_unsupported_table_final_state_mutation(sql: &str) -> bool {
 /// authority. Committed `DROP TABLE`, standalone table/column rename forms, and
 /// destructive ALTER TABLE DROP actions are likewise rejected until table,
 /// column, constraint, removal/recreation, and dependent-object effects are
-/// represented by a first-class final-table aggregate. Mutations removed by the
-/// transaction projection never reach either bounded fail-closed boundary.
+/// represented by a first-class final-table aggregate. Committed ADD-column
+/// actions remain supported only when each introduced durable column satisfies
+/// the same multi-word `snake_case` authority as CREATE TABLE columns. Mutations
+/// removed by the transaction projection never reach either bounded boundary.
 ///
 /// # Errors
 ///
@@ -264,6 +377,9 @@ pub fn validate_migration_catalog(
 
     if contains_unsupported_table_final_state_mutation(&committed_up) {
         return Err(MigrationContractError::UnsupportedTableFinalStateMutation);
+    }
+    if contains_invalid_alter_table_added_column_name(&committed_up) {
+        return Err(MigrationContractError::SingleWordObjectName);
     }
     if contains_unsupported_policy_mutation(&committed_up) {
         return Err(MigrationContractError::MissingRlsPolicy);
@@ -418,7 +534,8 @@ fn canonicalize_table_persistence_modifiers(sql: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        canonicalize_table_persistence_modifiers, contains_unsupported_policy_mutation,
+        canonicalize_table_persistence_modifiers,
+        contains_invalid_alter_table_added_column_name, contains_unsupported_policy_mutation,
         contains_unsupported_table_final_state_mutation, project_committed_sql,
     };
 
@@ -473,6 +590,29 @@ mod tests {
             "ALTER TABLE tenant_record ADD CONSTRAINT tenant_record_array_shape CHECK (some_func(ARRAY[a, drop_flag])) ;",
         ] {
             assert!(!contains_unsupported_table_final_state_mutation(sql));
+        }
+    }
+
+    #[test]
+    fn alter_table_add_column_naming_detection_is_action_bounded() {
+        for sql in [
+            "ALTER TABLE tenant_record ADD COLUMN flag boolean ;",
+            "ALTER TABLE tenant_record ADD COLUMN IF NOT EXISTS flag boolean ;",
+            "ALTER TABLE tenant_record ADD flag boolean ;",
+            "ALTER TABLE tenant_record ADD COLUMN auxiliary_flag boolean, ADD COLUMN flag boolean ;",
+        ] {
+            assert!(contains_invalid_alter_table_added_column_name(sql));
+        }
+        for sql in [
+            "ALTER TABLE tenant_record ADD COLUMN auxiliary_flag boolean ;",
+            "ALTER TABLE tenant_record ADD CONSTRAINT tenant_record_shape CHECK (some_func(a, b)) ;",
+            "ALTER TABLE tenant_record ADD CHECK (tenant_record_id IS NOT NULL) ;",
+            "ALTER TABLE tenant_record ADD NOT NULL tenant_record_id ;",
+            "ALTER TABLE tenant_record ADD UNIQUE (tenant_record_id) ;",
+            "ALTER TABLE tenant_record ADD PRIMARY KEY (tenant_record_id) ;",
+            "ALTER TABLE tenant_record ADD FOREIGN KEY (tenant_record_id) REFERENCES tenant_record (tenant_record_id) ;",
+        ] {
+            assert!(!contains_invalid_alter_table_added_column_name(sql));
         }
     }
 
