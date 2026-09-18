@@ -448,33 +448,13 @@ jobs:
           actual_files="$(git diff --cached --name-only -z | python -c 'import sys; print(len([x for x in sys.stdin.buffer.read().split(b"\0") if x]))')"
           [ "$actual_files" = "$EXPECTED_CHANGED_FILES" ]
 
-      - name: Restore pinned Rust quality tools
-        id: rust-tools-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: |
-            ~/.cargo/bin/cargo-nextest
-            ~/.cargo/bin/cargo-deny
-          key: ${{ runner.os }}-${{ runner.arch }}-tepp-rust-tools-nextest-0.9.140-deny-0.19.7
-
-      - name: Restore pinned cargo-llvm-cov
-        id: llvm-cov-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.cargo/bin/cargo-llvm-cov
-          key: ${{ runner.os }}-${{ runner.arch }}-tepp-cargo-llvm-cov-0.8.6
-
-      - name: Install pinned Rust quality tools
+      - name: Install pinned Rust quality tools without persistent cache authority
         shell: bash
         run: |
           set -euo pipefail
-          if [ "${{ steps.rust-tools-cache.outputs.cache-hit }}" != true ]; then
-            cargo install cargo-nextest --locked --version 0.9.140
-            cargo install cargo-deny --locked --version 0.19.7
-          fi
-          if [ "${{ steps.llvm-cov-cache.outputs.cache-hit }}" != true ]; then
-            cargo install cargo-llvm-cov --locked --version 0.8.6
-          fi
+          cargo install cargo-nextest --locked --version 0.9.140
+          cargo install cargo-deny --locked --version 0.19.7
+          cargo install cargo-llvm-cov --locked --version 0.8.6
           rustup toolchain install nightly-2026-08-21 --profile minimal --component llvm-tools-preview
 
       - name: Run every release-quality gate
