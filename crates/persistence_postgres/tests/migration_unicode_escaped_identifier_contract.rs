@@ -16,6 +16,10 @@ fn unicode_escaped_pg_settings_identity_cannot_bypass_replication_role_guard() {
         r#"UPDATE U&"pg_!0073ettings" UESCAPE '!' SET setting = 'replica' WHERE name = 'session_replication_role';"#,
         r#"UPDATE U&"pg_settings" UESCAPE '_' SET setting = 'replica' WHERE name = 'session_replication_role';"#,
         r#"UPDATE pg_catalog . U&"pg_settings" SET setting = 'replica' WHERE name = 'session_replication_role';"#,
+        r#"UPDATE U&"pg_catalog" . pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';"#,
+        r#"UPDATE U&"pg_catalog" . U&"pg_settings" SET setting = 'replica' WHERE name = 'session_replication_role';"#,
+        r#"UPDATE pg_settings AS U&"p" SET setting = 'replica' WHERE U&"p".name = 'session_replication_role';"#,
+        r#"UPDATE pg_settings SET U&"setting" = 'replica' WHERE name = 'session_replication_role';"#,
     ] {
         assert_eq!(
             validate_migration_catalog(&embedded_with(final_sql)),
@@ -27,8 +31,12 @@ fn unicode_escaped_pg_settings_identity_cannot_bypass_replication_role_guard() {
 
 #[test]
 fn unrelated_safe_unicode_escaped_relation_identity_remains_unrelated() {
-    let final_sql = r#"UPDATE U&"audit_settings" SET setting = 'replica' WHERE name = 'session_replication_role';"#;
-    assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    for final_sql in [
+        r#"UPDATE U&"audit_settings" SET setting = 'replica' WHERE name = 'session_replication_role';"#,
+        r#"UPDATE U&"audit_schema" . pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';"#,
+    ] {
+        assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    }
 }
 
 #[test]
