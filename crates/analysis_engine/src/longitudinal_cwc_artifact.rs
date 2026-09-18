@@ -121,12 +121,10 @@ pub struct LongitudinalCwcArtifact {
     pub snapshot_id: String,
     /// Historical evidence cutoff used by the composition.
     pub knowledge_cutoff: String,
-    /// Eligible clustered rows after cutoff.
+    /// Cutoff-visible clustered rows used by the scientific composition.
     pub row_count: u64,
-    /// Distinct clusters among eligible rows.
+    /// Distinct clusters among cutoff-visible rows.
     pub cluster_count: u64,
-    /// Rows excluded because availability was after the cutoff.
-    pub excluded_after_cutoff_count: u64,
     /// Within-cluster OLS slope after CWC.
     pub within_slope: f64,
     /// Between-cluster OLS slope of cluster means.
@@ -179,10 +177,6 @@ impl LongitudinalCwcArtifact {
     fn validate(&self) -> Result<(), AnalysisEngineError> {
         let max_rows = u64::try_from(MAX_EVIDENCE_UNITS)
             .map_err(|_| AnalysisEngineError::InvalidLongitudinalCwcArtifact)?;
-        let total_rows = self
-            .row_count
-            .checked_add(self.excluded_after_cutoff_count)
-            .ok_or(AnalysisEngineError::InvalidLongitudinalCwcArtifact)?;
         let expected_contextual_effect = self.between_slope - self.within_slope;
         if self.schema_version != LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION
             || !valid_identifier(&self.run_id)
@@ -192,7 +186,6 @@ impl LongitudinalCwcArtifact {
             || self.row_count > max_rows
             || self.cluster_count < 2
             || self.cluster_count > self.row_count
-            || total_rows > max_rows
             || !self.within_slope.is_finite()
             || !self.between_slope.is_finite()
             || !self.contextual_effect.is_finite()
@@ -215,22 +208,16 @@ pub struct LongitudinalCwcExecution {
     pub terminal_result: AnalysisRunTerminalResult,
 }
 
-struct EligibleCwcRows {
-    scores: Vec<ClusteredScore>,
-    excluded_after_cutoff_count: u64,
-}
-
 fn admit_scores_at_cutoff(
     scores: &[LongitudinalClusterScore],
     snapshot_id: &str,
     knowledge_cutoff: KnowledgeCutoff,
-) -> Result<EligibleCwcRows, AnalysisEngineError> {
+) -> Result<Vec<ClusteredScore>, AnalysisEngineError> {
     if scores.len() > MAX_EVIDENCE_UNITS {
         return Err(AnalysisEngineError::LimitExceeded);
     }
     let mut evidence_ids = BTreeSet::new();
     let mut eligible = Vec::new();
-    let mut excluded_after_cutoff_count = 0_u64;
     for score in scores {
         if score.snapshot_id != snapshot_id {
             return Err(AnalysisEngineError::SnapshotMismatch);
@@ -244,8 +231,6 @@ fn admit_scores_at_cutoff(
                 predictor: score.predictor,
                 outcome: score.outcome,
             });
-        } else {
-            excluded_after_cutoff_count += 1;
         }
     }
     if eligible.is_empty() {
@@ -253,10 +238,7 @@ fn admit_scores_at_cutoff(
             PsychometricError::InvalidNumericInput,
         ));
     }
-    Ok(EligibleCwcRows {
-        scores: eligible,
-        excluded_after_cutoff_count,
-    })
+    Ok(eligible)
 }
 
 fn require_causal_refusal(
@@ -276,7 +258,7 @@ fn require_causal_refusal(
 ///
 /// The caller supplies already-mapped clustered coordinates. Each row carries its immutable
 /// evidence identity, source snapshot, and availability provenance. Future-unavailable rows are
-/// censored before evidence-identity admission, so they cannot alter a historical replay;
+/// removed before the historical identity/domain census and do not enter digest-bound output;
 /// duplicate identities among cutoff-visible evidence fail closed before scientific composition.
 /// This executor does not invent an ESEM/DSEM estimator, persist rows, or treat the recovered
 /// slopes as a causal effect.
@@ -309,15 +291,15 @@ pub fn execute_longitudinal_cwc_run(
     }
 
     let eligible = admit_scores_at_cutoff(scores, snapshot_id, knowledge_cutoff)?;
-    let slopes = recover_cluster_mean_within_between_slopes(&eligible.scores)?;
+    let slopes = recover_cluster_mean_within_between_slopes(&eligible)?;
     require_causal_refusal(claim_causal_effect(CausalHeuristic::TemporalPrecedence))?;
 
     let mut clusters = BTreeSet::new();
-    for score in &eligible.scores {
+    for score in &eligible {
         clusters.insert(score.cluster_key);
     }
-    let row_count = u64::try_from(eligible.scores.len())
-        .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+    let row_count =
+        u64::try_from(eligible.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let cluster_count =
         u64::try_from(clusters.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let artifact = LongitudinalCwcArtifact {
@@ -327,7 +309,6 @@ pub fn execute_longitudinal_cwc_run(
         knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
         row_count,
         cluster_count,
-        excluded_after_cutoff_count: eligible.excluded_after_cutoff_count,
         within_slope: slopes.within_slope,
         between_slope: slopes.between_slope,
         contextual_effect: slopes.contextual_effect,
@@ -368,7 +349,6 @@ mod tests {
             knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
             row_count: 4,
             cluster_count: 2,
-            excluded_after_cutoff_count: 0,
             within_slope: 0.5,
             between_slope: 2.0,
             contextual_effect: 1.5,
