@@ -44,6 +44,8 @@ For every open PR:
 
 A merge, review request, documentation update, queued check, blocked PR, or one completed product slice is an intermediate state while another safe action exists. Waiting on one branch blocks only that branch. After every mutation, merge, or defer decision, rebuild the executable queue. When the PR/issue queue reaches zero, select the highest-impact bounded buyer-visible, scientific-validity, security, privacy, operability, or ecosystem gap, implement it, open/review/merge its PR, then continue. Never bypass branch protection or claim queued/stale evidence has passed.
 
+Every push cancels that pull request's in-flight checks. While required checks are backlogged, batch follow-up commits into one push instead of pushing each slice as it lands: an intermediate head cannot merge while the queue is behind, so the cancelled runner time buys nothing and is taken from work that can merge. Repository-local CI already skips draft pull requests, so this applies to pull requests that are ready for review. Push immediately and do not batch when the commit repairs a failing required check, resolves a conflict that blocks merge, or answers a review a reviewer is waiting on: those commits change what the queue can merge, so their runner time is not discarded.
+
 ## Release contract
 
 A release requires a clean integration state, exact protected-head CI/security evidence, scientific/recovery acceptance appropriate to changed capabilities, reproducible artifacts, SBOM and provenance, validated migrations/rollback/recovery where present, updated `CHANGELOG.md`, version consistency, accessibility/operability evidence for user-facing components, and no unresolved scientific, privacy, security, or supply-chain blocker.

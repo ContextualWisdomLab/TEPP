@@ -63,7 +63,6 @@ def _parse_branch_record(record: object) -> tuple[tuple[int, int, int, int], int
     return coordinates, true_count, false_count
 
 
-
 def is_live_sqlx_transport_source(filename: str) -> bool:
     """Return whether *filename* is the live-server SQLx transport source.
 
@@ -224,6 +223,21 @@ def is_executable_source_line(
     if _line_in_multiline_string(lines, line_number):
         return False
     text = lines[line_number - 1].strip()
+    if "*/" in text:
+        suffix = text.rsplit("*/", 1)[1].strip()
+        if suffix in {
+            "{",
+            "}",
+            "(",
+            ")",
+            "},",
+            ");",
+            "];",
+            "();",
+            "};",
+            "});",
+        }:
+            text = suffix
     if not text:
         return False
     if text.startswith("//"):
@@ -241,10 +255,12 @@ def is_executable_source_line(
         "();",
         "};",
         "});",
-        "Ok(())",
     }:
         return False
-    if _is_standalone_string_literal(text) or text.startswith("} else"):
+    if (
+        _is_standalone_string_literal(text)
+        and not _is_match_arm_body(lines, line_number)
+    ) or text.startswith("} else"):
         return False
     if text.endswith(" {"):
         type_name = text[:-2]
@@ -352,21 +368,22 @@ def _is_structural_comma_continuation(
 
 
 def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
-    """Return whether a source line is only a continuation of a string literal.
+    """Return whether a source line is only a continuation of a string or comment.
 
-    LLVM assigns one line location to a multi-line SQL or JSON literal, while
-    LCOV can still emit zero-count records for its continuation lines. Those
-    bytes are data, not independently executable Rust statements. Rust comments,
-    character literals, and raw-string delimiters are ignored while finding the
-    literal so embedded quote characters cannot hide later production lines.
+    LLVM can emit zero-count rows for multi-line string and block-comment
+    continuations. The target remains trivia only when a block comment occupies
+    the whole target line; executable source after a closing ``*/`` keeps that
+    line in the authored denominator.
     """
 
     in_string = False
     block_comment_depth = 0
     raw_hashes: int | None = None
     for index, line in enumerate(lines, start=1):
-        if index == line_number and (in_string or block_comment_depth > 0):
+        target_started_in_block_comment = index == line_number and block_comment_depth > 0
+        if index == line_number and in_string:
             return True
+        target_has_code_after_comment = False
         stripped = line.strip()
         started_literal = False
         escaped = False
@@ -408,6 +425,8 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 continue
             if line.startswith("//", position):
                 break
+            if target_started_in_block_comment and not line[position].isspace():
+                target_has_code_after_comment = True
             if line[position] == "'":
                 char_start = position
                 position += 1
@@ -446,12 +465,18 @@ def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
                 started_literal = True
             position += 1
         if index == line_number:
-            if block_comment_depth > 0 or stripped.startswith("/*") and stripped.endswith("*/"):
+            if target_started_in_block_comment and not target_has_code_after_comment:
+                return True
+            if block_comment_depth > 0 or (
+                stripped.startswith("/*")
+                and not _rust_code_before_line_comment(line).strip()
+            ):
                 return True
             return in_string and started_literal and stripped.startswith(
                 ('"', "r\"", "r#", "br\"", "br#")
             )
     return False
+
 
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
     """Recognize a guard continued onto the lines immediately before an arm."""
@@ -681,6 +706,52 @@ def _character_literal_end(line: str, cursor: int) -> int | None:
     return None
 
 
+def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
+    """Return whether *line_number* is the whole body of a ``match`` arm.
+
+    A match arm whose body is one string literal is executable production
+    behavior: a zero count means the arm was never taken. Comments between the
+    arm label and its literal body are not executable code and must not hide it
+    from the authored-line denominator.
+    """
+
+    block_comment_depth = 0
+    for index in range(line_number - 2, -1, -1):
+        previous = lines[index].strip()
+        if not previous:
+            continue
+        if block_comment_depth:
+            block_comment_depth += previous.count("*/") - previous.count("/*")
+            if block_comment_depth > 0:
+                continue
+            block_comment_depth = 0
+            previous = previous.rsplit("/*", 1)[0].strip()
+            if not previous:
+                continue
+        if previous.startswith("//"):
+            continue
+        if previous.startswith("/*"):
+            if "*/" not in previous:
+                continue
+            previous = previous.split("*/", 1)[1].strip()
+            if not previous:
+                continue
+        if previous.endswith("*/") and "/*" not in previous:
+            block_comment_depth = previous.count("*/")
+            continue
+        if "/*" in previous and previous.endswith("*/"):
+            # A leading complete block comment may have been stripped above;
+            # any opener left here follows executable code on the same line.
+            previous = previous.split("/*", 1)[0].strip()
+        code = _rust_code_before_line_comment(previous).rstrip()
+        if not code:
+            continue
+        if code.endswith(("=>", "=> {")):
+            return True
+        return False
+    return False
+
+
 def _is_standalone_string_literal(text: str) -> bool:
     """Return whether *text* is only a normal string literal and punctuation."""
     if not text.startswith('"'):
@@ -694,6 +765,141 @@ def _is_standalone_string_literal(text: str) -> bool:
         else:
             escaped = False
     return False
+
+
+def _rust_code_before_line_comment(line: str) -> str:
+    """Return one Rust source line with comments removed outside literals."""
+
+    code: list[str] = []
+    in_string = False
+    raw_hashes: int | None = None
+    block_comment_depth = 0
+    cursor = 0
+    while cursor < len(line):
+        if block_comment_depth:
+            if line.startswith("/*", cursor):
+                block_comment_depth += 1
+                cursor += 2
+            elif line.startswith("*/", cursor):
+                block_comment_depth -= 1
+                cursor += 2
+            else:
+                cursor += 1
+            continue
+        if raw_hashes is not None:
+            delimiter = '"' + ("#" * raw_hashes)
+            closing = line.find(delimiter, cursor)
+            if closing == -1:
+                code.append(line[cursor:])
+                break
+            code.append(line[cursor : closing + len(delimiter)])
+            cursor = closing + len(delimiter)
+            raw_hashes = None
+            continue
+        if in_string:
+            character = line[cursor]
+            code.append(character)
+            if character == "\\" and cursor + 1 < len(line):
+                cursor += 1
+                code.append(line[cursor])
+            elif character == '"':
+                in_string = False
+            cursor += 1
+            continue
+        if line.startswith("//", cursor):
+            break
+        if line.startswith("/*", cursor):
+            block_comment_depth = 1
+            cursor += 2
+            continue
+        raw_start = _raw_string_start(line, cursor)
+        if raw_start is not None:
+            raw_hashes, next_cursor = raw_start
+            code.append(line[cursor:next_cursor])
+            cursor = next_cursor
+            continue
+        if line[cursor] == '"':
+            in_string = True
+            code.append(line[cursor])
+            cursor += 1
+            continue
+        if line[cursor] == "'":
+            character_end = _character_literal_end(line, cursor)
+            if character_end is not None:
+                code.append(line[cursor:character_end])
+                cursor = character_end
+                continue
+        code.append(line[cursor])
+        cursor += 1
+    return "".join(code)
+
+
+def opens_a_block(source_path: str, line_number: int, repository_root: Path | None) -> bool:
+    """Return whether *line_number* ends by opening a brace-delimited block."""
+
+    try:
+        path = (
+            resolve_repository_source_path(source_path, repository_root)
+            if repository_root is not None
+            else Path(source_path)
+        )
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    if line_number <= 0 or line_number > len(lines):
+        return False
+    code = _rust_code_before_line_comment(lines[line_number - 1])
+    return code.rstrip().endswith("{")
+
+
+def _first_meaningful_source_line_after(
+    source_path: str, line_number: int, repository_root: Path | None
+) -> int | None:
+    """Return the first later line that is not non-authored lexical trivia."""
+
+    try:
+        path = (
+            resolve_repository_source_path(source_path, repository_root)
+            if repository_root is not None
+            else Path(source_path)
+        )
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+    for candidate_number in range(line_number + 1, len(lines) + 1):
+        stripped = lines[candidate_number - 1].strip()
+        if not stripped or stripped.startswith("//"):
+            continue
+        if _line_in_multiline_string(lines, candidate_number):
+            continue
+        return candidate_number
+    return None
+
+
+def reconcile_contradictory_zero_counts(
+    line_counts: dict[tuple[str, int], int], repository_root: Path | None
+) -> None:
+    """Mark a proven-executed zero-count opener covered without deleting it.
+
+    LLVM can report a zero count for a brace-delimited opener while its first
+    meaningful nested line has a positive count. Blank and line-comment-only
+    lines are not authored coverage units, so they cannot break that proof. A
+    closing brace or any other meaningful unmeasured line stops the proof;
+    reconciliation never crosses into a sibling statement outside the block.
+    """
+
+    for key in [key for key, count in line_counts.items() if count == 0]:
+        source_path, line_number = key
+        if not opens_a_block(source_path, line_number, repository_root):
+            continue
+        nested_line = _first_meaningful_source_line_after(
+            source_path, line_number, repository_root
+        )
+        if nested_line is None:
+            continue
+        nested_count = line_counts.get((source_path, nested_line))
+        if nested_count is not None and nested_count > 0:
+            line_counts[key] = 1
 
 
 def load_lcov_line_totals(
@@ -741,6 +947,7 @@ def load_lcov_line_totals(
         raise ValueError("LCOV source record must end with end_of_record")
     if not line_counts:
         raise ValueError("LCOV report contains no authored source lines")
+    reconcile_contradictory_zero_counts(line_counts, root)
     covered = sum(execution_count > 0 for execution_count in line_counts.values())
     return {"lines": {"count": len(line_counts), "covered": covered}}
 

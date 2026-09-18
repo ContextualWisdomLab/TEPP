@@ -7,6 +7,7 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - converted_to_draft
     paths:
       - "**/*.md"
       - "**/*.json"
@@ -34,6 +35,7 @@ concurrency:
 jobs:
   validate:
     name: Validate planning and governance contracts
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
