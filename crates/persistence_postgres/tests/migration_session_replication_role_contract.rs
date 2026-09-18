@@ -142,3 +142,38 @@ SELECT 'WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = replica WHERE
     );
     assert_eq!(validate_migration_catalog(&catalog), Ok(()));
 }
+
+#[test]
+fn committed_dynamic_set_config_value_fails_closed_for_replication_role() {
+    for final_sql in [
+        "SELECT set_config('session_replication_role', lower('REPLICA'), false);",
+        "SELECT pg_catalog . set_config('session_replication_role', (SELECT 'replica'), false);",
+        "WITH desired(value) AS (VALUES ('replica')) SELECT set_config('session_replication_role', (SELECT value FROM desired), false);",
+    ] {
+        assert_eq!(
+            validate_migration_catalog(&embedded_with(final_sql)),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "non-atomic set_config value must fail closed for session_replication_role: {final_sql}",
+        );
+    }
+}
+
+#[test]
+fn rolled_back_dynamic_set_config_value_does_not_change_durable_migration_effects() {
+    for final_sql in [
+        "BEGIN; SELECT set_config('session_replication_role', lower('REPLICA'), true); ROLLBACK;",
+        "BEGIN; SELECT pg_catalog . set_config('session_replication_role', (SELECT 'replica'), false); ROLLBACK;",
+    ] {
+        assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    }
+}
+
+#[test]
+fn dynamic_unrelated_set_config_identity_or_parameter_remains_unrelated() {
+    for final_sql in [
+        "SELECT audit_support.set_config('session_replication_role', lower('REPLICA'), false);",
+        "SELECT set_config('application_name', lower('REPLICA'), false);",
+    ] {
+        assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    }
+}
