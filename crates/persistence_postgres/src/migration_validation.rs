@@ -676,6 +676,120 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
     false
 }
 
+/// Detect persistent PostgreSQL defaults that can make later application sessions
+/// enter replica execution mode before TEPP's runtime trigger contracts run.
+///
+/// The statement has already crossed the shared lexical authority and committed
+/// transaction projection. This fold therefore handles only normalized `ALTER`
+/// configuration commands; it does not re-lex raw SQL. Role-specific defaults are
+/// relevant for `tepp_app_runtime`, PostgreSQL pseudo-current-role targets, and
+/// `ALL`; database and system defaults are conservatively relevant because this
+/// validator does not own deployment database/cluster identity. Direct `origin`
+/// and `local` are the only values that prove ordinary triggers remain enabled.
+/// `FROM CURRENT`, `DEFAULT`, and `RESET` fail closed because the inherited/current
+/// value and precedence chain are not yet represented by a first-class default-
+/// state aggregate. `ALTER SYSTEM` is evaluated here only as durable SQL state;
+/// PostgreSQL itself forbids running it inside a transaction block.
+fn statement_sets_unsafe_persistent_replication_role_default(statement: &str) -> bool {
+    let delimited = statement.replace('=', " = ");
+    let tokens = delimited.split_whitespace().collect::<Vec<_>>();
+    if !tokens
+        .first()
+        .is_some_and(|token| token.eq_ignore_ascii_case("ALTER"))
+    {
+        return false;
+    }
+
+    let mut index = 1usize;
+    let scope = tokens.get(index).copied();
+    let role_scoped = scope.is_some_and(|token| token.eq_ignore_ascii_case("ROLE"));
+    let database_scoped = scope.is_some_and(|token| token.eq_ignore_ascii_case("DATABASE"));
+    let system_scoped = scope.is_some_and(|token| token.eq_ignore_ascii_case("SYSTEM"));
+    if !role_scoped && !database_scoped && !system_scoped {
+        return false;
+    }
+    index += 1;
+
+    if role_scoped {
+        let Some(target) = tokens.get(index).copied() else {
+            return false;
+        };
+        let target_may_be_runtime = target.eq_ignore_ascii_case("tepp_app_runtime")
+            || target.eq_ignore_ascii_case("ALL")
+            || target.eq_ignore_ascii_case("CURRENT_ROLE")
+            || target.eq_ignore_ascii_case("CURRENT_USER")
+            || target.eq_ignore_ascii_case("SESSION_USER");
+        if !target_may_be_runtime {
+            return false;
+        }
+        index += 1;
+        if tokens
+            .get(index)
+            .is_some_and(|token| token.eq_ignore_ascii_case("IN"))
+        {
+            if !tokens
+                .get(index + 1)
+                .is_some_and(|token| token.eq_ignore_ascii_case("DATABASE"))
+                || tokens.get(index + 2).is_none()
+            {
+                return true;
+            }
+            index += 3;
+        }
+    } else if database_scoped {
+        if tokens.get(index).is_none() {
+            return false;
+        }
+        index += 1;
+    }
+
+    if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("RESET"))
+    {
+        return tokens.get(index + 1).is_some_and(|parameter| {
+            parameter.eq_ignore_ascii_case("session_replication_role")
+                || parameter.eq_ignore_ascii_case("ALL")
+        });
+    }
+    if !tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("SET"))
+    {
+        return false;
+    }
+    index += 1;
+
+    if !tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("session_replication_role"))
+    {
+        return false;
+    }
+    index += 1;
+
+    if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("FROM"))
+    {
+        return tokens
+            .get(index + 1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("CURRENT"));
+    }
+    if !tokens
+        .get(index)
+        .is_some_and(|token| *token == "=" || token.eq_ignore_ascii_case("TO"))
+    {
+        return true;
+    }
+    index += 1;
+
+    !tokens.get(index).is_some_and(|value| {
+        value.trim_matches('\'').eq_ignore_ascii_case("origin")
+            || value.trim_matches('\'').eq_ignore_ascii_case("local")
+    })
+}
+
 /// Detect committed PostgreSQL execution modes that cannot prove ordinary triggers stayed enabled.
 ///
 /// The input has already crossed the shared lexical authority and committed-state
@@ -683,12 +797,13 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
 /// statements are absent. PostgreSQL `DO` and `CALL` immediately execute opaque
 /// procedural code or a procedure whose effects are not proven by this bounded
 /// validator, so committed top-level forms fail closed. Direct SQL settings,
-/// `set_config`, and writable `pg_settings.setting` retain their existing bounded
-/// handling. Unicode-escaped direct `SET` parameter names reuse the shared quoted
-/// projection: canonical `session_replication_role` is protected, an invalid
-/// escaped projection is treated as potentially protected, and a safely projected
-/// unrelated identifier remains unrelated. Direct `origin` and `local` retain
-/// their statically safe ordinary-trigger semantics.
+/// `set_config`, writable `pg_settings.setting`, and persistent role/database/
+/// system login defaults retain one execution-context boundary. Unicode-escaped
+/// direct `SET` parameter names reuse the shared quoted projection: canonical
+/// `session_replication_role` is protected, an invalid escaped projection is
+/// treated as potentially protected, and a safely projected unrelated identifier
+/// remains unrelated. Direct `origin` and `local` retain their statically safe
+/// ordinary-trigger semantics.
 fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
     sql.split(';').any(|statement| {
         if statement
@@ -703,6 +818,7 @@ fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
 
         if statement_calls_unsafe_set_config(statement)
             || statement_updates_unsafe_replication_role_via_pg_settings(statement)
+            || statement_sets_unsafe_persistent_replication_role_default(statement)
         {
             return true;
         }
@@ -783,9 +899,10 @@ fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
 /// after that shared lexical projection and before lifecycle folding, so a
 /// rolled-back `ALTER ROLE ... NOBYPASSRLS` cannot certify an actually unsafe
 /// runtime role. A committed unsafe `session_replication_role` mutation through
-/// `SET`, PostgreSQL's `set_config` equivalent, or canonical `pg_settings` update
-/// also fails the runtime-role contract because it can suppress ordinary
-/// enforcement triggers while durable catalog definitions remain enabled.
+/// `SET`, PostgreSQL's `set_config` equivalent, canonical `pg_settings` update,
+/// or a persistent role/database/system login default also fails the runtime-role
+/// contract because it can suppress ordinary enforcement triggers while durable
+/// catalog definitions remain enabled.
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
     let lifecycle_sql = preserve_quoted_special_role_specifications(sql);
     let normalized_lifecycle = implementation::normalize_migration_sql_with_grantor_identity(
