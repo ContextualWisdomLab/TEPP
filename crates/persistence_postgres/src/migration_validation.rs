@@ -442,10 +442,9 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
 ///
 /// The input has already crossed the shared lexical authority and committed-state
 /// projection. Comments and data literals are therefore opaque, while rolled-back
-/// statements are absent. PostgreSQL `DO` executes an anonymous procedural body
-/// immediately; because that body is intentionally opaque to this bounded SQL
-/// validator, a committed top-level `DO` fails closed rather than being assumed
-/// not to mutate `session_replication_role` or protected data. Direct SQL settings,
+/// statements are absent. PostgreSQL `DO` and `CALL` immediately execute opaque
+/// procedural code or a procedure whose effects are not proven by this bounded
+/// validator, so committed top-level forms fail closed. Direct SQL settings,
 /// `set_config`, and writable `pg_settings.setting` retain their existing bounded
 /// handling; `origin` and `local` remain the statically proven safe direct modes.
 fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
@@ -453,7 +452,9 @@ fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
         if statement
             .split_whitespace()
             .next()
-            .is_some_and(|token| token.eq_ignore_ascii_case("DO"))
+            .is_some_and(|token| {
+                token.eq_ignore_ascii_case("DO") || token.eq_ignore_ascii_case("CALL")
+            })
         {
             return true;
         }
