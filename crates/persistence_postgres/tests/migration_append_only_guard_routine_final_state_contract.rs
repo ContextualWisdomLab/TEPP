@@ -13,11 +13,13 @@ fn committed_guard_routine_removal_cannot_reuse_historical_append_only_evidence(
     for final_sql in [
         "DROP FUNCTION reject_append_only_mutation() CASCADE;",
         "DROP FUNCTION IF EXISTS reject_append_only_mutation() CASCADE;",
+        "DROP ROUTINE reject_append_only_mutation() CASCADE;",
+        "DROP ROUTINE IF EXISTS reject_append_only_mutation() CASCADE;",
     ] {
         assert_eq!(
             validate_migration_catalog(&embedded_with(final_sql)),
             Err(MigrationContractError::UnsupportedTableFinalStateMutation),
-            "committed guard-function removal must invalidate historical trigger evidence: {final_sql}",
+            "committed guard-routine removal must invalidate historical trigger evidence: {final_sql}",
         );
     }
 }
@@ -45,10 +47,12 @@ $tepp$;
 
 #[test]
 fn rolled_back_guard_routine_mutations_do_not_change_durable_enforcement() {
-    let dropped = embedded_with(
+    for final_sql in [
         "BEGIN; DROP FUNCTION reject_append_only_mutation() CASCADE; ROLLBACK;",
-    );
-    assert_eq!(validate_migration_catalog(&dropped), Ok(()));
+        "BEGIN; DROP ROUTINE reject_append_only_mutation() CASCADE; ROLLBACK;",
+    ] {
+        assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    }
 
     let replaced = embedded_with(
         r#"
@@ -72,8 +76,10 @@ fn marker_like_guard_routine_mutations_are_not_statements() {
     let catalog = embedded_with(
         r#"
 SELECT 'DROP FUNCTION reject_append_only_mutation() CASCADE';
+SELECT 'DROP ROUTINE reject_append_only_mutation() CASCADE';
 SELECT $$CREATE OR REPLACE FUNCTION reject_append_only_mutation()$$;
 -- DROP FUNCTION reject_append_only_mutation() CASCADE;
+-- DROP ROUTINE reject_append_only_mutation() CASCADE;
 "#,
     );
     assert_eq!(validate_migration_catalog(&catalog), Ok(()));
