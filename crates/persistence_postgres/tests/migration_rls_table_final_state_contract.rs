@@ -61,3 +61,31 @@ fn later_enable_and_force_restore_the_required_final_state() {
     );
     assert_eq!(validate_migration_catalog(&catalog), Ok(()));
 }
+
+#[test]
+fn whitespace_qualified_sibling_table_cannot_repair_disabled_rls_state() {
+    let embedded = MigrationCatalog::from_embedded().expect("embedded catalog must load");
+    let up_sql = format!(
+        "{}\nALTER TABLE public . tenant_record DISABLE ROW LEVEL SECURITY;\nALTER TABLE public . event_instance ENABLE ROW LEVEL SECURITY;\nALTER TABLE public . event_instance FORCE ROW LEVEL SECURITY;",
+        embedded.up_sql()
+    );
+    let catalog = MigrationCatalog::from_sql(&up_sql, embedded.down_sql());
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsEnable),
+        "schema qualification must not collapse tenant_record and event_instance into one RLS state bucket"
+    );
+}
+
+#[test]
+fn rolled_back_whitespace_qualified_disable_remains_non_durable() {
+    let embedded = MigrationCatalog::from_embedded().expect("embedded catalog must load");
+    let up_sql = format!(
+        "{}\nBEGIN; ALTER TABLE public . tenant_record DISABLE ROW LEVEL SECURITY; ROLLBACK;",
+        embedded.up_sql()
+    );
+    let catalog = MigrationCatalog::from_sql(&up_sql, embedded.down_sql());
+
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+}
