@@ -30,6 +30,10 @@ fn unicode_escaped_replication_parameter_identity_is_protected_on_all_default_su
         r#"ALTER USER tepp_app_runtime SET U&"session_replication_\0072ole" TO replica;"#,
         r#"ALTER DATABASE tepp_database SET U&"session_replication_role" = replica;"#,
         r#"ALTER SYSTEM SET U&"session_replication!005frole" UESCAPE '!' = replica;"#,
+        r#"ALTER ROLE tepp_app_runtime RESET U&"session_replication_role";"#,
+        r#"ALTER USER tepp_app_runtime RESET U&"session_replication_\0072ole";"#,
+        r#"ALTER DATABASE tepp_database RESET U&"session_replication_role";"#,
+        r#"ALTER SYSTEM RESET U&"session_replication!005frole" UESCAPE '!';"#,
     ] {
         assert_eq!(
             validate_migration_catalog(&embedded_with(final_sql)),
@@ -48,6 +52,9 @@ fn unicode_escaped_persistent_defaults_preserve_safe_and_unrelated_controls() {
         r#"ALTER ROLE tepp_app_runtime SET U&"application_name" = replica;"#,
         r#"ALTER DATABASE tepp_database SET U&"application_name" = replica;"#,
         r#"ALTER SYSTEM SET U&"application_name" = replica;"#,
+        r#"ALTER ROLE tepp_app_runtime RESET U&"application_name";"#,
+        r#"ALTER DATABASE tepp_database RESET U&"application_name";"#,
+        r#"ALTER SYSTEM RESET U&"application_name";"#,
     ] {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
@@ -59,6 +66,7 @@ fn rolled_back_unicode_persistent_default_is_not_durable() {
         r#"BEGIN; ALTER ROLE U&"tepp_app_runtime" SET session_replication_role = replica; ROLLBACK;"#,
         r#"BEGIN; ALTER USER tepp_app_runtime SET U&"session_replication_role" = replica; ROLLBACK;"#,
         r#"BEGIN; ALTER DATABASE tepp_database SET U&"session_replication_role" = replica; ROLLBACK;"#,
+        r#"BEGIN; ALTER ROLE tepp_app_runtime RESET U&"session_replication_role"; ROLLBACK;"#,
     ] {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
