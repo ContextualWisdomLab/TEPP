@@ -27,6 +27,7 @@ fn committed_replica_execution_mode_cannot_bypass_runtime_trigger_enforcement() 
 fn committed_set_config_replica_mode_cannot_bypass_runtime_trigger_enforcement() {
     for final_sql in [
         "SELECT set_config('session_replication_role', 'replica', false);",
+        "SELECT pg_catalog . set_config('session_replication_role', 'replica', false);",
         "BEGIN; SELECT set_config('session_replication_role', 'replica', true); COMMIT;",
     ] {
         assert_eq!(
