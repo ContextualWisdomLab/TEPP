@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-18T19:25:33Z  
+**Snapshot:** 2026-09-18T20:11:10Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
@@ -18,7 +18,7 @@ A planning document, mergeable branch, local/source inspection, predecessor-head
 | TEPP releases | **0** | No open TEPP head is a released contract. |
 | #435 documentation authority | open / Draft / mergeable; branch `chore/queue-authority-ddd-20260901` | Canonical operator/TRACEABILITY updates belong here; this file intentionally does not self-pin #435's mutable head. |
 | #492 central admission consumer | `794ba9e6dda9f043aa499920fdf609b81b075d7e`, Draft, base `main` | Preserved schedule/parser repair remains valid, but immutable `.github` worker policy and contextual-orchestrator `orchestrator/free` release authority must exist before consumer migration and new exact-head evidence. |
-| #538 foundation successor | `0a6947b11f2dba9e161f2abe8bdec0f652d4b47a`, Ready, base `main` | Current foundation landing vehicle; dependency-review support, CodeQL Actions compatibility, and a qualifying independent approval remain promotion prerequisites. |
+| #538 foundation successor | `f335624cea977fea7d7fe6f36871868557fe2bb7`, Ready, base `main` | #594 removes the post-proposal writable cache surface found by exact-head Actions CodeQL. New exact-head checks must reacquire evidence; #498 Dependency Graph support, `.github#2276` authenticated GHAS identity reads, and qualifying independent approval remain promotion prerequisites. |
 | #521 persistence successor | `2e3c57bcabff660a69c2ce5fcae45ffd1424bbd9`, Draft, base #538 | #590 is the last accepted production repair. #591 was an invalid `SET SCHEMA` safety hypothesis and was retired ordinary-forward without production repair. |
 | #488 Validation Evidence | `520df488fd86ba48008af8ee5a2e112b4587fc22`, Draft, base #492 | Current exact head remains short of owned-production 100% authored line/branch evidence and qualifying approval. |
 | #310 Longitudinal Modeling | `ba10820e0d28cc33d1b91ef37f6f6d163b3d91e9`, Draft, base `main` | TEPP-owned temporal/longitudinal semantics remain mutable and unreleased; reusable static arithmetic must arrive only through immutable fast-mlsirm releases. |
@@ -75,6 +75,12 @@ Canonical `docs/TRACEABILITY.md` must index the current #491/#488 resource/cardi
 
 #590 is the last accepted production repair: whitespace around schema qualification could alias sibling relation RLS final state, so unsupported qualified identities fail closed. #591 then proposed rejecting `ALTER TABLE ... SET SCHEMA`; review showed TEPP has no schema-bound owner/ACL/search_path invariant and relation-attached RLS/policy/trigger state survives schema movement. That hypothesis was therefore retired ordinary-forward without a production fix. The architectural endpoint remains canonical relation identity, a shared PostgreSQL Unicode identifier decoder, and first-class final RLS/execution/default-state aggregates with explicit RESET/DEFAULT/FROM CURRENT precedence.
 
+## Foundation / CI security boundary
+
+#538's predecessor head exposed two exact CodeQL Actions findings in the hourly generated-proposal verifier. After the immutable proposal patch was applied, two `actions/cache@v5` steps restored Rust quality binaries into `~/.cargo/bin`; cache post-actions could persist proposal-mutated bytes under stable default-branch keys. #594 records RED `af3e0bc...`, corrected RED `24241780...`, and causal repair `f335624...`: the verifier now has a structural regression forbidding `actions/cache@` in that trust boundary and installs the same version-pinned `cargo-nextest`, `cargo-deny`, and `cargo-llvm-cov` directly before proposal code runs. The repair does not suppress CodeQL or weaken artifact identity, credential stripping, quality gates, coverage, or publication separation.
+
+The same canonical dispatch proved a separate owner-path failure: Python SARIF was clean but `.github` could not read TEPP `code-scanning/analyses`, receiving HTTP 403 from the integration while checking GHAS base/head configuration identity. `.github#2276` owns that cross-repository permission repair and must preserve fail-closed semantics. #498 independently remains the repository-admin prerequisite for Dependency Graph/dependency-review support. Neither external prerequisite is grounds to bypass #538 gates.
+
 ## Gap register
 
 | ID / vehicle | Gap / state | Current closure evidence |
@@ -83,7 +89,7 @@ Canonical `docs/TRACEABILITY.md` must index the current #491/#488 resource/cardi
 | GAP-045–125 | Validation Evidence arithmetic/recovery lineage; verification pending | Exact source/tests/research remain inherited on #488; current authored line/branch evidence is 12,344/12,346 and 4,450/4,452. |
 | #491 / #488 | Resource/cardinality and translated-dispersion floating-proof obligations remain open | Buyer-path metric cardinality must be typed/versioned before Analysis Run admission can narrow public-library resource proofs; exact-real separation alone does not remove the floating positivity guard. |
 | #492 | Central admission consumer migration is incomplete | Wait for immutable `.github` worker and contextual-orchestrator `orchestrator/free` authority, then migrate leaf workflow/guidance and reacquire exact-head gates. |
-| #538 | Foundation successor not yet promotion-complete | Dependency-review support, CodeQL Actions compatibility, and qualifying independent approval remain. |
+| #538 / #594 | Foundation successor security repair is implemented but not yet promoted | Exact-head `f335624...` must reacquire Rust/docs/security/Semgrep/CodeQL evidence proving the cache-poisoning findings are gone. #498 Dependency Graph, `.github#2276` GHAS analyses-read authority, and qualifying independent approval remain prerequisites. |
 | #521 | Persistence successor verification pending | Land #538 normally, non-force restack surviving delta, then reacquire Rust/Python/docs/security/CodeQL, Live PostgreSQL, rustdoc and authored line/branch/edge evidence. |
 | #310 | Longitudinal consumer blocked on released static arithmetic | Consume only a new immutable fast-mlsirm release after #1717 then #1816 land with owner acceptance. |
 
