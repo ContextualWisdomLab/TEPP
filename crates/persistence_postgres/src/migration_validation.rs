@@ -253,6 +253,12 @@ fn top_level_keyword_index(tokens: &[&str], start: usize, keyword: &str) -> Opti
 /// forms. Both scalar `setting = value` and PostgreSQL's single-column row
 /// assignment `(setting) = [ROW] (value)` cross the same boundary. Direct
 /// `origin` and `local` assignment atoms are always safe for ordinary triggers.
+/// PostgreSQL Unicode-escaped quoted relation names currently reach this layer as
+/// a structural `U&` marker followed by the shared quoted-identifier projection.
+/// A directly equivalent lowercase `pg_settings` spelling is folded into this
+/// same authority, while an invalid/escaped projection fails closed because its
+/// decoded identity is not yet owned. Safe projected unrelated names remain
+/// unrelated; no second raw-SQL lexer is introduced here.
 /// For any other value, only a complete direct equality to one unrelated quoted
 /// setting name proves that `session_replication_role` is excluded; protected
 /// equality is recognized in either operand order, and any unsupported predicate
@@ -280,6 +286,8 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
     {
         index += 1;
     }
+
+    let mut unicode_escaped_target = false;
     if tokens
         .get(index)
         .is_some_and(|token| token.eq_ignore_ascii_case("pg_settings"))
@@ -287,15 +295,60 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
         index += 1;
     } else if tokens
         .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+    {
+        let Some(projected_name) = tokens.get(index + 1) else {
+            return true;
+        };
+        if projected_name.eq_ignore_ascii_case("pg_settings") {
+            unicode_escaped_target = true;
+            index += 2;
+        } else if projected_name.eq_ignore_ascii_case("INVALID_QUOTED_IDENTIFIER") {
+            return true;
+        } else {
+            return false;
+        }
+    } else if tokens
+        .get(index)
         .is_some_and(|token| token.eq_ignore_ascii_case("pg_catalog"))
         && tokens.get(index + 1) == Some(&".")
-        && tokens
+    {
+        if tokens
             .get(index + 2)
             .is_some_and(|token| token.eq_ignore_ascii_case("pg_settings"))
-    {
-        index += 3;
+        {
+            index += 3;
+        } else if tokens
+            .get(index + 2)
+            .is_some_and(|token| token.eq_ignore_ascii_case("U&"))
+        {
+            let Some(projected_name) = tokens.get(index + 3) else {
+                return true;
+            };
+            if projected_name.eq_ignore_ascii_case("pg_settings") {
+                unicode_escaped_target = true;
+                index += 4;
+            } else if projected_name.eq_ignore_ascii_case("INVALID_QUOTED_IDENTIFIER") {
+                return true;
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        }
     } else {
         return false;
+    }
+
+    if unicode_escaped_target
+        && tokens
+            .get(index)
+            .is_some_and(|token| token.eq_ignore_ascii_case("UESCAPE"))
+    {
+        // The shared lexer has already consumed the one-character UESCAPE
+        // literal. The identifier has no escapes if it projected to the exact
+        // lowercase `pg_settings` atom, so the clause does not change identity.
+        index += 1;
     }
 
     if tokens.get(index) == Some(&"*") {
@@ -617,6 +670,8 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH changed_setting AS (UPDATE pg_settings SET setting = (SELECT 'replica' WHERE true) WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET (setting) = ('replica') WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_catalog . pg_settings AS p SET (setting) = ROW('replica') WHERE p.name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE U&\"pg_settings\" SET setting = 'replica' WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE U&\"pg_\\0073ettings\" SET setting = 'replica' WHERE name = 'session_replication_role';",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
         }
@@ -637,6 +692,7 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings SET (setting) = ('origin') WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE pg_settings AS p SET (setting) = ROW('local') WHERE p.name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE audit_support.pg_settings SET setting = 'replica' WHERE name = 'session_replication_role';",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; UPDATE U&\"audit_settings\" SET setting = 'replica' WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH marker AS (SELECT 1) UPDATE pg_settings SET setting = 'origin' WHERE name = 'session_replication_role';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; WITH changed_setting AS (UPDATE pg_settings SET setting = 'local' WHERE name = 'session_replication_role' RETURNING name) SELECT count(*) FROM changed_setting;",
         ] {
