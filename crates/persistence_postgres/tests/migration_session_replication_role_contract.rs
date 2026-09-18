@@ -203,3 +203,23 @@ fn named_set_config_safe_atoms_and_unrelated_parameter_remain_accepted() {
         assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
     }
 }
+
+#[test]
+fn dynamic_set_config_setting_name_fails_closed_when_target_cannot_be_proven_unrelated() {
+    for final_sql in [
+        "SELECT set_config(lower('SESSION_REPLICATION_ROLE'), 'replica', false);",
+        "SELECT set_config(setting_name => (SELECT 'session_replication_role'), new_value => 'replica', is_local => false);",
+    ] {
+        assert_eq!(
+            validate_migration_catalog(&embedded_with(final_sql)),
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "dynamic set_config setting_name must fail closed because the protected target cannot be excluded: {final_sql}",
+        );
+    }
+}
+
+#[test]
+fn rolled_back_dynamic_set_config_setting_name_remains_non_durable() {
+    let final_sql = "BEGIN; SELECT set_config(lower('SESSION_REPLICATION_ROLE'), 'replica', true); ROLLBACK;";
+    assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+}
