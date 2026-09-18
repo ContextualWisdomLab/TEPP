@@ -13,9 +13,13 @@ fn committed_role_replica_login_defaults_cannot_bypass_runtime_trigger_enforceme
     for final_sql in [
         "ALTER ROLE tepp_app_runtime SET session_replication_role = replica;",
         "ALTER ROLE tepp_app_runtime IN DATABASE tepp_database SET session_replication_role TO replica;",
+        "ALTER USER tepp_app_runtime SET session_replication_role = replica;",
+        "ALTER USER tepp_app_runtime IN DATABASE tepp_database SET session_replication_role TO replica;",
         "ALTER ROLE ALL SET session_replication_role = replica;",
+        "ALTER USER ALL IN DATABASE tepp_database SET session_replication_role = replica;",
         "ALTER ROLE ALL IN DATABASE tepp_database SET session_replication_role TO replica;",
         "ALTER ROLE tepp_app_runtime SET session_replication_role FROM CURRENT;",
+        "ALTER USER tepp_app_runtime SET session_replication_role FROM CURRENT;",
     ] {
         assert_eq!(
             validate_migration_catalog(&embedded_with(final_sql)),
@@ -43,7 +47,9 @@ fn committed_database_or_system_replica_defaults_fail_closed() {
 fn ordinary_trigger_safe_login_defaults_remain_accepted() {
     for final_sql in [
         "ALTER ROLE tepp_app_runtime SET session_replication_role = origin;",
+        "ALTER USER tepp_app_runtime SET session_replication_role = origin;",
         "ALTER ROLE tepp_app_runtime SET session_replication_role TO local;",
+        "ALTER USER ALL IN DATABASE tepp_database SET session_replication_role = local;",
         "ALTER ROLE ALL IN DATABASE tepp_database SET session_replication_role = origin;",
         "ALTER DATABASE tepp_database SET session_replication_role = local;",
         "ALTER SYSTEM SET session_replication_role = origin;",
@@ -56,7 +62,10 @@ fn ordinary_trigger_safe_login_defaults_remain_accepted() {
 fn unrelated_persistent_defaults_do_not_impersonate_replication_role() {
     for final_sql in [
         "ALTER ROLE tepp_app_runtime SET application_name = 'replica';",
+        "ALTER USER tepp_app_runtime SET application_name = 'replica';",
         "ALTER ROLE audit_runtime SET session_replication_role = replica;",
+        "ALTER USER audit_runtime SET session_replication_role = replica;",
+        "ALTER USER MAPPING FOR tepp_app_runtime SERVER foreign_server OPTIONS (SET user 'replica');",
         "ALTER DATABASE tepp_database SET application_name = 'replica';",
         "ALTER SYSTEM SET application_name = 'replica';",
     ] {
@@ -68,6 +77,7 @@ fn unrelated_persistent_defaults_do_not_impersonate_replication_role() {
 fn rolled_back_role_or_database_default_mutation_is_not_durable() {
     for final_sql in [
         "BEGIN; ALTER ROLE tepp_app_runtime SET session_replication_role = replica; ROLLBACK;",
+        "BEGIN; ALTER USER tepp_app_runtime SET session_replication_role = replica; ROLLBACK;",
         "BEGIN; ALTER ROLE ALL IN DATABASE tepp_database SET session_replication_role = replica; ROLLBACK;",
         "BEGIN; ALTER DATABASE tepp_database SET session_replication_role = replica; ROLLBACK;",
     ] {
@@ -80,7 +90,7 @@ fn marker_like_persistent_default_text_is_not_a_configuration_change() {
     let catalog = embedded_with(
         r#"
 SELECT 'ALTER ROLE tepp_app_runtime SET session_replication_role = replica';
--- ALTER ROLE tepp_app_runtime SET session_replication_role = replica;
+-- ALTER USER tepp_app_runtime SET session_replication_role = replica;
 SELECT $$ALTER DATABASE tepp_database SET session_replication_role = replica$$;
 SELECT 'ALTER SYSTEM SET session_replication_role = replica';
 "#,
