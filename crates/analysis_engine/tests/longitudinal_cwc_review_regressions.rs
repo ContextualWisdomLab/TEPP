@@ -71,7 +71,6 @@ fn artifact() -> LongitudinalCwcArtifact {
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
         row_count: 4,
         cluster_count: 2,
-        excluded_after_cutoff_count: 0,
         within_slope: 0.5,
         between_slope: 2.0,
         contextual_effect: 1.5,
@@ -156,21 +155,12 @@ fn artifact_refuses_inconsistent_contextual_effect() {
 }
 
 #[test]
-fn artifact_refuses_counts_impossible_for_the_executor() {
+fn artifact_refuses_visible_count_impossible_for_the_executor() {
     let mut oversized = artifact();
     oversized.row_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("limit") + 1;
     oversized.cluster_count = 2;
     assert_eq!(
         oversized.to_json(),
-        Err(AnalysisEngineError::InvalidLongitudinalCwcArtifact)
-    );
-
-    let mut impossible_total = artifact();
-    impossible_total.row_count = u64::try_from(MAX_EVIDENCE_UNITS).expect("limit");
-    impossible_total.cluster_count = 2;
-    impossible_total.excluded_after_cutoff_count = 1;
-    assert_eq!(
-        impossible_total.to_json(),
         Err(AnalysisEngineError::InvalidLongitudinalCwcArtifact)
     );
 }
