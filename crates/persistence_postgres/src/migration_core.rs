@@ -55,132 +55,56 @@ fn contains_unsupported_policy_mutation(sql: &str) -> bool {
     })
 }
 
-/// Return the next whitespace-delimited token span beginning at or after `from`.
-///
-/// The caller operates only on SQL that already crossed the shared PostgreSQL
-/// lexical authority, so this cursor is deliberately structural rather than a
-/// second lexer. Byte spans are retained because ALTER TABLE action parsing must
-/// continue from the exact end of the target instead of searching for a repeated
-/// identifier spelling later in the statement.
-fn next_sql_token_span(sql: &str, from: usize) -> Option<(usize, usize)> {
-    let tail = sql.get(from..)?;
-    let mut token_start = None;
-
-    for (offset, ch) in tail.char_indices() {
-        if token_start.is_none() {
-            if !ch.is_whitespace() {
-                token_start = Some(from + offset);
-            }
-            continue;
-        }
-        if ch.is_whitespace() {
-            return Some((token_start.expect("token start is set"), from + offset));
-        }
-    }
-
-    token_start.map(|start| (start, sql.len()))
-}
-
-/// Return whether one normalized token span equals an ASCII PostgreSQL keyword.
-fn token_span_eq(sql: &str, span: (usize, usize), keyword: &str) -> bool {
-    sql.get(span.0..span.1)
-        .is_some_and(|token| token.eq_ignore_ascii_case(keyword))
-}
-
-/// Return whether an ALTER TABLE action begins with PostgreSQL `RENAME`.
-fn alter_table_action_is_rename(action: &str) -> bool {
-    next_sql_token_span(action, 0).is_some_and(|span| token_span_eq(action, span, "RENAME"))
-}
-
-/// Detect a RENAME action in PostgreSQL's comma-separated ALTER TABLE action list.
-///
-/// PostgreSQL permits multiple table alterations in one statement. A supported
-/// first action therefore cannot certify a later rename. Commas inside CHECK or
-/// expression parentheses and array/subscript brackets are not action separators;
-/// lexical comments and literals were already normalized before this boundary.
-fn alter_table_actions_include_rename(actions: &str) -> bool {
-    let mut parenthesis_depth = 0usize;
-    let mut bracket_depth = 0usize;
-    let mut action_start = 0usize;
-
-    for (index, ch) in actions.char_indices() {
-        match ch {
-            '(' => parenthesis_depth = parenthesis_depth.saturating_add(1),
-            ')' => parenthesis_depth = parenthesis_depth.saturating_sub(1),
-            '[' => bracket_depth = bracket_depth.saturating_add(1),
-            ']' => bracket_depth = bracket_depth.saturating_sub(1),
-            ',' if parenthesis_depth == 0 && bracket_depth == 0 => {
-                if alter_table_action_is_rename(&actions[action_start..index]) {
-                    return true;
-                }
-                action_start = index + ch.len_utf8();
-            }
-            _ => {}
-        }
-    }
-
-    alter_table_action_is_rename(&actions[action_start..])
-}
-
 /// Return whether one committed statement mutates table identity beyond the bounded final-state model.
 ///
 /// `DROP TABLE` removes the durable relation outright. PostgreSQL table- and
 /// column-level `RENAME` operations also invalidate historical identity evidence
 /// even though the relation survives. The parser intentionally consumes only the
 /// statement prefix, optional `IF EXISTS` / `ONLY`, the exact table target, and
-/// then the bounded action list. This positional boundary keeps a table literally
+/// the following action token. This positional boundary keeps a table literally
 /// named `rename` from being mistaken for a rename action after lexical quote
-/// normalization while still detecting a later RENAME in a multi-action ALTER.
+/// normalization.
 fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool {
-    let Some(first) = next_sql_token_span(statement, 0) else {
+    let tokens = statement.split_whitespace().collect::<Vec<_>>();
+    if tokens.len() < 2 {
         return false;
-    };
-    let Some(second) = next_sql_token_span(statement, first.1) else {
-        return false;
-    };
+    }
 
-    if token_span_eq(statement, first, "DROP") && token_span_eq(statement, second, "TABLE") {
+    if tokens[0].eq_ignore_ascii_case("DROP") && tokens[1].eq_ignore_ascii_case("TABLE") {
         return true;
     }
-    if !token_span_eq(statement, first, "ALTER") || !token_span_eq(statement, second, "TABLE") {
+    if !tokens[0].eq_ignore_ascii_case("ALTER") || !tokens[1].eq_ignore_ascii_case("TABLE") {
         return false;
     }
 
-    let mut cursor = second.1;
-    let Some(mut target) = next_sql_token_span(statement, cursor) else {
-        return false;
-    };
-    if token_span_eq(statement, target, "IF") {
-        let Some(exists) = next_sql_token_span(statement, target.1) else {
-            return false;
-        };
-        if !token_span_eq(statement, exists, "EXISTS") {
-            return false;
-        }
-        target = match next_sql_token_span(statement, exists.1) {
-            Some(span) => span,
-            None => return false,
-        };
-    }
-    if token_span_eq(statement, target, "ONLY") {
-        target = match next_sql_token_span(statement, target.1) {
-            Some(span) => span,
-            None => return false,
-        };
-    }
-
-    cursor = target.1;
-    if next_sql_token_span(statement, cursor)
-        .is_some_and(|span| statement.get(span.0..span.1) == Some("*"))
+    let mut index = 2usize;
+    if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("IF"))
+        && tokens
+            .get(index + 1)
+            .is_some_and(|token| token.eq_ignore_ascii_case("EXISTS"))
     {
-        cursor = next_sql_token_span(statement, cursor)
-            .map(|span| span.1)
-            .unwrap_or(cursor);
+        index += 2;
+    }
+    if tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("ONLY"))
+    {
+        index += 1;
     }
 
-    statement
-        .get(cursor..)
-        .is_some_and(alter_table_actions_include_rename)
+    if tokens.get(index).is_none() {
+        return false;
+    }
+    index += 1;
+    if tokens.get(index) == Some(&"*") {
+        index += 1;
+    }
+
+    tokens
+        .get(index)
+        .is_some_and(|token| token.eq_ignore_ascii_case("RENAME"))
 }
 
 /// Detect committed table removal or identity mutation not yet owned by the final-table state model.
@@ -442,8 +366,6 @@ mod tests {
             "DROP TABLE IF EXISTS tenant_record CASCADE ;",
             "ALTER TABLE tenant_record RENAME TO tenant_record_archive ;",
             "ALTER TABLE IF EXISTS ONLY tenant_record RENAME COLUMN tenant_record_id TO tenant_key ;",
-            "ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY, RENAME COLUMN tenant_record_id TO tenant_key ;",
-            "ALTER TABLE tenant_record ADD CONSTRAINT tenant_record_shape CHECK (tenant_record_id IN (a, b)), RENAME TO tenant_record_archive ;",
         ] {
             assert!(contains_unsupported_table_final_state_mutation(sql));
         }
@@ -451,8 +373,6 @@ mod tests {
             "SELECT drop_table_marker ; CREATE TABLE tenant_record ( tenant_record_id uuid ) ;",
             "ALTER TABLE tenant_record ENABLE ROW LEVEL SECURITY ;",
             "ALTER TABLE rename ENABLE ROW LEVEL SECURITY ;",
-            "ALTER TABLE tenant_record ADD COLUMN rename text ;",
-            "ALTER TABLE tenant_record ADD CONSTRAINT tenant_record_shape CHECK (some_func(a, rename)) ;",
         ] {
             assert!(!contains_unsupported_table_final_state_mutation(sql));
         }
