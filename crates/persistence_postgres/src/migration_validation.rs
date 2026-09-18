@@ -56,19 +56,18 @@ fn is_builtin_set_config_occurrence(statement: &str, start: usize) -> bool {
         .is_none_or(|ch| ch != '.' && !is_function_identifier_continuation(ch))
 }
 
-/// Return whether one normalized statement calls PostgreSQL's `set_config`
-/// with the direct `session_replication_role = replica` contract atoms.
+/// Return whether one normalized statement can set `session_replication_role`
+/// to a value that is not statically proven safe for ordinary triggers.
 ///
-/// Argument whitespace is erased only after the shared lexical pass has made
-/// strings and comments safe to inspect. Function identity is resolved before
-/// compaction so statement whitespace cannot merge `SELECT` with `set_config`.
-/// The bounded matcher accepts the unqualified builtin and explicit
-/// `pg_catalog.set_config`, while excluding identifier prefixes and unrelated
-/// schemas such as `audit_support.set_config`. More dynamic configuration
-/// expressions remain for a future execution-context aggregate.
-fn statement_calls_replica_set_config(statement: &str) -> bool {
+/// The shared lexical pass already made comments, quoted marker text, and dollar
+/// bodies opaque. Function identity is resolved before whitespace compaction so
+/// identifier prefixes and unrelated schemas cannot impersonate PostgreSQL's
+/// builtin. For the canonical direct setting-name atom, only direct `origin` and
+/// `local` values are proven safe; `replica` and non-atomic value expressions fail
+/// closed because `set_config` is PostgreSQL's function equivalent of `SET`.
+fn statement_calls_unsafe_set_config(statement: &str) -> bool {
     const FUNCTION_NAME: &str = "set_config";
-    const CALL: &str = "set_config('session_replication_role','replica',";
+    const TARGET_PREFIX: &str = "set_config('session_replication_role',";
     let lower = statement.to_ascii_lowercase();
     let mut search_from = 0usize;
 
@@ -80,8 +79,32 @@ fn statement_calls_replica_set_config(statement: &str) -> bool {
                 .filter(|ch| !ch.is_whitespace())
                 .collect::<String>()
                 .to_ascii_lowercase();
-            if compact_call.starts_with(CALL) {
-                return true;
+            if let Some(value_and_rest) = compact_call.strip_prefix(TARGET_PREFIX) {
+                let mut parenthesis_depth = 0usize;
+                let mut bracket_depth = 0usize;
+                let mut value_end = None;
+                for (index, ch) in value_and_rest.char_indices() {
+                    match ch {
+                        '(' => parenthesis_depth = parenthesis_depth.saturating_add(1),
+                        ')' if parenthesis_depth > 0 => parenthesis_depth -= 1,
+                        '[' => bracket_depth = bracket_depth.saturating_add(1),
+                        ']' if bracket_depth > 0 => bracket_depth -= 1,
+                        ',' if parenthesis_depth == 0 && bracket_depth == 0 => {
+                            value_end = Some(index);
+                            break;
+                        }
+                        ')' | ']' if parenthesis_depth == 0 && bracket_depth == 0 => break,
+                        _ => {}
+                    }
+                }
+
+                let value = value_end
+                    .map(|end| &value_and_rest[..end])
+                    .unwrap_or(value_and_rest);
+                let safe = matches!(value, "'origin'" | "'local'");
+                if !safe {
+                    return true;
+                }
             }
         }
         search_from = start + FUNCTION_NAME.len();
@@ -299,7 +322,7 @@ fn statement_updates_unsafe_replication_role_via_pg_settings(statement: &str) ->
 /// and `local` atoms.
 fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
     sql.split(';').any(|statement| {
-        if statement_calls_replica_set_config(statement)
+        if statement_calls_unsafe_set_config(statement)
             || statement_updates_unsafe_replication_role_via_pg_settings(statement)
         {
             return true;
