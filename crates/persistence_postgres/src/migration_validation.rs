@@ -18,14 +18,45 @@ pub(super) fn normalize_migration_sql(sql: &str) -> Option<String> {
     implementation::normalize_migration_sql_with_grantor_identity(sql)
 }
 
-/// Return whether one normalized statement calls PostgreSQL's unqualified `set_config`
+/// Return whether a byte-position starts an unqualified or canonical `pg_catalog` function call.
+///
+/// The compact SQL fragment has already crossed the shared PostgreSQL lexical
+/// authority. Identifier continuations and arbitrary schema qualifiers cannot
+/// donate builtin-function identity; explicit `pg_catalog.` is accepted because
+/// it names PostgreSQL's canonical system implementation.
+fn is_builtin_function_start(compact: &str, start: usize) -> bool {
+    const PG_CATALOG_PREFIX: &str = "pg_catalog.";
+    let previous = compact[..start].chars().next_back();
+    let is_identifier_continuation = previous.is_some_and(|ch| {
+        ch.is_ascii_alphanumeric() || ch == '_' || ch == '$' || !ch.is_ascii()
+    });
+    if !is_identifier_continuation && previous != Some('.') {
+        return true;
+    }
+    if start < PG_CATALOG_PREFIX.len() {
+        return false;
+    }
+    let schema_start = start - PG_CATALOG_PREFIX.len();
+    if !compact[schema_start..start].eq_ignore_ascii_case(PG_CATALOG_PREFIX) {
+        return false;
+    }
+    compact[..schema_start]
+        .chars()
+        .next_back()
+        .is_none_or(|ch| {
+            !ch.is_ascii_alphanumeric() && ch != '_' && ch != '$' && ch != '.' && ch.is_ascii()
+        })
+}
+
+/// Return whether one normalized statement calls PostgreSQL's `set_config`
 /// with the direct `session_replication_role = replica` contract atoms.
 ///
 /// Whitespace is erased only after the shared lexical pass has made strings and
-/// comments safe to inspect. The function-name boundary excludes identifier
-/// prefixes and schema-qualified lookalikes such as `audit_support.set_config`.
-/// More dynamic configuration expressions remain outside this bounded matcher
-/// and must be owned by a future execution-context aggregate rather than guessed.
+/// comments safe to inspect. The function-name boundary accepts the unqualified
+/// builtin and explicit `pg_catalog.set_config`, while excluding identifier
+/// prefixes and unrelated schemas such as `audit_support.set_config`. More
+/// dynamic configuration expressions remain outside this bounded matcher and
+/// must be owned by a future execution-context aggregate rather than guessed.
 fn statement_calls_replica_set_config(statement: &str) -> bool {
     const CALL: &str = "set_config('session_replication_role','replica',";
     let compact = statement
@@ -37,11 +68,7 @@ fn statement_calls_replica_set_config(statement: &str) -> bool {
 
     while let Some(relative) = compact[search_from..].find(CALL) {
         let start = search_from + relative;
-        let previous = compact[..start].chars().next_back();
-        let is_identifier_continuation = previous.is_some_and(|ch| {
-            ch.is_ascii_alphanumeric() || ch == '_' || ch == '$' || !ch.is_ascii()
-        });
-        if !is_identifier_continuation && previous != Some('.') {
+        if is_builtin_function_start(&compact, start) {
             return true;
         }
         search_from = start + CALL.len();
@@ -113,9 +140,9 @@ fn committed_replica_trigger_execution_mode(sql: &str) -> bool {
 /// after that shared lexical projection and before lifecycle folding, so a
 /// rolled-back `ALTER ROLE ... NOBYPASSRLS` cannot certify an actually unsafe
 /// runtime role. A committed `session_replication_role = replica`, whether via
-/// `SET` or the direct unqualified `set_config` equivalent, also fails the
-/// runtime-role contract because it suppresses ordinary enforcement triggers
-/// even when their durable catalog definitions remain enabled.
+/// `SET` or PostgreSQL's direct `set_config` equivalent, also fails the runtime-
+/// role contract because it suppresses ordinary enforcement triggers even when
+/// their durable catalog definitions remain enabled.
 pub(super) fn declares_created_role(sql: &str, expected_role: &str) -> Option<bool> {
     let lifecycle_sql = preserve_quoted_special_role_specifications(sql);
     let normalized_lifecycle = implementation::normalize_migration_sql_with_grantor_identity(
@@ -177,6 +204,7 @@ mod tests {
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SET SESSION session_replication_role TO 'replica';",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SET LOCAL session_replication_role = replica; COMMIT;",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT set_config('session_replication_role', 'replica', false);",
+            "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; SELECT pg_catalog . set_config('session_replication_role', 'replica', false);",
             "CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS; BEGIN; SELECT set_config('session_replication_role', 'replica', true); COMMIT;",
         ] {
             assert_eq!(declares_created_role(sql, "tepp_app_runtime"), Some(false));
