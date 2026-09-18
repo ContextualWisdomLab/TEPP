@@ -25,6 +25,12 @@ fn unicode_escaped_pg_settings_identity_cannot_bypass_replication_role_guard() {
 }
 
 #[test]
+fn unrelated_safe_unicode_escaped_relation_identity_remains_unrelated() {
+    let final_sql = r#"UPDATE U&"audit_settings" SET setting = 'replica' WHERE name = 'session_replication_role';"#;
+    assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+}
+
+#[test]
 fn rolled_back_unicode_escaped_pg_settings_mutation_is_not_durable() {
     let final_sql = r#"BEGIN; UPDATE U&"pg_settings" SET setting = 'replica' WHERE name = 'session_replication_role'; ROLLBACK;"#;
     assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
