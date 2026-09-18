@@ -63,10 +63,11 @@ fn is_builtin_set_config_occurrence(statement: &str, start: usize) -> bool {
 /// bodies opaque. Function identity is resolved before whitespace compaction so
 /// identifier prefixes and unrelated schemas cannot impersonate PostgreSQL's
 /// builtin. Positional, named (`=>` / `:=`), and mixed notation are folded into
-/// the canonical `setting_name` / `new_value` slots. For the direct
-/// `session_replication_role` setting-name atom, only direct `origin` and `local`
-/// values are proven safe; `replica` and non-atomic value expressions fail closed
-/// because `set_config` is PostgreSQL's function equivalent of `SET`.
+/// the canonical `setting_name` / `new_value` slots. A direct quoted setting name
+/// can prove an unrelated target. A dynamic setting-name expression cannot, so it
+/// fails closed. For direct `session_replication_role`, only direct `origin` and
+/// `local` values are proven safe; other or dynamic values fail closed because
+/// `set_config` is PostgreSQL's function equivalent of `SET`.
 fn statement_calls_unsafe_set_config(statement: &str) -> bool {
     const FUNCTION_NAME: &str = "set_config";
     const CALL_PREFIX: &str = "set_config(";
@@ -168,11 +169,18 @@ fn statement_calls_unsafe_set_config(statement: &str) -> bool {
                         positional_index += 1;
                     }
 
-                    if setting_name == Some("'session_replication_role'") {
-                        let safe = matches!(new_value, Some("'origin'") | Some("'local'"));
-                        if !safe {
-                            return true;
+                    match setting_name {
+                        Some("'session_replication_role'") => {
+                            let safe = matches!(new_value, Some("'origin'") | Some("'local'"));
+                            if !safe {
+                                return true;
+                            }
                         }
+                        Some(name)
+                            if name.len() >= 2
+                                && name.starts_with('\'')
+                                && name.ends_with('\'') => {}
+                        Some(_) | None => return true,
                     }
                 }
             }
