@@ -26,8 +26,8 @@ fn committed_drop_table_cannot_reuse_historical_create_and_rls_evidence() {
     let catalog = table_catalog("DROP TABLE tenant_record;");
     assert_eq!(
         validate_migration_catalog(&catalog),
-        Err(MigrationContractError::EmptyMigrationSql),
-        "a committed table removal must invalidate historical CREATE TABLE and dependent RLS evidence"
+        Err(MigrationContractError::UnsupportedTableFinalStateMutation),
+        "a committed table removal must fail with an explicit final-state limitation rather than masquerading as empty SQL"
     );
 }
 
