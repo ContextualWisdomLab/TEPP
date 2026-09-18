@@ -219,19 +219,20 @@ fn admit_scores_at_cutoff(
     let mut evidence_ids = BTreeSet::new();
     let mut eligible = Vec::new();
     for score in scores {
+        if score.available_time.instant() > knowledge_cutoff.instant() {
+            continue;
+        }
         if score.snapshot_id != snapshot_id {
             return Err(AnalysisEngineError::SnapshotMismatch);
         }
-        if score.available_time.instant() <= knowledge_cutoff.instant() {
-            if !evidence_ids.insert(score.evidence_id.as_str()) {
-                return Err(AnalysisEngineError::DuplicateEvidence);
-            }
-            eligible.push(ClusteredScore {
-                cluster_key: score.cluster_key,
-                predictor: score.predictor,
-                outcome: score.outcome,
-            });
+        if !evidence_ids.insert(score.evidence_id.as_str()) {
+            return Err(AnalysisEngineError::DuplicateEvidence);
         }
+        eligible.push(ClusteredScore {
+            cluster_key: score.cluster_key,
+            predictor: score.predictor,
+            outcome: score.outcome,
+        });
     }
     if eligible.is_empty() {
         return Err(AnalysisEngineError::Psychometric(
