@@ -9,7 +9,7 @@ fn embedded_with(final_sql: &str) -> MigrationCatalog {
 }
 
 #[test]
-fn committed_replica_execution_mode_cannot_bypass_append_only_triggers() {
+fn committed_replica_execution_mode_cannot_bypass_runtime_trigger_enforcement() {
     for final_sql in [
         "SET session_replication_role = replica;",
         "SET SESSION session_replication_role TO replica;",
@@ -17,8 +17,8 @@ fn committed_replica_execution_mode_cannot_bypass_append_only_triggers() {
     ] {
         assert_eq!(
             validate_migration_catalog(&embedded_with(final_sql)),
-            Err(MigrationContractError::MissingAppendOnlyTrigger),
-            "committed replica execution mode must invalidate ordinary trigger enforcement: {final_sql}",
+            Err(MigrationContractError::MissingAppRuntimeRole),
+            "committed replica execution mode must invalidate the runtime-role safety contract: {final_sql}",
         );
     }
 }
