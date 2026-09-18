@@ -6,6 +6,7 @@ use psychometric_core::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use tepp_api::{
     AnalysisResultSummary, AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalResult,
@@ -29,6 +30,7 @@ const LONGITUDINAL_CWC_INFERENCE_STATUS: &str = "composed_cwc_slopes_not_causal"
 /// One already-mapped clustered score offered to a cutoff-safe CWC run.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LongitudinalClusterScore {
+    evidence_id: String,
     snapshot_id: String,
     cluster_key: u64,
     predictor: f64,
@@ -37,30 +39,43 @@ pub struct LongitudinalClusterScore {
 }
 
 impl LongitudinalClusterScore {
-    /// Bind one clustered predictor–outcome pair to immutable snapshot and availability provenance.
+    /// Bind one clustered predictor–outcome pair to immutable evidence, snapshot, and availability provenance.
     ///
     /// # Errors
     ///
-    /// Returns [`AnalysisEngineError::InvalidEvidence`] when the snapshot identifier is invalid or
-    /// either coordinate is non-finite.
+    /// Returns [`AnalysisEngineError::InvalidEvidence`] when either identity is invalid or either
+    /// coordinate is non-finite.
     pub fn new(
+        evidence_id: impl Into<String>,
         snapshot_id: impl Into<String>,
         cluster_key: u64,
         predictor: f64,
         outcome: f64,
         available_time: AvailableTime,
     ) -> Result<Self, AnalysisEngineError> {
+        let evidence_id = evidence_id.into();
         let snapshot_id = snapshot_id.into();
-        if !valid_identifier(&snapshot_id) || !predictor.is_finite() || !outcome.is_finite() {
+        if !valid_identifier(&evidence_id)
+            || !valid_identifier(&snapshot_id)
+            || !predictor.is_finite()
+            || !outcome.is_finite()
+        {
             return Err(AnalysisEngineError::InvalidEvidence);
         }
         Ok(Self {
+            evidence_id,
             snapshot_id,
             cluster_key,
             predictor,
             outcome,
             available_time,
         })
+    }
+
+    /// Return the opaque immutable evidence identity.
+    #[must_use]
+    pub fn evidence_id(&self) -> &str {
+        &self.evidence_id
     }
 
     /// Return the immutable source snapshot identity.
@@ -213,11 +228,15 @@ fn admit_scores_at_cutoff(
     if scores.len() > MAX_EVIDENCE_UNITS {
         return Err(AnalysisEngineError::LimitExceeded);
     }
+    let mut evidence_ids = BTreeSet::new();
     let mut eligible = Vec::new();
     let mut excluded_after_cutoff_count = 0_u64;
     for score in scores {
         if score.snapshot_id != snapshot_id {
             return Err(AnalysisEngineError::SnapshotMismatch);
+        }
+        if !evidence_ids.insert(score.evidence_id.as_str()) {
+            return Err(AnalysisEngineError::DuplicateEvidence);
         }
         if score.available_time.instant() <= knowledge_cutoff.instant() {
             eligible.push(ClusteredScore {
@@ -256,13 +275,15 @@ fn require_causal_refusal(
 /// Execute cutoff-safe CWC within/between composition as one analysis-run profile.
 ///
 /// The caller supplies already-mapped clustered coordinates. Each row carries its immutable
-/// source snapshot and availability provenance. This executor does not invent an ESEM/DSEM
-/// estimator, persist rows, or treat the recovered slopes as a causal effect.
+/// evidence identity, source snapshot, and availability provenance. Duplicate evidence is
+/// rejected before cutoff filtering so replay cannot alter row weighting or scientific output.
+/// This executor does not invent an ESEM/DSEM estimator, persist rows, or treat the recovered
+/// slopes as a causal effect.
 ///
 /// # Errors
 ///
-/// Returns a request/receipt/snapshot/cutoff/profile error, psychometric
-/// recovery failure, or invalid artifact error.
+/// Returns a request/receipt/snapshot/cutoff/profile error, duplicate-evidence refusal,
+/// psychometric recovery failure, or invalid artifact error.
 pub fn execute_longitudinal_cwc_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
@@ -290,7 +311,7 @@ pub fn execute_longitudinal_cwc_run(
     let slopes = recover_cluster_mean_within_between_slopes(&eligible.scores)?;
     require_causal_refusal(claim_causal_effect(CausalHeuristic::TemporalPrecedence))?;
 
-    let mut clusters = std::collections::BTreeSet::new();
+    let mut clusters = BTreeSet::new();
     for score in &eligible.scores {
         clusters.insert(score.cluster_key);
     }
