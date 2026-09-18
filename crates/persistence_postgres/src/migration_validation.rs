@@ -375,39 +375,39 @@ fn update_targets_unsafe_replication_role_via_pg_settings(update_statement: &str
         }
     };
 
-    let quoted_setting_name = |token: &str| -> Option<&str> {
-        if token.len() >= 2
+    let is_direct_quoted_setting_name = |token: &str| -> bool {
+        token.len() >= 2
             && token.starts_with('\'')
             && token.ends_with('\'')
             && !token[1..token.len() - 1].contains('\'')
-        {
-            Some(&token[1..token.len() - 1])
-        } else {
-            None
-        }
+    };
+    let is_protected_setting_name = |token: &str| -> bool {
+        is_direct_quoted_setting_name(token)
+            && token[1..token.len() - 1].eq_ignore_ascii_case("session_replication_role")
     };
 
     let predicate_start = where_index + 1;
     if let Some(after_name) = name_operand_end(predicate_start) {
-        if tokens.get(after_name) == Some(&"=")
-            && after_name + 2 == predicate_end
-            && let Some(setting_name) = tokens
-                .get(after_name + 1)
-                .and_then(|token| quoted_setting_name(token))
-        {
-            return setting_name.eq_ignore_ascii_case("session_replication_role");
+        if tokens.get(after_name) == Some(&"=") && after_name + 2 == predicate_end {
+            if let Some(setting_name) = tokens.get(after_name + 1) {
+                if is_direct_quoted_setting_name(setting_name) {
+                    return is_protected_setting_name(setting_name);
+                }
+            }
         }
         return true;
     }
 
-    if let Some(setting_name) = tokens
-        .get(predicate_start)
-        .and_then(|token| quoted_setting_name(token))
-        && tokens.get(predicate_start + 1) == Some(&"=")
-        && let Some(after_name) = name_operand_end(predicate_start + 2)
-        && after_name == predicate_end
-    {
-        return setting_name.eq_ignore_ascii_case("session_replication_role");
+    if let Some(setting_name) = tokens.get(predicate_start) {
+        if is_direct_quoted_setting_name(setting_name)
+            && tokens.get(predicate_start + 1) == Some(&"=")
+        {
+            if let Some(after_name) = name_operand_end(predicate_start + 2) {
+                if after_name == predicate_end {
+                    return is_protected_setting_name(setting_name);
+                }
+            }
+        }
     }
 
     true
