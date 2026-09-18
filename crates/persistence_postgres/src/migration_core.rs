@@ -88,17 +88,28 @@ fn token_span_eq(sql: &str, span: (usize, usize), keyword: &str) -> bool {
         .is_some_and(|token| token.eq_ignore_ascii_case(keyword))
 }
 
-/// Return whether one normalized token denotes TEPP's append-only guard routine.
+/// Return whether one normalized SQL span denotes TEPP's append-only guard routine.
 ///
-/// The shared lexical authority has already handled quoted identifiers. This
-/// helper only strips a schema qualifier and attached argument-list punctuation
-/// so the final-state guard can recognize both `reject_append_only_mutation()`
-/// and schema-qualified spellings without reparsing SQL bodies.
-fn token_span_names_append_only_guard_routine(sql: &str, span: (usize, usize)) -> bool {
-    let Some(token) = sql.get(span.0..span.1) else {
+/// PostgreSQL permits whitespace around the period in a schema-qualified name
+/// and between a routine name and its argument list. The shared lexical authority
+/// has already removed comments and opaque bodies, so this bounded identity check
+/// only joins whitespace-separated name punctuation until the signature or DROP
+/// behavior keyword. It does not reparse executable SQL.
+fn sql_span_names_append_only_guard_routine(sql: &str, span: (usize, usize)) -> bool {
+    let Some(fragment) = sql.get(span.0..span.1) else {
         return false;
     };
-    let name = token.split_once('(').map_or(token, |(name, _)| name);
+    let mut name = String::new();
+    for token in fragment.split_whitespace() {
+        if token.eq_ignore_ascii_case("CASCADE") || token.eq_ignore_ascii_case("RESTRICT") {
+            break;
+        }
+        if let Some((before_signature, _)) = token.split_once('(') {
+            name.push_str(before_signature);
+            break;
+        }
+        name.push_str(token);
+    }
     name.rsplit('.')
         .next()
         .is_some_and(|part| part.eq_ignore_ascii_case("reject_append_only_mutation"))
@@ -159,9 +170,7 @@ fn statement_drops_append_only_guard_routine(statement: &str) -> bool {
             }
             ',' if parenthesis_depth == 0 => {
                 let target = &targets[target_start..index];
-                if next_sql_token_span(target, 0)
-                    .is_some_and(|span| token_span_names_append_only_guard_routine(target, span))
-                {
+                if sql_span_names_append_only_guard_routine(target, (0, target.len())) {
                     return true;
                 }
                 target_start = index + ch.len_utf8();
@@ -173,8 +182,7 @@ fn statement_drops_append_only_guard_routine(statement: &str) -> bool {
         return true;
     }
     let final_target = &targets[target_start..];
-    next_sql_token_span(final_target, 0)
-        .is_some_and(|span| token_span_names_append_only_guard_routine(final_target, span))
+    sql_span_names_append_only_guard_routine(final_target, (0, final_target.len()))
 }
 
 /// Return whether one committed statement defines TEPP's append-only guard routine.
@@ -191,15 +199,15 @@ fn statement_defines_append_only_guard_routine(statement: &str) -> bool {
     let Some(function_keyword) = next_sql_token_span(statement, replace_keyword.1) else {
         return false;
     };
-    let Some(routine) = next_sql_token_span(statement, function_keyword.1) else {
-        return false;
-    };
 
     token_span_eq(statement, create_keyword, "CREATE")
         && token_span_eq(statement, or_keyword, "OR")
         && token_span_eq(statement, replace_keyword, "REPLACE")
         && token_span_eq(statement, function_keyword, "FUNCTION")
-        && token_span_names_append_only_guard_routine(statement, routine)
+        && sql_span_names_append_only_guard_routine(
+            statement,
+            (function_keyword.1, statement.len()),
+        )
 }
 
 /// Detect committed mutations that make historical append-only guard evidence stale.
@@ -764,6 +772,12 @@ mod tests {
         )));
         assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
             "{canonical} DROP FUNCTION other_guard(), public.reject_append_only_mutation() CASCADE ;"
+        )));
+        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
+            "{canonical} DROP FUNCTION other_guard(), public . reject_append_only_mutation() CASCADE ;"
+        )));
+        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
+            "{canonical} CREATE OR REPLACE FUNCTION public . reject_append_only_mutation() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NULL END  ;"
         )));
         assert!(!contains_unsupported_append_only_guard_routine_mutation(&format!(
             "{canonical} DROP FUNCTION reject_append_only_mutation_shadow() CASCADE ;"
