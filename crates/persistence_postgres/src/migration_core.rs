@@ -93,14 +93,40 @@ fn alter_table_action_starts_with_drop(action: &str) -> bool {
     next_sql_token_span(action, 0).is_some_and(|span| token_span_eq(action, span, "DROP"))
 }
 
-/// Detect destructive DROP actions in PostgreSQL's comma-separated ALTER TABLE action list.
+/// Return whether one ALTER TABLE action weakens ordinary trigger enforcement.
+///
+/// PostgreSQL keeps disabled triggers in catalog state but does not execute them.
+/// `ENABLE REPLICA TRIGGER` is likewise insufficient for TEPP's ordinary
+/// application path because it fires only when `session_replication_role` is
+/// `replica`, not under the normal origin/local modes. Ordinary `ENABLE TRIGGER`
+/// and `ENABLE ALWAYS TRIGGER` remain admissible.
+fn alter_table_action_weakens_trigger_enforcement(action: &str) -> bool {
+    let Some(first) = next_sql_token_span(action, 0) else {
+        return false;
+    };
+    let Some(second) = next_sql_token_span(action, first.1) else {
+        return false;
+    };
+
+    if token_span_eq(action, first, "DISABLE") && token_span_eq(action, second, "TRIGGER") {
+        return true;
+    }
+    if !token_span_eq(action, first, "ENABLE") || !token_span_eq(action, second, "REPLICA") {
+        return false;
+    }
+    next_sql_token_span(action, second.1)
+        .is_some_and(|third| token_span_eq(action, third, "TRIGGER"))
+}
+
+/// Detect unsupported final-state actions in PostgreSQL's comma-separated ALTER TABLE action list.
 ///
 /// Action commas are recognized only outside expression parentheses and
 /// array/subscript brackets. That keeps commas inside CHECK/function expressions
-/// or `ARRAY[...]` from manufacturing action boundaries. Unbalanced delimiters
-/// fail closed because malformed structure cannot prove the absence of a later
-/// destructive action.
-fn alter_table_actions_include_drop(actions: &str) -> bool {
+/// or `ARRAY[...]` from manufacturing action boundaries. Destructive `DROP` and
+/// trigger modes that disable normal application-path enforcement fail closed.
+/// Unbalanced delimiters also fail closed because malformed structure cannot
+/// prove the absence of a later unsupported action.
+fn alter_table_actions_include_unsupported_final_state_mutation(actions: &str) -> bool {
     let mut parenthesis_depth = 0usize;
     let mut bracket_depth = 0usize;
     let mut action_start = 0usize;
@@ -122,7 +148,10 @@ fn alter_table_actions_include_drop(actions: &str) -> bool {
                 bracket_depth -= 1;
             }
             ',' if parenthesis_depth == 0 && bracket_depth == 0 => {
-                if alter_table_action_starts_with_drop(&actions[action_start..index]) {
+                let action = &actions[action_start..index];
+                if alter_table_action_starts_with_drop(action)
+                    || alter_table_action_weakens_trigger_enforcement(action)
+                {
                     return true;
                 }
                 action_start = index + ch.len_utf8();
@@ -134,7 +163,9 @@ fn alter_table_actions_include_drop(actions: &str) -> bool {
     if parenthesis_depth != 0 || bracket_depth != 0 {
         return true;
     }
-    alter_table_action_starts_with_drop(&actions[action_start..])
+    let final_action = &actions[action_start..];
+    alter_table_action_starts_with_drop(final_action)
+        || alter_table_action_weakens_trigger_enforcement(final_action)
 }
 
 /// Return the committed ALTER TABLE action list after its target relation.
@@ -283,8 +314,10 @@ fn contains_invalid_alter_table_added_column_name(sql: &str) -> bool {
 /// `DROP TABLE` removes the durable relation. Standalone PostgreSQL `RENAME`
 /// forms make historical table/column identities stale. The ordinary
 /// `ALTER TABLE ... action [, ...]` form can also contain destructive `DROP`
-/// actions such as `DROP COLUMN` or `DROP CONSTRAINT`; every top-level action is
-/// inspected so an additive first action cannot hide a later destructive one.
+/// actions such as `DROP COLUMN` or `DROP CONSTRAINT`, plus trigger firing-state
+/// changes that can disable ordinary application-path enforcement. Every
+/// top-level action is inspected so a safe first action cannot hide a later
+/// unsupported mutation.
 /// Target parsing is positional, which keeps a table literally named `rename`
 /// or `drop` from being confused with an action after lexical normalization.
 fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool {
@@ -310,7 +343,7 @@ fn statement_has_unsupported_table_final_state_mutation(statement: &str) -> bool
     if token_span_eq(actions, first_action, "RENAME") {
         return true;
     }
-    alter_table_actions_include_drop(actions)
+    alter_table_actions_include_unsupported_final_state_mutation(actions)
 }
 
 /// Detect committed table removals or identity/destructive mutations not yet owned by final-table state.
@@ -343,10 +376,11 @@ fn contains_unsupported_table_final_state_mutation(sql: &str) -> bool {
 /// `DISABLE` or `NO FORCE` cannot reuse stale positive evidence from earlier SQL.
 /// Committed `ALTER POLICY` and `DROP POLICY` are temporarily rejected until
 /// policy identity, clause replacement, and removal have their own final-state
-/// authority. Committed `DROP TABLE`, standalone table/column rename forms, and
-/// destructive ALTER TABLE DROP actions are likewise rejected until table,
+/// authority. Committed `DROP TABLE`, standalone table/column rename forms,
+/// destructive ALTER TABLE DROP actions, and trigger modes that disable normal
+/// application-path enforcement are likewise rejected until table, trigger,
 /// column, constraint, removal/recreation, and dependent-object effects are
-/// represented by a first-class final-table aggregate. Committed ADD-column
+/// represented by first-class final-state aggregates. Committed ADD-column
 /// actions remain supported only when each introduced durable column satisfies
 /// the same multi-word `snake_case` authority as CREATE TABLE columns. Mutations
 /// removed by the transaction projection never reach either bounded boundary.
@@ -578,6 +612,10 @@ mod tests {
             "ALTER TABLE IF EXISTS ONLY tenant_record RENAME COLUMN tenant_record_id TO tenant_key ;",
             "ALTER TABLE tenant_record DROP COLUMN tenant_record_id CASCADE ;",
             "ALTER TABLE tenant_record ADD COLUMN auxiliary_flag boolean, DROP COLUMN tenant_record_id CASCADE ;",
+            "ALTER TABLE source_artifact DISABLE TRIGGER source_artifact_reject_mutation ;",
+            "ALTER TABLE source_artifact DISABLE TRIGGER USER ;",
+            "ALTER TABLE source_artifact ENABLE REPLICA TRIGGER source_artifact_reject_mutation ;",
+            "ALTER TABLE source_artifact ADD COLUMN auxiliary_flag boolean, DISABLE TRIGGER source_artifact_reject_mutation ;",
         ] {
             assert!(contains_unsupported_table_final_state_mutation(sql));
         }
@@ -588,6 +626,8 @@ mod tests {
             "ALTER TABLE tenant_record ADD COLUMN drop_flag boolean ;",
             "ALTER TABLE tenant_record ADD CONSTRAINT tenant_record_shape CHECK (some_func(a, drop_flag)) ;",
             "ALTER TABLE tenant_record ADD CONSTRAINT tenant_record_array_shape CHECK (some_func(ARRAY[a, drop_flag])) ;",
+            "ALTER TABLE source_artifact ENABLE TRIGGER source_artifact_reject_mutation ;",
+            "ALTER TABLE source_artifact ENABLE ALWAYS TRIGGER source_artifact_reject_mutation ;",
         ] {
             assert!(!contains_unsupported_table_final_state_mutation(sql));
         }
