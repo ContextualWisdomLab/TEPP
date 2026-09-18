@@ -104,26 +104,27 @@ fn token_span_names_append_only_guard_routine(sql: &str, span: (usize, usize)) -
         .is_some_and(|part| part.eq_ignore_ascii_case("reject_append_only_mutation"))
 }
 
-/// Return whether one committed DROP FUNCTION statement targets the append-only guard routine.
+/// Return whether one committed DROP FUNCTION / DROP ROUTINE statement targets the append-only guard.
 ///
-/// PostgreSQL permits multiple function targets separated by top-level commas;
-/// commas inside function signatures are not target boundaries. Malformed
+/// PostgreSQL permits multiple routine targets separated by top-level commas;
+/// commas inside routine signatures are not target boundaries. Malformed
 /// parenthesis structure fails closed because this bounded authority cannot prove
 /// that the append-only guard is absent from an ambiguous DROP statement.
 fn statement_drops_append_only_guard_routine(statement: &str) -> bool {
     let Some(drop_keyword) = next_sql_token_span(statement, 0) else {
         return false;
     };
-    let Some(function_keyword) = next_sql_token_span(statement, drop_keyword.1) else {
+    let Some(routine_kind) = next_sql_token_span(statement, drop_keyword.1) else {
         return false;
     };
     if !token_span_eq(statement, drop_keyword, "DROP")
-        || !token_span_eq(statement, function_keyword, "FUNCTION")
+        || !(token_span_eq(statement, routine_kind, "FUNCTION")
+            || token_span_eq(statement, routine_kind, "ROUTINE"))
     {
         return false;
     }
 
-    let mut cursor = function_keyword.1;
+    let mut cursor = routine_kind.1;
     let Some(mut first_target) = next_sql_token_span(statement, cursor) else {
         return true;
     };
@@ -203,13 +204,14 @@ fn statement_defines_append_only_guard_routine(statement: &str) -> bool {
 
 /// Detect committed mutations that make historical append-only guard evidence stale.
 ///
-/// PostgreSQL `DROP FUNCTION ... CASCADE` can remove dependent triggers, while a
-/// later `CREATE OR REPLACE FUNCTION` can replace the routine body without
-/// changing the function identity referenced by those triggers. Until TEPP owns
-/// final routine-body and dependency state, the first canonical guard definition
-/// is accepted but a later replacement or committed removal fails closed. Input
-/// is already lexically normalized and transaction-projected, so rolled-back
-/// mutations and marker text in comments/literals/dollar bodies are absent here.
+/// PostgreSQL `DROP FUNCTION` / `DROP ROUTINE ... CASCADE` can remove dependent
+/// triggers, while a later `CREATE OR REPLACE FUNCTION` can replace the routine
+/// body without changing the function identity referenced by those triggers.
+/// Until TEPP owns final routine-body and dependency state, the first canonical
+/// guard definition is accepted but a later replacement or committed removal
+/// fails closed. Input is already lexically normalized and transaction-projected,
+/// so rolled-back mutations and marker text in comments/literals/dollar bodies
+/// are absent here.
 fn contains_unsupported_append_only_guard_routine_mutation(sql: &str) -> bool {
     let mut seen_guard_definition = false;
     for statement in sql.split(';') {
