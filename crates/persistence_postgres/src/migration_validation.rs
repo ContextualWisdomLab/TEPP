@@ -62,12 +62,14 @@ fn is_builtin_set_config_occurrence(statement: &str, start: usize) -> bool {
 /// The shared lexical pass already made comments, quoted marker text, and dollar
 /// bodies opaque. Function identity is resolved before whitespace compaction so
 /// identifier prefixes and unrelated schemas cannot impersonate PostgreSQL's
-/// builtin. For the canonical direct setting-name atom, only direct `origin` and
-/// `local` values are proven safe; `replica` and non-atomic value expressions fail
-/// closed because `set_config` is PostgreSQL's function equivalent of `SET`.
+/// builtin. Positional, named (`=>` / `:=`), and mixed notation are folded into
+/// the canonical `setting_name` / `new_value` slots. For the direct
+/// `session_replication_role` setting-name atom, only direct `origin` and `local`
+/// values are proven safe; `replica` and non-atomic value expressions fail closed
+/// because `set_config` is PostgreSQL's function equivalent of `SET`.
 fn statement_calls_unsafe_set_config(statement: &str) -> bool {
     const FUNCTION_NAME: &str = "set_config";
-    const TARGET_PREFIX: &str = "set_config('session_replication_role',";
+    const CALL_PREFIX: &str = "set_config(";
     let lower = statement.to_ascii_lowercase();
     let mut search_from = 0usize;
 
@@ -79,31 +81,99 @@ fn statement_calls_unsafe_set_config(statement: &str) -> bool {
                 .filter(|ch| !ch.is_whitespace())
                 .collect::<String>()
                 .to_ascii_lowercase();
-            if let Some(value_and_rest) = compact_call.strip_prefix(TARGET_PREFIX) {
+
+            if let Some(arguments_and_rest) = compact_call.strip_prefix(CALL_PREFIX) {
+                let bytes = arguments_and_rest.as_bytes();
+                let mut arguments = Vec::new();
+                let mut argument_start = 0usize;
                 let mut parenthesis_depth = 0usize;
                 let mut bracket_depth = 0usize;
-                let mut value_end = None;
-                for (index, ch) in value_and_rest.char_indices() {
-                    match ch {
-                        '(' => parenthesis_depth = parenthesis_depth.saturating_add(1),
-                        ')' if parenthesis_depth > 0 => parenthesis_depth -= 1,
-                        '[' => bracket_depth = bracket_depth.saturating_add(1),
-                        ']' if bracket_depth > 0 => bracket_depth -= 1,
-                        ',' if parenthesis_depth == 0 && bracket_depth == 0 => {
-                            value_end = Some(index);
+                let mut in_single_quote = false;
+                let mut call_closed = false;
+                let mut index = 0usize;
+
+                while index < bytes.len() {
+                    match bytes[index] {
+                        b'\'' => {
+                            if in_single_quote
+                                && bytes.get(index + 1).is_some_and(|next| *next == b'\'')
+                            {
+                                index += 2;
+                                continue;
+                            }
+                            in_single_quote = !in_single_quote;
+                        }
+                        b'(' if !in_single_quote => {
+                            parenthesis_depth = parenthesis_depth.saturating_add(1);
+                        }
+                        b')' if !in_single_quote && parenthesis_depth > 0 => {
+                            parenthesis_depth -= 1;
+                        }
+                        b'[' if !in_single_quote => {
+                            bracket_depth = bracket_depth.saturating_add(1);
+                        }
+                        b']' if !in_single_quote && bracket_depth > 0 => {
+                            bracket_depth -= 1;
+                        }
+                        b',' if !in_single_quote
+                            && parenthesis_depth == 0
+                            && bracket_depth == 0 =>
+                        {
+                            arguments.push(&arguments_and_rest[argument_start..index]);
+                            argument_start = index + 1;
+                        }
+                        b')' if !in_single_quote
+                            && parenthesis_depth == 0
+                            && bracket_depth == 0 =>
+                        {
+                            arguments.push(&arguments_and_rest[argument_start..index]);
+                            call_closed = true;
                             break;
                         }
-                        ')' | ']' if parenthesis_depth == 0 && bracket_depth == 0 => break,
                         _ => {}
                     }
+                    index += 1;
                 }
 
-                let value = value_end
-                    .map(|end| &value_and_rest[..end])
-                    .unwrap_or(value_and_rest);
-                let safe = matches!(value, "'origin'" | "'local'");
-                if !safe {
-                    return true;
+                if call_closed {
+                    let mut positional_index = 0usize;
+                    let mut setting_name = None;
+                    let mut new_value = None;
+
+                    for argument in arguments {
+                        let argument = argument.trim();
+                        if let Some(value) = argument
+                            .strip_prefix("setting_name=>")
+                            .or_else(|| argument.strip_prefix("setting_name:="))
+                        {
+                            setting_name = Some(value);
+                            continue;
+                        }
+                        if let Some(value) = argument
+                            .strip_prefix("new_value=>")
+                            .or_else(|| argument.strip_prefix("new_value:="))
+                        {
+                            new_value = Some(value);
+                            continue;
+                        }
+                        if argument.contains("=>") || argument.contains(":=") {
+                            continue;
+                        }
+
+                        match positional_index {
+                            0 => setting_name = Some(argument),
+                            1 => new_value = Some(argument),
+                            _ => {}
+                        }
+                        positional_index += 1;
+                    }
+
+                    if setting_name == Some("'session_replication_role'") {
+                        let safe = matches!(new_value, Some("'origin'") | Some("'local'"));
+                        if !safe {
+                            return true;
+                        }
+                    }
                 }
             }
         }
