@@ -62,11 +62,13 @@ fn later_enable_and_force_restore_the_required_final_state() {
     assert_eq!(validate_migration_catalog(&catalog), Ok(()));
 }
 
-#[test]
-fn whitespace_qualified_sibling_table_cannot_repair_disabled_rls_state() {
+fn assert_qualified_sibling_does_not_repair_disabled_target(
+    disabled_target: &str,
+    sibling_target: &str,
+) {
     let embedded = MigrationCatalog::from_embedded().expect("embedded catalog must load");
     let up_sql = format!(
-        "{}\nALTER TABLE public . tenant_record DISABLE ROW LEVEL SECURITY;\nALTER TABLE public . event_instance ENABLE ROW LEVEL SECURITY;\nALTER TABLE public . event_instance FORCE ROW LEVEL SECURITY;",
+        "{}\nALTER TABLE {disabled_target} DISABLE ROW LEVEL SECURITY;\nALTER TABLE {sibling_target} ENABLE ROW LEVEL SECURITY;\nALTER TABLE {sibling_target} FORCE ROW LEVEL SECURITY;",
         embedded.up_sql()
     );
     let catalog = MigrationCatalog::from_sql(&up_sql, embedded.down_sql());
@@ -75,6 +77,22 @@ fn whitespace_qualified_sibling_table_cannot_repair_disabled_rls_state() {
         validate_migration_catalog(&catalog),
         Err(MigrationContractError::MissingRlsEnable),
         "schema qualification must not collapse tenant_record and event_instance into one RLS state bucket"
+    );
+}
+
+#[test]
+fn whitespace_qualified_sibling_table_cannot_repair_disabled_rls_state() {
+    assert_qualified_sibling_does_not_repair_disabled_target(
+        "public . tenant_record",
+        "public . event_instance",
+    );
+}
+
+#[test]
+fn period_adjacent_qualified_sibling_table_cannot_repair_disabled_rls_state() {
+    assert_qualified_sibling_does_not_repair_disabled_target(
+        "public .tenant_record",
+        "public .event_instance",
     );
 }
 
