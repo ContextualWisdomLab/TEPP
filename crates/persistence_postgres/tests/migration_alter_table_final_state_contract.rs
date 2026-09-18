@@ -44,14 +44,38 @@ fn committed_tenant_column_rename_cannot_reuse_historical_column_evidence() {
 }
 
 #[test]
+fn committed_table_schema_move_cannot_reuse_historical_relation_identity() {
+    for mutation in [
+        "ALTER TABLE tenant_record SET SCHEMA archive;",
+        "ALTER TABLE IF EXISTS tenant_record SET SCHEMA archive;",
+    ] {
+        let catalog = table_catalog(mutation);
+        assert_eq!(
+            validate_migration_catalog(&catalog),
+            Err(MigrationContractError::UnsupportedTableFinalStateMutation),
+            "moving the relation to another schema must invalidate historical unqualified table evidence"
+        );
+    }
+}
+
+#[test]
 fn rolled_back_table_identity_mutations_do_not_change_the_durable_contract() {
     for mutation in [
         "BEGIN; ALTER TABLE tenant_record RENAME TO tenant_record_archive; ROLLBACK;",
         "BEGIN; ALTER TABLE tenant_record RENAME COLUMN tenant_record_id TO tenant_key; ROLLBACK;",
+        "BEGIN; ALTER TABLE tenant_record SET SCHEMA archive; ROLLBACK;",
     ] {
         let catalog = table_catalog(mutation);
         assert_eq!(validate_migration_catalog(&catalog), Ok(()));
     }
+}
+
+#[test]
+fn set_schema_marker_text_outside_structure_remains_inert() {
+    let catalog = table_catalog(
+        "SELECT 'ALTER TABLE tenant_record SET SCHEMA archive'; -- ALTER TABLE tenant_record SET SCHEMA archive",
+    );
+    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
 }
 
 #[test]
