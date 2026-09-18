@@ -61,11 +61,24 @@ fn origin_and_local_execution_modes_preserve_ordinary_trigger_enforcement() {
 }
 
 #[test]
-fn unrelated_schema_set_config_does_not_impersonate_the_postgresql_builtin() {
-    let catalog = embedded_with(
+fn keyword_and_parameter_prefixes_do_not_impersonate_replica_mode_changes() {
+    for final_sql in [
+        "SETSESSION session_replication_role = replica;",
+        "SET session_replication_role_shadow = replica;",
+    ] {
+        assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    }
+}
+
+#[test]
+fn unrelated_function_identity_does_not_impersonate_the_postgresql_builtin() {
+    for final_sql in [
         "SELECT audit_support.set_config('session_replication_role', 'replica', false);",
-    );
-    assert_eq!(validate_migration_catalog(&catalog), Ok(()));
+        "SELECT pg_catalog_shadow.set_config('session_replication_role', 'replica', false);",
+        "SELECT myset_config('session_replication_role', 'replica', false);",
+    ] {
+        assert_eq!(validate_migration_catalog(&embedded_with(final_sql)), Ok(()));
+    }
 }
 
 #[test]
