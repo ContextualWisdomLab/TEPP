@@ -63,6 +63,30 @@ fn rows() -> Vec<LongitudinalClusterScore> {
     ]
 }
 
+fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
+    AnalysisRunAccepted::new(
+        "run-longitudinal-cwc",
+        "accepted",
+        &request.idempotency_key,
+    )
+    .expect("accepted")
+}
+
+fn execute(
+    request: &AnalysisRunRequest,
+    scores: &[LongitudinalClusterScore],
+) -> analysis_engine::LongitudinalCwcExecution {
+    execute_longitudinal_cwc_run(
+        request,
+        &accepted(request),
+        SNAPSHOT_ID,
+        cutoff(),
+        scores,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("execution")
+}
+
 fn artifact() -> LongitudinalCwcArtifact {
     LongitudinalCwcArtifact {
         schema_version: LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION.into(),
@@ -81,12 +105,7 @@ fn artifact() -> LongitudinalCwcArtifact {
 #[test]
 fn equivalent_cutoff_instants_bind_and_provider_status_stays_separate() {
     let request = request("2026-08-01T01:00:00+01:00");
-    let accepted = AnalysisRunAccepted::new(
-        "run-longitudinal-cwc",
-        "accepted",
-        &request.idempotency_key,
-    )
-    .expect("accepted");
+    let accepted = accepted(&request);
 
     let execution = execute_longitudinal_cwc_run(
         &request,
@@ -114,21 +133,16 @@ fn equivalent_cutoff_instants_bind_and_provider_status_stays_separate() {
 }
 
 #[test]
-fn cross_snapshot_rows_fail_closed_before_scientific_composition() {
+fn visible_cross_snapshot_rows_fail_closed_before_scientific_composition() {
     let request = request("2026-08-01T00:00:00Z");
-    let accepted = AnalysisRunAccepted::new(
-        "run-longitudinal-cwc",
-        "accepted",
-        &request.idempotency_key,
-    )
-    .expect("accepted");
+    let accepted = accepted(&request);
     let mut mixed = rows();
     mixed.push(row(
         "snapshot-other",
         3,
         8.0,
         20.0,
-        "2026-08-15T00:00:00Z",
+        "2026-07-15T00:00:00Z",
     ));
 
     assert_eq!(
@@ -142,6 +156,25 @@ fn cross_snapshot_rows_fail_closed_before_scientific_composition() {
         ),
         Err(AnalysisEngineError::SnapshotMismatch)
     );
+}
+
+#[test]
+fn future_unavailable_cross_snapshot_rows_do_not_change_historical_replay() {
+    let request = request("2026-08-01T00:00:00Z");
+    let baseline_rows = rows();
+    let baseline = execute(&request, &baseline_rows);
+    let mut replay_rows = baseline_rows;
+    replay_rows.push(row(
+        "snapshot-other",
+        3,
+        8.0,
+        20.0,
+        "2026-08-15T00:00:00Z",
+    ));
+    let replay = execute(&request, &replay_rows);
+
+    assert_eq!(replay.artifact, baseline.artifact);
+    assert_eq!(replay.terminal_result, baseline.terminal_result);
 }
 
 #[test]
