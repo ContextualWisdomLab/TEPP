@@ -88,14 +88,18 @@ fn token_span_eq(sql: &str, span: (usize, usize), keyword: &str) -> bool {
         .is_some_and(|token| token.eq_ignore_ascii_case(keyword))
 }
 
-/// Return whether one normalized SQL span denotes TEPP's append-only guard routine.
+/// Return whether one normalized SQL span denotes `routine_name`.
 ///
 /// PostgreSQL permits whitespace around the period in a schema-qualified name
 /// and between a routine name and its argument list. The shared lexical authority
 /// has already removed comments and opaque bodies, so this bounded identity check
 /// only joins whitespace-separated name punctuation until the signature or DROP
 /// behavior keyword. It does not reparse executable SQL.
-fn sql_span_names_append_only_guard_routine(sql: &str, span: (usize, usize)) -> bool {
+fn sql_span_names_guard_routine(
+    sql: &str,
+    span: (usize, usize),
+    routine_name: &str,
+) -> bool {
     let Some(fragment) = sql.get(span.0..span.1) else {
         return false;
     };
@@ -112,16 +116,16 @@ fn sql_span_names_append_only_guard_routine(sql: &str, span: (usize, usize)) -> 
     }
     name.rsplit('.')
         .next()
-        .is_some_and(|part| part.eq_ignore_ascii_case("reject_append_only_mutation"))
+        .is_some_and(|part| part.eq_ignore_ascii_case(routine_name))
 }
 
-/// Return whether one committed DROP FUNCTION / DROP ROUTINE statement targets the append-only guard.
+/// Return whether one committed DROP FUNCTION / DROP ROUTINE statement targets `routine_name`.
 ///
 /// PostgreSQL permits multiple routine targets separated by top-level commas;
 /// commas inside routine signatures are not target boundaries. Malformed
 /// parenthesis structure fails closed because this bounded authority cannot prove
-/// that the append-only guard is absent from an ambiguous DROP statement.
-fn statement_drops_append_only_guard_routine(statement: &str) -> bool {
+/// that the protected routine is absent from an ambiguous DROP statement.
+fn statement_drops_guard_routine(statement: &str, routine_name: &str) -> bool {
     let Some(drop_keyword) = next_sql_token_span(statement, 0) else {
         return false;
     };
@@ -170,7 +174,7 @@ fn statement_drops_append_only_guard_routine(statement: &str) -> bool {
             }
             ',' if parenthesis_depth == 0 => {
                 let target = &targets[target_start..index];
-                if sql_span_names_append_only_guard_routine(target, (0, target.len())) {
+                if sql_span_names_guard_routine(target, (0, target.len()), routine_name) {
                     return true;
                 }
                 target_start = index + ch.len_utf8();
@@ -182,11 +186,11 @@ fn statement_drops_append_only_guard_routine(statement: &str) -> bool {
         return true;
     }
     let final_target = &targets[target_start..];
-    sql_span_names_append_only_guard_routine(final_target, (0, final_target.len()))
+    sql_span_names_guard_routine(final_target, (0, final_target.len()), routine_name)
 }
 
-/// Return whether one committed statement defines TEPP's append-only guard routine.
-fn statement_defines_append_only_guard_routine(statement: &str) -> bool {
+/// Return whether one committed statement defines `routine_name` with CREATE OR REPLACE FUNCTION.
+fn statement_defines_guard_routine(statement: &str, routine_name: &str) -> bool {
     let Some(create_keyword) = next_sql_token_span(statement, 0) else {
         return false;
     };
@@ -204,29 +208,30 @@ fn statement_defines_append_only_guard_routine(statement: &str) -> bool {
         && token_span_eq(statement, or_keyword, "OR")
         && token_span_eq(statement, replace_keyword, "REPLACE")
         && token_span_eq(statement, function_keyword, "FUNCTION")
-        && sql_span_names_append_only_guard_routine(
+        && sql_span_names_guard_routine(
             statement,
             (function_keyword.1, statement.len()),
+            routine_name,
         )
 }
 
-/// Detect committed mutations that make historical append-only guard evidence stale.
+/// Detect committed mutations that make historical guard-routine evidence stale.
 ///
 /// PostgreSQL `DROP FUNCTION` / `DROP ROUTINE ... CASCADE` can remove dependent
-/// triggers, while a later `CREATE OR REPLACE FUNCTION` can replace the routine
+/// triggers, while a later `CREATE OR REPLACE FUNCTION` can replace a routine
 /// body without changing the function identity referenced by those triggers.
 /// Until TEPP owns final routine-body and dependency state, the first canonical
-/// guard definition is accepted but a later replacement or committed removal
-/// fails closed. Input is already lexically normalized and transaction-projected,
-/// so rolled-back mutations and marker text in comments/literals/dollar bodies
-/// are absent here.
-fn contains_unsupported_append_only_guard_routine_mutation(sql: &str) -> bool {
+/// definition is accepted but a later replacement or committed removal fails
+/// closed. Input is already lexically normalized and transaction-projected, so
+/// rolled-back mutations and marker text in comments/literals/dollar bodies are
+/// absent here.
+fn contains_unsupported_guard_routine_mutation(sql: &str, routine_name: &str) -> bool {
     let mut seen_guard_definition = false;
     for statement in sql.split(';') {
-        if statement_drops_append_only_guard_routine(statement) {
+        if statement_drops_guard_routine(statement, routine_name) {
             return true;
         }
-        if statement_defines_append_only_guard_routine(statement) {
+        if statement_defines_guard_routine(statement, routine_name) {
             if seen_guard_definition {
                 return true;
             }
@@ -529,12 +534,12 @@ fn contains_unsupported_table_final_state_mutation(sql: &str) -> bool {
 /// policy identity, clause replacement, and removal have their own final-state
 /// authority. Committed `DROP TABLE` / `DROP TRIGGER`, standalone table/column
 /// rename forms, destructive ALTER TABLE DROP actions, trigger modes that disable
-/// normal application-path enforcement, append-only guard-routine removal, and
-/// a second committed `CREATE OR REPLACE FUNCTION reject_append_only_mutation`
-/// are likewise rejected until table, trigger, routine, column, constraint,
-/// removal/recreation, dependent-object, and routine-body effects are represented
-/// by first-class final-state aggregates. Committed ADD-column actions remain
-/// supported only when each introduced durable column satisfies the same
+/// normal application-path enforcement, protected guard-routine removal, and a
+/// second committed `CREATE OR REPLACE FUNCTION` for an append-only or retention
+/// enforcement guard are likewise rejected until table, trigger, routine, column,
+/// constraint, removal/recreation, dependent-object, and routine-body effects are
+/// represented by first-class final-state aggregates. Committed ADD-column actions
+/// remain supported only when each introduced durable column satisfies the same
 /// multi-word `snake_case` authority as CREATE TABLE columns. Mutations removed
 /// by the transaction projection never reach either bounded boundary.
 ///
@@ -562,10 +567,21 @@ pub fn validate_migration_catalog(
         return Err(MigrationContractError::MissingAppRuntimeRole);
     };
 
-    if contains_unsupported_append_only_guard_routine_mutation(&committed_up)
-        || contains_unsupported_table_final_state_mutation(&committed_up)
+    if contains_unsupported_guard_routine_mutation(
+        &committed_up,
+        "reject_append_only_mutation",
+    ) || contains_unsupported_table_final_state_mutation(&committed_up)
     {
         return Err(MigrationContractError::UnsupportedTableFinalStateMutation);
+    }
+    if [
+        "reject_held_evidence_deletion",
+        "reject_tombstoned_evidence_restore",
+    ]
+    .iter()
+    .any(|routine_name| contains_unsupported_guard_routine_mutation(&committed_up, routine_name))
+    {
+        return Err(MigrationContractError::MissingRetentionLegalHold);
     }
     if contains_invalid_alter_table_added_column_name(&committed_up) {
         return Err(MigrationContractError::SingleWordObjectName);
@@ -724,8 +740,7 @@ fn canonicalize_table_persistence_modifiers(sql: &str) -> String {
 mod tests {
     use super::{
         canonicalize_table_persistence_modifiers,
-        contains_invalid_alter_table_added_column_name,
-        contains_unsupported_append_only_guard_routine_mutation,
+        contains_invalid_alter_table_added_column_name, contains_unsupported_guard_routine_mutation,
         contains_unsupported_policy_mutation, contains_unsupported_table_final_state_mutation,
         project_committed_sql,
     };
@@ -761,27 +776,56 @@ mod tests {
     }
 
     #[test]
-    fn append_only_guard_routine_final_state_detection_is_target_bounded() {
+    fn guard_routine_final_state_detection_is_target_bounded() {
         let canonical = "CREATE OR REPLACE FUNCTION reject_append_only_mutation() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NULL END  ;";
-        assert!(!contains_unsupported_append_only_guard_routine_mutation(canonical));
-        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
-            "{canonical} CREATE OR REPLACE FUNCTION reject_append_only_mutation() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NULL END  ;"
-        )));
-        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
-            "{canonical} DROP FUNCTION reject_append_only_mutation() CASCADE ;"
-        )));
-        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
-            "{canonical} DROP FUNCTION other_guard(), public.reject_append_only_mutation() CASCADE ;"
-        )));
-        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
-            "{canonical} DROP FUNCTION other_guard(), public . reject_append_only_mutation() CASCADE ;"
-        )));
-        assert!(contains_unsupported_append_only_guard_routine_mutation(&format!(
-            "{canonical} CREATE OR REPLACE FUNCTION public . reject_append_only_mutation() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NULL END  ;"
-        )));
-        assert!(!contains_unsupported_append_only_guard_routine_mutation(&format!(
-            "{canonical} DROP FUNCTION reject_append_only_mutation_shadow() CASCADE ;"
-        )));
+        assert!(!contains_unsupported_guard_routine_mutation(
+            canonical,
+            "reject_append_only_mutation"
+        ));
+        assert!(contains_unsupported_guard_routine_mutation(
+            &format!(
+                "{canonical} CREATE OR REPLACE FUNCTION reject_append_only_mutation() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NULL END  ;"
+            ),
+            "reject_append_only_mutation"
+        ));
+        assert!(contains_unsupported_guard_routine_mutation(
+            &format!("{canonical} DROP FUNCTION reject_append_only_mutation() CASCADE ;"),
+            "reject_append_only_mutation"
+        ));
+        assert!(contains_unsupported_guard_routine_mutation(
+            &format!(
+                "{canonical} DROP FUNCTION other_guard(), public.reject_append_only_mutation() CASCADE ;"
+            ),
+            "reject_append_only_mutation"
+        ));
+        assert!(contains_unsupported_guard_routine_mutation(
+            &format!(
+                "{canonical} DROP FUNCTION other_guard(), public . reject_append_only_mutation() CASCADE ;"
+            ),
+            "reject_append_only_mutation"
+        ));
+        assert!(contains_unsupported_guard_routine_mutation(
+            &format!(
+                "{canonical} CREATE OR REPLACE FUNCTION public . reject_append_only_mutation() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NULL END  ;"
+            ),
+            "reject_append_only_mutation"
+        ));
+        assert!(!contains_unsupported_guard_routine_mutation(
+            &format!("{canonical} DROP FUNCTION reject_append_only_mutation_shadow() CASCADE ;"),
+            "reject_append_only_mutation"
+        ));
+
+        let retention = "CREATE OR REPLACE FUNCTION reject_held_evidence_deletion() RETURNS trigger LANGUAGE plpgsql AS  BEGIN RETURN NEW END  ;";
+        assert!(!contains_unsupported_guard_routine_mutation(
+            retention,
+            "reject_held_evidence_deletion"
+        ));
+        assert!(contains_unsupported_guard_routine_mutation(
+            &format!(
+                "{retention} DROP ROUTINE IF EXISTS public . reject_held_evidence_deletion() CASCADE ;"
+            ),
+            "reject_held_evidence_deletion"
+        ));
     }
 
     #[test]
