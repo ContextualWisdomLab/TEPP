@@ -1,0 +1,1 @@
+- `tepp-project-history-request get` mints LineageWeave stored-request GET onto spawned `tepp-loopback` TCP (ADR 0088). Metric-free; stored projection `inference_status` remains `temporal_association_only`. Does not infer causality. Naruon refused. `NaruonLiveService` stays POST-only. Does not re-open cancel lineages. Not GAP-010 Figma/export, not persistence.
