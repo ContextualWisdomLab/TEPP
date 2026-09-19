@@ -74,6 +74,42 @@ fn disjoint_same_identity_reentry_preserves_longitudinal_membership_spells() {
 }
 
 #[test]
+fn disjoint_same_identity_spells_are_order_independent_at_insertion() {
+    let member = MemberId::new();
+    let group = GroupId::new();
+    let mut network = MembershipNetwork::new();
+
+    network
+        .insert(assignment(
+            member,
+            group,
+            "2026-03-01T00:00:00Z",
+            "2026-03-31T23:59:59Z",
+        ))
+        .expect("later spell inserted first");
+    network
+        .insert(assignment(
+            member,
+            group,
+            "2026-01-01T00:00:00Z",
+            "2026-01-31T23:59:59Z",
+        ))
+        .expect("earlier disjoint spell inserted second");
+
+    assert_eq!(network.assignment_count(), 2);
+    assert_eq!(
+        admit_single_membership(
+            &network,
+            member,
+            event_time("2026-01-15T00:00:00Z"),
+        )
+        .expect("earlier spell admission")
+        .group_id(),
+        group
+    );
+}
+
+#[test]
 fn same_identity_closed_intervals_cannot_overlap_or_share_an_endpoint() {
     let member = MemberId::new();
     let group = GroupId::new();
