@@ -31,15 +31,6 @@ fn request(cutoff: &str) -> AnalysisRunRequest {
     }
 }
 
-fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
-    AnalysisRunAccepted::new(
-        "run-longitudinal-cwc",
-        "accepted",
-        &request.idempotency_key,
-    )
-    .expect("accepted")
-}
-
 fn row(
     snapshot_id: &str,
     cluster_key: u64,
@@ -70,6 +61,15 @@ fn rows() -> Vec<LongitudinalClusterScore> {
         row(SNAPSHOT_ID, 2, 4.0, 10.0, "2026-07-01T00:00:00Z"),
         row(SNAPSHOT_ID, 2, 6.0, 11.0, "2026-07-01T00:00:00Z"),
     ]
+}
+
+fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
+    AnalysisRunAccepted::new(
+        "run-longitudinal-cwc",
+        "accepted",
+        &request.idempotency_key,
+    )
+    .expect("accepted")
 }
 
 fn execute(
