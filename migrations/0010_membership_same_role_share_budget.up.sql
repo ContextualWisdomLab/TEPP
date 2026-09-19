@@ -155,10 +155,15 @@ BEGIN
     ON CONFLICT (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code)
     DO UPDATE SET system_time = membership_share_budget_guard.system_time;
 
-    candidate_start := lower(NEW.valid_from_window);
+    -- `0006` intentionally permits non-empty uncertainty windows with unbounded sides. PostgreSQL
+    -- returns NULL from lower()/upper() for those sides; letting NULL reach the overlap predicate
+    -- would turn a real possible overlap into SQL UNKNOWN and omit the row from the budget. Map only
+    -- those schema-admitted unbounded envelope sides to temporal infinities for conservative
+    -- admission. Empty ranges are already rejected by `0006`.
+    candidate_start := COALESCE(lower(NEW.valid_from_window), '-infinity'::timestamptz);
     candidate_end := CASE
         WHEN NEW.valid_to_window IS NULL THEN 'infinity'::timestamptz
-        ELSE upper(NEW.valid_to_window)
+        ELSE COALESCE(upper(NEW.valid_to_window), 'infinity'::timestamptz)
     END;
 
     SELECT COALESCE(SUM(membership_binary64_scaled_numerator(existing.membership_weight)), 0)
@@ -177,10 +182,10 @@ BEGIN
        )
        -- Membership validity boundaries are uncertainty windows. Budget admission is deliberately
        -- conservative: if two assignments can overlap, their known shares must fit the same budget.
-       AND lower(existing.valid_from_window) <= candidate_end
+       AND COALESCE(lower(existing.valid_from_window), '-infinity'::timestamptz) <= candidate_end
        AND candidate_start <= CASE
             WHEN existing.valid_to_window IS NULL THEN 'infinity'::timestamptz
-            ELSE upper(existing.valid_to_window)
+            ELSE COALESCE(upper(existing.valid_to_window), 'infinity'::timestamptz)
        END;
 
     IF existing_numerator + candidate_numerator > unity_numerator THEN
