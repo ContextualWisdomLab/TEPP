@@ -1,8 +1,7 @@
 //! Validated membership weights for partial or full affiliation.
 
 use crate::MembershipError;
-use serde::{Deserialize, Deserializer, Serialize};
-use serde::de::Error as _;
+use serde::{Deserialize, Serialize};
 
 /// A finite membership share in the closed unit interval `[0, 1]`.
 ///
@@ -48,12 +47,10 @@ impl MembershipWeight {
 impl<'de> Deserialize<'de> for MembershipWeight {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         let value = f64::deserialize(deserializer)?;
-        Self::new(value).map_err(|_| {
-            D::Error::custom("membership weight must be finite and within the closed interval [0, 1]")
-        })
+        Self::new(value).map_err(serde::de::Error::custom)
     }
 }
 
