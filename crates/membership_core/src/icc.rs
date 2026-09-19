@@ -8,7 +8,7 @@ use temporal_core::EventTime;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum MembershipDesign {
-    /// Each active member belongs to exactly one group in one role at full weight.
+    /// All active members occupy one common role/classification, one group each, at full weight.
     Nested,
     /// At least one member is active in two or more roles, with no multiple-membership signal.
     CrossClassified,
@@ -16,6 +16,10 @@ pub enum MembershipDesign {
     MultipleMembership,
     /// The active population contains both cross-classification and multiple-membership structure.
     CrossClassifiedMultipleMembership,
+    /// Members are locally single-classified but the active population spans more than one role/classification.
+    HeterogeneousClassification,
+    /// The population spans classifications and also contains multiple-membership structure.
+    HeterogeneousClassificationMultipleMembership,
 }
 
 impl MembershipDesign {
@@ -26,7 +30,9 @@ impl MembershipDesign {
             Self::Nested => true,
             Self::CrossClassified
             | Self::MultipleMembership
-            | Self::CrossClassifiedMultipleMembership => false,
+            | Self::CrossClassifiedMultipleMembership
+            | Self::HeterogeneousClassification
+            | Self::HeterogeneousClassificationMultipleMembership => false,
         }
     }
 }
@@ -67,9 +73,9 @@ impl NestedOutcome {
 
 /// Classify active memberships at `instant` without collapsing structure.
 ///
-/// Cross-classification and multiple-membership signals are tracked independently.
-/// Populations that contain both are reported explicitly rather than forcing one
-/// design dimension to hide the other.
+/// Cross-classification, population-level classification heterogeneity, and
+/// multiple-membership signals are tracked independently. A one-way nested
+/// design requires every active member to belong to one common role/classification.
 ///
 /// # Errors
 ///
@@ -92,8 +98,9 @@ pub fn classify_membership_design(
 /// estimator
 /// `σ²_u / (σ²_u + σ²_e)` with
 /// `σ²_e = MSW` and `σ²_u = max(0, (MSB − MSW) / n₀)`.
-/// Cross-classified and multiple-membership designs fail closed: a nested
-/// ICC is not a substitute for an MMMC model.
+/// Cross-classified, classification-heterogeneous, and multiple-membership
+/// designs fail closed: a nested ICC is not a substitute for an MMMC model or
+/// for pooling distinct classification dimensions.
 ///
 /// # Errors
 ///
@@ -126,7 +133,9 @@ pub fn nested_intraclass_correlation(
         MembershipDesign::Nested => {}
         MembershipDesign::CrossClassified
         | MembershipDesign::MultipleMembership
-        | MembershipDesign::CrossClassifiedMultipleMembership => {
+        | MembershipDesign::CrossClassifiedMultipleMembership
+        | MembershipDesign::HeterogeneousClassification
+        | MembershipDesign::HeterogeneousClassificationMultipleMembership => {
             return Err(MembershipError::NestedIccInapplicable);
         }
     }
@@ -144,6 +153,7 @@ where
     let mut saw_active = false;
     let mut saw_cross = false;
     let mut saw_multiple = false;
+    let mut active_roles = BTreeSet::new();
     for member_id in members {
         let active = network.active_memberships_for(member_id, instant);
         if active.is_empty() {
@@ -155,6 +165,7 @@ where
         let mut has_partial_weight = false;
         for assignment in active {
             has_partial_weight |= assignment.weight().value().to_bits() != 1.0_f64.to_bits();
+            active_roles.insert(assignment.role());
             groups_by_role
                 .entry(assignment.role())
                 .or_default()
@@ -166,11 +177,14 @@ where
     if !saw_active {
         return Err(MembershipError::InsufficientClusterStructure);
     }
-    match (saw_cross, saw_multiple) {
-        (true, true) => Ok(MembershipDesign::CrossClassifiedMultipleMembership),
-        (true, false) => Ok(MembershipDesign::CrossClassified),
-        (false, true) => Ok(MembershipDesign::MultipleMembership),
-        (false, false) => Ok(MembershipDesign::Nested),
+    let saw_heterogeneous_classification = active_roles.len() >= 2;
+    match (saw_cross, saw_heterogeneous_classification, saw_multiple) {
+        (true, _, true) => Ok(MembershipDesign::CrossClassifiedMultipleMembership),
+        (true, _, false) => Ok(MembershipDesign::CrossClassified),
+        (false, true, true) => Ok(MembershipDesign::HeterogeneousClassificationMultipleMembership),
+        (false, true, false) => Ok(MembershipDesign::HeterogeneousClassification),
+        (false, false, true) => Ok(MembershipDesign::MultipleMembership),
+        (false, false, false) => Ok(MembershipDesign::Nested),
     }
 }
 
@@ -234,6 +248,10 @@ mod tests {
         assert!(!MembershipDesign::CrossClassified.allows_nested_icc());
         assert!(!MembershipDesign::MultipleMembership.allows_nested_icc());
         assert!(!MembershipDesign::CrossClassifiedMultipleMembership.allows_nested_icc());
+        assert!(!MembershipDesign::HeterogeneousClassification.allows_nested_icc());
+        assert!(
+            !MembershipDesign::HeterogeneousClassificationMultipleMembership.allows_nested_icc()
+        );
         let member = MemberId::new();
         let outcome = NestedOutcome::new(member, 1.5).expect("finite");
         assert_eq!(outcome.member_id(), member);
