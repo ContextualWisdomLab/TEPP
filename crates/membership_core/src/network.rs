@@ -2,9 +2,7 @@
 
 use crate::{GroupId, MemberId, MembershipAssignment, MembershipError, MembershipRole};
 use std::collections::{BTreeMap, BTreeSet};
-use temporal_core::{
-    AllenRelation, EventTime, TemporalBoundary, classify_interval_relation,
-};
+use temporal_core::{AllenRelation, EventTime, TemporalBoundary, classify_interval_relation};
 
 /// An in-memory network of weighted multiple memberships.
 ///
@@ -152,7 +150,10 @@ impl MembershipNetwork {
     }
 }
 
-fn collect_known_boundary(checkpoints: &mut BTreeSet<EventTime>, boundary: TemporalBoundary<EventTime>) {
+fn collect_known_boundary(
+    checkpoints: &mut BTreeSet<EventTime>,
+    boundary: TemporalBoundary<EventTime>,
+) {
     match boundary {
         TemporalBoundary::Included(instant) | TemporalBoundary::Excluded(instant) => {
             checkpoints.insert(instant);
