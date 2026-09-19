@@ -54,6 +54,36 @@ fn production_shape_run_excludes_future_available_evidence() {
 }
 
 #[test]
+fn future_duplicate_identity_cannot_change_a_historical_cutoff_result() {
+    let request = AnalysisRunRequest {
+        contract_version: 1,
+        idempotency_key: "future-duplicate-run".into(),
+        tenant_workspace_id: "workspace-opaque-1".into(),
+        snapshot_id: "snapshot-future-duplicate".into(),
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        model_contract_version: "temporal-evidence-v1".into(),
+        output_profile: "validation-report".into(),
+    };
+    let accepted =
+        AnalysisRunAccepted::new("run-future-duplicate", "accepted", "future-duplicate-run")
+            .expect("accepted");
+    let corpus = AnalysisCorpus::new(
+        "snapshot-future-duplicate",
+        vec![
+            evidence("stable-id", "2026-07-31T23:59:59Z", 2),
+            evidence("stable-id", "2026-08-01T00:00:01Z", 99),
+        ],
+    )
+    .expect("snapshot");
+
+    let execution = execute_analysis_run(&request, &accepted, &corpus, "2026-08-01T00:01:00Z")
+        .expect("future-unavailable evidence must not affect the historical run");
+    let artifact = execution.artifact.expect("artifact");
+    assert_eq!(artifact.eligible_evidence_count, 1);
+    assert_eq!(artifact.eligible_membership_count, 2);
+}
+
+#[test]
 fn evidence_available_exactly_at_cutoff_is_eligible_and_keeps_membership() {
     let request = AnalysisRunRequest {
         contract_version: 1,

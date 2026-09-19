@@ -71,6 +71,11 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Analysis engine v1 doctoring | [`docs/doctoring/analysis-engine-v1.md`](docs/doctoring/analysis-engine-v1.md) |
 | Analysis engine gap-closure doctoring | [`docs/doctoring/analysis-engine-gap-closure.md`](docs/doctoring/analysis-engine-gap-closure.md) |
+| Copy-identity analysis-run doctoring | [`docs/doctoring/copy-identity-analysis-run.md`](docs/doctoring/copy-identity-analysis-run.md) |
+| Location-membership analysis-run doctoring | [`docs/doctoring/location-membership-analysis-run.md`](docs/doctoring/location-membership-analysis-run.md) |
+| Episode-membership analysis-run doctoring | [`docs/doctoring/episode-membership-analysis-run.md`](docs/doctoring/episode-membership-analysis-run.md) |
+| Subevent-containment analysis-run doctoring | [`docs/doctoring/subevent-containment-analysis-run.md`](docs/doctoring/subevent-containment-analysis-run.md) |
+| Membership-target analysis-run doctoring | [`docs/doctoring/membership-target-analysis-run.md`](docs/doctoring/membership-target-analysis-run.md) |
 | Corpus-split leakage-audit wire doctoring | [`docs/research/corpus-split-manifest-wire.md`](docs/research/corpus-split-manifest-wire.md) |
 | Unicode canonical-identity doctoring | [`docs/research/unicode-canonical-identity.md`](docs/research/unicode-canonical-identity.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
