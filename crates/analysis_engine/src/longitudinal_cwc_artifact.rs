@@ -185,7 +185,7 @@ impl LongitudinalCwcArtifact {
             || self.row_count < 2
             || self.row_count > max_rows
             || self.cluster_count < 2
-            || self.cluster_count > self.row_count
+            || self.cluster_count >= self.row_count
             || !self.within_slope.is_finite()
             || !self.between_slope.is_finite()
             || !self.contextual_effect.is_finite()
