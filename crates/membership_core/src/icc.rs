@@ -8,11 +8,11 @@ use temporal_core::EventTime;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum MembershipDesign {
-    /// Each active member belongs to exactly one group in one role.
+    /// Each active member belongs to exactly one group in one role at full weight.
     Nested,
     /// At least one member is active in two or more roles.
     CrossClassified,
-    /// At least one member is active in two or more groups of the same role.
+    /// At least one member has same-role group multiplicity or a partial one-role weight.
     MultipleMembership,
 }
 
@@ -63,8 +63,9 @@ impl NestedOutcome {
 
 /// Classify active memberships at `instant` without collapsing structure.
 ///
-/// Multiple membership is reported before cross-classification so a member
-/// who occupies two groups in one role is not misread as a nested hierarchy.
+/// Same-role group multiplicity and one-role partial weights are reported as
+/// multiple membership before cross-classification so neither is misread as a
+/// complete nested hierarchy.
 ///
 /// # Errors
 ///
@@ -144,7 +145,9 @@ where
         saw_active = true;
         let mut groups_by_role: BTreeMap<MembershipRole, BTreeSet<crate::GroupId>> =
             BTreeMap::new();
+        let mut has_partial_weight = false;
         for assignment in active {
+            has_partial_weight |= assignment.weight().value().to_bits() != 1.0_f64.to_bits();
             groups_by_role
                 .entry(assignment.role())
                 .or_default()
@@ -157,6 +160,8 @@ where
         }
         if groups_by_role.len() >= 2 {
             saw_cross = true;
+        } else if has_partial_weight {
+            return Ok(MembershipDesign::MultipleMembership);
         }
     }
     if !saw_active {
