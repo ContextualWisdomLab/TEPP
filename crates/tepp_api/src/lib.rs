@@ -21,6 +21,8 @@ mod envelope;
 mod error;
 mod export;
 mod export_http;
+mod export_stored_request_cli;
+mod export_stored_request_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
 mod lineageweave_http;
@@ -106,6 +108,30 @@ pub use export_http::ExportRetrieval;
 pub use export_http::naruon_export_retrieval_exchange;
 /// Refuse scientific-metric keys on export-retrieval JSON.
 pub use export_http::refuse_metrics_on_export_retrieval_payload;
+/// Loopback CLI invocation for naruon export stored-request GET.
+pub use export_stored_request_cli::ExportStoredRequestCliInvocation;
+/// Loopback CLI verb for export stored-request GET.
+pub use export_stored_request_cli::ExportStoredRequestCliVerb;
+/// Compose HTTP/1.1 from a stored-request CLI invocation.
+pub use export_stored_request_cli::compose_export_stored_request_cli_http;
+/// Dispatch a stored-request CLI invocation against an in-process listener.
+pub use export_stored_request_cli::dispatch_export_stored_request_cli;
+/// Execute a stored-request CLI invocation over loopback TCP.
+pub use export_stored_request_cli::execute_export_stored_request_cli;
+/// Render `tepp-loopback` HTTP/1.1 from a stored-request exchange.
+pub use export_stored_request_cli::loopback_http1_from_export_stored_request_exchange;
+/// Read leftover stdin for stored-request GET; empty is admitted.
+pub use export_stored_request_cli::read_export_stored_request_cli_stdin;
+/// Filter stored-request CLI stdout so scientific-acceptance never prints.
+pub use export_stored_request_cli::render_export_stored_request_cli_stdout;
+/// Extract the opaque export identity from a stored-request path.
+pub use export_stored_request_http::export_stored_request_path_id;
+/// Whether a path is the export stored-request extra-segment resource.
+pub use export_stored_request_http::is_export_stored_request_path;
+/// Build a naruon export stored-request GET exchange.
+pub use export_stored_request_http::naruon_export_stored_request_exchange;
+/// Refuse scientific-metric keys on export stored-request JSON.
+pub use export_stored_request_http::refuse_metrics_on_export_stored_request_payload;
 
 /// Analytical export purpose.
 pub use authorization::AnalyticalPurpose;
