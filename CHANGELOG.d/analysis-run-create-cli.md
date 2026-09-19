@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-analysis-runs create` submits metric-free analysis runs (ADR 0034). Create CLI stdout refuses RMSE/bias/coverage/SE-gate/scientific-acceptance keys. Not GET-by-id, not scientific-acceptance CLI, not collection list, not cancel CLI, not persistence.

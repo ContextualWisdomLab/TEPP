@@ -17,6 +17,7 @@ mod analysis_run_cancel_cli;
 mod analysis_run_cancel_http;
 mod analysis_run_collection_cli;
 mod analysis_run_collection_http;
+mod analysis_run_create_cli;
 mod analysis_run_live;
 mod analysis_run_status_http;
 mod authorization;
@@ -133,6 +134,20 @@ pub use analysis_run_collection_http::parse_collection_page_cursor;
 pub use analysis_run_collection_http::parse_collection_page_limit;
 /// Refuse scientific-metric keys on a collection payload.
 pub use analysis_run_collection_http::refuse_metrics_on_collection_payload;
+/// One validated create CLI invocation.
+pub use analysis_run_create_cli::AnalysisRunCreateCliInvocation;
+/// Loopback create CLI verb.
+pub use analysis_run_create_cli::AnalysisRunCreateCliVerb;
+/// Compose loopback create POST bytes for a CLI invocation.
+pub use analysis_run_create_cli::compose_analysis_run_create_cli_http;
+/// Dispatch a create CLI invocation against an in-process listener.
+pub use analysis_run_create_cli::dispatch_analysis_run_create_cli;
+/// Execute a create CLI invocation over loopback TCP.
+pub use analysis_run_create_cli::execute_analysis_run_create_cli;
+/// Read leftover stdin for the create CLI.
+pub use analysis_run_create_cli::read_analysis_run_create_cli_stdin;
+/// Render metric-free create CLI stdout.
+pub use analysis_run_create_cli::render_analysis_run_create_cli_stdout;
 /// Consumer-neutral loopback analysis-run service.
 pub use analysis_run_live::AnalysisRunLiveService;
 /// Analysis-run status HTTP exchange re-exports.
