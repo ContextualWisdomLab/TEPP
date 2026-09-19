@@ -10,6 +10,7 @@
 //! class so multilevel and multiple-membership estimators can avoid atomistic
 //! fallacy.
 
+mod admission;
 mod assignment;
 mod error;
 mod ess;
@@ -19,6 +20,8 @@ mod network;
 mod role;
 mod weight;
 
+/// Fail-closed admission for estimators that only support full single membership.
+pub use admission::{SingleMembershipAdmission, admit_single_membership};
 /// One weighted, role-typed, time-varying membership assignment.
 pub use assignment::MembershipAssignment;
 /// Fail-closed membership-domain validation errors.
@@ -31,7 +34,7 @@ pub use identifier::MemberId;
 pub use network::MembershipNetwork;
 /// Contextual membership roles (not permanent entity classes).
 pub use role::MembershipRole;
-/// Finite non-negative membership weight.
+/// Finite membership share in the closed unit interval `[0, 1]`.
 pub use weight::MembershipWeight;
 
 /// Design effect `n / ESS` for membership weights.

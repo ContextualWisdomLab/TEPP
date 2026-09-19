@@ -6,7 +6,7 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum MembershipError {
-    /// A membership weight was negative, non-finite, or otherwise invalid.
+    /// A membership weight was outside `[0, 1]`, non-finite, or otherwise invalid.
     InvalidMembershipWeight,
     /// A validity interval was empty, ordered backward, or open-ended where a
     /// known interval is required.
@@ -17,8 +17,10 @@ pub enum MembershipError {
     UnsupportedWireVersion,
     /// An assignment referenced a role string that is not a TEPP membership role.
     UnknownMembershipRole,
-    /// A duplicate assignment key was rejected by the membership network.
+    /// The same member/group/role identity had overlapping or endpoint-touching validity.
     DuplicateMembershipAssignment,
+    /// A full single-membership estimator cannot represent the active membership design without loss.
+    SingleMembershipProfileInapplicable,
     /// Nested ICC is undefined for cross-classified or multiple-membership designs.
     NestedIccInapplicable,
     /// Clusters or within-group residual degrees of freedom are insufficient.
@@ -40,6 +42,9 @@ impl fmt::Display for MembershipError {
             Self::UnsupportedWireVersion => "unsupported membership wire version",
             Self::UnknownMembershipRole => "unknown membership role",
             Self::DuplicateMembershipAssignment => "duplicate membership assignment",
+            Self::SingleMembershipProfileInapplicable => {
+                "single-membership profile is inapplicable to this membership design"
+            }
             Self::NestedIccInapplicable => "nested ICC is inapplicable to this membership design",
             Self::InsufficientClusterStructure => "insufficient cluster structure for nested ICC",
             Self::InvalidOutcome => "invalid nested ICC outcome",
@@ -82,6 +87,10 @@ mod tests {
             (
                 MembershipError::DuplicateMembershipAssignment,
                 "duplicate membership assignment",
+            ),
+            (
+                MembershipError::SingleMembershipProfileInapplicable,
+                "single-membership profile is inapplicable to this membership design",
             ),
             (
                 MembershipError::NestedIccInapplicable,
