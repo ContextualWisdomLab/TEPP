@@ -251,7 +251,7 @@ fn admit_scores_at_cutoff(
 }
 
 fn digest_admitted_evidence(
-    admitted: &mut Vec<&LongitudinalClusterScore>,
+    admitted: &mut [&LongitudinalClusterScore],
 ) -> Result<String, AnalysisEngineError> {
     admitted.sort_unstable_by(|left, right| left.evidence_id.cmp(&right.evidence_id));
     let mut hasher = Sha256::new();
