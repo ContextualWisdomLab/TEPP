@@ -31,6 +31,15 @@ fn request(cutoff: &str) -> AnalysisRunRequest {
     }
 }
 
+fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
+    AnalysisRunAccepted::new(
+        "run-longitudinal-cwc",
+        "accepted",
+        &request.idempotency_key,
+    )
+    .expect("accepted")
+}
+
 fn row(
     snapshot_id: &str,
     cluster_key: u64,
@@ -61,15 +70,6 @@ fn rows() -> Vec<LongitudinalClusterScore> {
         row(SNAPSHOT_ID, 2, 4.0, 10.0, "2026-07-01T00:00:00Z"),
         row(SNAPSHOT_ID, 2, 6.0, 11.0, "2026-07-01T00:00:00Z"),
     ]
-}
-
-fn accepted(request: &AnalysisRunRequest) -> AnalysisRunAccepted {
-    AnalysisRunAccepted::new(
-        "run-longitudinal-cwc",
-        "accepted",
-        &request.idempotency_key,
-    )
-    .expect("accepted")
 }
 
 fn execute(
@@ -194,6 +194,18 @@ fn artifact_refuses_visible_count_impossible_for_the_executor() {
     oversized.cluster_count = 2;
     assert_eq!(
         oversized.to_json(),
+        Err(AnalysisEngineError::InvalidLongitudinalCwcArtifact)
+    );
+}
+
+#[test]
+fn artifact_refuses_all_singleton_cluster_success_shape() {
+    let mut impossible = artifact();
+    impossible.row_count = 2;
+    impossible.cluster_count = 2;
+
+    assert_eq!(
+        impossible.to_json(),
         Err(AnalysisEngineError::InvalidLongitudinalCwcArtifact)
     );
 }
