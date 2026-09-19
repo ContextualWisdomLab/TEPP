@@ -73,6 +73,10 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Analysis engine gap-closure doctoring | [`docs/doctoring/analysis-engine-gap-closure.md`](docs/doctoring/analysis-engine-gap-closure.md) |
 | Corpus-split leakage-audit wire doctoring | [`docs/research/corpus-split-manifest-wire.md`](docs/research/corpus-split-manifest-wire.md) |
 | Unicode canonical-identity doctoring | [`docs/research/unicode-canonical-identity.md`](docs/research/unicode-canonical-identity.md) |
+| Export idempotency-key lookup HTTP doctoring | [`docs/research/export-idempotency-lookup-http.md`](docs/research/export-idempotency-lookup-http.md) |
+| Export idempotency-key lookup CLI doctoring | [`docs/research/export-idempotency-lookup-cli.md`](docs/research/export-idempotency-lookup-cli.md) |
+| Export idempotency-key lookup stored-request GET doctoring | [`docs/research/export-idempotency-lookup-stored-request-http.md`](docs/research/export-idempotency-lookup-stored-request-http.md) |
+| Export idempotency-key lookup stored-request CLI doctoring | [`docs/research/export-idempotency-lookup-stored-request-cli.md`](docs/research/export-idempotency-lookup-stored-request-cli.md) |
 | Change history | [`CHANGELOG.md`](CHANGELOG.md) |
 
 ## Maturity vocabulary

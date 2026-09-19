@@ -31,6 +31,10 @@ Read [`ADR_POLICY.md`](ADR_POLICY.md) first. **Decision status and implementatio
 | [0024](0024-lineage-pair-criterion-and-project-journey-posterior.md) | Independent Event Lineage pair criterion and posterior Project Journey | Proposed | active-PR | Strict artifacts preserve criterion/event-time draws, branches, ties, and CPU/GPU receipts without claiming the scientific estimator is complete. |
 | [0025](0025-macos-native-rust-mlx-metal-boundary.md) | macOS-native Rust-owned MLX Metal execution | Accepted | accepted-target | Compose authenticates to a native host service; Linux never claims Metal, and actual backend/parity receipts fail closed. |
 | [0054](0054-export-retrieval-get.md) | Loopback export retrieval GET | Accepted | active-PR | `AnalysisRunLiveService` mints a metric-free `export_id` on naruon `POST /v1/exports` and serves `GET /v1/exports/{export_id}`; `NaruonLiveService` stays POST-only. |
+| [0093](0093-export-idempotency-lookup-get.md) | Loopback export idempotency-key lookup GET | Accepted | active-PR | `AnalysisRunLiveService` serves naruon-only `GET /v1/exports/by-idempotency/{idempotency_key}`; `NaruonLiveService` stays POST-only. |
+| [0094](0094-export-idempotency-lookup-cli.md) | Loopback export idempotency-key lookup CLI | Accepted | active-PR | Published `tepp-export-lookup lookup` mints naruon lookup GET onto spawned `tepp-loopback` TCP; `NaruonLiveService` stays POST-only. |
+| [0099](0099-export-idempotency-lookup-stored-request-get.md) | Loopback export idempotency-key lookup stored-request GET | Accepted | active-PR | Complements ADR 0093 and ADR 0089; `GET /v1/exports/by-idempotency/{idempotency_key}/request` returns the stored create. Unique versus protected main (0026–0098 occupied including #470=0098). Does not re-open cancel lineages. |
+| [0100](0100-export-idempotency-lookup-stored-request-cli.md) | Quarantine-parity export lookup stored-request CLI | Accepted | active-PR | Complements ADR 0099; published `tepp-export-lookup-request get` returns `authorization_denied` and never discloses stored creates. Unique versus protected main (0026–0099 occupied including #466=0099). Does not weaken fail-closed. |
 | [0023](0023-lineage-criterion-anchor-contract.md) | TEPP-owned Event Lineage criterion anchor | Accepted | active-PR | PR #237 publishes the strict accepted/rejected artifact and identities; estimator execution remains fail-closed future work. |
 | [0024](0024-independent-topic-importance-anchor.md) | Posterior topic-context producer contract | Accepted | contract-only active-PR | Strict DTO/schema only; the current estimator does not emit it. fast-mlsirm owns case-deletion influence. |
 | [0001](0001-rust-first-modular-msa.md) | Rust-first numerical core and CPU `f64` reference | Accepted | partial | ADR 0011 owns cross-service/MSA authority; 0001 retains numerical/backend authority. |
@@ -142,6 +146,8 @@ Use the narrowest owning ADR when decisions overlap:
 - **independent lineage criterion and posterior Project Journey:** ADR 0023.
 - **macOS-native Rust-owned MLX Metal execution:** ADR 0024.
 - **loopback export retrieval identity:** ADR 0054.
+- **loopback export idempotency-key lookup:** ADR 0093.
+- **loopback export idempotency-key lookup CLI:** ADR 0094.
 
 ## Change and supersession rule
 
