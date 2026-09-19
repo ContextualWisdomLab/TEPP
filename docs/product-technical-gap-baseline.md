@@ -2,7 +2,7 @@
 
 **Status:** Active delivery recovery  
 **Product:** Temporal Event Psychometrics Platform (TEPP)  
-**Snapshot:** 2026-09-18T23:11:12Z  
+**Snapshot:** 2026-09-19T00:11:00Z  
 **Protected-main evidence:** `a243f18da4a4ca8a8d068c39922537f1f8ed6ad0`  
 **Workspace version:** `0.2.0`
 
@@ -34,7 +34,7 @@ At this snapshot the latest immutable fast-mlsirm release is **v0.11.4**, publis
 
 | Owner vehicle | Exact current evidence | TEPP implication |
 | --- | --- | --- |
-| fast-mlsirm #1717 | `81d3ed2275a785cd3b136f267b208c0d2c166dd3`, open / Ready / mergeable | Post-restack Python source-isolation and buyer-delivery packet integrity repairs are mutable. Exact-head CI/security/CodeQL/Semgrep/fuzz runs remain pending/unallocated; no predecessor GREEN transfers. Organization runner-acquisition authority is `.github#712`. |
+| fast-mlsirm #1717 | `4493f58ac02ba16e08e2d8dc6b0e2ef2b2407db8`, open / Ready / mergeable | Exact predecessor `81d3ed2275...` acquired a hosted runner and returned three unsuppressed Semgrep WARNING findings: two dynamic `globals()` namespace lookups in `python/fast_mlsirm/dif.py` and one discovered-module `importlib.import_module(modname)` execution in `tools/inventory_public_api.py`. Ordinary-forward repairs `b2f1cac98...` and `4493f58ac...` remove those dynamic execution surfaces without suppression or gate weakening. Fresh current-head CI/security/CodeQL/Semgrep/fuzz remain pending/queued, so the repair is not yet hosted GREEN. Organization runner-acquisition authority remains `.github#712` for the still-waiting current-head jobs. |
 | fast-mlsirm #1816 | `7b853c2e8766c0dd58c3b01064c0dbcad1500493`, open / Draft / mergeable, protected-main compare ahead 19 / behind 0 | Correctly-rounded finite binary64 mean candidate has been ordinary-forward reconciled to `main@a712995b1c22230bc7fcc7f693ae4ad88cb363f4` while preserving exactly six owner deltas. It remains mutable/unreleased; new Security/CodeQL/Semgrep are queued and CI/fuzz are Draft-skipped, so no acceptance transfers. |
 | fast-mlsirm release | `v0.11.4`, immutable | Current released owner authority only; it does **not** authorize TEPP to consume #1717/#1816 mutable deltas. |
 
@@ -94,7 +94,7 @@ The foundation advance for #594 created an ordinary stack-maintenance obligation
 
 The same canonical dispatch proved a separate owner-path failure: Python SARIF was clean but `.github` could not read TEPP `code-scanning/analyses`, receiving HTTP 403 from the integration while checking GHAS base/head configuration identity. `.github#2276` owns that cross-repository permission repair and must preserve fail-closed semantics. #498 independently remains the repository-admin prerequisite for Dependency Graph/dependency-review support. Neither external prerequisite is grounds to bypass #538 gates.
 
-Current required jobs also remain in the organization-level pre-checkout runner-acquisition class. TEPP #538 Rust Foundation jobs are queued with `runner_id=0`, empty runner identity and `steps=[]`, while fast-mlsirm #1717 shows the same cross-repository class. Canonical diagnosis belongs to `.github#712`; no leaf no-op wake commit, blind rerun, label downgrade, or predecessor receipt is valid acceptance evidence.
+Current required jobs also remain in the organization-level pre-checkout runner-acquisition class. TEPP #538 Rust Foundation jobs are queued with `runner_id=0`, empty runner identity and `steps=[]`; fast-mlsirm #1717's new exact-head gates are likewise waiting in pending/queued state. The predecessor #1717 Semgrep run did acquire a hosted runner and returned the three real source findings recorded above, so runner starvation and source-level RED are distinct diagnoses. Canonical queue diagnosis remains `.github#712`; no leaf no-op wake commit, blind rerun, label downgrade, or predecessor receipt is valid acceptance evidence.
 
 ## Gap register
 
