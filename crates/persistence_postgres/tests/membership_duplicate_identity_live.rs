@@ -76,7 +76,7 @@ fn same_target_same_role_must_be_temporally_disjoint() {
         "department",
         "1",
         "'[2026-02-01,2026-02-01]'::tstzrange",
-        "'[2026-02-10,2026-02-10)'::tstzrange",
+        "'[2026-02-09,2026-02-10)'::tstzrange",
     )
     .expect("first spell");
     insert_membership(
