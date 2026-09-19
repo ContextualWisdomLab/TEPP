@@ -49,14 +49,25 @@ mod tests {
     use crate::MembershipError;
 
     #[test]
-    fn weight_constructors_accept_finite_non_negative_values() {
+    fn weight_constructors_accept_only_bounded_affiliation_shares() {
         let zero = MembershipWeight::new(0.0).expect("zero").value();
+        let partial = MembershipWeight::new(0.5).expect("partial").value();
         let full = MembershipWeight::full().expect("full").value();
-        assert!((zero - 0.0).abs() < f64::EPSILON);
-        assert!((full - 1.0).abs() < f64::EPSILON);
-        assert_eq!(
-            MembershipWeight::new(f64::INFINITY),
-            Err(MembershipError::InvalidMembershipWeight)
-        );
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(partial.to_bits(), 0.5_f64.to_bits());
+        assert_eq!(full.to_bits(), 1.0_f64.to_bits());
+
+        for invalid in [
+            1.0 + f64::EPSILON,
+            -f64::EPSILON,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ] {
+            assert_eq!(
+                MembershipWeight::new(invalid),
+                Err(MembershipError::InvalidMembershipWeight)
+            );
+        }
     }
 }
