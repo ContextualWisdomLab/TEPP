@@ -142,7 +142,7 @@ fn insert_membership(
     weight: &str,
     valid_from_window: &str,
     valid_to_window: &str,
-) -> Result<u64, persistence_postgres::PersistenceError> {
+) -> Result<(), persistence_postgres::PersistenceError> {
     repo.session_mut().execute(&format!(
         "INSERT INTO membership_assignment (\
             membership_assignment_id, tenant_record_id, document_record_id, text_segment_id, \
