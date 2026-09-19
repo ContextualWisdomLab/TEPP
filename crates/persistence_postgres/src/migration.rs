@@ -36,6 +36,10 @@ const MEMBERSHIP_WEIGHT_UNIT_INTERVAL_UP: &str =
     include_str!("../../../migrations/0009_membership_weight_unit_interval.up.sql");
 const MEMBERSHIP_WEIGHT_UNIT_INTERVAL_DOWN: &str =
     include_str!("../../../migrations/0009_membership_weight_unit_interval.down.sql");
+const MEMBERSHIP_SHARE_BUDGET_UP: &str =
+    include_str!("../../../migrations/0010_membership_same_role_share_budget.up.sql");
+const MEMBERSHIP_SHARE_BUDGET_DOWN: &str =
+    include_str!("../../../migrations/0010_membership_same_role_share_budget.down.sql");
 
 /// Forward and rollback SQL for one migration unit.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -53,10 +57,10 @@ impl MigrationCatalog {
     /// sources are unexpectedly empty.
     pub fn from_embedded() -> Result<Self, MigrationContractError> {
         let up_sql = format!(
-            "{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}\n{TEMPORAL_ORDER_UP}\n{MEMBERSHIP_UP}\n{RETENTION_UP}\n{ANALYSIS_RUN_UP}\n{MEMBERSHIP_WEIGHT_UNIT_INTERVAL_UP}"
+            "{FOUNDATION_UP}\n{RLS_UP}\n{MODEL_RUN_UP}\n{APPEND_ONLY_UP}\n{TEMPORAL_ORDER_UP}\n{MEMBERSHIP_UP}\n{RETENTION_UP}\n{ANALYSIS_RUN_UP}\n{MEMBERSHIP_WEIGHT_UNIT_INTERVAL_UP}\n{MEMBERSHIP_SHARE_BUDGET_UP}"
         );
         let down_sql = format!(
-            "{MEMBERSHIP_WEIGHT_UNIT_INTERVAL_DOWN}\n{ANALYSIS_RUN_DOWN}\n{RETENTION_DOWN}\n{MEMBERSHIP_DOWN}\n{TEMPORAL_ORDER_DOWN}\n{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}"
+            "{MEMBERSHIP_SHARE_BUDGET_DOWN}\n{MEMBERSHIP_WEIGHT_UNIT_INTERVAL_DOWN}\n{ANALYSIS_RUN_DOWN}\n{RETENTION_DOWN}\n{MEMBERSHIP_DOWN}\n{TEMPORAL_ORDER_DOWN}\n{APPEND_ONLY_DOWN}\n{MODEL_RUN_DOWN}\n{RLS_DOWN}\n{FOUNDATION_DOWN}"
         );
         Self::from_sources(&up_sql, &down_sql)
     }
@@ -760,7 +764,7 @@ mod tests {
             "DROP TABLE tenant_record;",
         );
         assert_eq!(
-            validate_migration_catalog(&missing_revoke),
+            validate_append_only_immutability(&missing_revoke),
             Err(MigrationContractError::MissingAppendOnlyTrigger)
         );
 
