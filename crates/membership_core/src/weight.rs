@@ -60,15 +60,19 @@ mod tests {
     use crate::MembershipError;
 
     #[test]
-    fn weight_constructors_accept_only_bounded_affiliation_shares() {
-        let zero = MembershipWeight::new(0.0).expect("zero").value();
+    fn weight_constructors_accept_only_positive_bounded_affiliation_shares() {
+        let minimum_positive = MembershipWeight::new(f64::from_bits(1))
+            .expect("minimum positive binary64 share")
+            .value();
         let partial = MembershipWeight::new(0.5).expect("partial").value();
         let full = MembershipWeight::full().expect("full").value();
-        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(minimum_positive.to_bits(), 1);
         assert_eq!(partial.to_bits(), 0.5_f64.to_bits());
         assert_eq!(full.to_bits(), 1.0_f64.to_bits());
 
         for invalid in [
+            0.0,
+            -0.0,
             1.0 + f64::EPSILON,
             -f64::EPSILON,
             f64::INFINITY,
@@ -88,6 +92,8 @@ mod tests {
             serde_json::from_str("0.5").expect("valid partial wire weight");
         assert_eq!(partial.value().to_bits(), 0.5_f64.to_bits());
 
+        assert!(serde_json::from_str::<MembershipWeight>("0.0").is_err());
+        assert!(serde_json::from_str::<MembershipWeight>("-0.0").is_err());
         assert!(serde_json::from_str::<MembershipWeight>("1.25").is_err());
         assert!(serde_json::from_str::<MembershipWeight>("-0.25").is_err());
     }
