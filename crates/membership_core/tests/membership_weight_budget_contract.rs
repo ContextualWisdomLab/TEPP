@@ -101,6 +101,50 @@ fn aggregate_budget_is_checked_across_more_than_one_existing_membership() {
 }
 
 #[test]
+fn exact_binary64_overrun_cannot_round_back_to_an_admitted_unity_budget() {
+    let member = MemberId::new();
+    let mut network = MembershipNetwork::new();
+    let as_of = event_time("2026-06-15T00:00:00Z");
+    let weights = [
+        0.9734628667233794,
+        0.0038851022715484258,
+        0.02265203100507213,
+    ];
+
+    for weight in weights[..2].iter().copied() {
+        network
+            .insert(assignment(
+                member,
+                GroupId::new(),
+                MembershipRole::Project,
+                weight,
+                "2026-01-01T00:00:00Z",
+                "2026-12-31T23:59:59Z",
+            ))
+            .expect("the first two represented shares remain below unity");
+    }
+
+    let before_count = network.assignment_count();
+    assert_eq!(
+        network.insert(assignment(
+            member,
+            GroupId::new(),
+            MembershipRole::Project,
+            weights[2],
+            "2026-01-01T00:00:00Z",
+            "2026-12-31T23:59:59Z",
+        )),
+        Err(MembershipError::InvalidMembershipWeight),
+        "the exact represented binary64 sum exceeds one even though ordinary f64 addition rounds to 1.0"
+    );
+    assert_eq!(network.assignment_count(), before_count);
+    assert_eq!(
+        network.active_memberships_for(member, as_of).len(),
+        before_count
+    );
+}
+
+#[test]
 fn exact_unity_same_role_overlap_remains_valid_multiple_membership() {
     let member = MemberId::new();
     let mut network = MembershipNetwork::new();
