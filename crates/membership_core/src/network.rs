@@ -188,7 +188,8 @@ where
         }
 
         let bits = value.to_bits();
-        let raw_exponent = ((bits >> 52) & 0x7ff) as i32;
+        let raw_exponent = i32::try_from((bits >> 52) & 0x7ff)
+            .expect("binary64 exponent field always fits in i32");
         let fraction = bits & ((1_u64 << 52) - 1);
         let (mut significand, base_exponent) = if raw_exponent == 0 {
             (fraction, BINARY64_MIN_EXPONENT)
