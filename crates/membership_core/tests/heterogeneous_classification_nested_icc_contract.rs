@@ -14,6 +14,7 @@ fn insert(
     member_id: MemberId,
     group_id: GroupId,
     role: MembershipRole,
+    weight: f64,
     start: EventTime,
     end: EventTime,
 ) {
@@ -23,7 +24,7 @@ fn insert(
                 member_id,
                 group_id,
                 role,
-                MembershipWeight::new(1.0).expect("full membership weight"),
+                MembershipWeight::new(weight).expect("bounded membership weight"),
                 start,
                 end,
             )
@@ -47,6 +48,7 @@ fn heterogeneous_population_roles_are_not_one_nested_classification() {
         members[0],
         department,
         MembershipRole::Department,
+        1.0,
         start,
         end,
     );
@@ -55,6 +57,7 @@ fn heterogeneous_population_roles_are_not_one_nested_classification() {
         members[1],
         department,
         MembershipRole::Department,
+        1.0,
         start,
         end,
     );
@@ -63,6 +66,7 @@ fn heterogeneous_population_roles_are_not_one_nested_classification() {
         members[2],
         project,
         MembershipRole::Project,
+        1.0,
         start,
         end,
     );
@@ -71,14 +75,14 @@ fn heterogeneous_population_roles_are_not_one_nested_classification() {
         members[3],
         project,
         MembershipRole::Project,
+        1.0,
         start,
         end,
     );
 
-    let design = classify_membership_design(&network, as_of).expect("active design");
-    assert_ne!(
-        design,
-        MembershipDesign::Nested,
+    assert_eq!(
+        classify_membership_design(&network, as_of).expect("active design"),
+        MembershipDesign::HeterogeneousClassification,
         "different active role/classification dimensions must not collapse into one nested level",
     );
 
@@ -92,5 +96,38 @@ fn heterogeneous_population_roles_are_not_one_nested_classification() {
         nested_intraclass_correlation(&network, as_of, &outcomes),
         Err(MembershipError::NestedIccInapplicable),
         "one-way nested ICC must fail closed across heterogeneous classification roles",
+    );
+}
+
+#[test]
+fn heterogeneous_roles_do_not_hide_multiple_membership_signal() {
+    let start = event_time("2026-01-01T00:00:00Z");
+    let end = event_time("2026-12-31T00:00:00Z");
+    let as_of = event_time("2026-06-01T00:00:00Z");
+    let mut network = MembershipNetwork::new();
+
+    insert(
+        &mut network,
+        MemberId::new(),
+        GroupId::new(),
+        MembershipRole::Department,
+        0.6,
+        start,
+        end,
+    );
+    insert(
+        &mut network,
+        MemberId::new(),
+        GroupId::new(),
+        MembershipRole::Project,
+        1.0,
+        start,
+        end,
+    );
+
+    assert_eq!(
+        classify_membership_design(&network, as_of).expect("active design"),
+        MembershipDesign::HeterogeneousClassificationMultipleMembership,
+        "population-level role heterogeneity must not erase a partial/multiple-membership signal",
     );
 }
