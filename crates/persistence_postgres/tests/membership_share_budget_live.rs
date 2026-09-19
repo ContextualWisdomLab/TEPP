@@ -11,10 +11,6 @@ use std::thread;
 use uuid::Uuid;
 
 const LIVE_GATE_ENV: &str = "TEPP_LIVE_POSTGRES";
-const SHARE_BUDGET_UP: &str =
-    include_str!("../../../migrations/0010_membership_same_role_share_budget.up.sql");
-const SHARE_BUDGET_DOWN: &str =
-    include_str!("../../../migrations/0010_membership_same_role_share_budget.down.sql");
 
 fn live_postgres_requested() -> bool {
     std::env::var(LIVE_GATE_ENV).is_ok_and(|value| value == "1")
@@ -32,16 +28,25 @@ fn live_postgres_preserves_exact_and_concurrent_same_role_share_budget() {
     let pool = open_live_sqlx_pool(&config, options).expect("open live PostgreSQL pool");
     let mut repo = LiveDocumentRepository::new(pool);
     let catalog = MigrationCatalog::from_embedded().expect("embedded migration catalog");
+    assert!(
+        catalog
+            .up_sql()
+            .contains("membership_assignment_same_role_share_budget"),
+        "production migration catalog must own the #616 admission trigger"
+    );
+    assert!(
+        catalog
+            .down_sql()
+            .contains("DROP FUNCTION IF EXISTS enforce_membership_same_role_share_budget"),
+        "rollback catalog must remove the #616 admission function before earlier migrations"
+    );
 
-    let _ = apply_sql_batch(repo.session_mut(), SHARE_BUDGET_DOWN);
     let _ = apply_sql_batch(repo.session_mut(), catalog.down_sql());
     let _ = repo
         .session_mut()
         .execute("DROP ROLE IF EXISTS tepp_app_runtime");
     repo.apply_migrations(&catalog)
-        .expect("0001..0009 migration catalog must apply");
-    apply_sql_batch(repo.session_mut(), SHARE_BUDGET_UP)
-        .expect("0010 exact membership share-budget migration must apply");
+        .expect("0001..0010 migration catalog must apply");
 
     let tenant_record_id = Uuid::now_v7();
     let entity_a = Uuid::now_v7();
