@@ -6,8 +6,8 @@
 -- replacing scientific identity with decimal SUM or ordinary floating accumulation.
 --
 -- A narrow guard row serializes writers for one tenant/observed-unit/role lane before the
--- pointwise temporal aggregate is evaluated. This closes the initially-empty-row race that a plain
--- SELECT/trigger check cannot prevent.
+-- pointwise temporal aggregate and duplicate-edge predicates are evaluated. This closes the
+-- initially-empty-row race that a plain SELECT/trigger check cannot prevent.
 
 CREATE OR REPLACE FUNCTION membership_binary64_scaled_numerator(weight numeric)
 RETURNS numeric
@@ -184,9 +184,54 @@ AS $membership_same_role_max_existing_numerator$
     FROM states
 $membership_same_role_max_existing_numerator$;
 
+CREATE OR REPLACE FUNCTION membership_duplicate_temporal_edge_exists(
+    candidate_tenant_record_id uuid,
+    candidate_observed_unit_kind text,
+    candidate_observed_unit_id uuid,
+    candidate_target_entity_id uuid,
+    candidate_target_project_id uuid,
+    candidate_membership_type_code text,
+    candidate_envelope tstzrange,
+    excluded_membership_assignment_id uuid
+)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+AS $membership_duplicate_temporal_edge_exists$
+    SELECT EXISTS (
+        SELECT 1
+        FROM membership_assignment AS existing
+        WHERE existing.tenant_record_id = candidate_tenant_record_id
+          AND existing.membership_type_code = candidate_membership_type_code
+          AND existing.membership_assignment_id <> excluded_membership_assignment_id
+          AND (
+                (candidate_observed_unit_kind = 'document'
+                 AND existing.document_record_id = candidate_observed_unit_id
+                 AND existing.text_segment_id IS NULL)
+             OR (candidate_observed_unit_kind = 'text_segment'
+                 AND existing.text_segment_id = candidate_observed_unit_id
+                 AND existing.document_record_id IS NULL)
+          )
+          AND (
+                (candidate_target_entity_id IS NOT NULL
+                 AND candidate_target_project_id IS NULL
+                 AND existing.target_entity_id = candidate_target_entity_id
+                 AND existing.target_project_id IS NULL)
+             OR (candidate_target_project_id IS NOT NULL
+                 AND candidate_target_entity_id IS NULL
+                 AND existing.target_project_id = candidate_target_project_id
+                 AND existing.target_entity_id IS NULL)
+          )
+          AND membership_possible_activity_envelope(
+                existing.valid_from_window,
+                existing.valid_to_window
+              ) && candidate_envelope
+    )
+$membership_duplicate_temporal_edge_exists$;
+
 -- Validate state admitted by the predecessor schema before installing new enforcement. This keeps
--- `0010` from surrounding an already-unreconstructable Membership lane with a trigger that only
--- protects future writes. The pure helper definitions above are retry-safe if this statement fails;
+-- `0010` from surrounding an already-unreconstructable Membership lane with triggers that only
+-- protect future writes. The pure helper definitions above are retry-safe if this statement fails;
 -- guard rows and trigger authority are created only after the historical state proves admissible.
 DO $membership_existing_share_budget_validation$
 DECLARE
@@ -214,6 +259,20 @@ BEGIN
         ELSE
             RAISE EXCEPTION 'membership assignment has no observed unit'
                 USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_observed_unit_exactly_one';
+        END IF;
+
+        IF membership_duplicate_temporal_edge_exists(
+            existing.tenant_record_id,
+            observed_kind,
+            observed_id,
+            existing.target_entity_id,
+            existing.target_project_id,
+            existing.membership_type_code,
+            candidate_envelope,
+            existing.membership_assignment_id
+        ) THEN
+            RAISE EXCEPTION 'pre-existing duplicate membership temporal edge overlaps'
+                USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_duplicate_temporal_edge';
         END IF;
 
         existing_numerator := membership_same_role_max_existing_numerator(
@@ -313,6 +372,21 @@ BEGIN
         NEW.valid_from_window,
         NEW.valid_to_window
     );
+
+    IF membership_duplicate_temporal_edge_exists(
+        NEW.tenant_record_id,
+        observed_kind,
+        observed_id,
+        NEW.target_entity_id,
+        NEW.target_project_id,
+        NEW.membership_type_code,
+        candidate_envelope,
+        NEW.membership_assignment_id
+    ) THEN
+        RAISE EXCEPTION 'duplicate membership temporal edge overlaps'
+            USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_duplicate_temporal_edge';
+    END IF;
+
     existing_numerator := membership_same_role_max_existing_numerator(
         NEW.tenant_record_id,
         observed_kind,
@@ -336,6 +410,8 @@ BEFORE INSERT OR UPDATE OF
     tenant_record_id,
     document_record_id,
     text_segment_id,
+    target_entity_id,
+    target_project_id,
     membership_type_code,
     membership_weight,
     valid_from_window,
