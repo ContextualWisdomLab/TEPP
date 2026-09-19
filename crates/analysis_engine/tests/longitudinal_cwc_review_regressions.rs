@@ -93,6 +93,8 @@ fn artifact() -> LongitudinalCwcArtifact {
         run_id: "run-longitudinal-cwc".into(),
         snapshot_id: SNAPSHOT_ID.into(),
         knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        admitted_evidence_sha256:
+            "0000000000000000000000000000000000000000000000000000000000000000".into(),
         row_count: 4,
         cluster_count: 2,
         within_slope: 0.5,
