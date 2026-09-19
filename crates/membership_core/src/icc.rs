@@ -10,10 +10,12 @@ use temporal_core::EventTime;
 pub enum MembershipDesign {
     /// Each active member belongs to exactly one group in one role at full weight.
     Nested,
-    /// At least one member is active in two or more roles.
+    /// At least one member is active in two or more roles, with no multiple-membership signal.
     CrossClassified,
-    /// At least one member has same-role group multiplicity or a partial one-role weight.
+    /// At least one member has same-role group multiplicity or a partial weight, with no cross-classification signal.
     MultipleMembership,
+    /// The active population contains both cross-classification and multiple-membership structure.
+    CrossClassifiedMultipleMembership,
 }
 
 impl MembershipDesign {
@@ -22,7 +24,9 @@ impl MembershipDesign {
     pub const fn allows_nested_icc(self) -> bool {
         match self {
             Self::Nested => true,
-            Self::CrossClassified | Self::MultipleMembership => false,
+            Self::CrossClassified
+            | Self::MultipleMembership
+            | Self::CrossClassifiedMultipleMembership => false,
         }
     }
 }
@@ -63,9 +67,9 @@ impl NestedOutcome {
 
 /// Classify active memberships at `instant` without collapsing structure.
 ///
-/// Same-role group multiplicity and one-role partial weights are reported as
-/// multiple membership before cross-classification so neither is misread as a
-/// complete nested hierarchy.
+/// Cross-classification and multiple-membership signals are tracked independently.
+/// Populations that contain both are reported explicitly rather than forcing one
+/// design dimension to hide the other.
 ///
 /// # Errors
 ///
@@ -120,7 +124,9 @@ pub fn nested_intraclass_correlation(
     }
     match classify_members(network, instant, outcome_members.iter().copied())? {
         MembershipDesign::Nested => {}
-        MembershipDesign::CrossClassified | MembershipDesign::MultipleMembership => {
+        MembershipDesign::CrossClassified
+        | MembershipDesign::MultipleMembership
+        | MembershipDesign::CrossClassifiedMultipleMembership => {
             return Err(MembershipError::NestedIccInapplicable);
         }
     }
@@ -137,6 +143,7 @@ where
 {
     let mut saw_active = false;
     let mut saw_cross = false;
+    let mut saw_multiple = false;
     for member_id in members {
         let active = network.active_memberships_for(member_id, instant);
         if active.is_empty() {
@@ -153,24 +160,17 @@ where
                 .or_default()
                 .insert(assignment.group_id());
         }
-        for groups in groups_by_role.values() {
-            if groups.len() >= 2 {
-                return Ok(MembershipDesign::MultipleMembership);
-            }
-        }
-        if groups_by_role.len() >= 2 {
-            saw_cross = true;
-        } else if has_partial_weight {
-            return Ok(MembershipDesign::MultipleMembership);
-        }
+        saw_multiple |= has_partial_weight || groups_by_role.values().any(|groups| groups.len() >= 2);
+        saw_cross |= groups_by_role.len() >= 2;
     }
     if !saw_active {
         return Err(MembershipError::InsufficientClusterStructure);
     }
-    if saw_cross {
-        Ok(MembershipDesign::CrossClassified)
-    } else {
-        Ok(MembershipDesign::Nested)
+    match (saw_cross, saw_multiple) {
+        (true, true) => Ok(MembershipDesign::CrossClassifiedMultipleMembership),
+        (true, false) => Ok(MembershipDesign::CrossClassified),
+        (false, true) => Ok(MembershipDesign::MultipleMembership),
+        (false, false) => Ok(MembershipDesign::Nested),
     }
 }
 
@@ -233,6 +233,7 @@ mod tests {
         assert!(MembershipDesign::Nested.allows_nested_icc());
         assert!(!MembershipDesign::CrossClassified.allows_nested_icc());
         assert!(!MembershipDesign::MultipleMembership.allows_nested_icc());
+        assert!(!MembershipDesign::CrossClassifiedMultipleMembership.allows_nested_icc());
         let member = MemberId::new();
         let outcome = NestedOutcome::new(member, 1.5).expect("finite");
         assert_eq!(outcome.member_id(), member);
