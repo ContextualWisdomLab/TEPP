@@ -68,3 +68,41 @@ fn lone_partial_weight_cannot_be_reinterpreted_as_full_nested_structure() {
     );
     assert!(nested_intraclass_correlation(&full, as_of, &full_outcomes).is_ok());
 }
+
+#[test]
+fn full_weight_cross_classification_remains_distinct_from_multiple_membership() {
+    let start = event_time("2026-01-01T00:00:00Z");
+    let end = event_time("2026-12-31T00:00:00Z");
+    let as_of = event_time("2026-06-01T00:00:00Z");
+    let member = MemberId::new();
+    let mut network = MembershipNetwork::new();
+
+    for (group, role) in [
+        (GroupId::new(), MembershipRole::Author),
+        (GroupId::new(), MembershipRole::Project),
+    ] {
+        network
+            .insert(
+                MembershipAssignment::new(
+                    member,
+                    group,
+                    role,
+                    MembershipWeight::full().expect("full membership weight"),
+                    start,
+                    end,
+                )
+                .expect("membership assignment"),
+            )
+            .expect("insert membership");
+    }
+
+    assert_eq!(
+        classify_membership_design(&network, as_of).expect("classify cross-classified design"),
+        MembershipDesign::CrossClassified
+    );
+    let outcome = NestedOutcome::new(member, 1.0).expect("finite outcome");
+    assert_eq!(
+        nested_intraclass_correlation(&network, as_of, &[outcome]),
+        Err(MembershipError::NestedIccInapplicable)
+    );
+}
