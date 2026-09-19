@@ -225,9 +225,14 @@ mod tests {
     }
 
     #[test]
-    fn non_positive_weight_and_hostile_labels_fail_closed() {
+    fn out_of_unit_interval_weight_and_hostile_labels_fail_closed() {
         let mut weight = valid_document_entity();
         weight.membership_weight = 0.0;
+        assert_eq!(
+            insert_membership_assignment_sql(&weight),
+            Err(PersistenceError::InvalidMembershipAssignment)
+        );
+        weight.membership_weight = 1.0 + f64::EPSILON;
         assert_eq!(
             insert_membership_assignment_sql(&weight),
             Err(PersistenceError::InvalidMembershipAssignment)
@@ -237,6 +242,11 @@ mod tests {
             insert_membership_assignment_sql(&weight),
             Err(PersistenceError::InvalidMembershipAssignment)
         );
+
+        let mut minimum_positive = valid_document_entity();
+        minimum_positive.membership_weight = f64::from_bits(1);
+        insert_membership_assignment_sql(&minimum_positive)
+            .expect("minimum positive binary64 share remains persistable");
 
         let mut label = valid_document_entity();
         label.membership_type_code = "author'; DROP TABLE".into();
