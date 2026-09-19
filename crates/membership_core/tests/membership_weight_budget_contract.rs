@@ -1,7 +1,8 @@
 //! Owner-level contracts for time-varying multiple-membership share budgets.
 
 use membership_core::{
-    GroupId, MemberId, MembershipAssignment, MembershipNetwork, MembershipRole, MembershipWeight,
+    GroupId, MemberId, MembershipAssignment, MembershipError, MembershipNetwork, MembershipRole,
+    MembershipWeight,
 };
 use temporal_core::EventTime;
 
@@ -41,7 +42,7 @@ fn overlapping_same_role_shares_cannot_exceed_unity() {
             member,
             first_group,
             MembershipRole::Project,
-            0.7,
+            0.75,
             "2026-01-01T00:00:00Z",
             "2026-12-31T23:59:59Z",
         ))
@@ -52,27 +53,58 @@ fn overlapping_same_role_shares_cannot_exceed_unity() {
         member,
         second_group,
         MembershipRole::Project,
-        0.6,
+        0.5,
         "2026-03-01T00:00:00Z",
         "2026-09-30T23:59:59Z",
     ));
 
-    assert!(result.is_err(), "known same-role shares above unity must fail closed");
+    assert_eq!(result, Err(MembershipError::InvalidMembershipWeight));
     assert_eq!(network.assignment_count(), before_count);
     assert_eq!(
         network
             .active_weight_by_role(member, as_of)
             .get(&MembershipRole::Project)
             .copied(),
-        Some(0.7)
+        Some(0.75)
     );
+}
+
+#[test]
+fn aggregate_budget_is_checked_across_more_than_one_existing_membership() {
+    let member = MemberId::new();
+    let mut network = MembershipNetwork::new();
+    for group_id in [GroupId::new(), GroupId::new()] {
+        network
+            .insert(assignment(
+                member,
+                group_id,
+                MembershipRole::Project,
+                0.375,
+                "2026-01-01T00:00:00Z",
+                "2026-12-31T23:59:59Z",
+            ))
+            .expect("pair remains below unity");
+    }
+
+    assert_eq!(
+        network.insert(assignment(
+            member,
+            GroupId::new(),
+            MembershipRole::Project,
+            0.375,
+            "2026-01-01T00:00:00Z",
+            "2026-12-31T23:59:59Z",
+        )),
+        Err(MembershipError::InvalidMembershipWeight)
+    );
+    assert_eq!(network.assignment_count(), 2);
 }
 
 #[test]
 fn exact_unity_same_role_overlap_remains_valid_multiple_membership() {
     let member = MemberId::new();
     let mut network = MembershipNetwork::new();
-    for (group_id, weight) in [(GroupId::new(), 0.6), (GroupId::new(), 0.4)] {
+    for (group_id, weight) in [(GroupId::new(), 0.75), (GroupId::new(), 0.25)] {
         network
             .insert(assignment(
                 member,
