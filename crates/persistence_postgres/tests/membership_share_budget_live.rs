@@ -51,7 +51,12 @@ fn live_postgres_preserves_exact_and_concurrent_same_role_share_budget() {
     let tenant_record_id = Uuid::now_v7();
     let entity_a = Uuid::now_v7();
     let entity_b = Uuid::now_v7();
-    seed_tenant_and_entities(&mut repo, tenant_record_id, &[entity_a, entity_b]);
+    let entity_c = Uuid::now_v7();
+    seed_tenant_and_entities(
+        &mut repo,
+        tenant_record_id,
+        &[entity_a, entity_b, entity_c],
+    );
 
     let overrun_document = Uuid::now_v7();
     repo.session_mut()
@@ -154,6 +159,87 @@ fn live_postgres_preserves_exact_and_concurrent_same_role_share_budget() {
             Some("2026-01-20"),
         ))
         .expect("disjoint event-time spell has an independent budget");
+
+    let pointwise_document = Uuid::now_v7();
+    repo.session_mut()
+        .execute(&membership_insert_sql(
+            tenant_record_id,
+            pointwise_document,
+            entity_a,
+            Uuid::now_v7(),
+            "department",
+            "0.6",
+            "2026-02-01",
+            Some("2026-02-10"),
+        ))
+        .expect("early same-role spell");
+    repo.session_mut()
+        .execute(&membership_insert_sql(
+            tenant_record_id,
+            pointwise_document,
+            entity_b,
+            Uuid::now_v7(),
+            "department",
+            "0.6",
+            "2026-02-20",
+            Some("2026-02-28"),
+        ))
+        .expect("late disjoint same-role spell");
+    repo.session_mut()
+        .execute(&membership_insert_sql(
+            tenant_record_id,
+            pointwise_document,
+            entity_c,
+            Uuid::now_v7(),
+            "department",
+            "0.4",
+            "2026-02-05",
+            Some("2026-02-25"),
+        ))
+        .expect(
+            "a spanning candidate is valid when each pointwise same-role total stays at or below unity",
+        );
+    assert_membership_count(&mut repo, pointwise_document, "department", 3);
+
+    let genuine_triple_overlap_document = Uuid::now_v7();
+    for (entity, weight, from, to) in [
+        (entity_a, "0.4", "2026-03-01", "2026-03-31"),
+        (entity_b, "0.4", "2026-03-10", "2026-03-20"),
+    ] {
+        repo.session_mut()
+            .execute(&membership_insert_sql(
+                tenant_record_id,
+                genuine_triple_overlap_document,
+                entity,
+                Uuid::now_v7(),
+                "department",
+                weight,
+                from,
+                Some(to),
+            ))
+            .expect("valid prefix before the genuine triple overlap");
+    }
+    assert!(
+        repo.session_mut()
+            .execute(&membership_insert_sql(
+                tenant_record_id,
+                genuine_triple_overlap_document,
+                entity_c,
+                Uuid::now_v7(),
+                "department",
+                "0.3",
+                "2026-03-15",
+                Some("2026-03-16"),
+            ))
+            .is_err(),
+        "a genuine common-time aggregate above unity must remain rejected"
+    );
+    assert_membership_count(
+        &mut repo,
+        genuine_triple_overlap_document,
+        "department",
+        2,
+    );
 
     let binary64_boundary_document = Uuid::now_v7();
     for (index, weight) in [
