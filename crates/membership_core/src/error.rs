@@ -6,7 +6,7 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum MembershipError {
-    /// A membership weight was negative, non-finite, or otherwise invalid.
+    /// A membership weight was outside `[0, 1]`, non-finite, or otherwise invalid.
     InvalidMembershipWeight,
     /// A validity interval was empty, ordered backward, or open-ended where a
     /// known interval is required.
