@@ -19,6 +19,7 @@ episode_membership = { path = "../episode_membership", version = "0.2.0" }
 inferred_status = { path = "../inferred_status", version = "0.2.0" }
 membership_target = { path = "../membership_target", version = "0.2.0" }
 subevent_containment = { path = "../subevent_containment", version = "0.2.0" }
+psychometric_core = { path = "../psychometric_core", version = "0.2.0" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }

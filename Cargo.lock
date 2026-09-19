@@ -79,6 +79,7 @@ dependencies = [
  "location_membership",
  "membership_core",
  "membership_target",
+ "psychometric_core",
  "relation_graph",
  "serde",
  "serde_json",
