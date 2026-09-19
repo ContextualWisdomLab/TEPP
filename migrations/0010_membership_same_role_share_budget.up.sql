@@ -113,8 +113,7 @@ AS $enforce_membership_same_role_share_budget$
 DECLARE
     observed_kind text;
     observed_id uuid;
-    candidate_start timestamptz;
-    candidate_end timestamptz;
+    candidate_envelope tstzrange;
     existing_numerator numeric;
     candidate_numerator numeric;
     unity_numerator numeric;
@@ -155,16 +154,20 @@ BEGIN
     ON CONFLICT (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code)
     DO UPDATE SET system_time = membership_share_budget_guard.system_time;
 
-    -- `0006` intentionally permits non-empty uncertainty windows with unbounded sides. PostgreSQL
-    -- returns NULL from lower()/upper() for those sides; letting NULL reach the overlap predicate
-    -- would turn a real possible overlap into SQL UNKNOWN and omit the row from the budget. Map only
-    -- those schema-admitted unbounded envelope sides to temporal infinities for conservative
-    -- admission. Empty ranges are already rejected by `0006`.
-    candidate_start := COALESCE(lower(NEW.valid_from_window), '-infinity'::timestamptz);
-    candidate_end := CASE
-        WHEN NEW.valid_to_window IS NULL THEN 'infinity'::timestamptz
-        ELSE COALESCE(upper(NEW.valid_to_window), 'infinity'::timestamptz)
-    END;
+    -- One membership can be active at any instant between its earliest admissible start and latest
+    -- admissible end. Construct that possible-activity envelope as a range so PostgreSQL preserves
+    -- unbounded sides and endpoint inclusivity instead of collapsing either into NULL/scalar `<=`
+    -- semantics. Empty uncertainty windows are already rejected by `0006`.
+    candidate_envelope := tstzrange(
+        lower(NEW.valid_from_window),
+        CASE WHEN NEW.valid_to_window IS NULL THEN NULL ELSE upper(NEW.valid_to_window) END,
+        (CASE WHEN lower_inc(NEW.valid_from_window) THEN '[' ELSE '(' END)
+        ||
+        (CASE
+            WHEN NEW.valid_to_window IS NOT NULL AND upper_inc(NEW.valid_to_window) THEN ']'
+            ELSE ')'
+        END)
+    );
 
     SELECT COALESCE(SUM(membership_binary64_scaled_numerator(existing.membership_weight)), 0)
       INTO existing_numerator
@@ -180,13 +183,23 @@ BEGIN
              AND existing.text_segment_id = observed_id
              AND existing.document_record_id IS NULL)
        )
-       -- Membership validity boundaries are uncertainty windows. Budget admission is deliberately
-       -- conservative: if two assignments can overlap, their known shares must fit the same budget.
-       AND COALESCE(lower(existing.valid_from_window), '-infinity'::timestamptz) <= candidate_end
-       AND candidate_start <= CASE
-            WHEN existing.valid_to_window IS NULL THEN 'infinity'::timestamptz
-            ELSE COALESCE(upper(existing.valid_to_window), 'infinity'::timestamptz)
-       END;
+       -- Admission is conservative only when the two schema-admitted possible-activity envelopes
+       -- actually overlap. PostgreSQL range overlap retains open/closed endpoint semantics and
+       -- handles unbounded sides without timestamp nudging or tolerance.
+       AND tstzrange(
+            lower(existing.valid_from_window),
+            CASE
+                WHEN existing.valid_to_window IS NULL THEN NULL
+                ELSE upper(existing.valid_to_window)
+            END,
+            (CASE WHEN lower_inc(existing.valid_from_window) THEN '[' ELSE '(' END)
+            ||
+            (CASE
+                WHEN existing.valid_to_window IS NOT NULL
+                     AND upper_inc(existing.valid_to_window) THEN ']'
+                ELSE ')'
+            END)
+       ) && candidate_envelope;
 
     IF existing_numerator + candidate_numerator > unity_numerator THEN
         RAISE EXCEPTION 'overlapping same-role membership shares exceed unity'
