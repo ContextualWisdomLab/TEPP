@@ -25,7 +25,7 @@ pub struct MembershipAssignmentRecord {
     pub target_project_id: Option<Uuid>,
     /// Contextual membership type (author, department, customer, project role).
     pub membership_type_code: String,
-    /// Positive membership weight used by multilevel estimators.
+    /// Finite membership share in the owner domain `(0, 1]`.
     pub membership_weight: f64,
     /// Inclusive start window; an exact start is the singleton `[t,t]`.
     pub valid_from: EventTime,
@@ -40,13 +40,13 @@ pub struct MembershipAssignmentRecord {
 }
 
 impl MembershipAssignmentRecord {
-    /// Fail-closed exactly-one, weight, window-order, and label validation.
+    /// Fail-closed exactly-one, unit-interval weight, window-order, and label validation.
     ///
     /// # Errors
     ///
     /// Returns [`PersistenceError::InvalidMembershipAssignment`] when the
-    /// observed unit, target, weight, inverted `valid_to`, or labels violate
-    /// the ERD contract.
+    /// observed unit, target, membership share, inverted `valid_to`, or labels
+    /// violate the ERD contract.
     pub fn validate(&self) -> Result<(), PersistenceError> {
         if !exactly_one(self.document_record_id, self.text_segment_id) {
             return Err(PersistenceError::InvalidMembershipAssignment);
@@ -54,7 +54,10 @@ impl MembershipAssignmentRecord {
         if !exactly_one(self.target_entity_id, self.target_project_id) {
             return Err(PersistenceError::InvalidMembershipAssignment);
         }
-        if !self.membership_weight.is_finite() || self.membership_weight <= 0.0 {
+        if !self.membership_weight.is_finite()
+            || self.membership_weight <= 0.0
+            || self.membership_weight > 1.0
+        {
             return Err(PersistenceError::InvalidMembershipAssignment);
         }
         if let Some(end) = self.valid_to
@@ -225,9 +228,14 @@ mod tests {
     }
 
     #[test]
-    fn non_positive_weight_and_hostile_labels_fail_closed() {
+    fn out_of_unit_interval_weight_and_hostile_labels_fail_closed() {
         let mut weight = valid_document_entity();
         weight.membership_weight = 0.0;
+        assert_eq!(
+            insert_membership_assignment_sql(&weight),
+            Err(PersistenceError::InvalidMembershipAssignment)
+        );
+        weight.membership_weight = 1.0 + f64::EPSILON;
         assert_eq!(
             insert_membership_assignment_sql(&weight),
             Err(PersistenceError::InvalidMembershipAssignment)
@@ -237,6 +245,11 @@ mod tests {
             insert_membership_assignment_sql(&weight),
             Err(PersistenceError::InvalidMembershipAssignment)
         );
+
+        let mut minimum_positive = valid_document_entity();
+        minimum_positive.membership_weight = f64::from_bits(1);
+        insert_membership_assignment_sql(&minimum_positive)
+            .expect("minimum positive binary64 share remains persistable");
 
         let mut label = valid_document_entity();
         label.membership_type_code = "author'; DROP TABLE".into();
