@@ -26,6 +26,8 @@ pub const LONGITUDINAL_CWC_OUTPUT_PROFILE: &str = "longitudinal_cwc_v1";
 /// Maximum canonical artifact JSON size.
 pub const LONGITUDINAL_CWC_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const LONGITUDINAL_CWC_INFERENCE_STATUS: &str = "composed_cwc_slopes_not_causal";
+const LONGITUDINAL_CWC_ADMITTED_EVIDENCE_DIGEST_DOMAIN: &[u8] =
+    b"tepp.longitudinal_cwc.admitted_evidence.v1\0";
 
 /// One already-mapped clustered score offered to a cutoff-safe CWC run.
 #[derive(Clone, Debug, PartialEq)]
@@ -121,6 +123,8 @@ pub struct LongitudinalCwcArtifact {
     pub snapshot_id: String,
     /// Historical evidence cutoff used by the composition.
     pub knowledge_cutoff: String,
+    /// Canonical SHA-256 commitment to the exact cutoff-visible evidence population.
+    pub admitted_evidence_sha256: String,
     /// Cutoff-visible clustered rows used by the scientific composition.
     pub row_count: u64,
     /// Distinct clusters among cutoff-visible rows.
@@ -141,7 +145,7 @@ impl LongitudinalCwcArtifact {
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::InvalidLongitudinalCwcArtifact`] when the
-    /// schema, identifiers, counts, slopes, or claim boundary fail.
+    /// schema, identifiers, digest, counts, slopes, or claim boundary fail.
     pub fn from_json(payload: &str) -> Result<Self, AnalysisEngineError> {
         if payload.len() > LONGITUDINAL_CWC_ARTIFACT_BYTE_LIMIT {
             return Err(AnalysisEngineError::LimitExceeded);
@@ -182,6 +186,7 @@ impl LongitudinalCwcArtifact {
             || !valid_identifier(&self.run_id)
             || !valid_identifier(&self.snapshot_id)
             || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
+            || !valid_sha256(&self.admitted_evidence_sha256)
             || self.row_count < 2
             || self.row_count > max_rows
             || self.cluster_count < 2
@@ -212,12 +217,13 @@ fn admit_scores_at_cutoff(
     scores: &[LongitudinalClusterScore],
     snapshot_id: &str,
     knowledge_cutoff: KnowledgeCutoff,
-) -> Result<Vec<ClusteredScore>, AnalysisEngineError> {
+) -> Result<(Vec<ClusteredScore>, String), AnalysisEngineError> {
     if scores.len() > MAX_EVIDENCE_UNITS {
         return Err(AnalysisEngineError::LimitExceeded);
     }
     let mut evidence_ids = BTreeSet::new();
     let mut eligible = Vec::new();
+    let mut admitted = Vec::new();
     for score in scores {
         if score.available_time.instant() > knowledge_cutoff.instant() {
             continue;
@@ -228,6 +234,7 @@ fn admit_scores_at_cutoff(
         if !evidence_ids.insert(score.evidence_id.as_str()) {
             return Err(AnalysisEngineError::DuplicateEvidence);
         }
+        admitted.push(score);
         eligible.push(ClusteredScore {
             cluster_key: score.cluster_key,
             predictor: score.predictor,
@@ -239,7 +246,46 @@ fn admit_scores_at_cutoff(
             PsychometricError::InvalidNumericInput,
         ));
     }
-    Ok(eligible)
+    let admitted_evidence_sha256 = digest_admitted_evidence(&mut admitted)?;
+    Ok((eligible, admitted_evidence_sha256))
+}
+
+fn digest_admitted_evidence(
+    admitted: &mut Vec<&LongitudinalClusterScore>,
+) -> Result<String, AnalysisEngineError> {
+    admitted.sort_unstable_by(|left, right| left.evidence_id.cmp(&right.evidence_id));
+    let mut hasher = Sha256::new();
+    hasher.update(LONGITUDINAL_CWC_ADMITTED_EVIDENCE_DIGEST_DOMAIN);
+    let row_count =
+        u64::try_from(admitted.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+    hasher.update(row_count.to_be_bytes());
+    for score in admitted {
+        update_length_prefixed(&mut hasher, score.evidence_id.as_bytes())?;
+        update_length_prefixed(&mut hasher, score.snapshot_id.as_bytes())?;
+        hasher.update(score.cluster_key.to_be_bytes());
+        hasher.update(score.predictor.to_bits().to_be_bytes());
+        hasher.update(score.outcome.to_bits().to_be_bytes());
+        let available_time = score.available_time.to_rfc3339();
+        update_length_prefixed(&mut hasher, available_time.as_bytes())?;
+    }
+    Ok(format_digest(hasher.finalize()))
+}
+
+fn update_length_prefixed(
+    hasher: &mut Sha256,
+    value: &[u8],
+) -> Result<(), AnalysisEngineError> {
+    let length = u32::try_from(value.len()).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+    hasher.update(length.to_be_bytes());
+    hasher.update(value);
+    Ok(())
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn require_causal_refusal(
@@ -261,6 +307,8 @@ fn require_causal_refusal(
 /// evidence identity, source snapshot, and availability provenance. Future-unavailable rows are
 /// removed before the historical identity/domain census and do not enter digest-bound output;
 /// duplicate identities among cutoff-visible evidence fail closed before scientific composition.
+/// The artifact commits to the exact admitted evidence population with a versioned canonical
+/// SHA-256 whose ordering is evidence-identity based and independent of source enumeration.
 /// This executor does not invent an ESEM/DSEM estimator, persist rows, or treat the recovered
 /// slopes as a causal effect.
 ///
@@ -291,7 +339,8 @@ pub fn execute_longitudinal_cwc_run(
         return Err(AnalysisEngineError::InvalidEvidence);
     }
 
-    let eligible = admit_scores_at_cutoff(scores, snapshot_id, knowledge_cutoff)?;
+    let (eligible, admitted_evidence_sha256) =
+        admit_scores_at_cutoff(scores, snapshot_id, knowledge_cutoff)?;
     let slopes = recover_cluster_mean_within_between_slopes(&eligible)?;
     require_causal_refusal(claim_causal_effect(CausalHeuristic::TemporalPrecedence))?;
 
@@ -308,6 +357,7 @@ pub fn execute_longitudinal_cwc_run(
         run_id: accepted.run_id.clone(),
         snapshot_id: snapshot_id.to_owned(),
         knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
+        admitted_evidence_sha256,
         row_count,
         cluster_count,
         within_slope: slopes.within_slope,
@@ -348,6 +398,8 @@ mod tests {
             run_id: "run-1".into(),
             snapshot_id: "snapshot-1".into(),
             knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            admitted_evidence_sha256:
+                "0000000000000000000000000000000000000000000000000000000000000000".into(),
             row_count: 4,
             cluster_count: 2,
             within_slope: 0.5,
@@ -407,6 +459,16 @@ mod tests {
             {
                 let mut value = artifact.clone();
                 value.knowledge_cutoff = "invalid".into();
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.admitted_evidence_sha256 = "0".repeat(63);
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.admitted_evidence_sha256 = "A".repeat(64);
                 value
             },
             {
