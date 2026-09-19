@@ -11,13 +11,17 @@ use std::thread;
 use uuid::Uuid;
 
 const LIVE_GATE_ENV: &str = "TEPP_LIVE_POSTGRES";
+const SHARE_BUDGET_UP: &str =
+    include_str!("../../../migrations/0010_membership_same_role_share_budget.up.sql");
+const SHARE_BUDGET_DOWN: &str =
+    include_str!("../../../migrations/0010_membership_same_role_share_budget.down.sql");
 
 fn live_postgres_requested() -> bool {
     std::env::var(LIVE_GATE_ENV).is_ok_and(|value| value == "1")
 }
 
 #[test]
-fn live_postgres_preserves_exact_same_role_share_budget() {
+fn live_postgres_preserves_exact_and_concurrent_same_role_share_budget() {
     if !live_postgres_requested() {
         return;
     }
@@ -29,12 +33,15 @@ fn live_postgres_preserves_exact_same_role_share_budget() {
     let mut repo = LiveDocumentRepository::new(pool);
     let catalog = MigrationCatalog::from_embedded().expect("embedded migration catalog");
 
+    let _ = apply_sql_batch(repo.session_mut(), SHARE_BUDGET_DOWN);
     let _ = apply_sql_batch(repo.session_mut(), catalog.down_sql());
     let _ = repo
         .session_mut()
         .execute("DROP ROLE IF EXISTS tepp_app_runtime");
     repo.apply_migrations(&catalog)
-        .expect("membership budget migration catalog must apply");
+        .expect("0001..0009 migration catalog must apply");
+    apply_sql_batch(repo.session_mut(), SHARE_BUDGET_UP)
+        .expect("0010 exact membership share-budget migration must apply");
 
     let tenant_record_id = Uuid::now_v7();
     let entity_a = Uuid::now_v7();
@@ -86,6 +93,20 @@ fn live_postgres_preserves_exact_same_role_share_budget() {
             ))
             .expect("exact-unity same-role shares remain valid");
     }
+
+    let partial_document = Uuid::now_v7();
+    repo.session_mut()
+        .execute(&membership_insert_sql(
+            tenant_record_id,
+            partial_document,
+            entity_a,
+            Uuid::now_v7(),
+            "department",
+            "0.375",
+            "2026-01-01",
+            None,
+        ))
+        .expect("sub-unity partial view remains admissible without normalization");
 
     let different_role_document = Uuid::now_v7();
     for (entity, role) in [(entity_a, "department"), (entity_b, "project")] {
@@ -179,34 +200,8 @@ fn live_postgres_preserves_exact_same_role_share_budget() {
             .is_err(),
         "positive NUMERIC values that underflow binary64 must not become zero-share affiliations"
     );
-}
 
-#[test]
-fn concurrent_same_role_first_writers_cannot_commit_an_overrun() {
-    if !live_postgres_requested() {
-        return;
-    }
-
-    let config = require_live_sqlx_config()
-        .expect("DATABASE_URL must be valid when TEPP_LIVE_POSTGRES=1");
-    let options = LiveSqlxPoolOptions::new(1, 5_000).expect("pool options");
-    let pool = open_live_sqlx_pool(&config, options).expect("open live PostgreSQL pool");
-    let mut repo = LiveDocumentRepository::new(pool);
-    let catalog = MigrationCatalog::from_embedded().expect("embedded migration catalog");
-
-    let _ = apply_sql_batch(repo.session_mut(), catalog.down_sql());
-    let _ = repo
-        .session_mut()
-        .execute("DROP ROLE IF EXISTS tepp_app_runtime");
-    repo.apply_migrations(&catalog)
-        .expect("membership budget migration catalog must apply");
-
-    let tenant_record_id = Uuid::now_v7();
-    let entity_a = Uuid::now_v7();
-    let entity_b = Uuid::now_v7();
-    let document_record_id = Uuid::now_v7();
-    seed_tenant_and_entities(&mut repo, tenant_record_id, &[entity_a, entity_b]);
-
+    let concurrent_document = Uuid::now_v7();
     let barrier = Arc::new(Barrier::new(2));
     let handles: Vec<_> = [entity_a, entity_b]
         .into_iter()
@@ -218,7 +213,7 @@ fn concurrent_same_role_first_writers_cannot_commit_an_overrun() {
                 let mut pool = open_live_sqlx_pool(&config, options).expect("thread pool");
                 let sql = membership_insert_sql(
                     tenant_record_id,
-                    document_record_id,
+                    concurrent_document,
                     entity_record_id,
                     Uuid::now_v7(),
                     "department",
@@ -237,7 +232,7 @@ fn concurrent_same_role_first_writers_cannot_commit_an_overrun() {
         .filter(|&ok| ok)
         .count();
     assert_eq!(committed, 1, "only one 0.6 first writer may commit");
-    assert_membership_count(&mut repo, document_record_id, "department", 1);
+    assert_membership_count(&mut repo, concurrent_document, "department", 1);
 }
 
 fn seed_tenant_and_entities(
