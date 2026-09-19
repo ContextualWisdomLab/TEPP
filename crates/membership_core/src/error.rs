@@ -17,7 +17,7 @@ pub enum MembershipError {
     UnsupportedWireVersion,
     /// An assignment referenced a role string that is not a TEPP membership role.
     UnknownMembershipRole,
-    /// A duplicate assignment key was rejected by the membership network.
+    /// The same member/group/role identity had overlapping or endpoint-touching validity.
     DuplicateMembershipAssignment,
     /// A full single-membership estimator cannot represent the active membership design without loss.
     SingleMembershipProfileInapplicable,
