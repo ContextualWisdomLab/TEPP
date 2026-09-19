@@ -1,4 +1,8 @@
-use evidence_core::{SourceArtifact, SourceAvailability, SourceObservation, SourceSnapshotReceiptV1};
+//! Regression coverage for literal immutable snapshot IDs that resemble mutable locator prefixes.
+
+use evidence_core::{
+    SourceArtifact, SourceAvailability, SourceObservation, SourceSnapshotReceiptV1,
+};
 
 fn source_availability() -> SourceAvailability {
     let artifact =
