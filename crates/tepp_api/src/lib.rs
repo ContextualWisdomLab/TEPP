@@ -20,6 +20,8 @@ mod corpus_split_manifest;
 mod envelope;
 mod error;
 mod export;
+mod export_collection_cli;
+mod export_collection_http;
 mod export_http;
 mod lineage_criterion_anchor;
 mod lineage_pair_criterion;
@@ -104,6 +106,40 @@ pub use export_http::EXPORT_RETRIEVAL_ID_MAX_LEN;
 pub use export_http::ExportRetrieval;
 /// Build a naruon export-retrieval GET exchange.
 pub use export_http::naruon_export_retrieval_exchange;
+/// Build a credential-free naruon export collection GET exchange.
+pub use export_collection_http::naruon_export_collection_exchange;
+/// Whether a path is the export collection resource.
+pub use export_collection_http::is_export_collection_path;
+/// Page stored export collection rows with an exclusive export-id cursor.
+pub use export_collection_http::page_export_collection_items;
+/// Parse the optional exclusive `tepp-page-cursor` header.
+pub use export_collection_http::parse_export_collection_page_cursor;
+/// Parse the optional `tepp-page-limit` header.
+pub use export_collection_http::parse_export_collection_page_limit;
+/// Metric-free export collection page.
+pub use export_collection_http::ExportCollection;
+/// Maximum opaque cursor length on export collection GET.
+pub use export_collection_http::EXPORT_COLLECTION_CURSOR_MAX_LEN;
+/// Default page size for export collection GET.
+pub use export_collection_http::EXPORT_COLLECTION_DEFAULT_LIMIT;
+/// Maximum page size for export collection GET.
+pub use export_collection_http::EXPORT_COLLECTION_MAX_LIMIT;
+/// Supported operator verbs for the loopback export-collection CLI.
+pub use export_collection_cli::ExportCollectionCliVerb;
+/// One operator CLI invocation against a loopback export-collection GET listener.
+pub use export_collection_cli::ExportCollectionCliInvocation;
+/// Compose one HTTP/1.1 collection GET from the typed naruon exchange.
+pub use export_collection_cli::compose_export_collection_cli_http;
+/// Dispatch one collection CLI invocation against an in-process listener.
+pub use export_collection_cli::dispatch_export_collection_cli;
+/// Execute one collection CLI invocation over loopback TCP.
+pub use export_collection_cli::execute_export_collection_cli;
+/// Render a typed export-collection exchange as HTTP/1.1 for a loopback listener.
+pub use export_collection_cli::loopback_http1_from_export_collection_exchange;
+/// Read stdin leftover bytes on a non-terminal; collection GET admits empty.
+pub use export_collection_cli::read_export_collection_cli_stdin;
+/// Filter CLI stdout so collection never prints scientific acceptance.
+pub use export_collection_cli::render_export_collection_cli_stdout;
 /// Refuse scientific-metric keys on export-retrieval JSON.
 pub use export_http::refuse_metrics_on_export_retrieval_payload;
 

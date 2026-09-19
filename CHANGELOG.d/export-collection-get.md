@@ -1,0 +1,1 @@
+- `tepp_api` loopback `GET /v1/exports` enumerates authorized purpose-bound export identities on `AnalysisRunLiveService` / `tepp-loopback` (ADR 0075). Metric-free receipts only. `tepp.scientific_acceptance.v1` never appears. Does not infer causality. LineageWeave refused. `NaruonLiveService` stays POST-only. Not export retrieval GET, not GAP-010 Figma/export, not persistence.

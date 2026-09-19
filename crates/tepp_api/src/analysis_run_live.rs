@@ -3,7 +3,8 @@
 //! This module keeps the Naruon compatibility listener intact while providing
 //! the shared `/v1/analysis-runs` and cutoff-safe `/v1/temporal-context`
 //! boundaries needed by Naruon and `LineageWeave`. Naruon may also POST and
-//! GET `/v1/exports/{export_id}` for metric-free purpose-bound retrieval.
+//! GET `/v1/exports/{export_id}` for metric-free purpose-bound retrieval and
+//! `GET /v1/exports` to enumerate those identities.
 //! It accepts transport acknowledgements, temporal evidence context, and
 //! export identities only; completed psychometric results remain outside this
 //! crate.
@@ -12,9 +13,13 @@ use std::collections::HashMap;
 use std::io::Write;
 use std::net::{SocketAddr, TcpListener};
 
+use crate::export_collection_http::{
+    is_export_collection_path, page_export_collection_items, parse_export_collection_page_cursor,
+    parse_export_collection_page_limit, ExportCollection,
+};
 use crate::export_http::{export_retrieval_path_id, refuse_metrics_on_export_retrieval_payload};
 use crate::lineageweave_http::{
-    LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE, consumer_is_supported,
+    consumer_is_supported, LINEAGEWEAVE_CONSUMER_CODE, NARUON_CONSUMER_CODE,
 };
 use crate::live_http::{
     header_value, map_io_error, parse_headers, parse_request_line, read_http_request_with_limit,
@@ -22,12 +27,12 @@ use crate::live_http::{
 };
 use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH};
 use crate::{
-    AnalysisRunAccepted, AnalysisRunRequest, AnalyticalPurpose, ApiError,
-    DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, ErrorEnvelope, ExportAuthorizationRequest, ExportRetrieval,
-    NARUON_LIVE_IO_TIMEOUT, NaruonLiveResponse, PROJECT_HISTORY_PATH, ProjectHistoryProjection,
-    ProjectHistoryRequest, TEMPORAL_CONTEXT_PATH, TemporalContextRequest, authorize_export,
-    build_temporal_context, project_history_projection, requests_are_idempotent_matches,
-    require_export_allowed,
+    authorize_export, build_temporal_context, project_history_projection,
+    requests_are_idempotent_matches, require_export_allowed, AnalysisRunAccepted,
+    AnalysisRunRequest, AnalyticalPurpose, ApiError, ErrorEnvelope, ExportAuthorizationRequest,
+    ExportRetrieval, NaruonLiveResponse, ProjectHistoryProjection, ProjectHistoryRequest,
+    TemporalContextRequest, DEFAULT_PROJECT_HISTORY_BYTE_LIMIT, NARUON_LIVE_IO_TIMEOUT,
+    PROJECT_HISTORY_PATH, TEMPORAL_CONTEXT_PATH,
 };
 
 const MAX_LIVE_REQUEST_BODY_BYTES: usize = DEFAULT_PROJECT_HISTORY_BYTE_LIMIT;
@@ -162,6 +167,9 @@ impl AnalysisRunLiveService {
         let (method, path) = parse_request_line(lines.next().unwrap_or(""))?;
         let headers = parse_headers(&mut lines)?;
         if method == "GET" {
+            if is_export_collection_path(path) {
+                return self.list_exports(&headers, body);
+            }
             if matches!(
                 export_retrieval_path_id(path),
                 Ok(_) | Err(ApiError::LimitExceeded)
@@ -342,6 +350,37 @@ impl AnalysisRunLiveService {
         Ok(json_response(200, "OK", response_body))
     }
 
+    fn list_exports(
+        &self,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<NaruonLiveResponse, ApiError> {
+        if !body.trim().is_empty() {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        refuse_metrics_on_export_retrieval_payload(body)?;
+        let consumer = require_headers(headers, self.bound_addr, false)?;
+        if consumer != NARUON_CONSUMER_CODE {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        if headers.contains_key("idempotency-key") {
+            return Err(ApiError::InvalidWirePayload);
+        }
+        let limit =
+            parse_export_collection_page_limit(headers.get("tepp-page-limit").map(String::as_str))?;
+        let cursor = parse_export_collection_page_cursor(
+            headers.get("tepp-page-cursor").map(String::as_str),
+        )?;
+        let items = self
+            .authorized_exports
+            .values()
+            .map(|stored| stored.retrieval.clone())
+            .collect();
+        let (page, next_cursor) = page_export_collection_items(items, cursor.as_deref(), limit);
+        let collection = ExportCollection::new(page, next_cursor)?;
+        Ok(json_response(200, "OK", collection.to_json()?))
+    }
+
     fn response_from_error(&mut self, error: ApiError) -> NaruonLiveResponse {
         let request_id = format!("analysis-run-live-{}", self.next_request_serial);
         self.next_request_serial += 1;
@@ -417,17 +456,16 @@ mod tests {
     use std::time::Duration;
 
     use super::{
-        AnalysisRunLiveService, consumer_tenant_idempotency_key, declared_content_length,
-        error_envelope_json, host_implies_table_access, map_io_error, parse_headers,
-        require_headers, split_header_line, status_for,
+        consumer_tenant_idempotency_key, declared_content_length, error_envelope_json,
+        host_implies_table_access, map_io_error, parse_headers, require_headers, split_header_line,
+        status_for, AnalysisRunLiveService,
     };
     use crate::live_http::{host_is_loopback, read_http_request, split_request};
     use crate::{
-        ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, ApiError,
-        DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, ErrorEnvelope, LINEAGEWEAVE_CONSUMER_CODE,
-        NARUON_ANALYSIS_RUN_PATH, NARUON_CONSUMER_CODE, NARUON_EXPORT_PATH,
-        NARUON_LIVE_HEADER_BYTE_LIMIT, NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT,
-        TEMPORAL_CONTEXT_PATH,
+        AnalysisRunRequest, ApiError, ErrorEnvelope, ANALYSIS_RUN_CONTRACT_VERSION,
+        DEFAULT_ANALYSIS_RUN_BYTE_LIMIT, LINEAGEWEAVE_CONSUMER_CODE, NARUON_ANALYSIS_RUN_PATH,
+        NARUON_CONSUMER_CODE, NARUON_EXPORT_PATH, NARUON_LIVE_HEADER_BYTE_LIMIT,
+        NARUON_LIVE_HEADER_COUNT_LIMIT, NARUON_LIVE_IO_TIMEOUT, TEMPORAL_CONTEXT_PATH,
     };
 
     fn sample_run() -> AnalysisRunRequest {
@@ -1135,7 +1173,7 @@ mod tests {
                     "GET {NARUON_EXPORT_PATH} HTTP/1.1\r\nHost: 127.0.0.1\r\ncontent-type: application/json\r\ntepp-consumer: naruon\r\ntepp-contract-version: 1\r\ncontent-length: 0\r\n\r\n"
                 ))
                 .status_code,
-            400
+            200
         );
         assert_eq!(
             service
