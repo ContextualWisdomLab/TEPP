@@ -1,14 +1,16 @@
 //! Validated membership weights for partial or full affiliation.
 
 use crate::MembershipError;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
+use serde::de::Error as _;
 
-/// A finite, non-negative membership weight.
+/// A finite membership share in the closed unit interval `[0, 1]`.
 ///
 /// Weights of `1.0` represent full affiliation. Values in `(0, 1)` represent
 /// partial multiple membership and must be preserved rather than rounded away
-/// before multilevel estimation.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+/// before multilevel estimation. Values above `1.0` are not affiliation shares
+/// and fail closed rather than being normalized or clamped.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 pub struct MembershipWeight(f64);
 
@@ -18,9 +20,9 @@ impl MembershipWeight {
     /// # Errors
     ///
     /// Returns [`MembershipError::InvalidMembershipWeight`] when `value` is
-    /// negative, infinite, or not a number.
+    /// outside `[0, 1]`, infinite, or not a number.
     pub fn new(value: f64) -> Result<Self, MembershipError> {
-        if value.is_finite() && value >= 0.0 {
+        if value.is_finite() && (0.0..=1.0).contains(&value) {
             Ok(Self(value))
         } else {
             Err(MembershipError::InvalidMembershipWeight)
@@ -40,6 +42,18 @@ impl MembershipWeight {
     #[must_use]
     pub const fn value(self) -> f64 {
         self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for MembershipWeight {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = f64::deserialize(deserializer)?;
+        Self::new(value).map_err(|_| {
+            D::Error::custom("membership weight must be finite and within the closed interval [0, 1]")
+        })
     }
 }
 
