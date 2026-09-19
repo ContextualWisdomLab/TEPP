@@ -70,4 +70,14 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn serde_deserialization_cannot_bypass_weight_validation() {
+        let partial: MembershipWeight =
+            serde_json::from_str("0.5").expect("valid partial wire weight");
+        assert_eq!(partial.value().to_bits(), 0.5_f64.to_bits());
+
+        assert!(serde_json::from_str::<MembershipWeight>("1.25").is_err());
+        assert!(serde_json::from_str::<MembershipWeight>("-0.25").is_err());
+    }
 }
