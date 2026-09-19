@@ -6,35 +6,8 @@
 -- replacing scientific identity with decimal SUM or ordinary floating accumulation.
 --
 -- A narrow guard row serializes writers for one tenant/observed-unit/role lane before the
--- overlapping-row aggregate is evaluated. This closes the initially-empty-row race that a plain
+-- pointwise temporal aggregate is evaluated. This closes the initially-empty-row race that a plain
 -- SELECT/trigger check cannot prevent.
-
-CREATE TABLE membership_share_budget_guard (
-    tenant_record_id uuid NOT NULL REFERENCES tenant_record (tenant_record_id),
-    observed_unit_kind text NOT NULL,
-    observed_unit_id uuid NOT NULL,
-    membership_type_code text NOT NULL,
-    system_time timestamptz NOT NULL DEFAULT statement_timestamp(),
-    available_time timestamptz NOT NULL DEFAULT statement_timestamp(),
-    PRIMARY KEY (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code),
-    CONSTRAINT membership_share_budget_guard_unit_kind CHECK (
-        observed_unit_kind IN ('document', 'text_segment')
-    )
-);
-
-GRANT SELECT, INSERT ON TABLE membership_share_budget_guard TO tepp_app_runtime;
-GRANT UPDATE (system_time) ON TABLE membership_share_budget_guard TO tepp_app_runtime;
-
-ALTER TABLE membership_share_budget_guard ENABLE ROW LEVEL SECURITY;
-ALTER TABLE membership_share_budget_guard FORCE ROW LEVEL SECURITY;
-CREATE POLICY membership_share_budget_guard_tenant_isolation ON membership_share_budget_guard
-    FOR ALL
-    USING (
-        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
-    )
-    WITH CHECK (
-        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
-    );
 
 CREATE OR REPLACE FUNCTION membership_binary64_scaled_numerator(weight numeric)
 RETURNS numeric
@@ -105,6 +78,188 @@ BEGIN
 END;
 $membership_binary64_scaled_numerator$;
 
+CREATE OR REPLACE FUNCTION membership_possible_activity_envelope(
+    valid_from_window tstzrange,
+    valid_to_window tstzrange
+)
+RETURNS tstzrange
+LANGUAGE sql
+IMMUTABLE
+AS $membership_possible_activity_envelope$
+    SELECT tstzrange(
+        lower(valid_from_window),
+        CASE WHEN valid_to_window IS NULL THEN NULL ELSE upper(valid_to_window) END,
+        (CASE WHEN lower_inc(valid_from_window) THEN '[' ELSE '(' END)
+        ||
+        (CASE
+            WHEN valid_to_window IS NOT NULL AND upper_inc(valid_to_window) THEN ']'
+            ELSE ')'
+        END)
+    )
+$membership_possible_activity_envelope$;
+
+CREATE OR REPLACE FUNCTION membership_same_role_max_existing_numerator(
+    candidate_tenant_record_id uuid,
+    candidate_observed_unit_kind text,
+    candidate_observed_unit_id uuid,
+    candidate_membership_type_code text,
+    candidate_envelope tstzrange,
+    excluded_membership_assignment_id uuid
+)
+RETURNS numeric
+LANGUAGE sql
+STABLE
+AS $membership_same_role_max_existing_numerator$
+    WITH lane_memberships AS (
+        SELECT
+            membership_binary64_scaled_numerator(existing.membership_weight) AS numerator,
+            membership_possible_activity_envelope(
+                existing.valid_from_window,
+                existing.valid_to_window
+            ) AS envelope
+        FROM membership_assignment AS existing
+        WHERE existing.tenant_record_id = candidate_tenant_record_id
+          AND existing.membership_type_code = candidate_membership_type_code
+          AND existing.membership_assignment_id <> excluded_membership_assignment_id
+          AND (
+                (candidate_observed_unit_kind = 'document'
+                 AND existing.document_record_id = candidate_observed_unit_id
+                 AND existing.text_segment_id IS NULL)
+             OR (candidate_observed_unit_kind = 'text_segment'
+                 AND existing.text_segment_id = candidate_observed_unit_id
+                 AND existing.document_record_id IS NULL)
+          )
+    ),
+    relevant AS (
+        SELECT numerator, envelope
+        FROM lane_memberships
+        WHERE envelope && candidate_envelope
+    ),
+    boundaries AS (
+        SELECT lower(candidate_envelope) AS boundary
+        WHERE NOT lower_inf(candidate_envelope)
+        UNION
+        SELECT upper(candidate_envelope) AS boundary
+        WHERE NOT upper_inf(candidate_envelope)
+        UNION
+        SELECT lower(envelope) AS boundary
+        FROM relevant
+        WHERE NOT lower_inf(envelope)
+        UNION
+        SELECT upper(envelope) AS boundary
+        FROM relevant
+        WHERE NOT upper_inf(envelope)
+    ),
+    point_states AS (
+        SELECT COALESCE(SUM(relevant.numerator), 0) AS numerator
+        FROM boundaries
+        LEFT JOIN relevant ON relevant.envelope @> boundaries.boundary
+        WHERE candidate_envelope @> boundaries.boundary
+        GROUP BY boundaries.boundary
+    ),
+    right_open_states AS (
+        SELECT COALESCE(SUM(relevant.numerator), 0) AS numerator
+        FROM boundaries
+        LEFT JOIN relevant
+          ON (lower_inf(relevant.envelope) OR lower(relevant.envelope) <= boundaries.boundary)
+         AND (upper_inf(relevant.envelope) OR upper(relevant.envelope) > boundaries.boundary)
+        WHERE (lower_inf(candidate_envelope) OR lower(candidate_envelope) <= boundaries.boundary)
+          AND (upper_inf(candidate_envelope) OR upper(candidate_envelope) > boundaries.boundary)
+        GROUP BY boundaries.boundary
+    ),
+    lower_unbounded_state AS (
+        SELECT COALESCE(SUM(relevant.numerator), 0) AS numerator
+        FROM relevant
+        WHERE lower_inf(candidate_envelope)
+          AND lower_inf(relevant.envelope)
+    ),
+    states AS (
+        SELECT numerator FROM point_states
+        UNION ALL
+        SELECT numerator FROM right_open_states
+        UNION ALL
+        SELECT numerator FROM lower_unbounded_state
+    )
+    SELECT COALESCE(MAX(numerator), 0)
+    FROM states
+$membership_same_role_max_existing_numerator$;
+
+-- Validate state admitted by the predecessor schema before installing new enforcement. This keeps
+-- `0010` from surrounding an already-unreconstructable Membership lane with a trigger that only
+-- protects future writes. The pure helper definitions above are retry-safe if this statement fails;
+-- guard rows and trigger authority are created only after the historical state proves admissible.
+DO $membership_existing_share_budget_validation$
+DECLARE
+    existing membership_assignment%ROWTYPE;
+    observed_kind text;
+    observed_id uuid;
+    candidate_envelope tstzrange;
+    existing_numerator numeric;
+    candidate_numerator numeric;
+    unity_numerator numeric := membership_binary64_scaled_numerator(1::numeric);
+BEGIN
+    FOR existing IN SELECT * FROM membership_assignment LOOP
+        candidate_numerator := membership_binary64_scaled_numerator(existing.membership_weight);
+        candidate_envelope := membership_possible_activity_envelope(
+            existing.valid_from_window,
+            existing.valid_to_window
+        );
+
+        IF existing.document_record_id IS NOT NULL THEN
+            observed_kind := 'document';
+            observed_id := existing.document_record_id;
+        ELSIF existing.text_segment_id IS NOT NULL THEN
+            observed_kind := 'text_segment';
+            observed_id := existing.text_segment_id;
+        ELSE
+            RAISE EXCEPTION 'membership assignment has no observed unit'
+                USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_observed_unit_exactly_one';
+        END IF;
+
+        existing_numerator := membership_same_role_max_existing_numerator(
+            existing.tenant_record_id,
+            observed_kind,
+            observed_id,
+            existing.membership_type_code,
+            candidate_envelope,
+            existing.membership_assignment_id
+        );
+
+        IF existing_numerator + candidate_numerator > unity_numerator THEN
+            RAISE EXCEPTION 'pre-existing overlapping same-role membership shares exceed unity'
+                USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_same_role_share_budget';
+        END IF;
+    END LOOP;
+END;
+$membership_existing_share_budget_validation$;
+
+CREATE TABLE membership_share_budget_guard (
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record (tenant_record_id),
+    observed_unit_kind text NOT NULL,
+    observed_unit_id uuid NOT NULL,
+    membership_type_code text NOT NULL,
+    system_time timestamptz NOT NULL DEFAULT statement_timestamp(),
+    available_time timestamptz NOT NULL DEFAULT statement_timestamp(),
+    PRIMARY KEY (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code),
+    CONSTRAINT membership_share_budget_guard_unit_kind CHECK (
+        observed_unit_kind IN ('document', 'text_segment')
+    )
+);
+
+GRANT SELECT, INSERT ON TABLE membership_share_budget_guard TO tepp_app_runtime;
+GRANT UPDATE (system_time) ON TABLE membership_share_budget_guard TO tepp_app_runtime;
+
+ALTER TABLE membership_share_budget_guard ENABLE ROW LEVEL SECURITY;
+ALTER TABLE membership_share_budget_guard FORCE ROW LEVEL SECURITY;
+CREATE POLICY membership_share_budget_guard_tenant_isolation ON membership_share_budget_guard
+    FOR ALL
+    USING (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    )
+    WITH CHECK (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    );
+
 CREATE OR REPLACE FUNCTION enforce_membership_same_role_share_budget()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -154,52 +309,18 @@ BEGIN
     ON CONFLICT (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code)
     DO UPDATE SET system_time = membership_share_budget_guard.system_time;
 
-    -- One membership can be active at any instant between its earliest admissible start and latest
-    -- admissible end. Construct that possible-activity envelope as a range so PostgreSQL preserves
-    -- unbounded sides and endpoint inclusivity instead of collapsing either into NULL/scalar `<=`
-    -- semantics. Empty uncertainty windows are already rejected by `0006`.
-    candidate_envelope := tstzrange(
-        lower(NEW.valid_from_window),
-        CASE WHEN NEW.valid_to_window IS NULL THEN NULL ELSE upper(NEW.valid_to_window) END,
-        (CASE WHEN lower_inc(NEW.valid_from_window) THEN '[' ELSE '(' END)
-        ||
-        (CASE
-            WHEN NEW.valid_to_window IS NOT NULL AND upper_inc(NEW.valid_to_window) THEN ']'
-            ELSE ')'
-        END)
+    candidate_envelope := membership_possible_activity_envelope(
+        NEW.valid_from_window,
+        NEW.valid_to_window
     );
-
-    SELECT COALESCE(SUM(membership_binary64_scaled_numerator(existing.membership_weight)), 0)
-      INTO existing_numerator
-      FROM membership_assignment AS existing
-     WHERE existing.tenant_record_id = NEW.tenant_record_id
-       AND existing.membership_type_code = NEW.membership_type_code
-       AND existing.membership_assignment_id <> NEW.membership_assignment_id
-       AND (
-            (observed_kind = 'document'
-             AND existing.document_record_id = observed_id
-             AND existing.text_segment_id IS NULL)
-         OR (observed_kind = 'text_segment'
-             AND existing.text_segment_id = observed_id
-             AND existing.document_record_id IS NULL)
-       )
-       -- Admission is conservative only when the two schema-admitted possible-activity envelopes
-       -- actually overlap. PostgreSQL range overlap retains open/closed endpoint semantics and
-       -- handles unbounded sides without timestamp nudging or tolerance.
-       AND tstzrange(
-            lower(existing.valid_from_window),
-            CASE
-                WHEN existing.valid_to_window IS NULL THEN NULL
-                ELSE upper(existing.valid_to_window)
-            END,
-            (CASE WHEN lower_inc(existing.valid_from_window) THEN '[' ELSE '(' END)
-            ||
-            (CASE
-                WHEN existing.valid_to_window IS NOT NULL
-                     AND upper_inc(existing.valid_to_window) THEN ']'
-                ELSE ')'
-            END)
-       ) && candidate_envelope;
+    existing_numerator := membership_same_role_max_existing_numerator(
+        NEW.tenant_record_id,
+        observed_kind,
+        observed_id,
+        NEW.membership_type_code,
+        candidate_envelope,
+        NEW.membership_assignment_id
+    );
 
     IF existing_numerator + candidate_numerator > unity_numerator THEN
         RAISE EXCEPTION 'overlapping same-role membership shares exceed unity'
