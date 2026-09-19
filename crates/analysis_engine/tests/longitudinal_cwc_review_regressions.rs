@@ -222,6 +222,19 @@ fn artifact_digest_commits_to_cutoff_visible_evidence_identity() {
 }
 
 #[test]
+fn admitted_payload_commitment_is_stable_under_benign_row_permutation() {
+    let request = request("2026-08-01T00:00:00Z");
+    let baseline_rows = rows();
+    let baseline = execute(&request, &baseline_rows);
+    let mut permuted_rows = rows();
+    permuted_rows.reverse();
+    let permuted = execute(&request, &permuted_rows);
+
+    assert_eq!(permuted.artifact, baseline.artifact);
+    assert_eq!(permuted.terminal_result, baseline.terminal_result);
+}
+
+#[test]
 fn artifact_refuses_inconsistent_contextual_effect() {
     let mut tampered = artifact();
     tampered.contextual_effect = 0.0;
