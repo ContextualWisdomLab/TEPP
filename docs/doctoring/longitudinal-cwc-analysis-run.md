@@ -10,12 +10,13 @@
 **Lockfile integrity owner:** #597
 **Artifact structural-validity owner:** #599
 **Admitted-evidence commitment owner:** #600
+**Canonical cutoff artifact-identity owner:** #601
 
 Protected main owns Enders and Tofighi (2007) CWC within/between/contextual OLS in `psychometric_core`. This branch only composes that owner into `analysis_engine`; it does not implement a second estimator, DSEM, RI-CLPM, persistence, or causal identification.
 
 ## Repaired application contract
 
-The predecessor profile was not fully historical or self-consistent. It compared request/executor cutoffs as RFC 3339 text, trusted a run-level snapshot label while individual rows lacked snapshot provenance, accepted artifact counts outside the executable population envelope, accepted a finite but inconsistent contextual effect, discarded the causal-refusal provider result, reused the scientific inference label as terminal provider validation state, dropped the opaque evidence identity needed to prevent cutoff-visible replay/pseudo-replication, emitted `excluded_after_cutoff_count` so later-only corpus existence altered an earlier artifact digest, checked row snapshot provenance before availability admission so a future-only row from another snapshot could fail an otherwise identical historical replay, accepted an all-singleton success-artifact count shape that the executor cannot produce, and after admission dropped the exact evidence identity/numeric provenance from the digest-bound artifact.
+The predecessor profile was not fully historical or self-consistent. It compared request/executor cutoffs as RFC 3339 text, trusted a run-level snapshot label while individual rows lacked snapshot provenance, accepted artifact counts outside the executable population envelope, accepted a finite but inconsistent contextual effect, discarded the causal-refusal provider result, reused the scientific inference label as terminal provider validation state, dropped the opaque evidence identity needed to prevent cutoff-visible replay/pseudo-replication, emitted `excluded_after_cutoff_count` so later-only corpus existence altered an earlier artifact digest, checked row snapshot provenance before availability admission so a future-only row from another snapshot could fail an otherwise identical historical replay, accepted an all-singleton success-artifact count shape that the executor cannot produce, after admission dropped the exact evidence identity/numeric provenance from the digest-bound artifact, and accepted multiple RFC 3339 artifact spellings for the same cutoff instant even though artifact serialization/digesting is defined as canonical.
 
 Current branch behavior is stricter:
 
@@ -32,12 +33,13 @@ Current branch behavior is stricter:
 - only the provenance commitment is canonicalized by immutable evidence ID, so benign source enumeration does not change it; estimator inputs remain untouched and #596 is not hidden by sorting;
 - standalone artifact import rejects malformed or non-lowercase admitted-evidence digests;
 - a successful artifact requires `cluster_count < row_count`, rejecting the impossible all-singleton count shape without claiming this structural rule proves full-rank design;
-- equivalent legal RFC 3339 spellings bind by `KnowledgeCutoff::instant()`;
+- equivalent legal RFC 3339 request/executor spellings bind by `KnowledgeCutoff::instant()`;
+- the digest-bound artifact accepts only the exact `KnowledgeCutoff::to_rfc3339()` representation, preventing more than one valid wire/digest identity for the same cutoff instant;
 - `contextual_effect` must equal the exact `between_slope - within_slope` value produced by the owner contract;
 - the exact `CausalUnderidentified` refusal is required, while unexpected success or another provider error fails closed;
 - terminal `validation_status` is `validated`; the artifact separately carries `composed_cwc_slopes_not_causal`.
 
-The snapshot, identity, and admitted-payload rules are historical-population rules, not raw-corpus side channels. Replaying one cutoff-visible source row can change stacked within-cluster weighting, cluster means, within/between slopes, contextual effect, and `row_count`; allowing it would turn transport replay into a scientific weighting rule. A cutoff-visible row from another snapshot similarly violates provenance. Conversely, validating, counting, or hashing later-unavailable rows would leak future corpus state into an earlier replay. The new commitment is source-text-free content identity; it does not attest which upstream mapping implementation produced those coordinates.
+The snapshot, identity, admitted-payload, and canonical-cutoff rules are historical-result integrity rules, not raw-corpus side channels. Replaying one cutoff-visible source row can change stacked within-cluster weighting, cluster means, within/between slopes, contextual effect, and `row_count`; allowing it would turn transport replay into a scientific weighting rule. A cutoff-visible row from another snapshot similarly violates provenance. Conversely, validating, counting, or hashing later-unavailable rows would leak future corpus state into an earlier replay. The new commitment is source-text-free content identity; it does not attest which upstream mapping implementation produced those coordinates. Canonical request matching and canonical artifact text serve different purposes: the former compares temporal instants, while the latter ensures one digest-bound representation per instant.
 
 RED / repair lineage on this branch:
 
@@ -60,14 +62,16 @@ RED / repair lineage on this branch:
 - `da1a846901f54f8500a30ae4a4988289da170916` is the #600 public RED: changing one cutoff-visible opaque evidence identity while keeping coordinates, counts, and slopes equal must change the digest-bound result;
 - `625a3a4562dbdb3527e3377eabb9231fc374f1b9` adds the versioned domain-separated admitted-evidence commitment and standalone digest validation;
 - `676173fac5568f6147d560233aca5c1b9203da8d` migrates the public artifact fixture, `d2159307ec8e289fb5c5850c09c05bd668c6429e` proves benign permutation stability for the new commitment, and `988679869a8241ec5a7f932ee9fd1bf3df77dd42` keeps the digest helper slice-bounded without changing behavior;
+- `a5a039e4001e01d1d089e14c6c548d6d5ea60842` is the #601 public RED: canonical UTC remains valid while a semantically equivalent noncanonical offset spelling must fail standalone artifact validation;
+- `6c06c0de11d565f09e4cdba48834165f4518e909` is the #601 minimal causal repair: artifact validation parses through `KnowledgeCutoff` once and requires exact equality with `to_rfc3339()`;
 - ADR 0033 remains `Proposed`, not protected-main `Accepted` authority.
 
 ## Scientific evidence boundary
 
 Existing known-truth CWC tests are useful regression evidence, but one noiseless profile fixture does not establish commercial recovery. Issue #501 requires repeated true-parameter recovery with RMSE, bias, Monte Carlo uncertainty, explicit attempted/recovered/failed denominators, cluster-size and signal/noise variation, unequal follow-up/time-varying availability, and leakage-safe rolling-origin evaluation.
 
-#592, #593, #595, #597, #599 and #600 are integrity prerequisites, not substitutes for #501. #596 is a separate unresolved numerical invariant whose repair belongs to the released fast-mlsirm finite-binary64 owner. Do not promote this profile to scientific acceptance or release readiness from deterministic fixtures alone. LLM judgments are not numerical acceptance evidence.
+#592, #593, #595, #597, #599, #600 and #601 are integrity prerequisites, not substitutes for #501. #596 is a separate unresolved numerical invariant whose repair belongs to the released fast-mlsirm finite-binary64 owner. Do not promote this profile to scientific acceptance or release readiness from deterministic fixtures alone. LLM judgments are not numerical acceptance evidence.
 
 ## Merge boundary
 
-The PR remains Draft until the valid #592/#593/#595/#596/#597/#599/#600 deltas survive the #416 fold, exact-head Rust/documentation/security/coverage gates, review-thread resolution, qualifying current-head independent approval, shared documentation consolidation, and #501 or equivalent checked-in scientific evidence converge on the surviving head. Predecessor checks or reviews do not transfer after a head change.
+The PR remains Draft until the valid #592/#593/#595/#596/#597/#599/#600/#601 deltas survive the #416 fold, exact-head Rust/documentation/security/coverage gates, review-thread resolution, qualifying current-head independent approval, shared documentation consolidation, and #501 or equivalent checked-in scientific evidence converge on the surviving head. Predecessor checks or reviews do not transfer after a head change.
