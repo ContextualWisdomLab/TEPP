@@ -2,7 +2,7 @@
 
 use crate::{GroupId, MemberId, MembershipAssignment, MembershipError, MembershipRole};
 use std::collections::{BTreeMap, BTreeSet};
-use temporal_core::EventTime;
+use temporal_core::{AllenRelation, EventTime, classify_interval_relation};
 
 /// An in-memory network of weighted multiple memberships.
 ///
@@ -12,7 +12,6 @@ use temporal_core::EventTime;
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct MembershipNetwork {
     assignments: Vec<MembershipAssignment>,
-    keys: BTreeSet<(MemberId, GroupId, MembershipRole)>,
 }
 
 impl MembershipNetwork {
@@ -24,18 +23,28 @@ impl MembershipNetwork {
 
     /// Insert one validated assignment.
     ///
+    /// Repeated `(member, group, role)` identities are valid when their closed
+    /// event-time intervals are strictly disjoint, preserving longitudinal leave
+    /// and re-entry spells. Overlapping or endpoint-touching intervals for the
+    /// same identity fail closed because they would create two simultaneously
+    /// active copies of one membership edge.
+    ///
     /// # Errors
     ///
-    /// Returns [`MembershipError::DuplicateMembershipAssignment`] when the same
-    /// `(member, group, role)` key already exists. Validity revisions must be
-    /// modeled as new temporal edges rather than silent overwrites.
+    /// Returns [`MembershipError::DuplicateMembershipAssignment`] when an
+    /// existing assignment has the same `(member, group, role)` identity and its
+    /// validity interval is not strictly before or after the candidate interval.
     pub fn insert(&mut self, assignment: MembershipAssignment) -> Result<(), MembershipError> {
-        let key = (
-            assignment.member_id(),
-            assignment.group_id(),
-            assignment.role(),
-        );
-        if !self.keys.insert(key) {
+        let conflicts = self.assignments.iter().copied().any(|existing| {
+            existing.member_id() == assignment.member_id()
+                && existing.group_id() == assignment.group_id()
+                && existing.role() == assignment.role()
+                && !matches!(
+                    classify_interval_relation(&existing.validity(), &assignment.validity()),
+                    Ok(AllenRelation::Before | AllenRelation::After)
+                )
+        });
+        if conflicts {
             return Err(MembershipError::DuplicateMembershipAssignment);
         }
         self.assignments.push(assignment);
