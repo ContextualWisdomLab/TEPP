@@ -6,8 +6,9 @@
 -- replacing scientific identity with decimal SUM or ordinary floating accumulation.
 --
 -- A narrow guard row serializes writers for one tenant/observed-unit/role lane before the
--- pointwise temporal aggregate and duplicate-edge predicates are evaluated. This closes the
--- initially-empty-row race that a plain SELECT/trigger check cannot prevent.
+-- pointwise temporal aggregate and duplicate-edge predicates are evaluated. Admission protection
+-- is installed before the historical scan so predecessor writes cannot slip through a validation
+-- to trigger cutover gap.
 
 CREATE OR REPLACE FUNCTION membership_binary64_scaled_numerator(weight numeric)
 RETURNS numeric
@@ -31,9 +32,6 @@ BEGIN
             USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_weight_unit_interval';
     END IF;
 
-    -- float8send exposes the canonical IEEE-754 binary64 payload selected by PostgreSQL's
-    -- numeric->double precision conversion. The owner contract is defined on that represented
-    -- value, not on the source decimal spelling.
     payload := pg_catalog.float8send(weight::double precision);
     raw_bits :=
           (get_byte(payload, 0)::bigint << 56)
@@ -45,8 +43,6 @@ BEGIN
         | (get_byte(payload, 6)::bigint << 8)
         |  get_byte(payload, 7)::bigint;
 
-    -- Positive finite binary64 values <= 1.0 have monotonically ordered positive bit patterns.
-    -- Zero covers decimal values that underflow the owner's smallest positive binary64 share.
     IF raw_bits <= 0 OR raw_bits > 4607182418800017408 THEN
         RAISE EXCEPTION 'membership weight is not representable in the owner binary64 domain'
             USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_weight_unit_interval';
@@ -55,7 +51,6 @@ BEGIN
     raw_exponent := ((raw_bits >> 52) & 2047)::integer;
     fraction := raw_bits & 4503599627370495;
     IF raw_exponent = 0 THEN
-        -- Subnormal: exact value = fraction * 2^-1074, so the scaled numerator is `fraction`.
         RETURN fraction::numeric;
     END IF;
 
@@ -63,7 +58,6 @@ BEGIN
     exponent_shift := raw_exponent - 1;
     factor_exponent := exponent_shift;
 
-    -- Compute 2^exponent_shift with exact NUMERIC integer multiplication and logarithmic work.
     WHILE factor_exponent > 0 LOOP
         IF factor_exponent % 2 = 1 THEN
             factor := factor * factor_base;
@@ -229,10 +223,136 @@ AS $membership_duplicate_temporal_edge_exists$
     )
 $membership_duplicate_temporal_edge_exists$;
 
--- Validate state admitted by the predecessor schema before installing new enforcement. This keeps
--- `0010` from surrounding an already-unreconstructable Membership lane with triggers that only
--- protect future writes. The pure helper definitions above are retry-safe if this statement fails;
--- guard rows and trigger authority are created only after the historical state proves admissible.
+CREATE TABLE IF NOT EXISTS membership_share_budget_guard (
+    tenant_record_id uuid NOT NULL REFERENCES tenant_record (tenant_record_id),
+    observed_unit_kind text NOT NULL,
+    observed_unit_id uuid NOT NULL,
+    membership_type_code text NOT NULL,
+    system_time timestamptz NOT NULL DEFAULT statement_timestamp(),
+    available_time timestamptz NOT NULL DEFAULT statement_timestamp(),
+    PRIMARY KEY (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code),
+    CONSTRAINT membership_share_budget_guard_unit_kind CHECK (
+        observed_unit_kind IN ('document', 'text_segment')
+    )
+);
+
+GRANT SELECT, INSERT ON TABLE membership_share_budget_guard TO tepp_app_runtime;
+GRANT UPDATE (system_time) ON TABLE membership_share_budget_guard TO tepp_app_runtime;
+
+ALTER TABLE membership_share_budget_guard ENABLE ROW LEVEL SECURITY;
+ALTER TABLE membership_share_budget_guard FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS membership_share_budget_guard_tenant_isolation ON membership_share_budget_guard;
+CREATE POLICY membership_share_budget_guard_tenant_isolation ON membership_share_budget_guard
+    FOR ALL
+    USING (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    )
+    WITH CHECK (
+        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+    );
+
+CREATE OR REPLACE FUNCTION enforce_membership_same_role_share_budget()
+RETURNS trigger
+LANGUAGE plpgsql
+VOLATILE
+AS $enforce_membership_same_role_share_budget$
+DECLARE
+    observed_kind text;
+    observed_id uuid;
+    candidate_envelope tstzrange;
+    existing_numerator numeric;
+    candidate_numerator numeric;
+    unity_numerator numeric;
+BEGIN
+    IF NEW.document_record_id IS NOT NULL THEN
+        observed_kind := 'document';
+        observed_id := NEW.document_record_id;
+    ELSIF NEW.text_segment_id IS NOT NULL THEN
+        observed_kind := 'text_segment';
+        observed_id := NEW.text_segment_id;
+    ELSE
+        RAISE EXCEPTION 'membership assignment has no observed unit'
+            USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_observed_unit_exactly_one';
+    END IF;
+
+    candidate_numerator := membership_binary64_scaled_numerator(NEW.membership_weight);
+    unity_numerator := membership_binary64_scaled_numerator(1::numeric);
+
+    INSERT INTO membership_share_budget_guard (
+        tenant_record_id,
+        observed_unit_kind,
+        observed_unit_id,
+        membership_type_code,
+        system_time,
+        available_time
+    ) VALUES (
+        NEW.tenant_record_id,
+        observed_kind,
+        observed_id,
+        NEW.membership_type_code,
+        statement_timestamp(),
+        statement_timestamp()
+    )
+    ON CONFLICT (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code)
+    DO UPDATE SET system_time = membership_share_budget_guard.system_time;
+
+    candidate_envelope := membership_possible_activity_envelope(
+        NEW.valid_from_window,
+        NEW.valid_to_window
+    );
+
+    IF membership_duplicate_temporal_edge_exists(
+        NEW.tenant_record_id,
+        observed_kind,
+        observed_id,
+        NEW.target_entity_id,
+        NEW.target_project_id,
+        NEW.membership_type_code,
+        candidate_envelope,
+        NEW.membership_assignment_id
+    ) THEN
+        RAISE EXCEPTION 'duplicate membership temporal edge overlaps'
+            USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_duplicate_temporal_edge';
+    END IF;
+
+    existing_numerator := membership_same_role_max_existing_numerator(
+        NEW.tenant_record_id,
+        observed_kind,
+        observed_id,
+        NEW.membership_type_code,
+        candidate_envelope,
+        NEW.membership_assignment_id
+    );
+
+    IF existing_numerator + candidate_numerator > unity_numerator THEN
+        RAISE EXCEPTION 'overlapping same-role membership shares exceed unity'
+            USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_same_role_share_budget';
+    END IF;
+
+    RETURN NEW;
+END;
+$enforce_membership_same_role_share_budget$;
+
+DROP TRIGGER IF EXISTS membership_assignment_same_role_share_budget ON membership_assignment;
+CREATE TRIGGER membership_assignment_same_role_share_budget
+BEFORE INSERT OR UPDATE OF
+    tenant_record_id,
+    document_record_id,
+    text_segment_id,
+    target_entity_id,
+    target_project_id,
+    membership_type_code,
+    membership_weight,
+    valid_from_window,
+    valid_to_window
+ON membership_assignment
+FOR EACH ROW
+EXECUTE FUNCTION enforce_membership_same_role_share_budget();
+
+-- Historical validation runs only after future writes are protected. This deliberately mirrors the
+-- operational shape of `NOT VALID -> VALIDATE`: an invalid predecessor dataset leaves the new
+-- admission gate installed, fails the migration, and can be repaired by the data owner before an
+-- idempotent retry. No long explicit table lock is held across the scientific scan.
 DO $membership_existing_share_budget_validation$
 DECLARE
     existing membership_assignment%ROWTYPE;
@@ -291,131 +411,3 @@ BEGIN
     END LOOP;
 END;
 $membership_existing_share_budget_validation$;
-
-CREATE TABLE membership_share_budget_guard (
-    tenant_record_id uuid NOT NULL REFERENCES tenant_record (tenant_record_id),
-    observed_unit_kind text NOT NULL,
-    observed_unit_id uuid NOT NULL,
-    membership_type_code text NOT NULL,
-    system_time timestamptz NOT NULL DEFAULT statement_timestamp(),
-    available_time timestamptz NOT NULL DEFAULT statement_timestamp(),
-    PRIMARY KEY (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code),
-    CONSTRAINT membership_share_budget_guard_unit_kind CHECK (
-        observed_unit_kind IN ('document', 'text_segment')
-    )
-);
-
-GRANT SELECT, INSERT ON TABLE membership_share_budget_guard TO tepp_app_runtime;
-GRANT UPDATE (system_time) ON TABLE membership_share_budget_guard TO tepp_app_runtime;
-
-ALTER TABLE membership_share_budget_guard ENABLE ROW LEVEL SECURITY;
-ALTER TABLE membership_share_budget_guard FORCE ROW LEVEL SECURITY;
-CREATE POLICY membership_share_budget_guard_tenant_isolation ON membership_share_budget_guard
-    FOR ALL
-    USING (
-        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
-    )
-    WITH CHECK (
-        tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
-    );
-
-CREATE OR REPLACE FUNCTION enforce_membership_same_role_share_budget()
-RETURNS trigger
-LANGUAGE plpgsql
-VOLATILE
-AS $enforce_membership_same_role_share_budget$
-DECLARE
-    observed_kind text;
-    observed_id uuid;
-    candidate_envelope tstzrange;
-    existing_numerator numeric;
-    candidate_numerator numeric;
-    unity_numerator numeric;
-BEGIN
-    IF NEW.document_record_id IS NOT NULL THEN
-        observed_kind := 'document';
-        observed_id := NEW.document_record_id;
-    ELSIF NEW.text_segment_id IS NOT NULL THEN
-        observed_kind := 'text_segment';
-        observed_id := NEW.text_segment_id;
-    ELSE
-        RAISE EXCEPTION 'membership assignment has no observed unit'
-            USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_observed_unit_exactly_one';
-    END IF;
-
-    candidate_numerator := membership_binary64_scaled_numerator(NEW.membership_weight);
-    unity_numerator := membership_binary64_scaled_numerator(1::numeric);
-
-    -- The guard row is durable coordination state. ON CONFLICT DO UPDATE obtains a row lock that
-    -- survives until transaction end; concurrent first writers therefore cannot both observe an
-    -- empty membership lane. At stronger MVCC isolation a stale conflicting row update fails via
-    -- PostgreSQL serialization semantics instead of admitting an unverified aggregate.
-    INSERT INTO membership_share_budget_guard (
-        tenant_record_id,
-        observed_unit_kind,
-        observed_unit_id,
-        membership_type_code,
-        system_time,
-        available_time
-    ) VALUES (
-        NEW.tenant_record_id,
-        observed_kind,
-        observed_id,
-        NEW.membership_type_code,
-        statement_timestamp(),
-        statement_timestamp()
-    )
-    ON CONFLICT (tenant_record_id, observed_unit_kind, observed_unit_id, membership_type_code)
-    DO UPDATE SET system_time = membership_share_budget_guard.system_time;
-
-    candidate_envelope := membership_possible_activity_envelope(
-        NEW.valid_from_window,
-        NEW.valid_to_window
-    );
-
-    IF membership_duplicate_temporal_edge_exists(
-        NEW.tenant_record_id,
-        observed_kind,
-        observed_id,
-        NEW.target_entity_id,
-        NEW.target_project_id,
-        NEW.membership_type_code,
-        candidate_envelope,
-        NEW.membership_assignment_id
-    ) THEN
-        RAISE EXCEPTION 'duplicate membership temporal edge overlaps'
-            USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_duplicate_temporal_edge';
-    END IF;
-
-    existing_numerator := membership_same_role_max_existing_numerator(
-        NEW.tenant_record_id,
-        observed_kind,
-        observed_id,
-        NEW.membership_type_code,
-        candidate_envelope,
-        NEW.membership_assignment_id
-    );
-
-    IF existing_numerator + candidate_numerator > unity_numerator THEN
-        RAISE EXCEPTION 'overlapping same-role membership shares exceed unity'
-            USING ERRCODE = '23514', CONSTRAINT = 'membership_assignment_same_role_share_budget';
-    END IF;
-
-    RETURN NEW;
-END;
-$enforce_membership_same_role_share_budget$;
-
-CREATE TRIGGER membership_assignment_same_role_share_budget
-BEFORE INSERT OR UPDATE OF
-    tenant_record_id,
-    document_record_id,
-    text_segment_id,
-    target_entity_id,
-    target_project_id,
-    membership_type_code,
-    membership_weight,
-    valid_from_window,
-    valid_to_window
-ON membership_assignment
-FOR EACH ROW
-EXECUTE FUNCTION enforce_membership_same_role_share_budget();
