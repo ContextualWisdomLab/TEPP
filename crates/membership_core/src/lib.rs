@@ -34,7 +34,7 @@ pub use identifier::MemberId;
 pub use network::MembershipNetwork;
 /// Contextual membership roles (not permanent entity classes).
 pub use role::MembershipRole;
-/// Finite non-negative membership weight.
+/// Finite membership share in the closed unit interval `[0, 1]`.
 pub use weight::MembershipWeight;
 
 /// Design effect `n / ESS` for membership weights.
