@@ -52,11 +52,18 @@ fn embedded_catalog_bounds_membership_weights_to_unit_interval() {
     let up_sql = normalized(catalog.up_sql());
     let down_sql = normalized(catalog.down_sql());
 
+    let add_constraint = "constraint membership_assignment_weight_unit_interval check (membership_weight > 0 and membership_weight <= 1) not valid";
+    let validate_constraint =
+        "validate constraint membership_assignment_weight_unit_interval";
+    let add_position = up_sql
+        .find(add_constraint)
+        .expect("unit-interval check must be added without scanning existing rows under the initial DDL lock");
+    let validate_position = up_sql
+        .find(validate_constraint)
+        .expect("successor migration must validate pre-existing rows after fail-closed admission is installed");
     assert!(
-        up_sql.contains("constraint membership_assignment_weight_unit_interval")
-            && up_sql.contains("membership_weight > 0")
-            && up_sql.contains("membership_weight <= 1"),
-        "database admission must preserve the Membership owner's (0,1] share domain"
+        add_position < validate_position,
+        "NOT VALID admission must precede the lower-lock validation scan"
     );
     assert!(
         down_sql.contains("drop constraint membership_assignment_weight_unit_interval"),
