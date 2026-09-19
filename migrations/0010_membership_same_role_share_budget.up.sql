@@ -333,8 +333,7 @@ BEGIN
 END;
 $enforce_membership_same_role_share_budget$;
 
-DROP TRIGGER IF EXISTS membership_assignment_same_role_share_budget ON membership_assignment;
-CREATE TRIGGER membership_assignment_same_role_share_budget
+CREATE OR REPLACE TRIGGER membership_assignment_same_role_share_budget
 BEFORE INSERT OR UPDATE OF
     tenant_record_id,
     document_record_id,
