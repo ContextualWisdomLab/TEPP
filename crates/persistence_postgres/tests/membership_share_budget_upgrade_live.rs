@@ -35,11 +35,12 @@ fn successor_refuses_invalid_legacy_membership_state_and_accepts_pointwise_valid
 
     reset_to_predecessor(&mut repo, &full_catalog, predecessor_up);
     let (tenant_record_id, entities) = seed_scope(&mut repo, 3);
+    let underflow_document = Uuid::now_v7();
     insert_legacy_membership(
         &mut repo,
         tenant_record_id,
         entities[0],
-        Uuid::now_v7(),
+        underflow_document,
         "department",
         "1e-10000",
         "'[2026-01-01,2026-01-01]'::tstzrange",
@@ -49,7 +50,29 @@ fn successor_refuses_invalid_legacy_membership_state_and_accepts_pointwise_valid
         apply_sql_batch(repo.session_mut(), MEMBERSHIP_SHARE_BUDGET_UP).is_err(),
         "0010 must reject a positive NUMERIC legacy share that becomes binary64 zero"
     );
-    assert_successor_authority_absent(&mut repo);
+    assert_successor_enforcement_installed(&mut repo);
+    assert!(
+        repo.session_mut()
+            .execute(&membership_insert_sql(
+                tenant_record_id,
+                entities[1],
+                Uuid::now_v7(),
+                "department",
+                "1e-10000",
+                "'[2026-01-02,2026-01-02]'::tstzrange",
+                "NULL",
+            ))
+            .is_err(),
+        "failed historical validation must still leave future writes protected"
+    );
+    repo.session_mut()
+        .execute(&format!(
+            "DELETE FROM membership_assignment WHERE document_record_id = '{underflow_document}'::uuid"
+        ))
+        .expect("data owner remediation of the invalid predecessor row");
+    apply_sql_batch(repo.session_mut(), MEMBERSHIP_SHARE_BUDGET_UP)
+        .expect("retry after explicit remediation must be idempotent and succeed");
+    assert_successor_enforcement_installed(&mut repo);
 
     reset_to_predecessor(&mut repo, &full_catalog, predecessor_up);
     let (tenant_record_id, entities) = seed_scope(&mut repo, 3);
@@ -70,7 +93,7 @@ fn successor_refuses_invalid_legacy_membership_state_and_accepts_pointwise_valid
         apply_sql_batch(repo.session_mut(), MEMBERSHIP_SHARE_BUDGET_UP).is_err(),
         "0010 must reject a pre-existing pointwise same-role aggregate above unity"
     );
-    assert_successor_authority_absent(&mut repo);
+    assert_successor_enforcement_installed(&mut repo);
 
     reset_to_predecessor(&mut repo, &full_catalog, predecessor_up);
     let (tenant_record_id, entities) = seed_scope(&mut repo, 3);
@@ -98,7 +121,28 @@ fn successor_refuses_invalid_legacy_membership_state_and_accepts_pointwise_valid
         apply_sql_batch(repo.session_mut(), MEMBERSHIP_SHARE_BUDGET_UP).is_err(),
         "0010 must reject the #612 represented-binary64 legacy overrun"
     );
-    assert_successor_authority_absent(&mut repo);
+    assert_successor_enforcement_installed(&mut repo);
+
+    reset_to_predecessor(&mut repo, &full_catalog, predecessor_up);
+    let (tenant_record_id, entities) = seed_scope(&mut repo, 3);
+    let duplicate_edge = Uuid::now_v7();
+    for weight in ["0.5", "0.5"] {
+        insert_legacy_membership(
+            &mut repo,
+            tenant_record_id,
+            entities[0],
+            duplicate_edge,
+            "department",
+            weight,
+            "'[2026-03-01,2026-03-01]'::tstzrange",
+            "'[2026-03-31,2026-03-31]'::tstzrange",
+        );
+    }
+    assert!(
+        apply_sql_batch(repo.session_mut(), MEMBERSHIP_SHARE_BUDGET_UP).is_err(),
+        "0010 must reject a pre-existing duplicate temporal edge even when total share is unity"
+    );
+    assert_successor_enforcement_installed(&mut repo);
 
     reset_to_predecessor(&mut repo, &full_catalog, predecessor_up);
     let (tenant_record_id, entities) = seed_scope(&mut repo, 3);
@@ -150,6 +194,28 @@ fn successor_refuses_invalid_legacy_membership_state_and_accepts_pointwise_valid
         );
     }
 
+    let leave_reentry = Uuid::now_v7();
+    insert_legacy_membership(
+        &mut repo,
+        tenant_record_id,
+        entities[0],
+        leave_reentry,
+        "department",
+        "1",
+        "'[2026-06-01,2026-06-01]'::tstzrange",
+        "'[2026-06-09,2026-06-10)'::tstzrange",
+    );
+    insert_legacy_membership(
+        &mut repo,
+        tenant_record_id,
+        entities[0],
+        leave_reentry,
+        "department",
+        "1",
+        "'[2026-06-10,2026-06-10]'::tstzrange",
+        "'[2026-06-20,2026-06-20]'::tstzrange",
+    );
+
     let role_separated = Uuid::now_v7();
     insert_legacy_membership(
         &mut repo,
@@ -158,8 +224,8 @@ fn successor_refuses_invalid_legacy_membership_state_and_accepts_pointwise_valid
         role_separated,
         "department",
         "1",
-        "'(,2026-06-10]'::tstzrange",
-        "'[2026-06-20,)'::tstzrange",
+        "'(,2026-07-10]'::tstzrange",
+        "'[2026-07-20,)'::tstzrange",
     );
     insert_legacy_membership(
         &mut repo,
@@ -168,29 +234,13 @@ fn successor_refuses_invalid_legacy_membership_state_and_accepts_pointwise_valid
         role_separated,
         "project",
         "1",
-        "'[2026-06-01,2026-06-01]'::tstzrange",
-        "'[2026-06-30,2026-06-30]'::tstzrange",
+        "'[2026-07-01,2026-07-01]'::tstzrange",
+        "'[2026-07-30,2026-07-30]'::tstzrange",
     );
 
     apply_sql_batch(repo.session_mut(), MEMBERSHIP_SHARE_BUDGET_UP)
         .expect("pointwise-valid predecessor state must upgrade without normalization");
-    repo.session_mut()
-        .execute(
-            "DO $tepp_membership_upgrade$ BEGIN \
-             IF to_regclass('membership_share_budget_guard') IS NULL THEN \
-               RAISE EXCEPTION 'membership share-budget guard was not installed'; \
-             END IF; \
-             IF NOT EXISTS ( \
-               SELECT 1 FROM pg_trigger \
-               WHERE tgname = 'membership_assignment_same_role_share_budget' \
-                 AND tgrelid = 'membership_assignment'::regclass \
-                 AND NOT tgisinternal \
-             ) THEN \
-               RAISE EXCEPTION 'membership share-budget trigger was not installed'; \
-             END IF; \
-             END $tepp_membership_upgrade$",
-        )
-        .expect("successful upgrade installs the successor admission authority");
+    assert_successor_enforcement_installed(&mut repo);
 }
 
 fn reset_to_predecessor(
@@ -242,40 +292,60 @@ fn insert_legacy_membership(
     valid_to_window: &str,
 ) {
     repo.session_mut()
-        .execute(&format!(
-            "INSERT INTO membership_assignment (\
-                membership_assignment_id, tenant_record_id, document_record_id, text_segment_id, \
-                target_entity_id, target_project_id, membership_type_code, membership_weight, \
-                valid_from_window, valid_to_window, valid_time_precision_code, system_time, available_time\
-             ) VALUES (\
-                '{}'::uuid, '{tenant_record_id}'::uuid, '{document_record_id}'::uuid, NULL, \
-                '{entity_record_id}'::uuid, NULL, '{role}', {weight}, \
-                {valid_from_window}, {valid_to_window}, 'second', \
-                '2026-01-01T00:00:00Z'::timestamptz, '2026-01-01T00:00:00Z'::timestamptz\
-             )",
-            Uuid::now_v7()
+        .execute(&membership_insert_sql(
+            tenant_record_id,
+            entity_record_id,
+            document_record_id,
+            role,
+            weight,
+            valid_from_window,
+            valid_to_window,
         ))
         .expect("predecessor schema must admit the legacy fixture");
 }
 
-fn assert_successor_authority_absent(
+fn membership_insert_sql(
+    tenant_record_id: Uuid,
+    entity_record_id: Uuid,
+    document_record_id: Uuid,
+    role: &str,
+    weight: &str,
+    valid_from_window: &str,
+    valid_to_window: &str,
+) -> String {
+    format!(
+        "INSERT INTO membership_assignment (\
+            membership_assignment_id, tenant_record_id, document_record_id, text_segment_id, \
+            target_entity_id, target_project_id, membership_type_code, membership_weight, \
+            valid_from_window, valid_to_window, valid_time_precision_code, system_time, available_time\
+         ) VALUES (\
+            '{}'::uuid, '{tenant_record_id}'::uuid, '{document_record_id}'::uuid, NULL, \
+            '{entity_record_id}'::uuid, NULL, '{role}', {weight}, \
+            {valid_from_window}, {valid_to_window}, 'second', \
+            '2026-01-01T00:00:00Z'::timestamptz, '2026-01-01T00:00:00Z'::timestamptz\
+         )",
+        Uuid::now_v7()
+    )
+}
+
+fn assert_successor_enforcement_installed(
     repo: &mut LiveDocumentRepository<persistence_postgres::LiveSqlxPool>,
 ) {
     repo.session_mut()
         .execute(
-            "DO $tepp_membership_failed_upgrade$ BEGIN \
-             IF to_regclass('membership_share_budget_guard') IS NOT NULL THEN \
-               RAISE EXCEPTION 'failed upgrade installed the membership share-budget guard'; \
+            "DO $tepp_membership_upgrade$ BEGIN \
+             IF to_regclass('membership_share_budget_guard') IS NULL THEN \
+               RAISE EXCEPTION 'membership share-budget guard was not installed'; \
              END IF; \
-             IF EXISTS ( \
+             IF NOT EXISTS ( \
                SELECT 1 FROM pg_trigger \
                WHERE tgname = 'membership_assignment_same_role_share_budget' \
                  AND tgrelid = 'membership_assignment'::regclass \
                  AND NOT tgisinternal \
              ) THEN \
-               RAISE EXCEPTION 'failed upgrade installed the membership share-budget trigger'; \
+               RAISE EXCEPTION 'membership share-budget trigger was not installed'; \
              END IF; \
-             END $tepp_membership_failed_upgrade$",
+             END $tepp_membership_upgrade$",
         )
-        .expect("invalid predecessor state must fail before successor write authority is installed");
+        .expect("successor admission authority must be installed before historical validation");
 }
