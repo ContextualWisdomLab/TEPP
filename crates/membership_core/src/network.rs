@@ -2,7 +2,9 @@
 
 use crate::{GroupId, MemberId, MembershipAssignment, MembershipError, MembershipRole};
 use std::collections::{BTreeMap, BTreeSet};
-use temporal_core::{AllenRelation, EventTime, classify_interval_relation};
+use temporal_core::{
+    AllenRelation, EventTime, TemporalBoundary, classify_interval_relation,
+};
 
 /// An in-memory network of weighted multiple memberships.
 ///
@@ -29,11 +31,19 @@ impl MembershipNetwork {
     /// same identity fail closed because they would create two simultaneously
     /// active copies of one membership edge.
     ///
+    /// Concurrent assignments for the same `(member, role)` may represent
+    /// multiple membership across groups, but their known active shares must not
+    /// exceed `1.0`. Partial local views may sum below unity; insertion never
+    /// normalizes, clamps, or infers a missing complementary membership.
+    ///
     /// # Errors
     ///
     /// Returns [`MembershipError::DuplicateMembershipAssignment`] when an
     /// existing assignment has the same `(member, group, role)` identity and its
     /// validity interval is not strictly before or after the candidate interval.
+    /// Returns [`MembershipError::InvalidMembershipWeight`] when inserting the
+    /// candidate would make known concurrent shares for the same `(member, role)`
+    /// exceed unity at any event time.
     pub fn insert(&mut self, assignment: MembershipAssignment) -> Result<(), MembershipError> {
         let conflicts = self.assignments.iter().copied().any(|existing| {
             existing.member_id() == assignment.member_id()
@@ -46,6 +56,9 @@ impl MembershipNetwork {
         });
         if conflicts {
             return Err(MembershipError::DuplicateMembershipAssignment);
+        }
+        if self.exceeds_same_role_share_budget(assignment) {
+            return Err(MembershipError::InvalidMembershipWeight);
         }
         self.assignments.push(assignment);
         Ok(())
@@ -103,6 +116,48 @@ impl MembershipNetwork {
             *totals.entry(assignment.role()).or_insert(0.0) += assignment.weight().value();
         }
         totals
+    }
+
+    fn exceeds_same_role_share_budget(&self, candidate: MembershipAssignment) -> bool {
+        let candidate_validity = candidate.validity();
+        let mut checkpoints = BTreeSet::new();
+        collect_known_boundary(&mut checkpoints, candidate_validity.lower());
+        collect_known_boundary(&mut checkpoints, candidate_validity.upper());
+
+        for existing in self.assignments.iter().copied().filter(|existing| {
+            existing.member_id() == candidate.member_id() && existing.role() == candidate.role()
+        }) {
+            let validity = existing.validity();
+            collect_known_boundary(&mut checkpoints, validity.lower());
+            collect_known_boundary(&mut checkpoints, validity.upper());
+        }
+
+        checkpoints.into_iter().any(|instant| {
+            if !candidate.is_active_at(instant) {
+                return false;
+            }
+            let existing_share: f64 = self
+                .assignments
+                .iter()
+                .copied()
+                .filter(|existing| {
+                    existing.member_id() == candidate.member_id()
+                        && existing.role() == candidate.role()
+                        && existing.is_active_at(instant)
+                })
+                .map(|existing| existing.weight().value())
+                .sum();
+            existing_share + candidate.weight().value() > 1.0
+        })
+    }
+}
+
+fn collect_known_boundary(checkpoints: &mut BTreeSet<EventTime>, boundary: TemporalBoundary<EventTime>) {
+    match boundary {
+        TemporalBoundary::Included(instant) | TemporalBoundary::Excluded(instant) => {
+            checkpoints.insert(instant);
+        }
+        TemporalBoundary::Unbounded => {}
     }
 }
 
