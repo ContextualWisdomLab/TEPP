@@ -178,6 +178,48 @@ fn future_unavailable_cross_snapshot_rows_do_not_change_historical_replay() {
 }
 
 #[test]
+fn artifact_digest_commits_to_cutoff_visible_evidence_identity() {
+    let request = request("2026-08-01T00:00:00Z");
+    let baseline_rows = rows();
+    let baseline = execute(&request, &baseline_rows);
+    let mut substituted_rows = rows();
+    substituted_rows[0] = LongitudinalClusterScore::new(
+        "evidence-substituted-visible-row",
+        SNAPSHOT_ID,
+        1,
+        0.0,
+        2.0,
+        available("2026-07-01T00:00:00Z"),
+    )
+    .expect("substituted row");
+    let substituted = execute(&request, &substituted_rows);
+
+    assert_eq!(substituted.artifact.row_count, baseline.artifact.row_count);
+    assert_eq!(
+        substituted.artifact.cluster_count,
+        baseline.artifact.cluster_count
+    );
+    assert_eq!(substituted.artifact.within_slope, baseline.artifact.within_slope);
+    assert_eq!(
+        substituted.artifact.between_slope,
+        baseline.artifact.between_slope
+    );
+    assert_eq!(
+        substituted.artifact.contextual_effect,
+        baseline.artifact.contextual_effect
+    );
+    assert_ne!(
+        substituted.artifact.sha256().expect("substituted digest"),
+        baseline.artifact.sha256().expect("baseline digest"),
+        "digest-bound CWC artifact did not commit to the admitted evidence identity"
+    );
+    assert_ne!(
+        substituted.terminal_result, baseline.terminal_result,
+        "terminal result did not distinguish a different admitted evidence population"
+    );
+}
+
+#[test]
 fn artifact_refuses_inconsistent_contextual_effect() {
     let mut tampered = artifact();
     tampered.contextual_effect = 0.0;
