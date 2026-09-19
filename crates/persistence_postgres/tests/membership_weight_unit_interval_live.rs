@@ -79,15 +79,16 @@ fn live_postgres_rejects_membership_weight_above_unity() {
                SELECT 1 FROM pg_constraint \
                WHERE conname = 'membership_assignment_weight_unit_interval' \
                  AND conrelid = 'membership_assignment'::regclass \
+                 AND convalidated \
              ) THEN \
-               RAISE EXCEPTION 'missing membership weight unit-interval constraint'; \
+               RAISE EXCEPTION 'missing or unvalidated membership weight unit-interval constraint'; \
              END IF; \
              IF (SELECT COUNT(*) FROM membership_assignment) <> 2 THEN \
                RAISE EXCEPTION 'invalid membership write changed persisted row count'; \
              END IF; \
              END $tepp_membership_weight$",
         )
-        .expect("constraint identity and mutation atomicity");
+        .expect("validated constraint identity and mutation atomicity");
 }
 
 fn membership_insert_sql(
