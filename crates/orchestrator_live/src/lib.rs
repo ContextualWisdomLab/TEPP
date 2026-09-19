@@ -6,37 +6,33 @@
 //! `GET /v1/interpretation-runs` on loopback only. Accepted output is always
 //! hypothetical and never scientific authority. Collection GET enumerates
 //! metric-free identities so operators do not guess idempotency keys.
+//! GET-by-id returns one of those identities without POST replay.
 //! Table-access hosts, review/Copilot/GitHub credentials, and
 //! `COPILOT_GITHUB_TOKEN` fail closed. This crate does not implement TLS
 //! termination or call a model provider (ADR 0010; ADR 0011). The published
 //! `tepp-interpretation-runs` CLI mints typed contextual-orchestrator
 //! interpretation-run POST exchanges onto spawned `tepp-orchestrator-loopback`
-//! TCP.
+//! TCP. `tepp-interpretation-run-get` retrieves one accepted identity without
+//! POST replay.
 
 mod error;
 mod http;
 mod interpretation_run_cli;
 mod interpretation_run_collection_http;
+mod interpretation_run_retrieval_cli;
+mod interpretation_run_retrieval_http;
 mod mode;
 mod request;
 mod service;
 
 /// Fail-closed orchestrator live-listener errors.
 pub use error::OrchestratorLiveError;
+/// Loopback live HTTP/1.1 response.
+pub use http::OrchestratorLiveResponse;
 /// Maximum live HTTP header-block size in bytes.
 pub use http::LIVE_HEADER_BYTE_LIMIT;
 /// Maximum live HTTP header count.
 pub use http::LIVE_HEADER_COUNT_LIMIT;
-/// Loopback live HTTP/1.1 response.
-pub use http::OrchestratorLiveResponse;
-/// Published modular consumer for interpretation-run POST.
-pub use interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
-/// Loopback interpretation-run CLI invocation.
-pub use interpretation_run_cli::InterpretationRunCliInvocation;
-/// Loopback interpretation-run CLI verb.
-pub use interpretation_run_cli::InterpretationRunCliVerb;
-/// Typed HTTPS interpretation-run exchange.
-pub use interpretation_run_cli::InterpretationRunHttpExchange;
 /// Compose HTTP/1.1 interpretation-run POST from a CLI invocation.
 pub use interpretation_run_cli::compose_interpretation_run_cli_http;
 /// Build a credential-free contextual-orchestrator interpretation-run exchange.
@@ -53,18 +49,14 @@ pub use interpretation_run_cli::read_interpretation_run_cli_stdin;
 pub use interpretation_run_cli::refuse_metrics_on_interpretation_run_cli_payload;
 /// Filter interpretation-run CLI stdout so the accepted run stays hypothetical.
 pub use interpretation_run_cli::render_interpretation_run_cli_stdout;
-/// Maximum opaque cursor length on interpretation-run collection GET.
-pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_CURSOR_MAX_LEN;
-/// Default page size for interpretation-run collection GET.
-pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_DEFAULT_LIMIT;
-/// Maximum page size for interpretation-run collection GET.
-pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_MAX_LIMIT;
-/// Metric-free interpretation-run collection page.
-pub use interpretation_run_collection_http::InterpretationRunCollection;
-/// Typed GET exchange for interpretation-run collection.
-pub use interpretation_run_collection_http::InterpretationRunCollectionHttpExchange;
-/// One metric-free interpretation-run collection row.
-pub use interpretation_run_collection_http::InterpretationRunCollectionItem;
+/// Loopback interpretation-run CLI invocation.
+pub use interpretation_run_cli::InterpretationRunCliInvocation;
+/// Loopback interpretation-run CLI verb.
+pub use interpretation_run_cli::InterpretationRunCliVerb;
+/// Typed HTTPS interpretation-run exchange.
+pub use interpretation_run_cli::InterpretationRunHttpExchange;
+/// Published modular consumer for interpretation-run POST.
+pub use interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
 /// Build a credential-free contextual-orchestrator collection GET exchange.
 pub use interpretation_run_collection_http::contextual_orchestrator_interpretation_run_collection_exchange;
 /// Whether a path is the interpretation-run collection resource.
@@ -77,8 +69,50 @@ pub use interpretation_run_collection_http::parse_interpretation_run_collection_
 pub use interpretation_run_collection_http::parse_interpretation_run_collection_page_limit;
 /// Refuse metric, evidence, and causal-score keys on collection JSON.
 pub use interpretation_run_collection_http::refuse_metrics_on_interpretation_run_collection_payload;
+/// Metric-free interpretation-run collection page.
+pub use interpretation_run_collection_http::InterpretationRunCollection;
+/// Typed GET exchange for interpretation-run collection.
+pub use interpretation_run_collection_http::InterpretationRunCollectionHttpExchange;
+/// One metric-free interpretation-run collection row.
+pub use interpretation_run_collection_http::InterpretationRunCollectionItem;
+/// Maximum opaque cursor length on interpretation-run collection GET.
+pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_CURSOR_MAX_LEN;
+/// Default page size for interpretation-run collection GET.
+pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_DEFAULT_LIMIT;
+/// Maximum page size for interpretation-run collection GET.
+pub use interpretation_run_collection_http::INTERPRETATION_RUN_COLLECTION_MAX_LIMIT;
+/// Compose one HTTP/1.1 retrieval GET from the typed consumer exchange.
+pub use interpretation_run_retrieval_cli::compose_interpretation_run_retrieval_cli_http;
+/// Dispatch one retrieval CLI invocation against an in-process listener.
+pub use interpretation_run_retrieval_cli::dispatch_interpretation_run_retrieval_cli;
+/// Execute one retrieval CLI invocation over loopback TCP.
+pub use interpretation_run_retrieval_cli::execute_interpretation_run_retrieval_cli;
+/// Render a typed retrieval GET exchange as HTTP/1.1 for a loopback listener.
+pub use interpretation_run_retrieval_cli::loopback_http1_from_interpretation_run_retrieval_exchange;
+/// Read stdin leftover bytes; retrieval GET admits empty.
+pub use interpretation_run_retrieval_cli::read_interpretation_run_retrieval_cli_stdin;
+/// Filter CLI stdout so retrieval never prints scientific acceptance.
+pub use interpretation_run_retrieval_cli::render_interpretation_run_retrieval_cli_stdout;
+/// One operator CLI invocation against a loopback GET-by-id listener.
+pub use interpretation_run_retrieval_cli::InterpretationRunRetrievalCliInvocation;
+/// Supported operator verbs for the loopback interpretation-run retrieval CLI.
+pub use interpretation_run_retrieval_cli::InterpretationRunRetrievalCliVerb;
+/// Build a credential-free contextual-orchestrator GET-by-id exchange.
+pub use interpretation_run_retrieval_http::contextual_orchestrator_interpretation_run_retrieval_exchange;
+/// Serialize one metric-free GET-by-id identity.
+pub use interpretation_run_retrieval_http::interpretation_run_retrieval_item_json;
+/// Extract the opaque idempotency key from a GET-by-id path.
+pub use interpretation_run_retrieval_http::interpretation_run_retrieval_path_id;
+/// Typed GET exchange for interpretation-run GET-by-id.
+pub use interpretation_run_retrieval_http::InterpretationRunRetrievalHttpExchange;
+/// Maximum opaque idempotency-key length on interpretation-run GET-by-id.
+pub use interpretation_run_retrieval_http::INTERPRETATION_RUN_RETRIEVAL_ID_MAX_LEN;
 /// Closed ADR 0010 orchestration-mode vocabulary.
 pub use mode::OrchestrationMode;
+/// Accepted hypothetical interpretation-run response.
+pub use request::InterpretationRunAccepted;
+/// Interpretation-run create request.
+pub use request::InterpretationRunRequest;
 /// Default maximum interpretation-run JSON payload size in bytes.
 pub use request::DEFAULT_INTERPRETATION_BYTE_LIMIT;
 /// Canonical hypothetical claim-status label.
@@ -87,9 +121,5 @@ pub use request::HYPOTHETICAL_CLAIM_STATUS;
 pub use request::INTERPRETATION_RUN_CONTRACT_VERSION;
 /// Versioned path contextual-orchestrator may POST or GET.
 pub use request::INTERPRETATION_RUN_PATH;
-/// Accepted hypothetical interpretation-run response.
-pub use request::InterpretationRunAccepted;
-/// Interpretation-run create request.
-pub use request::InterpretationRunRequest;
 /// Loopback live HTTP/1.1 orchestrator listener.
 pub use service::OrchestratorLiveService;

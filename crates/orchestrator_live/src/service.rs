@@ -5,18 +5,21 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use crate::error::OrchestratorLiveError;
 use crate::http::{
-    OrchestratorLiveResponse, header_value, map_io_error, parse_headers, parse_request_line,
-    read_http_request, refuse_collection_get_headers, refuse_live_headers, split_request,
-    status_for, write_response,
+    header_value, map_io_error, parse_headers, parse_request_line, read_http_request,
+    refuse_collection_get_headers, refuse_live_headers, refuse_retrieval_get_headers,
+    split_request, status_for, write_response, OrchestratorLiveResponse,
 };
 use crate::interpretation_run_collection_http::{
-    InterpretationRunCollection, InterpretationRunCollectionItem,
     is_interpretation_run_collection_path, page_interpretation_run_collection_items,
     parse_interpretation_run_collection_page_cursor,
-    parse_interpretation_run_collection_page_limit,
+    parse_interpretation_run_collection_page_limit, InterpretationRunCollection,
+    InterpretationRunCollectionItem,
+};
+use crate::interpretation_run_retrieval_http::{
+    interpretation_run_retrieval_item_json, interpretation_run_retrieval_path_id,
 };
 use crate::request::{
-    INTERPRETATION_RUN_PATH, InterpretationRunAccepted, InterpretationRunRequest, to_json,
+    to_json, InterpretationRunAccepted, InterpretationRunRequest, INTERPRETATION_RUN_PATH,
 };
 
 /// Loopback live HTTP/1.1 service for contextual-orchestrator interpretation POSTs.
@@ -25,7 +28,8 @@ use crate::request::{
 /// loopback TCP so tests and standalone operation can prove request handling
 /// without TLS termination, table access, or scientific-authority promotion.
 /// `GET /v1/interpretation-runs` enumerates accepted hypothetical runs as
-/// metric-free identities.
+/// metric-free identities. `GET /v1/interpretation-runs/{idempotency_key}`
+/// returns one of those identities without POST replay.
 #[derive(Debug)]
 pub struct OrchestratorLiveService {
     listener: Option<TcpListener>,
@@ -173,7 +177,10 @@ impl OrchestratorLiveService {
         let (method, path) = parse_request_line(request_line)?;
         let headers = parse_headers(lines)?;
         if method == "GET" {
-            return self.list_interpretation_runs(path, &headers, body);
+            if is_interpretation_run_collection_path(path) {
+                return self.list_interpretation_runs(path, &headers, body);
+            }
+            return self.get_interpretation_run(path, &headers, body);
         }
         if method != "POST" || path != INTERPRETATION_RUN_PATH {
             return Err(OrchestratorLiveError::InvalidWirePayload);
@@ -221,6 +228,36 @@ impl OrchestratorLiveService {
             200,
             "OK",
             collection.to_json()?,
+        ))
+    }
+
+    fn get_interpretation_run(
+        &self,
+        path: &str,
+        headers: &HashMap<String, String>,
+        body: &str,
+    ) -> Result<OrchestratorLiveResponse, OrchestratorLiveError> {
+        let idempotency_key = interpretation_run_retrieval_path_id(path)?;
+        if !body.is_empty() {
+            return Err(OrchestratorLiveError::InvalidWirePayload);
+        }
+        refuse_retrieval_get_headers(headers)?;
+        let accepted = self
+            .accepted_runs
+            .get(&idempotency_key)
+            .map(|(_, accepted)| accepted)
+            .ok_or(OrchestratorLiveError::InvalidWirePayload)?;
+        let item = InterpretationRunCollectionItem::new(
+            accepted.interpretation_run_id(),
+            accepted.idempotency_key(),
+            accepted.orchestration_mode(),
+            accepted.claim_status(),
+            accepted.scientific_authority(),
+        )?;
+        Ok(OrchestratorLiveResponse::json(
+            200,
+            "OK",
+            interpretation_run_retrieval_item_json(&item)?,
         ))
     }
 
@@ -295,7 +332,7 @@ struct ErrorWire {
 
 #[cfg(test)]
 mod tests {
-    use super::{OrchestratorLiveService, envelope_json, fallback_envelope_json};
+    use super::{envelope_json, fallback_envelope_json, OrchestratorLiveService};
     use crate::error::OrchestratorLiveError;
 
     #[test]
@@ -309,13 +346,11 @@ mod tests {
             envelope_json(OrchestratorLiveError::LimitExceeded, "req-1".into())
                 .contains("limit_exceeded")
         );
-        assert!(
-            envelope_json(
-                OrchestratorLiveError::ScientificAuthorityRefused,
-                "req-2".into()
-            )
-            .contains("scientific_authority_refused")
-        );
+        assert!(envelope_json(
+            OrchestratorLiveError::ScientificAuthorityRefused,
+            "req-2".into()
+        )
+        .contains("scientific_authority_refused"));
         assert_eq!(
             OrchestratorLiveService::new()
                 .serve_accepted(Err(std::io::Error::other("accept")))
