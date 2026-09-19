@@ -3,12 +3,14 @@
 use crate::MembershipError;
 use serde::{Deserialize, Serialize};
 
-/// A finite membership share in the closed unit interval `[0, 1]`.
+/// A finite, strictly positive membership share in `(0, 1]`.
 ///
 /// Weights of `1.0` represent full affiliation. Values in `(0, 1)` represent
 /// partial multiple membership and must be preserved rather than rounded away
-/// before multilevel estimation. Values above `1.0` are not affiliation shares
-/// and fail closed rather than being normalized or clamped.
+/// before multilevel estimation. Zero is not an active affiliation: admitting a
+/// zero-share edge would create structural group/role membership without any
+/// membership mass. Values above `1.0` are not affiliation shares and fail
+/// closed rather than being normalized or clamped.
 #[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 pub struct MembershipWeight(f64);
@@ -19,9 +21,9 @@ impl MembershipWeight {
     /// # Errors
     ///
     /// Returns [`MembershipError::InvalidMembershipWeight`] when `value` is
-    /// outside `[0, 1]`, infinite, or not a number.
+    /// outside `(0, 1]`, infinite, or not a number.
     pub fn new(value: f64) -> Result<Self, MembershipError> {
-        if value.is_finite() && (0.0..=1.0).contains(&value) {
+        if value.is_finite() && value > 0.0 && value <= 1.0 {
             Ok(Self(value))
         } else {
             Err(MembershipError::InvalidMembershipWeight)
