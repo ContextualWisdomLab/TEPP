@@ -47,6 +47,24 @@ fn embedded_catalog_declares_typed_exactly_one_membership_targets() {
 }
 
 #[test]
+fn embedded_catalog_bounds_membership_weights_to_unit_interval() {
+    let catalog = MigrationCatalog::from_embedded().expect("embedded migration catalog");
+    let up_sql = normalized(catalog.up_sql());
+    let down_sql = normalized(catalog.down_sql());
+
+    assert!(
+        up_sql.contains("constraint membership_assignment_weight_unit_interval")
+            && up_sql.contains("membership_weight > 0")
+            && up_sql.contains("membership_weight <= 1"),
+        "database admission must preserve the Membership owner's (0,1] share domain"
+    );
+    assert!(
+        down_sql.contains("drop constraint membership_assignment_weight_unit_interval"),
+        "rollback must remove only the successor unit-interval constraint"
+    );
+}
+
+#[test]
 fn rollback_restores_foundation_membership_stub() {
     let catalog = MigrationCatalog::from_embedded().expect("embedded migration catalog");
     let down_sql = normalized(catalog.down_sql());
