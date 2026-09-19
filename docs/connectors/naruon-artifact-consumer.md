@@ -29,6 +29,7 @@ TEPP remains the scientific authority for estimation, recovery metrics, temporal
 | HTTP analysis-run status | `tepp_api` `naruon_analysis_run_status_exchange` → `GET /v1/analysis-runs/{run_id}` | naruon → TEPP |
 | HTTP analysis-run status (LineageWeave) | `tepp_api` `lineageweave_analysis_run_status_exchange` → `GET /v1/analysis-runs/{run_id}` | lineageweave → TEPP |
 | CLI analysis-run status | `tepp_api` `tepp-analysis-runs status` → loopback `GET /v1/analysis-runs/{run_id}` | naruon → TEPP |
+| CLI analysis-run wait | `tepp_api` `tepp-analysis-runs wait` → loopback poll of `GET /v1/analysis-runs/{run_id}` until terminal | naruon → TEPP |
 | HTTP export authorize | `tepp_api` `naruon_export_exchange` → `POST /v1/exports` | naruon → TEPP |
 | Live loopback POST | `tepp_api` `NaruonLiveService` → `POST /v1/analysis-runs` and `/v1/exports` | naruon → TEPP |
 

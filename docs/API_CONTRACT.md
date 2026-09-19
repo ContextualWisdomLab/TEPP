@@ -103,7 +103,9 @@ bodies stay metric-free, and only a succeeded status with profile
 loopback `tepp-analysis-runs status` CLI is the operator-visible client for
 that GET; accepted/running/failed stdout stays metric-free, and
 `tepp.scientific_acceptance.v1` prints only on succeeded
-`scientific_acceptance_v1`. Production
+`scientific_acceptance_v1`. The loopback `tepp-analysis-runs wait` CLI polls
+that GET until succeeded or failed, or until `--timeout-ms` elapses; timeout
+`0` fails closed on accepted or running. Production
 TLS remains a later adapter.
 
 The stacked `analysis_engine` slice provides the first executable service-side
