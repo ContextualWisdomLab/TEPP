@@ -181,11 +181,13 @@ impl LongitudinalCwcArtifact {
     fn validate(&self) -> Result<(), AnalysisEngineError> {
         let max_rows = u64::try_from(MAX_EVIDENCE_UNITS)
             .map_err(|_| AnalysisEngineError::InvalidLongitudinalCwcArtifact)?;
+        let knowledge_cutoff = KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff)
+            .map_err(|_| AnalysisEngineError::InvalidLongitudinalCwcArtifact)?;
         let expected_contextual_effect = self.between_slope - self.within_slope;
         if self.schema_version != LONGITUDINAL_CWC_ARTIFACT_SCHEMA_VERSION
             || !valid_identifier(&self.run_id)
             || !valid_identifier(&self.snapshot_id)
-            || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
+            || knowledge_cutoff.to_rfc3339() != self.knowledge_cutoff
             || !valid_sha256(&self.admitted_evidence_sha256)
             || self.row_count < 2
             || self.row_count > max_rows
