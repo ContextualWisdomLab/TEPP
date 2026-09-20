@@ -109,6 +109,36 @@ fn malformed_or_noncanonical_profile_input_fails_closed() {
 }
 
 #[test]
+fn negative_zero_uncertainty_multiplier_is_not_a_second_canonical_identity() {
+    let canonical_zero = ScientificRecoveryProfileV1::new(
+        2,
+        0.08,
+        0.0,
+        DGP,
+        SEEDS,
+        ESTIMAND,
+        STATE,
+        ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
+    )
+    .expect("positive zero is the canonical zero multiplier");
+    assert_eq!(canonical_zero.se_multiplier().to_bits(), 0.0_f64.to_bits());
+
+    assert_eq!(
+        ScientificRecoveryProfileV1::new(
+            2,
+            0.08,
+            -0.0,
+            DGP,
+            SEEDS,
+            ESTIMAND,
+            STATE,
+            ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
+        ),
+        Err(ValidationError::InvalidConfiguration)
+    );
+}
+
+#[test]
 fn promoted_scientific_authority_retains_exact_profile_identity() {
     let profile = profile(2, 0.08);
     let truth_rows = [[0.0], [0.0]];
