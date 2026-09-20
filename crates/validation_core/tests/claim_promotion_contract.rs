@@ -39,6 +39,10 @@ fn request<'evidence>(
     PromotionRequest::new(target, candidate_head, PROTECTED_HEAD, evidence).expect("request")
 }
 
+fn as_slices<const N: usize, const M: usize>(rows: &[[f64; M]; N]) -> Vec<&[f64]> {
+    rows.iter().map(|row| row.as_slice()).collect()
+}
+
 #[test]
 fn commit_heads_are_forty_hex_bytes() {
     let parsed = parse_commit_head(PROTECTED_HEAD).expect("head");
@@ -196,11 +200,16 @@ fn scientific_and_release_authorities_require_their_gates() {
 
 #[test]
 fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
-    let truth = [0.70, 0.55, 0.40, -0.20, 0.85];
-    let recovered = [0.72, 0.53, 0.41, -0.18, 0.84];
-    let rmse = root_mean_square_error(&truth, &recovered).expect("rmse");
-    let rmse_se = rmse_standard_error(&truth, &recovered).expect("se");
+    let truth_flat = [0.70, 0.55, 0.40, -0.20, 0.85];
+    let recovered_flat = [0.72, 0.53, 0.41, -0.18, 0.84];
+    let rmse = root_mean_square_error(&truth_flat, &recovered_flat).expect("rmse");
+    let rmse_se = rmse_standard_error(&truth_flat, &recovered_flat).expect("se");
     let max_rmse = rmse + 3.0 * rmse_se + 0.001;
+
+    let truth_rows = [[0.70], [0.55], [0.40], [-0.20], [0.85]];
+    let recovered_rows = [[0.72], [0.53], [0.41], [-0.18], [0.84]];
+    let truth = as_slices(&truth_rows);
+    let recovered = as_slices(&recovered_rows);
     let promoted = promote_scientific_recovery(
         PROTECTED_HEAD,
         PROTECTED_HEAD,
@@ -216,10 +225,18 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
     );
     assert!(rmse.is_finite());
     assert!(rmse_se.is_finite() && rmse_se > 0.0);
-    promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &truth, &truth, 0.001, 3.0)
-        .expect("exact");
+    promote_scientific_recovery(
+        PROTECTED_HEAD,
+        PROTECTED_HEAD,
+        &truth,
+        &truth,
+        0.001,
+        3.0,
+    )
+    .expect("exact");
 
-    let biased = [1.70, 1.55, 1.40, 0.80, 1.85];
+    let biased_rows = [[1.70], [1.55], [1.40], [0.80], [1.85]];
+    let biased = as_slices(&biased_rows);
     assert_eq!(
         promote_scientific_recovery(
             PROTECTED_HEAD,
@@ -242,8 +259,9 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
         ),
         Err(ValidationError::ClaimHeadMismatch)
     );
+    let empty: [&[f64]; 0] = [];
     assert_eq!(
-        promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &[], &[], 0.10, 3.0),
+        promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &empty, &empty, 0.10, 3.0),
         Err(ValidationError::InvalidInput)
     );
     assert_eq!(
