@@ -63,6 +63,8 @@ pub use scientific_recovery::ScientificRecoveryProfileV1;
 pub use scientific_recovery_evidence::ScientificRecoveryPromotionV1;
 /// Trusted-adapter provenance receipt for one independent scientific-recovery repetition.
 pub use scientific_recovery_evidence::ScientificRecoveryReplicationReceiptV1;
+/// Canonical ordered manifest of planned scientific-recovery RNG-state identities.
+pub use scientific_recovery_evidence::ScientificRecoverySeedManifestV1;
 /// Promote a scientific claim from recovery grouped by independent simulation replication.
 pub use scientific_recovery_evidence::promote_scientific_recovery;
 /// Derive the canonical identity of one represented scientific-recovery repetition payload.
