@@ -73,11 +73,8 @@ pub fn promote_scientific_recovery(
         profile,
         exact_head_receipt,
     )?;
-    let recovery_evidence_sha256 = recovery_evidence_sha256(
-        profile,
-        truth_replications,
-        recovered_replications,
-    )?;
+    let recovery_evidence_sha256 =
+        recovery_evidence_sha256(profile, truth_replications, recovered_replications)?;
 
     Ok(ScientificRecoveryPromotionV1 {
         inner,
@@ -118,7 +115,11 @@ fn recovery_evidence_sha256(
 }
 
 fn canonical_f64_bits(value: f64) -> u64 {
-    if value == 0.0 { 0 } else { value.to_bits() }
+    if value == 0.0 {
+        0
+    } else {
+        value.to_bits()
+    }
 }
 
 fn update_digest_u64(digest: &mut Sha256, value: usize) -> Result<(), ValidationError> {
