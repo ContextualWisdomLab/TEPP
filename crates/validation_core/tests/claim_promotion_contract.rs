@@ -195,18 +195,19 @@ fn scientific_and_release_authorities_require_their_gates() {
 }
 
 #[test]
-fn scientific_recovery_uses_computed_rmse_not_hardcoded_thresholds() {
+fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
     let truth = [0.70, 0.55, 0.40, -0.20, 0.85];
     let recovered = [0.72, 0.53, 0.41, -0.18, 0.84];
     let rmse = root_mean_square_error(&truth, &recovered).expect("rmse");
     let rmse_se = rmse_standard_error(&truth, &recovered).expect("se");
-    let computed_k = (rmse / rmse_se) + 1.0;
+    let max_rmse = rmse + 3.0 * rmse_se + 0.001;
     let promoted = promote_scientific_recovery(
         PROTECTED_HEAD,
         PROTECTED_HEAD,
         &truth,
         &recovered,
-        computed_k,
+        max_rmse,
+        3.0,
     )
     .expect("promote");
     assert_eq!(
@@ -215,21 +216,46 @@ fn scientific_recovery_uses_computed_rmse_not_hardcoded_thresholds() {
     );
     assert!(rmse.is_finite());
     assert!(rmse_se.is_finite() && rmse_se > 0.0);
-    promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &truth, &truth, 3.0)
+    promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &truth, &truth, 0.001, 3.0)
         .expect("exact");
 
     let biased = [1.70, 1.55, 1.40, 0.80, 1.85];
     assert_eq!(
-        promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &truth, &biased, 3.0),
+        promote_scientific_recovery(
+            PROTECTED_HEAD,
+            PROTECTED_HEAD,
+            &truth,
+            &biased,
+            0.10,
+            3.0,
+        ),
         Err(ValidationError::ClaimRecoveryRejected)
     );
     assert_eq!(
-        promote_scientific_recovery(OTHER_HEAD, PROTECTED_HEAD, &truth, &recovered, 3.0),
+        promote_scientific_recovery(
+            OTHER_HEAD,
+            PROTECTED_HEAD,
+            &truth,
+            &recovered,
+            max_rmse,
+            3.0,
+        ),
         Err(ValidationError::ClaimHeadMismatch)
     );
     assert_eq!(
-        promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &[], &[], 3.0),
+        promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &[], &[], 0.10, 3.0),
         Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        promote_scientific_recovery(
+            PROTECTED_HEAD,
+            PROTECTED_HEAD,
+            &truth,
+            &recovered,
+            0.0,
+            3.0,
+        ),
+        Err(ValidationError::InvalidConfiguration)
     );
 }
 
