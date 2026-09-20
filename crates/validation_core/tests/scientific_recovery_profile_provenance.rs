@@ -1,8 +1,8 @@
 //! Scientific recovery authority stays bound to one immutable, versioned design profile.
 
 use validation_core::{
-    ClaimAuthority, ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
-    ValidationError, promote_scientific_recovery,
+    ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, ScientificRecoveryFailurePolicyV1,
+    ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -23,6 +23,10 @@ fn profile(planned_replications: usize, max_rmse: f64) -> ScientificRecoveryProf
         ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
     )
     .expect("valid recovery profile")
+}
+
+fn exact_head_evidence() -> [ClaimEvidence; 1] {
+    [ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true)]
 }
 
 #[test]
@@ -146,8 +150,15 @@ fn promoted_scientific_authority_retains_exact_profile_identity() {
     let truth: Vec<&[f64]> = truth_rows.iter().map(|row| row.as_slice()).collect();
     let recovered: Vec<&[f64]> = recovered_rows.iter().map(|row| row.as_slice()).collect();
 
-    let promotion = promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile)
-        .expect("exact recovery under immutable profile");
+    let promotion = promote_scientific_recovery(
+        HEAD,
+        HEAD,
+        &truth,
+        &recovered,
+        &profile,
+        &exact_head_evidence(),
+    )
+    .expect("exact recovery under immutable profile");
 
     assert_eq!(
         promotion.claim().authority(),
