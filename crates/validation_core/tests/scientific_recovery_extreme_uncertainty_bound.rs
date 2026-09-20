@@ -2,8 +2,10 @@
 
 use validation_core::{
     ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
-    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
+    ScientificRecoveryReplicationReceiptV1, ValidationError, promote_scientific_recovery,
+    rmse_standard_error, root_mean_square_error,
+    scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -40,6 +42,33 @@ fn exact_head_receipt() -> ScientificRecoveryExactHeadReceiptV1 {
     .expect("valid exact-head receipt")
 }
 
+fn replication_receipts(
+    profile: &ScientificRecoveryProfileV1,
+    truth: &[&[f64]],
+    recovered: &[&[f64]],
+) -> Vec<ScientificRecoveryReplicationReceiptV1> {
+    truth
+        .iter()
+        .zip(recovered)
+        .enumerate()
+        .map(|(index, (truth, recovered))| {
+            let payload = scientific_recovery_replication_payload_sha256(truth, recovered)
+                .expect("valid replication payload");
+            let seed_state = format!("{:064x}", index + 1);
+            let execution_artifact = format!("{:064x}", index + 1024);
+            ScientificRecoveryReplicationReceiptV1::new(
+                index,
+                &profile.sha256(),
+                profile.seed_manifest_sha256(),
+                &seed_state,
+                &execution_artifact,
+                &payload,
+            )
+            .expect("valid replication receipt")
+        })
+        .collect()
+}
+
 #[test]
 fn scaled_projection_must_not_erase_positive_uncertainty_above_the_target() {
     let previous_max = f64::from_bits(f64::MAX.to_bits() - 1);
@@ -65,6 +94,7 @@ fn scaled_projection_must_not_erase_positive_uncertainty_above_the_target() {
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
     let profile = profile(f64::MAX);
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
     assert_eq!(
         promote_scientific_recovery(
             HEAD,
@@ -73,6 +103,7 @@ fn scaled_projection_must_not_erase_positive_uncertainty_above_the_target() {
             &recovered,
             &profile,
             &exact_head_receipt(),
+            &replication_receipts,
         ),
         Err(ValidationError::ClaimRecoveryRejected),
         "scientific authority must not be minted when positive RMSE uncertainty exceeds the remaining practical margin"
@@ -94,6 +125,7 @@ fn practical_target_boundary_is_not_promoted_as_scientific_support() {
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
     let profile = profile(0.05);
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
     assert_eq!(
         promote_scientific_recovery(
             HEAD,
@@ -102,6 +134,7 @@ fn practical_target_boundary_is_not_promoted_as_scientific_support() {
             &recovered,
             &profile,
             &exact_head_receipt(),
+            &replication_receipts,
         ),
         Err(ValidationError::ClaimRecoveryRejected),
         "promotion requires the conservative RMSE bound to remain strictly inside the caller-owned target"
