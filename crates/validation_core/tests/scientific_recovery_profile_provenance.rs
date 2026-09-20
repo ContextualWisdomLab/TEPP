@@ -1,11 +1,13 @@
 //! Scientific recovery authority stays bound to one immutable, versioned design profile.
 
 use validation_core::{
-    ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, ScientificRecoveryFailurePolicyV1,
+    ClaimAuthority, ScientificRecoveryExactHeadReceiptStatusV1,
+    ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryFailurePolicyV1,
     ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
+const RECEIPT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
@@ -25,8 +27,13 @@ fn profile(planned_replications: usize, max_rmse: f64) -> ScientificRecoveryProf
     .expect("valid recovery profile")
 }
 
-fn exact_head_evidence() -> [ClaimEvidence; 1] {
-    [ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true)]
+fn exact_head_receipt() -> ScientificRecoveryExactHeadReceiptV1 {
+    ScientificRecoveryExactHeadReceiptV1::new(
+        HEAD,
+        RECEIPT,
+        ScientificRecoveryExactHeadReceiptStatusV1::Passed,
+    )
+    .expect("valid exact-head receipt")
 }
 
 #[test]
@@ -143,7 +150,7 @@ fn negative_zero_uncertainty_multiplier_is_not_a_second_canonical_identity() {
 }
 
 #[test]
-fn promoted_scientific_authority_retains_exact_profile_identity() {
+fn promoted_scientific_authority_retains_profile_and_exact_head_receipt_identity() {
     let profile = profile(2, 0.08);
     let truth_rows = [[0.0], [0.0]];
     let recovered_rows = [[0.0], [0.0]];
@@ -156,13 +163,14 @@ fn promoted_scientific_authority_retains_exact_profile_identity() {
         &truth,
         &recovered,
         &profile,
-        &exact_head_evidence(),
+        &exact_head_receipt(),
     )
-    .expect("exact recovery under immutable profile");
+    .expect("exact recovery under immutable profile and exact-head receipt");
 
     assert_eq!(
         promotion.claim().authority(),
         ClaimAuthority::ScientificallySupported
     );
     assert_eq!(promotion.profile_sha256(), profile.sha256());
+    assert_eq!(promotion.exact_head_receipt_sha256(), RECEIPT);
 }
