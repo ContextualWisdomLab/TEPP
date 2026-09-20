@@ -3,8 +3,9 @@
 use validation_core::{
     ClaimAuthority, ScientificRecoveryExactHeadReceiptStatusV1,
     ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1, ValidationError,
-    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
+    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
+    ScientificRecoverySeedManifestV1, ValidationError, promote_scientific_recovery,
+    scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -14,13 +15,24 @@ const SEEDS: &str = "22222222222222222222222222222222222222222222222222222222222
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
 
+fn seed_state(index: usize) -> String {
+    format!("{:064x}", index + 1)
+}
+
+fn seed_manifest(planned_replications: usize) -> ScientificRecoverySeedManifestV1 {
+    let states: Vec<String> = (0..planned_replications).map(seed_state).collect();
+    let refs: Vec<&str> = states.iter().map(String::as_str).collect();
+    ScientificRecoverySeedManifestV1::new(&refs).expect("valid seed manifest")
+}
+
 fn profile(planned_replications: usize, max_rmse: f64) -> ScientificRecoveryProfileV1 {
+    let manifest = seed_manifest(planned_replications);
     ScientificRecoveryProfileV1::new(
         planned_replications,
         max_rmse,
         3.0,
         DGP,
-        SEEDS,
+        manifest.sha256(),
         ESTIMAND,
         STATE,
         ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
@@ -49,7 +61,7 @@ fn replication_receipts(
         .map(|(index, (truth, recovered))| {
             let payload = scientific_recovery_replication_payload_sha256(truth, recovered)
                 .expect("valid replication payload");
-            let seed_state = format!("{:064x}", index + 1);
+            let seed_state = seed_state(index);
             let execution_artifact = format!("{:064x}", index + 1024);
             ScientificRecoveryReplicationReceiptV1::new(
                 index,
@@ -67,6 +79,7 @@ fn replication_receipts(
 #[test]
 fn recovery_profile_identity_changes_with_predeclared_design_and_target() {
     let baseline = profile(2, 0.08);
+    let baseline_manifest = seed_manifest(2);
     let different_denominator = profile(3, 0.08);
     let different_target = profile(2, 0.081);
 
@@ -74,7 +87,7 @@ fn recovery_profile_identity_changes_with_predeclared_design_and_target() {
     assert_eq!(baseline.max_rmse().to_bits(), 0.08_f64.to_bits());
     assert_eq!(baseline.se_multiplier().to_bits(), 3.0_f64.to_bits());
     assert_eq!(baseline.dgp_sha256(), DGP);
-    assert_eq!(baseline.seed_manifest_sha256(), SEEDS);
+    assert_eq!(baseline.seed_manifest_sha256(), baseline_manifest.sha256());
     assert_eq!(baseline.estimand_sha256(), ESTIMAND);
     assert_eq!(baseline.state_composition_sha256(), STATE);
     assert_eq!(
