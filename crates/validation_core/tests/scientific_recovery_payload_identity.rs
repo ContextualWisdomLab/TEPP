@@ -2,7 +2,9 @@
 
 use validation_core::{
     ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, promote_scientific_recovery,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
+    ScientificRecoveryReplicationReceiptV1, promote_scientific_recovery,
+    scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -35,14 +37,51 @@ fn receipt() -> ScientificRecoveryExactHeadReceiptV1 {
     .expect("valid exact-head receipt")
 }
 
+fn replication_receipts(
+    profile: &ScientificRecoveryProfileV1,
+    truth: &[&[f64]],
+    recovered: &[&[f64]],
+) -> Vec<ScientificRecoveryReplicationReceiptV1> {
+    truth
+        .iter()
+        .zip(recovered)
+        .enumerate()
+        .map(|(index, (truth, recovered))| {
+            let payload = scientific_recovery_replication_payload_sha256(truth, recovered)
+                .expect("valid replication payload");
+            let seed_state = format!("{:064x}", index + 1);
+            let execution_artifact = format!("{:064x}", index + 1024);
+            ScientificRecoveryReplicationReceiptV1::new(
+                index,
+                &profile.sha256(),
+                profile.seed_manifest_sha256(),
+                &seed_state,
+                &execution_artifact,
+                &payload,
+            )
+            .expect("valid replication receipt")
+        })
+        .collect()
+}
+
 fn promote(
     truth_rows: &[[f64; 2]; 2],
     recovered_rows: &[[f64; 2]; 2],
 ) -> validation_core::ScientificRecoveryPromotionV1 {
     let truth: Vec<&[f64]> = truth_rows.iter().map(|row| row.as_slice()).collect();
     let recovered: Vec<&[f64]> = recovered_rows.iter().map(|row| row.as_slice()).collect();
-    promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile(), &receipt())
-        .expect("valid exact recovery")
+    let profile = profile();
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    promote_scientific_recovery(
+        HEAD,
+        HEAD,
+        &truth,
+        &recovered,
+        &profile,
+        &receipt(),
+        &replication_receipts,
+    )
+    .expect("valid exact recovery")
 }
 
 #[test]
