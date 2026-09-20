@@ -3,8 +3,8 @@
 use validation_core::{
     ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
     ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
-    ScientificRecoveryReplicationReceiptV1, ValidationError, promote_scientific_recovery,
-    rmse_standard_error, root_mean_square_error,
+    ScientificRecoveryReplicationReceiptV1, ScientificRecoverySeedManifestV1, ValidationError,
+    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
     scientific_recovery_replication_payload_sha256,
 };
 
@@ -19,13 +19,24 @@ fn as_slices<const N: usize, const M: usize>(rows: &[[f64; M]; N]) -> Vec<&[f64]
     rows.iter().map(|row| row.as_slice()).collect()
 }
 
+fn seed_state(index: usize) -> String {
+    format!("{:064x}", index + 1)
+}
+
+fn seed_manifest(planned_replications: usize) -> ScientificRecoverySeedManifestV1 {
+    let states: Vec<String> = (0..planned_replications).map(seed_state).collect();
+    let refs: Vec<&str> = states.iter().map(String::as_str).collect();
+    ScientificRecoverySeedManifestV1::new(&refs).expect("valid seed manifest")
+}
+
 fn profile(planned_replications: usize, max_rmse: f64) -> ScientificRecoveryProfileV1 {
+    let manifest = seed_manifest(planned_replications);
     ScientificRecoveryProfileV1::new(
         planned_replications,
         max_rmse,
         3.0,
         DGP,
-        SEEDS,
+        manifest.sha256(),
         ESTIMAND,
         STATE,
         ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
@@ -54,7 +65,7 @@ fn replication_receipts(
         .map(|(index, (truth, recovered))| {
             let payload = scientific_recovery_replication_payload_sha256(truth, recovered)
                 .expect("valid replication payload");
-            let seed_state = format!("{:064x}", index + 1);
+            let seed_state = seed_state(index);
             let execution_artifact = format!("{:064x}", index + 1024);
             ScientificRecoveryReplicationReceiptV1::new(
                 index,
