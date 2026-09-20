@@ -4,8 +4,8 @@
 //! wraps that gate so exported scientific authority commits both the exact represented
 //! grouped truth/recovery payload and the ordered per-replication RNG-state/execution
 //! receipts presented by the trusted simulation adapter. These digests are content and
-//! lineage identities only; they are not signatures, seed-manifest membership proofs,
-//! execution attestations, or chronology proofs.
+//! lineage identities only; they are not signatures, execution attestations, or chronology
+//! proofs.
 
 use crate::scientific_recovery;
 use crate::{PromotedClaim, ValidationError};
@@ -16,6 +16,80 @@ const RECOVERY_EVIDENCE_SCHEMA: &str = "tepp.scientific_recovery_evidence.v1";
 const REPLICATION_PAYLOAD_SCHEMA: &str = "tepp.scientific_recovery_replication_payload.v1";
 const REPLICATION_RECEIPT_SCHEMA: &str = "tepp.scientific_recovery_replication_receipt.v1";
 const REPLICATION_PROVENANCE_SCHEMA: &str = "tepp.scientific_recovery_replication_provenance.v1";
+const SEED_MANIFEST_SCHEMA: &str = "tepp.scientific_recovery_seed_manifest.v1";
+
+/// Canonical ordered manifest of planned RNG-state or seed-entry identities.
+///
+/// The manifest identity is derived from the ordered unique canonical SHA-256 entries.
+/// Scientific recovery reconstructs this value from the presented per-replication receipts
+/// and requires its digest to equal the manifest identity already committed by the recovery
+/// profile. This proves membership and order against the represented manifest content; it
+/// does not prove when the manifest was approved or that an execution actually used a seed.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScientificRecoverySeedManifestV1 {
+    seed_state_sha256: Vec<String>,
+    sha256: String,
+}
+
+impl ScientificRecoverySeedManifestV1 {
+    /// Construct a canonical ordered seed manifest.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] when fewer than two entries are supplied,
+    /// an entry is not canonical lowercase SHA-256 hexadecimal, or any entry is duplicated.
+    pub fn new(seed_state_sha256: &[&str]) -> Result<Self, ValidationError> {
+        if seed_state_sha256.len() < 2 {
+            return Err(ValidationError::InvalidInput);
+        }
+        let mut unique = HashSet::with_capacity(seed_state_sha256.len());
+        for value in seed_state_sha256 {
+            if !is_canonical_sha256(value) || !unique.insert(*value) {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+
+        let mut digest = Sha256::new();
+        update_digest_field(&mut digest, SEED_MANIFEST_SCHEMA.as_bytes());
+        update_digest_usize(&mut digest, seed_state_sha256.len());
+        for (index, value) in seed_state_sha256.iter().enumerate() {
+            update_digest_usize(&mut digest, index);
+            update_digest_field(&mut digest, value.as_bytes());
+        }
+
+        Ok(Self {
+            seed_state_sha256: seed_state_sha256
+                .iter()
+                .map(|value| (*value).to_owned())
+                .collect(),
+            sha256: hex_encode(&digest.finalize()),
+        })
+    }
+
+    /// Number of planned independent seed-state entries.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.seed_state_sha256.len()
+    }
+
+    /// Whether the manifest contains no planned entries.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.seed_state_sha256.is_empty()
+    }
+
+    /// Planned seed-state identity at one zero-based repetition index.
+    #[must_use]
+    pub fn seed_state_sha256(&self, index: usize) -> Option<&str> {
+        self.seed_state_sha256.get(index).map(String::as_str)
+    }
+
+    /// Domain-separated SHA-256 identity of the ordered manifest content.
+    #[must_use]
+    pub fn sha256(&self) -> &str {
+        &self.sha256
+    }
+}
 
 /// Trusted-adapter identity for one planned simulation repetition and its execution artifact.
 ///
@@ -23,8 +97,7 @@ const REPLICATION_PROVENANCE_SCHEMA: &str = "tepp.scientific_recovery_replicatio
 /// seed-manifest identity, one planned RNG-state/seed-entry identity, one immutable execution
 /// artifact identity, and the exact represented truth/recovery payload identity for that
 /// repetition. The receipt digest is derived inside this value object; supplied dependency
-/// digests remain trusted-adapter inputs and are not cryptographic proof of execution or
-/// seed-manifest membership.
+/// digests remain trusted-adapter inputs and are not cryptographic proof of execution.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScientificRecoveryReplicationReceiptV1 {
     replication_index: usize,
@@ -207,9 +280,10 @@ pub fn scientific_recovery_replication_payload_sha256(
 ///
 /// `replication_receipts[i]` must describe outer scientific repetition `i`, bind the exact
 /// profile and seed-manifest identities, and carry the exact payload digest recomputed by this
-/// owner from `truth_replications[i]` and `recovered_replications[i]`. Planned RNG-state/seed
-/// entry identities must be unique across independent repetitions so accidental seed reuse
-/// cannot masquerade as additional Monte Carlo evidence.
+/// owner from `truth_replications[i]` and `recovered_replications[i]`. The ordered seed-state
+/// identities are reconstructed as a canonical manifest and must hash to the manifest identity
+/// already committed by the profile; arbitrary unique seed-state substitutions therefore fail
+/// closed rather than masquerading as planned Monte Carlo evidence.
 ///
 /// The underlying Validation Evidence owner then performs the existing profile, replication,
 /// numerical, exact-head receipt, and ADR 0014 authority checks. Successful authority retains
@@ -218,9 +292,9 @@ pub fn scientific_recovery_replication_payload_sha256(
 /// # Errors
 ///
 /// Returns [`ValidationError::InvalidInput`] for receipt count/order/profile/manifest/payload
-/// mismatch, duplicate planned seed-state identity, malformed represented replication payload,
-/// or any canonical scientific-recovery input refusal. Other fail-closed errors propagate from
-/// the numerical/profile/exact-head/ADR 0014 gate.
+/// mismatch, a non-canonical or duplicate planned seed-state identity, malformed represented
+/// replication payload, or any canonical scientific-recovery input refusal. Other fail-closed
+/// errors propagate from the numerical/profile/exact-head/ADR 0014 gate.
 pub fn promote_scientific_recovery(
     candidate_head: &str,
     protected_head: &str,
@@ -268,8 +342,16 @@ fn validate_replication_receipts(
         return Err(ValidationError::InvalidInput);
     }
 
+    let seed_states: Vec<&str> = replication_receipts
+        .iter()
+        .map(ScientificRecoveryReplicationReceiptV1::seed_state_sha256)
+        .collect();
+    let seed_manifest = ScientificRecoverySeedManifestV1::new(&seed_states)?;
+    if seed_manifest.sha256() != profile.seed_manifest_sha256() {
+        return Err(ValidationError::InvalidInput);
+    }
+
     let profile_sha256 = profile.sha256();
-    let mut seed_states = HashSet::with_capacity(replication_receipts.len());
     let mut digest = Sha256::new();
     update_digest_field(&mut digest, REPLICATION_PROVENANCE_SCHEMA.as_bytes());
     update_digest_field(&mut digest, profile_sha256.as_bytes());
@@ -285,8 +367,8 @@ fn validate_replication_receipts(
         if receipt.replication_index() != index
             || receipt.profile_sha256() != profile_sha256
             || receipt.seed_manifest_sha256() != profile.seed_manifest_sha256()
+            || receipt.seed_state_sha256() != seed_manifest.seed_state_sha256(index).unwrap_or("")
             || receipt.payload_sha256() != expected_payload
-            || !seed_states.insert(receipt.seed_state_sha256())
         {
             return Err(ValidationError::InvalidInput);
         }
