@@ -1,0 +1,3 @@
+### Fixed
+
+- Bind each independent scientific-recovery repetition to an ordered Validation Evidence receipt carrying the exact recovery-profile and seed-manifest identities, one planned RNG-state/seed-entry SHA-256, one immutable execution-artifact SHA-256, and the exact represented truth/recovery payload SHA-256. Promotion now rejects receipt count/order/profile/manifest/payload mismatches and duplicate planned seed-state identities, and retains a domain-separated aggregate replication-provenance SHA-256. These trusted-adapter digests provide content/lineage identity only; they do not prove seed-manifest membership, execution authenticity, signature validity, or pre-execution chronology.
