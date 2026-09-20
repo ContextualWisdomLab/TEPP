@@ -29,6 +29,7 @@ mod numeric;
 mod report;
 mod rmse;
 mod scientific_recovery;
+mod scientific_recovery_evidence;
 mod temporal_order;
 mod validation_evidence;
 
@@ -58,10 +59,10 @@ pub use scientific_recovery::ScientificRecoveryExactHeadReceiptStatusV1;
 pub use scientific_recovery::ScientificRecoveryFailurePolicyV1;
 /// Versioned scientific recovery design and acceptance policy.
 pub use scientific_recovery::ScientificRecoveryProfileV1;
-/// Scientific authority bound to exact recovery-profile and test-receipt identities.
-pub use scientific_recovery::ScientificRecoveryPromotionV1;
+/// Scientific authority bound to profile, exact-head receipt, and recovery-payload identities.
+pub use scientific_recovery_evidence::ScientificRecoveryPromotionV1;
 /// Promote a scientific claim from recovery grouped by independent simulation replication.
-pub use scientific_recovery::promote_scientific_recovery;
+pub use scientific_recovery_evidence::promote_scientific_recovery;
 /// Empirical interval coverage.
 pub use coverage::interval_coverage;
 /// Wilson bounds for coverage proportions.
