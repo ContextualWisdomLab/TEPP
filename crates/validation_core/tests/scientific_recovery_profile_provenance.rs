@@ -31,9 +31,24 @@ fn recovery_profile_identity_changes_with_predeclared_design_and_target() {
     let different_denominator = profile(3, 0.08);
     let different_target = profile(2, 0.081);
 
+    assert_eq!(baseline.planned_replications(), 2);
+    assert_eq!(baseline.max_rmse().to_bits(), 0.08_f64.to_bits());
+    assert_eq!(baseline.se_multiplier().to_bits(), 3.0_f64.to_bits());
+    assert_eq!(baseline.dgp_sha256(), DGP);
+    assert_eq!(baseline.seed_manifest_sha256(), SEEDS);
+    assert_eq!(baseline.estimand_sha256(), ESTIMAND);
+    assert_eq!(baseline.state_composition_sha256(), STATE);
+    assert_eq!(
+        baseline.failure_policy(),
+        ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered
+    );
+    assert_eq!(
+        baseline.failure_policy().wire_name(),
+        "require_all_planned_recovered"
+    );
+
     assert_ne!(baseline.sha256(), different_denominator.sha256());
     assert_ne!(baseline.sha256(), different_target.sha256());
-    assert_eq!(baseline.failure_policy().wire_name(), "require_all_planned_recovered");
 
     let encoded = baseline.to_json().expect("canonical profile json");
     let decoded = ScientificRecoveryProfileV1::from_json(&encoded).expect("profile roundtrip");
@@ -42,7 +57,7 @@ fn recovery_profile_identity_changes_with_predeclared_design_and_target() {
 }
 
 #[test]
-fn malformed_or_noncanonical_dependency_digest_fails_closed() {
+fn malformed_or_noncanonical_profile_input_fails_closed() {
     let uppercase = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
     assert_eq!(
         ScientificRecoveryProfileV1::new(
@@ -55,6 +70,40 @@ fn malformed_or_noncanonical_dependency_digest_fails_closed() {
             STATE,
             ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
         ),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        ScientificRecoveryProfileV1::new(
+            2,
+            0.08,
+            3.0,
+            "abcd",
+            SEEDS,
+            ESTIMAND,
+            STATE,
+            ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        ScientificRecoveryProfileV1::from_json("not-json"),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let baseline = profile(2, 0.08);
+    let encoded = baseline.to_json().expect("profile json");
+    let wrong_schema = encoded.replace(
+        "tepp.scientific_recovery_profile.v1",
+        "tepp.scientific_recovery_profile.v2",
+    );
+    assert_eq!(
+        ScientificRecoveryProfileV1::from_json(&wrong_schema),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let unknown_field = encoded.replacen('{', "{\"unexpected\":true,", 1);
+    assert_eq!(
+        ScientificRecoveryProfileV1::from_json(&unknown_field),
         Err(ValidationError::InvalidInput)
     );
 }
@@ -70,6 +119,9 @@ fn promoted_scientific_authority_retains_exact_profile_identity() {
     let promotion = promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile)
         .expect("exact recovery under immutable profile");
 
-    assert_eq!(promotion.claim().authority(), ClaimAuthority::ScientificallySupported);
+    assert_eq!(
+        promotion.claim().authority(),
+        ClaimAuthority::ScientificallySupported
+    );
     assert_eq!(promotion.profile_sha256(), profile.sha256());
 }
