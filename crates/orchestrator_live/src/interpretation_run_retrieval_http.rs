@@ -16,11 +16,11 @@
 use crate::error::OrchestratorLiveError;
 use crate::interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
 use crate::interpretation_run_collection_http::{
-    refuse_metrics_on_interpretation_run_collection_payload, InterpretationRunCollectionItem,
-    INTERPRETATION_RUN_COLLECTION_CURSOR_MAX_LEN,
+    INTERPRETATION_RUN_COLLECTION_CURSOR_MAX_LEN, InterpretationRunCollectionItem,
+    refuse_metrics_on_interpretation_run_collection_payload,
 };
 use crate::request::{
-    host_implies_table_access, require_nonempty, to_json, INTERPRETATION_RUN_PATH,
+    INTERPRETATION_RUN_PATH, host_implies_table_access, require_nonempty, to_json,
 };
 
 /// Maximum opaque idempotency-key length on the retrieval path.
@@ -59,6 +59,9 @@ pub fn interpretation_run_retrieval_path_id(path: &str) -> Result<String, Orches
     }
     let idempotency_key = decode_path_segment(encoded)?;
     require_nonempty(&idempotency_key)?;
+    if idempotency_key == "by-run-id" {
+        return Err(OrchestratorLiveError::InvalidWirePayload);
+    }
     if idempotency_key.contains('/') || idempotency_key.contains('\0') {
         return Err(OrchestratorLiveError::InvalidWirePayload);
     }
@@ -185,9 +188,9 @@ fn from_hex(byte: u8) -> Result<u8, OrchestratorLiveError> {
 #[cfg(test)]
 mod tests {
     use super::{
+        INTERPRETATION_RUN_RETRIEVAL_ID_MAX_LEN,
         contextual_orchestrator_interpretation_run_retrieval_exchange,
         interpretation_run_retrieval_item_json, interpretation_run_retrieval_path_id,
-        INTERPRETATION_RUN_RETRIEVAL_ID_MAX_LEN,
     };
     use crate::error::OrchestratorLiveError;
     use crate::interpretation_run_collection_http::InterpretationRunCollectionItem;
@@ -202,15 +205,19 @@ mod tests {
         )
         .expect("exchange");
         assert_eq!(exchange.method, "GET");
-        assert!(exchange
-            .target_url
-            .ends_with("/v1/interpretation-runs/idem-a"));
+        assert!(
+            exchange
+                .target_url
+                .ends_with("/v1/interpretation-runs/idem-a")
+        );
         assert!(exchange.body.is_empty());
-        assert!(!exchange
-            .headers
-            .iter()
-            .any(|(name, _)| name.eq_ignore_ascii_case("authorization")
-                || name.eq_ignore_ascii_case("idempotency-key")));
+        assert!(
+            !exchange
+                .headers
+                .iter()
+                .any(|(name, _)| name.eq_ignore_ascii_case("authorization")
+                    || name.eq_ignore_ascii_case("idempotency-key"))
+        );
         assert_eq!(
             interpretation_run_retrieval_path_id("/v1/interpretation-runs/idem-a").expect("id"),
             "idem-a"
@@ -247,6 +254,10 @@ mod tests {
         );
         assert_eq!(
             interpretation_run_retrieval_path_id("/v1/analysis-runs/idem-a"),
+            Err(OrchestratorLiveError::InvalidWirePayload)
+        );
+        assert_eq!(
+            interpretation_run_retrieval_path_id("/v1/interpretation-runs/by-run-id"),
             Err(OrchestratorLiveError::InvalidWirePayload)
         );
         assert_eq!(
