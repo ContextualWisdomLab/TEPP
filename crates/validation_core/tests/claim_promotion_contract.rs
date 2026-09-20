@@ -228,6 +228,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
     let rmse = root_mean_square_error(&truth_flat, &recovered_flat).expect("rmse");
     let rmse_se = rmse_standard_error(&truth_flat, &recovered_flat).expect("se");
     let max_rmse = rmse + 3.0 * rmse_se + 0.001;
+    let exact_head = implemented_main_evidence();
 
     let truth_rows = [[0.70], [0.55], [0.40], [-0.20], [0.85]];
     let recovered_rows = [[0.72], [0.53], [0.41], [-0.18], [0.84]];
@@ -240,6 +241,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
         &truth,
         &recovered,
         &profile,
+        &exact_head,
     )
     .expect("promote");
     assert_eq!(
@@ -257,6 +259,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
         &truth,
         &truth,
         &exact_profile,
+        &exact_head,
     )
     .expect("exact");
 
@@ -270,6 +273,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
             &truth,
             &biased,
             &biased_profile,
+            &exact_head,
         ),
         Err(ValidationError::ClaimRecoveryRejected)
     );
@@ -280,6 +284,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
             &truth,
             &recovered,
             &profile,
+            &exact_head,
         ),
         Err(ValidationError::ClaimHeadMismatch)
     );
@@ -292,6 +297,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
             &empty,
             &empty,
             &two_rep_profile,
+            &exact_head,
         ),
         Err(ValidationError::InvalidInput)
     );
