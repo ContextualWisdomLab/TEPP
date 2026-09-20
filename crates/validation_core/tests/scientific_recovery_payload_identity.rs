@@ -2,9 +2,11 @@
 
 use validation_core::{
     ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
-    ScientificRecoveryReplicationReceiptV1, ScientificRecoverySeedManifestV1,
-    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
+    ScientificRecoveryExecutionLedgerEntryV1, ScientificRecoveryFailurePolicyV1,
+    ScientificRecoveryProfileChronologyV1, ScientificRecoveryProfileRegistrationStatusV1,
+    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
+    ScientificRecoverySeedManifestV1, promote_scientific_recovery,
+    scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -12,6 +14,9 @@ const RECEIPT: &str = "555555555555555555555555555555555555555555555555555555555
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
+const LEDGER: &str = "6666666666666666666666666666666666666666666666666666666666666666";
+const REGISTRATION_ENTRY: &str =
+    "7777777777777777777777777777777777777777777777777777777777777777";
 
 fn seed_state(index: usize) -> String {
     format!("{:064x}", index + 1)
@@ -74,6 +79,34 @@ fn replication_receipts(
         .collect()
 }
 
+fn chronology(
+    profile: &ScientificRecoveryProfileV1,
+    receipts: &[ScientificRecoveryReplicationReceiptV1],
+) -> ScientificRecoveryProfileChronologyV1 {
+    let entries: Vec<_> = receipts
+        .iter()
+        .enumerate()
+        .map(|(index, receipt)| {
+            let entry_sha = format!("{:064x}", index + 4096);
+            ScientificRecoveryExecutionLedgerEntryV1::new(
+                receipt.execution_artifact_sha256(),
+                &entry_sha,
+                101 + index as u64,
+            )
+            .expect("valid execution ledger entry")
+        })
+        .collect();
+    ScientificRecoveryProfileChronologyV1::new(
+        profile,
+        LEDGER,
+        REGISTRATION_ENTRY,
+        100,
+        ScientificRecoveryProfileRegistrationStatusV1::Approved,
+        &entries,
+    )
+    .expect("approved chronology")
+}
+
 fn promote(
     truth_rows: &[[f64; 2]; 2],
     recovered_rows: &[[f64; 2]; 2],
@@ -82,6 +115,7 @@ fn promote(
     let recovered: Vec<&[f64]> = recovered_rows.iter().map(|row| row.as_slice()).collect();
     let profile = profile();
     let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    let chronology = chronology(&profile, &replication_receipts);
     promote_scientific_recovery(
         HEAD,
         HEAD,
@@ -90,6 +124,7 @@ fn promote(
         &profile,
         &receipt(),
         &replication_receipts,
+        &chronology,
     )
     .expect("valid exact recovery")
 }
