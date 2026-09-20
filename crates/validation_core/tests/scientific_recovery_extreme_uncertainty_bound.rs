@@ -1,8 +1,9 @@
 //! Extreme binary64 contract for scientific recovery's conservative RMSE bound.
 
 use validation_core::{
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
-    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
+    ClaimEvidence, ClaimEvidenceKind, ScientificRecoveryFailurePolicyV1,
+    ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
+    rmse_standard_error, root_mean_square_error,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -27,6 +28,10 @@ fn profile(max_rmse: f64) -> ScientificRecoveryProfileV1 {
         ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
     )
     .expect("valid profile")
+}
+
+fn exact_head_evidence() -> [ClaimEvidence; 1] {
+    [ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true)]
 }
 
 #[test]
@@ -55,7 +60,14 @@ fn scaled_projection_must_not_erase_positive_uncertainty_above_the_target() {
     let recovered = as_slices(&recovered_rows);
     let profile = profile(f64::MAX);
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile),
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head_evidence(),
+        ),
         Err(ValidationError::ClaimRecoveryRejected),
         "scientific authority must not be minted when positive RMSE uncertainty exceeds the remaining practical margin"
     );
@@ -77,7 +89,14 @@ fn practical_target_boundary_is_not_promoted_as_scientific_support() {
     let recovered = as_slices(&recovered_rows);
     let profile = profile(0.05);
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile),
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head_evidence(),
+        ),
         Err(ValidationError::ClaimRecoveryRejected),
         "promotion requires the conservative RMSE bound to remain strictly inside the caller-owned target"
     );
