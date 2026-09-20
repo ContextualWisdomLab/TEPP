@@ -1,6 +1,7 @@
 //! Exact-head claim promotion gates for ADR 0014 authorities.
 
 use crate::ValidationError;
+use crate::accept_within_standard_errors;
 use crate::rmse_standard_error;
 use crate::root_mean_square_error;
 
@@ -49,7 +50,7 @@ impl ClaimAuthority {
     }
 }
 
-/// Kind of evidence offered for a promotion request.
+/// Kind of evidence offered for promotion.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ClaimEvidenceKind {
     /// Exact-head unit/integration tests on the candidate commit.
@@ -318,8 +319,11 @@ pub fn promote_claim(request: &PromotionRequest<'_>) -> Result<PromotedClaim, Va
 /// The candidate must equal the protected head. `max_rmse` is the claim-specific
 /// practical recovery target owned by the validation profile; `se_multiplier`
 /// controls how much uncertainty around the estimated RMSE is included. Promotion
-/// requires the conservative bound `RMSE + se_multiplier * SE(RMSE) <= max_rmse`.
-/// This crate deliberately does not define a universal RMSE cutoff.
+/// requires the conservative bound `RMSE + se_multiplier * SE(RMSE) < max_rmse`.
+/// The strict boundary prevents a rounded equality at the practical target from
+/// being promoted and lets the existing exact residual-vs-standard-error comparator
+/// decide the margin without overflow-prone rescaling. This crate deliberately does
+/// not define a universal RMSE cutoff.
 ///
 /// # Errors
 ///
@@ -344,10 +348,9 @@ pub fn promote_scientific_recovery(
     }
     let rmse = root_mean_square_error(truth, recovered)?;
     let rmse_se = rmse_standard_error(truth, recovered)?;
-    let scale = rmse.max(rmse_se).max(max_rmse).max(1.0);
-    let scaled_upper_bound = (rmse / scale) + se_multiplier * (rmse_se / scale);
-    let scaled_target = max_rmse / scale;
-    if !scaled_upper_bound.is_finite() || scaled_upper_bound > scaled_target {
+    if rmse >= max_rmse
+        || accept_within_standard_errors(max_rmse, rmse, rmse_se, se_multiplier)?
+    {
         return Err(ValidationError::ClaimRecoveryRejected);
     }
     Ok(PromotedClaim::new(
