@@ -2,10 +2,11 @@
 
 use validation_core::{
     ClaimAuthority, ScientificRecoveryExactHeadReceiptStatusV1,
-    ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
-    ScientificRecoverySeedManifestV1, ValidationError, promote_scientific_recovery,
-    scientific_recovery_replication_payload_sha256,
+    ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryExecutionLedgerEntryV1,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileChronologyV1,
+    ScientificRecoveryProfileRegistrationStatusV1, ScientificRecoveryProfileV1,
+    ScientificRecoveryReplicationReceiptV1, ScientificRecoverySeedManifestV1, ValidationError,
+    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -27,6 +28,9 @@ const OTHER_PROFILE: &str =
     "6666666666666666666666666666666666666666666666666666666666666666";
 const OTHER_MANIFEST: &str =
     "7777777777777777777777777777777777777777777777777777777777777777";
+const LEDGER: &str = "8888888888888888888888888888888888888888888888888888888888888888";
+const REGISTRATION_ENTRY: &str =
+    "9999999999999999999999999999999999999999999999999999999999999999";
 
 fn seed_manifest() -> ScientificRecoverySeedManifestV1 {
     ScientificRecoverySeedManifestV1::new(&[SEED_0, SEED_1]).expect("valid seed manifest")
@@ -77,6 +81,34 @@ fn replication_receipt(
     .expect("valid replication receipt")
 }
 
+fn chronology(
+    profile: &ScientificRecoveryProfileV1,
+    receipts: &[ScientificRecoveryReplicationReceiptV1],
+) -> ScientificRecoveryProfileChronologyV1 {
+    let entries: Vec<_> = receipts
+        .iter()
+        .enumerate()
+        .map(|(index, receipt)| {
+            let entry_sha = format!("{:064x}", index + 4096);
+            ScientificRecoveryExecutionLedgerEntryV1::new(
+                receipt.execution_artifact_sha256(),
+                &entry_sha,
+                101 + index as u64,
+            )
+            .expect("valid execution ledger entry")
+        })
+        .collect();
+    ScientificRecoveryProfileChronologyV1::new(
+        profile,
+        LEDGER,
+        REGISTRATION_ENTRY,
+        100,
+        ScientificRecoveryProfileRegistrationStatusV1::Approved,
+        &entries,
+    )
+    .expect("approved chronology")
+}
+
 fn exact_rows() -> (Vec<&'static [f64]>, Vec<&'static [f64]>) {
     static TRUTH: [[f64; 1]; 2] = [[0.0], [1.0]];
     static RECOVERED: [[f64; 1]; 2] = [[0.0], [1.0]];
@@ -98,6 +130,7 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
         replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
     ];
+    let chronology = chronology(&profile, &receipts);
 
     assert_eq!(receipts[0].replication_index(), 0);
     assert_eq!(receipts[0].profile_sha256(), profile.sha256());
@@ -117,6 +150,7 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         &profile,
         &exact_head,
         &receipts,
+        &chronology,
     )
     .expect("planned seed-state and execution receipts match exact recovery payloads");
 
@@ -125,6 +159,7 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         ClaimAuthority::ScientificallySupported
     );
     assert_eq!(promoted.replication_provenance_sha256().len(), 64);
+    assert_eq!(promoted.profile_chronology_sha256(), chronology.sha256());
 
     let repeated = promote_scientific_recovery(
         HEAD,
@@ -134,6 +169,7 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         &profile,
         &exact_head,
         &receipts,
+        &chronology,
     )
     .expect("same represented execution provenance is deterministic");
     assert_eq!(
@@ -145,6 +181,7 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         replication_receipt(&profile, 0, SEED_0, EXEC_0_ALT, truth[0], recovered[0]),
         replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
     ];
+    let changed_chronology = chronology(&profile, &changed_execution);
     let changed = promote_scientific_recovery(
         HEAD,
         HEAD,
@@ -153,11 +190,16 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         &profile,
         &exact_head,
         &changed_execution,
+        &changed_chronology,
     )
     .expect("different immutable execution artifact may contain the same accepted payload");
     assert_ne!(
         promoted.replication_provenance_sha256(),
         changed.replication_provenance_sha256()
+    );
+    assert_ne!(
+        promoted.profile_chronology_sha256(),
+        changed.profile_chronology_sha256()
     );
 }
 
@@ -168,15 +210,17 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     let exact_head = exact_head_receipt();
     let payload_0 = scientific_recovery_replication_payload_sha256(truth[0], recovered[0])
         .expect("payload 0");
-
-    let mut reversed = vec![
+    let valid_receipts = vec![
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
         replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
     ];
+    let chronology = chronology(&profile, &valid_receipts);
+
+    let mut reversed = valid_receipts.clone();
     reversed.swap(0, 1);
     assert_eq!(
         promote_scientific_recovery(
-            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &reversed,
+            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &reversed, &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -195,7 +239,7 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     ];
     assert_eq!(
         promote_scientific_recovery(
-            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_profile,
+            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_profile, &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -214,7 +258,7 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     ];
     assert_eq!(
         promote_scientific_recovery(
-            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_manifest,
+            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_manifest, &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -233,7 +277,7 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     ];
     assert_eq!(
         promote_scientific_recovery(
-            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_payload,
+            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_payload, &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -251,6 +295,7 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
             &profile,
             &exact_head,
             &duplicate_seed_state,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -265,6 +310,7 @@ fn replication_receipt_cardinality_checks_cover_each_declared_population() {
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
         replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
     ];
+    let chronology = chronology(&profile, &receipts);
 
     assert_eq!(
         promote_scientific_recovery(
@@ -275,6 +321,7 @@ fn replication_receipt_cardinality_checks_cover_each_declared_population() {
             &profile,
             &exact_head,
             &receipts[..1],
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -287,6 +334,7 @@ fn replication_receipt_cardinality_checks_cover_each_declared_population() {
             &profile,
             &exact_head,
             &receipts,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -299,6 +347,7 @@ fn replication_receipt_cardinality_checks_cover_each_declared_population() {
             &profile,
             &exact_head,
             &receipts,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
