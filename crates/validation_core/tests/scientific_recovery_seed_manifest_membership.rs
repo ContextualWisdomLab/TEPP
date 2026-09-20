@@ -2,10 +2,11 @@
 
 use validation_core::{
     ClaimAuthority, ScientificRecoveryExactHeadReceiptStatusV1,
-    ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
-    ScientificRecoverySeedManifestV1, ValidationError, promote_scientific_recovery,
-    scientific_recovery_replication_payload_sha256,
+    ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryExecutionLedgerEntryV1,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileChronologyV1,
+    ScientificRecoveryProfileRegistrationStatusV1, ScientificRecoveryProfileV1,
+    ScientificRecoveryReplicationReceiptV1, ScientificRecoverySeedManifestV1, ValidationError,
+    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -21,6 +22,9 @@ const SEED_OUTSIDE: &str =
     "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const EXEC_0: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const EXEC_1: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+const LEDGER: &str = "6666666666666666666666666666666666666666666666666666666666666666";
+const REGISTRATION_ENTRY: &str =
+    "7777777777777777777777777777777777777777777777777777777777777777";
 
 fn seed_manifest() -> ScientificRecoverySeedManifestV1 {
     ScientificRecoverySeedManifestV1::new(&[SEED_0, SEED_1]).expect("valid ordered seed manifest")
@@ -70,6 +74,34 @@ fn replication_receipt(
     .expect("valid replication receipt")
 }
 
+fn chronology(
+    profile: &ScientificRecoveryProfileV1,
+    receipts: &[ScientificRecoveryReplicationReceiptV1],
+) -> ScientificRecoveryProfileChronologyV1 {
+    let entries: Vec<_> = receipts
+        .iter()
+        .enumerate()
+        .map(|(index, receipt)| {
+            let entry_sha = format!("{:064x}", index + 4096);
+            ScientificRecoveryExecutionLedgerEntryV1::new(
+                receipt.execution_artifact_sha256(),
+                &entry_sha,
+                101 + index as u64,
+            )
+            .expect("valid execution ledger entry")
+        })
+        .collect();
+    ScientificRecoveryProfileChronologyV1::new(
+        profile,
+        LEDGER,
+        REGISTRATION_ENTRY,
+        100,
+        ScientificRecoveryProfileRegistrationStatusV1::Approved,
+        &entries,
+    )
+    .expect("approved chronology")
+}
+
 #[test]
 fn promotion_requires_exact_ordered_seed_manifest_membership() {
     let manifest = seed_manifest();
@@ -83,6 +115,7 @@ fn promotion_requires_exact_ordered_seed_manifest_membership() {
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
         replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
     ];
+    let chronology = chronology(&profile, &receipts);
 
     let promoted = promote_scientific_recovery(
         HEAD,
@@ -92,6 +125,7 @@ fn promotion_requires_exact_ordered_seed_manifest_membership() {
         &profile,
         &exact_head,
         &receipts,
+        &chronology,
     )
     .expect("each receipt seed is the exact manifest entry at its repetition index");
     assert_eq!(
@@ -119,6 +153,7 @@ fn promotion_requires_exact_ordered_seed_manifest_membership() {
             &profile,
             &exact_head,
             &substituted,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
