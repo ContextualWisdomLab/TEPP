@@ -156,6 +156,7 @@ fn promoted_scientific_authority_retains_profile_and_exact_head_receipt_identity
     let recovered_rows = [[0.0], [0.0]];
     let truth: Vec<&[f64]> = truth_rows.iter().map(|row| row.as_slice()).collect();
     let recovered: Vec<&[f64]> = recovered_rows.iter().map(|row| row.as_slice()).collect();
+    let receipt = exact_head_receipt();
 
     let promotion = promote_scientific_recovery(
         HEAD,
@@ -163,7 +164,7 @@ fn promoted_scientific_authority_retains_profile_and_exact_head_receipt_identity
         &truth,
         &recovered,
         &profile,
-        &exact_head_receipt(),
+        &receipt,
     )
     .expect("exact recovery under immutable profile and exact-head receipt");
 
@@ -172,5 +173,9 @@ fn promoted_scientific_authority_retains_profile_and_exact_head_receipt_identity
         ClaimAuthority::ScientificallySupported
     );
     assert_eq!(promotion.profile_sha256(), profile.sha256());
-    assert_eq!(promotion.exact_head_receipt_sha256(), RECEIPT);
+    assert_eq!(receipt.artifact_sha256(), RECEIPT);
+    assert_eq!(
+        promotion.exact_head_receipt_sha256(),
+        receipt.receipt_sha256()
+    );
 }
