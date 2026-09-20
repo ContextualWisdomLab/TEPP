@@ -1,8 +1,9 @@
 //! Scientific claim promotion separates practical recovery accuracy from Monte Carlo precision.
 
 use validation_core::{
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
-    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
+    ClaimEvidence, ClaimEvidenceKind, ScientificRecoveryFailurePolicyV1,
+    ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
+    rmse_standard_error, root_mean_square_error,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -15,7 +16,11 @@ fn as_slices<const N: usize, const M: usize>(rows: &[[f64; M]; N]) -> Vec<&[f64]
     rows.iter().map(|row| row.as_slice()).collect()
 }
 
-fn profile(planned_replications: usize, max_rmse: f64, se_multiplier: f64) -> ScientificRecoveryProfileV1 {
+fn profile(
+    planned_replications: usize,
+    max_rmse: f64,
+    se_multiplier: f64,
+) -> ScientificRecoveryProfileV1 {
     ScientificRecoveryProfileV1::new(
         planned_replications,
         max_rmse,
@@ -27,6 +32,10 @@ fn profile(planned_replications: usize, max_rmse: f64, se_multiplier: f64) -> Sc
         ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
     )
     .expect("valid profile")
+}
+
+fn exact_head_evidence() -> [ClaimEvidence; 1] {
+    [ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true)]
 }
 
 #[test]
@@ -46,8 +55,15 @@ fn practical_rmse_inside_target_is_not_rejected_for_being_precisely_nonzero() {
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
     let profile = profile(8, 0.05, 3.0);
-    promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile)
-        .expect("a precisely estimated RMSE inside the explicit practical target must promote");
+    promote_scientific_recovery(
+        HEAD,
+        HEAD,
+        &truth,
+        &recovered,
+        &profile,
+        &exact_head_evidence(),
+    )
+    .expect("a precisely estimated RMSE inside the explicit practical target must promote");
 }
 
 #[test]
@@ -69,7 +85,14 @@ fn monte_carlo_uncertainty_remains_binding_near_practical_rmse_target() {
     let recovered = as_slices(&recovered_rows);
     let profile = profile(8, 0.05, 3.0);
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile),
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head_evidence(),
+        ),
         Err(ValidationError::ClaimRecoveryRejected)
     );
 }
