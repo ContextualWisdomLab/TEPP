@@ -3,24 +3,34 @@
 use validation_core::{
     ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
     ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
-    ScientificRecoveryReplicationReceiptV1, promote_scientific_recovery,
-    scientific_recovery_replication_payload_sha256,
+    ScientificRecoveryReplicationReceiptV1, ScientificRecoverySeedManifestV1,
+    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
 const RECEIPT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
-const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
 
+fn seed_state(index: usize) -> String {
+    format!("{:064x}", index + 1)
+}
+
+fn seed_manifest() -> ScientificRecoverySeedManifestV1 {
+    let states: Vec<String> = (0..2).map(seed_state).collect();
+    let refs: Vec<&str> = states.iter().map(String::as_str).collect();
+    ScientificRecoverySeedManifestV1::new(&refs).expect("valid seed manifest")
+}
+
 fn profile() -> ScientificRecoveryProfileV1 {
+    let manifest = seed_manifest();
     ScientificRecoveryProfileV1::new(
         2,
         0.08,
         3.0,
         DGP,
-        SEEDS,
+        manifest.sha256(),
         ESTIMAND,
         STATE,
         ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
@@ -49,7 +59,7 @@ fn replication_receipts(
         .map(|(index, (truth, recovered))| {
             let payload = scientific_recovery_replication_payload_sha256(truth, recovered)
                 .expect("valid replication payload");
-            let seed_state = format!("{:064x}", index + 1);
+            let seed_state = seed_state(index);
             let execution_artifact = format!("{:064x}", index + 1024);
             ScientificRecoveryReplicationReceiptV1::new(
                 index,
