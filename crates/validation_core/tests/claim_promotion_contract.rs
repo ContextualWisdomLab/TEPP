@@ -1,13 +1,18 @@
 //! ADR 0014 claim authorities cannot be promoted from unusable evidence.
 
 use validation_core::{
-    ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, PromotionRequest, ValidationError,
+    ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, PromotionRequest,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
     parse_commit_head, promote_claim, promote_scientific_recovery, rmse_standard_error,
     root_mean_square_error,
 };
 
 const PROTECTED_HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
 const OTHER_HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
+const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
 
 fn implemented_main_evidence() -> [ClaimEvidence; 1] {
     [ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true)]
@@ -41,6 +46,24 @@ fn request<'evidence>(
 
 fn as_slices<const N: usize, const M: usize>(rows: &[[f64; M]; N]) -> Vec<&[f64]> {
     rows.iter().map(|row| row.as_slice()).collect()
+}
+
+fn recovery_profile(
+    planned_replications: usize,
+    max_rmse: f64,
+    se_multiplier: f64,
+) -> ScientificRecoveryProfileV1 {
+    ScientificRecoveryProfileV1::new(
+        planned_replications,
+        max_rmse,
+        se_multiplier,
+        DGP,
+        SEEDS,
+        ESTIMAND,
+        STATE,
+        ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
+    )
+    .expect("valid recovery profile")
 }
 
 #[test]
@@ -210,44 +233,43 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
     let recovered_rows = [[0.72], [0.53], [0.41], [-0.18], [0.84]];
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
+    let profile = recovery_profile(5, max_rmse, 3.0);
     let promoted = promote_scientific_recovery(
         PROTECTED_HEAD,
         PROTECTED_HEAD,
         &truth,
         &recovered,
-        5,
-        max_rmse,
-        3.0,
+        &profile,
     )
     .expect("promote");
     assert_eq!(
-        promoted.authority(),
+        promoted.claim().authority(),
         ClaimAuthority::ScientificallySupported
     );
+    assert_eq!(promoted.profile_sha256(), profile.sha256());
     assert!(rmse.is_finite());
     assert!(rmse_se.is_finite() && rmse_se > 0.0);
+
+    let exact_profile = recovery_profile(5, 0.001, 3.0);
     promote_scientific_recovery(
         PROTECTED_HEAD,
         PROTECTED_HEAD,
         &truth,
         &truth,
-        5,
-        0.001,
-        3.0,
+        &exact_profile,
     )
     .expect("exact");
 
     let biased_rows = [[1.70], [1.55], [1.40], [0.80], [1.85]];
     let biased = as_slices(&biased_rows);
+    let biased_profile = recovery_profile(5, 0.10, 3.0);
     assert_eq!(
         promote_scientific_recovery(
             PROTECTED_HEAD,
             PROTECTED_HEAD,
             &truth,
             &biased,
-            5,
-            0.10,
-            3.0,
+            &biased_profile,
         ),
         Err(ValidationError::ClaimRecoveryRejected)
     );
@@ -257,26 +279,32 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
             PROTECTED_HEAD,
             &truth,
             &recovered,
-            5,
-            max_rmse,
-            3.0,
+            &profile,
         ),
         Err(ValidationError::ClaimHeadMismatch)
     );
     let empty: [&[f64]; 0] = [];
-    assert_eq!(
-        promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &empty, &empty, 2, 0.10, 3.0),
-        Err(ValidationError::InvalidInput)
-    );
+    let two_rep_profile = recovery_profile(2, 0.10, 3.0);
     assert_eq!(
         promote_scientific_recovery(
             PROTECTED_HEAD,
             PROTECTED_HEAD,
-            &truth,
-            &recovered,
+            &empty,
+            &empty,
+            &two_rep_profile,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        ScientificRecoveryProfileV1::new(
             5,
             0.0,
             3.0,
+            DGP,
+            SEEDS,
+            ESTIMAND,
+            STATE,
+            ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
         ),
         Err(ValidationError::InvalidConfiguration)
     );
