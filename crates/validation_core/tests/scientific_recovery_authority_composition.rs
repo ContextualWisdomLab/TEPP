@@ -3,7 +3,8 @@
 use validation_core::{
     ClaimAuthority, ScientificRecoveryExactHeadReceiptStatusV1,
     ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
+    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1, ValidationError,
+    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -46,11 +47,39 @@ fn receipt(
         .expect("valid exact-head receipt")
 }
 
+fn replication_receipts(
+    profile: &ScientificRecoveryProfileV1,
+    truth: &[&[f64]],
+    recovered: &[&[f64]],
+) -> Vec<ScientificRecoveryReplicationReceiptV1> {
+    truth
+        .iter()
+        .zip(recovered)
+        .enumerate()
+        .map(|(index, (truth, recovered))| {
+            let payload = scientific_recovery_replication_payload_sha256(truth, recovered)
+                .expect("valid replication payload");
+            let seed_state = format!("{:064x}", index + 1);
+            let execution_artifact = format!("{:064x}", index + 1024);
+            ScientificRecoveryReplicationReceiptV1::new(
+                index,
+                &profile.sha256(),
+                profile.seed_manifest_sha256(),
+                &seed_state,
+                &execution_artifact,
+                &payload,
+            )
+            .expect("valid replication receipt")
+        })
+        .collect()
+}
+
 #[test]
 fn passing_exact_head_receipt_composes_with_computed_recovery_and_is_retained() {
     let profile = exact_profile();
     let (truth, recovered) = exact_rows();
     let exact_head = receipt(HEAD, ScientificRecoveryExactHeadReceiptStatusV1::Passed);
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
 
     let promotion = promote_scientific_recovery(
         HEAD,
@@ -59,6 +88,7 @@ fn passing_exact_head_receipt_composes_with_computed_recovery_and_is_retained() 
         &recovered,
         &profile,
         &exact_head,
+        &replication_receipts,
     )
     .expect("exact-head receipt plus computed recovery");
 
@@ -83,9 +113,18 @@ fn predecessor_exact_head_receipt_cannot_be_relabelled_as_candidate_evidence() {
         OTHER_HEAD,
         ScientificRecoveryExactHeadReceiptStatusV1::Passed,
     );
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile, &predecessor),
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &predecessor,
+            &replication_receipts,
+        ),
         Err(ValidationError::ClaimPredecessorHead)
     );
 }
@@ -94,6 +133,7 @@ fn predecessor_exact_head_receipt_cannot_be_relabelled_as_candidate_evidence() {
 fn nonpassing_exact_head_receipt_states_stay_fail_closed() {
     let profile = exact_profile();
     let (truth, recovered) = exact_rows();
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
 
     for (status, expected) in [
         (
@@ -111,7 +151,15 @@ fn nonpassing_exact_head_receipt_states_stay_fail_closed() {
     ] {
         let exact_head = receipt(HEAD, status);
         assert_eq!(
-            promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile, &exact_head),
+            promote_scientific_recovery(
+                HEAD,
+                HEAD,
+                &truth,
+                &recovered,
+                &profile,
+                &exact_head,
+                &replication_receipts,
+            ),
             Err(expected)
         );
     }
