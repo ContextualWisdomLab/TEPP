@@ -31,3 +31,19 @@ fn scaled_projection_must_not_erase_positive_uncertainty_above_the_target() {
         "scientific authority must not be minted when positive RMSE uncertainty exceeds the remaining practical margin"
     );
 }
+
+#[test]
+fn practical_target_boundary_is_not_promoted_as_scientific_support() {
+    let truth = [0.0, 0.0];
+    let recovered = [0.05, -0.05];
+    let rmse = root_mean_square_error(&truth, &recovered).expect("rmse");
+    let rmse_se = rmse_standard_error(&truth, &recovered).expect("rmse se");
+
+    assert_eq!(rmse.to_bits(), 0.05_f64.to_bits());
+    assert_eq!(rmse_se.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 0.05, 3.0),
+        Err(ValidationError::ClaimRecoveryRejected),
+        "promotion requires the conservative RMSE bound to remain strictly inside the caller-owned target"
+    );
+}
