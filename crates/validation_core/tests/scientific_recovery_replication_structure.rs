@@ -2,8 +2,10 @@
 
 use validation_core::{
     ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
-    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
+    ScientificRecoveryReplicationReceiptV1, ValidationError, promote_scientific_recovery,
+    rmse_standard_error, root_mean_square_error,
+    scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -40,6 +42,33 @@ fn exact_head_receipt() -> ScientificRecoveryExactHeadReceiptV1 {
     .expect("valid exact-head receipt")
 }
 
+fn replication_receipts(
+    profile: &ScientificRecoveryProfileV1,
+    truth: &[&[f64]],
+    recovered: &[&[f64]],
+) -> Vec<ScientificRecoveryReplicationReceiptV1> {
+    truth
+        .iter()
+        .zip(recovered)
+        .enumerate()
+        .map(|(index, (truth, recovered))| {
+            let payload = scientific_recovery_replication_payload_sha256(truth, recovered)
+                .expect("valid replication payload");
+            let seed_state = format!("{:064x}", index + 1);
+            let execution_artifact = format!("{:064x}", index + 1024);
+            ScientificRecoveryReplicationReceiptV1::new(
+                index,
+                &profile.sha256(),
+                profile.seed_manifest_sha256(),
+                &seed_state,
+                &execution_artifact,
+                &payload,
+            )
+            .expect("valid replication receipt")
+        })
+        .collect()
+}
+
 #[test]
 fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_replications() {
     let flat_truth = [0.0; 128];
@@ -59,6 +88,7 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
     let truth = as_slices(&truth_replications);
     let recovered = as_slices(&recovered_replications);
     let profile = profile(2, 0.08);
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
 
     assert_eq!(
         promote_scientific_recovery(
@@ -68,6 +98,7 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
             &recovered,
             &profile,
             &exact_head_receipt(),
+            &replication_receipts,
         ),
         Err(ValidationError::ClaimRecoveryRejected),
         "64 perfectly correlated state coordinates inside each of two runs must still count as only two independent Monte Carlo replications"
@@ -81,6 +112,7 @@ fn replication_structure_must_be_complete_before_promotion() {
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
     let profile = profile(2, 0.01);
+    let one_receipt = replication_receipts(&profile, &truth[..1], &recovered[..1]);
 
     assert_eq!(
         promote_scientific_recovery(
@@ -90,6 +122,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             &recovered[..1],
             &profile,
             &exact_head_receipt(),
+            &one_receipt,
         ),
         Err(ValidationError::InvalidInput),
         "outer replication counts must match the declared design denominator"
@@ -98,7 +131,9 @@ fn replication_structure_must_be_complete_before_promotion() {
     let invalid_truth_rows = [[0.0, 0.0], [0.0, 0.0]];
     let invalid_recovered_rows = [[0.0, 0.0], [0.0, 0.0]];
     let invalid_truth = as_slices(&invalid_truth_rows);
-    let mut invalid_recovered = as_slices(&invalid_recovered_rows);
+    let full_recovered = as_slices(&invalid_recovered_rows);
+    let replication_receipts = replication_receipts(&profile, &invalid_truth, &full_recovered);
+    let mut invalid_recovered = full_recovered;
     invalid_recovered[1] = &invalid_recovered_rows[1][..1];
     assert_eq!(
         promote_scientific_recovery(
@@ -108,6 +143,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             &invalid_recovered,
             &profile,
             &exact_head_receipt(),
+            &replication_receipts,
         ),
         Err(ValidationError::InvalidInput),
         "each replication must contain a valid truth/recovery pair"
@@ -121,6 +157,7 @@ fn planned_replication_denominator_prevents_survivor_only_promotion() {
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
     let profile = profile(3, 0.01);
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
 
     assert_eq!(
         promote_scientific_recovery(
@@ -130,6 +167,7 @@ fn planned_replication_denominator_prevents_survivor_only_promotion() {
             &recovered,
             &profile,
             &exact_head_receipt(),
+            &replication_receipts,
         ),
         Err(ValidationError::InvalidInput),
         "two successful survivors must not satisfy a profile that planned three independent replications"
