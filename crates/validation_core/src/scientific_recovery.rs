@@ -60,8 +60,11 @@ impl ScientificRecoveryProfileV1 {
     ///
     /// Returns [`ValidationError::InvalidConfiguration`] when the planned
     /// replication count, practical RMSE target, or uncertainty multiplier is
-    /// invalid. Returns [`ValidationError::InvalidInput`] when any dependency
-    /// digest is not canonical lowercase SHA-256 hexadecimal.
+    /// invalid. The uncertainty multiplier accepts canonical positive zero but
+    /// rejects IEEE 754 negative zero so one scientific policy cannot acquire two
+    /// profile identities solely from the zero sign bit. Returns
+    /// [`ValidationError::InvalidInput`] when any dependency digest is not
+    /// canonical lowercase SHA-256 hexadecimal.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         planned_replications: usize,
@@ -78,6 +81,7 @@ impl ScientificRecoveryProfileV1 {
             || max_rmse <= 0.0
             || !se_multiplier.is_finite()
             || se_multiplier < 0.0
+            || (se_multiplier == 0.0 && se_multiplier.is_sign_negative())
         {
             return Err(ValidationError::InvalidConfiguration);
         }
