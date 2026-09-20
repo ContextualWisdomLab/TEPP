@@ -59,10 +59,14 @@ pub use scientific_recovery::ScientificRecoveryExactHeadReceiptStatusV1;
 pub use scientific_recovery::ScientificRecoveryFailurePolicyV1;
 /// Versioned scientific recovery design and acceptance policy.
 pub use scientific_recovery::ScientificRecoveryProfileV1;
-/// Scientific authority bound to profile, exact-head receipt, and recovery-payload identities.
+/// Scientific authority bound to profile, exact-head receipt, payload, and execution identities.
 pub use scientific_recovery_evidence::ScientificRecoveryPromotionV1;
+/// Trusted-adapter provenance receipt for one independent scientific-recovery repetition.
+pub use scientific_recovery_evidence::ScientificRecoveryReplicationReceiptV1;
 /// Promote a scientific claim from recovery grouped by independent simulation replication.
 pub use scientific_recovery_evidence::promote_scientific_recovery;
+/// Derive the canonical identity of one represented scientific-recovery repetition payload.
+pub use scientific_recovery_evidence::scientific_recovery_replication_payload_sha256;
 /// Empirical interval coverage.
 pub use coverage::interval_coverage;
 /// Wilson bounds for coverage proportions.
