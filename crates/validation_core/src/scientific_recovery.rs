@@ -7,7 +7,10 @@
 //! evaluated. This prevents within-replication rows from masquerading as `n_sim`.
 
 use crate::claim;
-use crate::{PromotedClaim, ValidationError, root_mean_square_error};
+use crate::{
+    ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, PromotedClaim, PromotionRequest,
+    ValidationError, root_mean_square_error,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -282,18 +285,25 @@ impl ScientificRecoveryPromotionV1 {
 /// uncertainty is evaluated. The profile owns the denominator, practical target,
 /// uncertainty multiplier, dependency provenance, and explicit failure policy.
 ///
+/// `claim_evidence` supplies repository/adapter evidence other than the recovery
+/// computation itself. A passing [`ClaimEvidenceKind::ScientificRecovery`] item is
+/// appended only after the numerical/profile gate succeeds, and final authority is
+/// minted through the canonical ADR 0014 claim gate. The recovery path therefore
+/// cannot invent [`ClaimEvidenceKind::ExactHeadTests`] on its own.
+///
 /// # Errors
 ///
 /// Returns [`ValidationError::InvalidInput`] when the presented outer denominator
-/// differs from the profile or an inner truth/recovery pair is invalid. The
-/// underlying exact-head claim gate also rejects head mismatch or a conservative
-/// RMSE bound that does not remain strictly inside the practical target.
+/// differs from the profile or an inner truth/recovery pair is invalid. Recovery
+/// rejection, head mismatch, missing/failing exact-head tests, queued/predecessor/
+/// skipped/LLM evidence, and other canonical claim-gate errors fail closed.
 pub fn promote_scientific_recovery(
     candidate_head: &str,
     protected_head: &str,
     truth_replications: &[&[f64]],
     recovered_replications: &[&[f64]],
     profile: &ScientificRecoveryProfileV1,
+    claim_evidence: &[ClaimEvidence],
 ) -> Result<ScientificRecoveryPromotionV1, ValidationError> {
     let planned_replications = profile.planned_replications();
     if truth_replications.len() != planned_replications
@@ -315,7 +325,11 @@ pub fn promote_scientific_recovery(
     let replication_rmse = replication_rmse?;
     let zero_truth = vec![0.0; replication_rmse.len()];
 
-    let claim = claim::promote_scientific_recovery(
+    // This private numerical gate proves the recovery criterion only. Its
+    // historical return value is deliberately not exposed as final authority;
+    // ADR 0014 authority below is recomposed through `promote_claim` with the
+    // caller's exact-head evidence plus the computed recovery item.
+    claim::promote_scientific_recovery(
         candidate_head,
         protected_head,
         &zero_truth,
@@ -323,6 +337,20 @@ pub fn promote_scientific_recovery(
         profile.max_rmse(),
         profile.se_multiplier(),
     )?;
+
+    let mut evidence = Vec::with_capacity(claim_evidence.len() + 1);
+    evidence.extend_from_slice(claim_evidence);
+    evidence.push(ClaimEvidence::new(
+        ClaimEvidenceKind::ScientificRecovery,
+        true,
+    ));
+    let request = PromotionRequest::new(
+        ClaimAuthority::ScientificallySupported,
+        candidate_head,
+        protected_head,
+        &evidence,
+    )?;
+    let claim = claim::promote_claim(&request)?;
 
     Ok(ScientificRecoveryPromotionV1 {
         claim,
