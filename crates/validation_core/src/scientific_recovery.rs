@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 const PROFILE_SCHEMA: &str = "tepp.scientific_recovery_profile.v1";
+const EXACT_HEAD_RECEIPT_SCHEMA: &str = "tepp.scientific_recovery_exact_head_receipt.v1";
 
 /// Failure policy bound into a scientific recovery profile.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -47,15 +48,30 @@ pub enum ScientificRecoveryExactHeadReceiptStatusV1 {
     Skipped,
 }
 
+impl ScientificRecoveryExactHeadReceiptStatusV1 {
+    /// Stable wire value committed into the receipt identity.
+    #[must_use]
+    pub const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Passed => "passed",
+            Self::Failed => "failed",
+            Self::Queued => "queued",
+            Self::Skipped => "skipped",
+        }
+    }
+}
+
 /// Immutable identity for the exact-head test evidence used by scientific recovery.
 ///
-/// The receipt SHA-256 is an opaque artifact identity supplied by a trusted
-/// repository/CI adapter. This value object does not infer test truth from the
-/// digest contents; it binds the adapter's terminal state and immutable receipt
-/// identity to the exact Git commit that was tested.
+/// The artifact SHA-256 is supplied by a trusted repository/CI adapter. The
+/// receipt SHA-256 is derived inside this value object from the versioned receipt
+/// schema, exact tested Git head, artifact SHA-256, and terminal state. This keeps
+/// semantically different receipts from sharing one audit identity while making no
+/// claim that the artifact digest itself cryptographically proves CI truth.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScientificRecoveryExactHeadReceiptV1 {
     head: [u8; 20],
+    artifact_sha256: String,
     receipt_sha256: String,
     status: ScientificRecoveryExactHeadReceiptStatusV1,
 }
@@ -66,18 +82,26 @@ impl ScientificRecoveryExactHeadReceiptV1 {
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] when `head` is not an exact Git
-    /// commit SHA or `receipt_sha256` is not canonical lowercase SHA-256 hex.
+    /// commit SHA or `artifact_sha256` is not canonical lowercase SHA-256 hex.
     pub fn new(
         head: &str,
-        receipt_sha256: &str,
+        artifact_sha256: &str,
         status: ScientificRecoveryExactHeadReceiptStatusV1,
     ) -> Result<Self, ValidationError> {
-        if !is_canonical_sha256(receipt_sha256) {
+        if !is_canonical_sha256(artifact_sha256) {
             return Err(ValidationError::InvalidInput);
         }
+        let head = claim::parse_commit_head(head)?;
+        let mut digest = Sha256::new();
+        update_digest_field(&mut digest, EXACT_HEAD_RECEIPT_SCHEMA.as_bytes());
+        update_digest_field(&mut digest, &head);
+        update_digest_field(&mut digest, artifact_sha256.as_bytes());
+        update_digest_field(&mut digest, status.wire_name().as_bytes());
+        let receipt_sha256 = hex_encode(&digest.finalize());
         Ok(Self {
-            head: claim::parse_commit_head(head)?,
-            receipt_sha256: receipt_sha256.to_owned(),
+            head,
+            artifact_sha256: artifact_sha256.to_owned(),
+            receipt_sha256,
             status,
         })
     }
@@ -88,7 +112,13 @@ impl ScientificRecoveryExactHeadReceiptV1 {
         self.head
     }
 
-    /// Canonical SHA-256 identity of the immutable CI/test receipt artifact.
+    /// Canonical SHA-256 identity of the underlying immutable CI/test artifact.
+    #[must_use]
+    pub fn artifact_sha256(&self) -> &str {
+        &self.artifact_sha256
+    }
+
+    /// Domain-separated SHA-256 identity of this exact head/artifact/status binding.
     #[must_use]
     pub fn receipt_sha256(&self) -> &str {
         &self.receipt_sha256
@@ -345,7 +375,7 @@ impl ScientificRecoveryPromotionV1 {
         &self.profile_sha256
     }
 
-    /// Exact SHA-256 of the immutable exact-head test receipt used for promotion.
+    /// Exact SHA-256 of the head/artifact/status receipt binding used for promotion.
     #[must_use]
     pub fn exact_head_receipt_sha256(&self) -> &str {
         &self.exact_head_receipt_sha256
@@ -360,8 +390,8 @@ impl ScientificRecoveryPromotionV1 {
 /// uncertainty multiplier, dependency provenance, and explicit failure policy.
 ///
 /// `exact_head_receipt` binds exact-head test evidence to the tested Git commit and
-/// an immutable receipt identity. Only a passing receipt for `candidate_head` is
-/// converted into internal [`ClaimEvidenceKind::ExactHeadTests`] evidence. A
+/// a domain-separated receipt identity. Only a passing receipt for `candidate_head`
+/// is converted into internal [`ClaimEvidenceKind::ExactHeadTests`] evidence. A
 /// passing [`ClaimEvidenceKind::ScientificRecovery`] item is appended only after
 /// the numerical/profile gate succeeds, and final authority is minted through the
 /// canonical ADR 0014 claim gate.
