@@ -8,7 +8,8 @@ use validation_core::{
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
 const OTHER_HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const RECEIPT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
+const RECEIPT_ARTIFACT: &str =
+    "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
@@ -41,7 +42,7 @@ fn receipt(
     head: &str,
     status: ScientificRecoveryExactHeadReceiptStatusV1,
 ) -> ScientificRecoveryExactHeadReceiptV1 {
-    ScientificRecoveryExactHeadReceiptV1::new(head, RECEIPT, status)
+    ScientificRecoveryExactHeadReceiptV1::new(head, RECEIPT_ARTIFACT, status)
         .expect("valid exact-head receipt")
 }
 
@@ -66,7 +67,12 @@ fn passing_exact_head_receipt_composes_with_computed_recovery_and_is_retained() 
         ClaimAuthority::ScientificallySupported
     );
     assert_eq!(promotion.profile_sha256(), profile.sha256());
-    assert_eq!(promotion.exact_head_receipt_sha256(), RECEIPT);
+    assert_eq!(exact_head.artifact_sha256(), RECEIPT_ARTIFACT);
+    assert_eq!(
+        promotion.exact_head_receipt_sha256(),
+        exact_head.receipt_sha256()
+    );
+    assert_ne!(promotion.exact_head_receipt_sha256(), RECEIPT_ARTIFACT);
 }
 
 #[test]
