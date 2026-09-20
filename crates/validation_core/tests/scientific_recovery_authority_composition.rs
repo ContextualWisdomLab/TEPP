@@ -2,10 +2,11 @@
 
 use validation_core::{
     ClaimAuthority, ScientificRecoveryExactHeadReceiptStatusV1,
-    ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
-    ScientificRecoverySeedManifestV1, ValidationError, promote_scientific_recovery,
-    scientific_recovery_replication_payload_sha256,
+    ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryExecutionLedgerEntryV1,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileChronologyV1,
+    ScientificRecoveryProfileRegistrationStatusV1, ScientificRecoveryProfileV1,
+    ScientificRecoveryReplicationReceiptV1, ScientificRecoverySeedManifestV1, ValidationError,
+    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -15,6 +16,9 @@ const RECEIPT_ARTIFACT: &str =
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
+const LEDGER: &str = "6666666666666666666666666666666666666666666666666666666666666666";
+const REGISTRATION_ENTRY: &str =
+    "7777777777777777777777777777777777777777777777777777777777777777";
 
 fn seed_state(index: usize) -> String {
     format!("{:064x}", index + 1)
@@ -85,12 +89,41 @@ fn replication_receipts(
         .collect()
 }
 
+fn chronology(
+    profile: &ScientificRecoveryProfileV1,
+    receipts: &[ScientificRecoveryReplicationReceiptV1],
+) -> ScientificRecoveryProfileChronologyV1 {
+    let entries: Vec<_> = receipts
+        .iter()
+        .enumerate()
+        .map(|(index, receipt)| {
+            let entry_sha = format!("{:064x}", index + 4096);
+            ScientificRecoveryExecutionLedgerEntryV1::new(
+                receipt.execution_artifact_sha256(),
+                &entry_sha,
+                101 + index as u64,
+            )
+            .expect("valid execution ledger entry")
+        })
+        .collect();
+    ScientificRecoveryProfileChronologyV1::new(
+        profile,
+        LEDGER,
+        REGISTRATION_ENTRY,
+        100,
+        ScientificRecoveryProfileRegistrationStatusV1::Approved,
+        &entries,
+    )
+    .expect("approved chronology")
+}
+
 #[test]
 fn passing_exact_head_receipt_composes_with_computed_recovery_and_is_retained() {
     let profile = exact_profile();
     let (truth, recovered) = exact_rows();
     let exact_head = receipt(HEAD, ScientificRecoveryExactHeadReceiptStatusV1::Passed);
     let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    let chronology = chronology(&profile, &replication_receipts);
 
     let promotion = promote_scientific_recovery(
         HEAD,
@@ -100,6 +133,7 @@ fn passing_exact_head_receipt_composes_with_computed_recovery_and_is_retained() 
         &profile,
         &exact_head,
         &replication_receipts,
+        &chronology,
     )
     .expect("exact-head receipt plus computed recovery");
 
@@ -114,6 +148,7 @@ fn passing_exact_head_receipt_composes_with_computed_recovery_and_is_retained() 
         exact_head.receipt_sha256()
     );
     assert_ne!(promotion.exact_head_receipt_sha256(), RECEIPT_ARTIFACT);
+    assert_eq!(promotion.profile_chronology_sha256(), chronology.sha256());
 }
 
 #[test]
@@ -125,6 +160,7 @@ fn predecessor_exact_head_receipt_cannot_be_relabelled_as_candidate_evidence() {
         ScientificRecoveryExactHeadReceiptStatusV1::Passed,
     );
     let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    let chronology = chronology(&profile, &replication_receipts);
 
     assert_eq!(
         promote_scientific_recovery(
@@ -135,6 +171,7 @@ fn predecessor_exact_head_receipt_cannot_be_relabelled_as_candidate_evidence() {
             &profile,
             &predecessor,
             &replication_receipts,
+            &chronology,
         ),
         Err(ValidationError::ClaimPredecessorHead)
     );
@@ -145,6 +182,7 @@ fn nonpassing_exact_head_receipt_states_stay_fail_closed() {
     let profile = exact_profile();
     let (truth, recovered) = exact_rows();
     let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    let chronology = chronology(&profile, &replication_receipts);
 
     for (status, expected) in [
         (
@@ -170,6 +208,7 @@ fn nonpassing_exact_head_receipt_states_stay_fail_closed() {
                 &profile,
                 &exact_head,
                 &replication_receipts,
+                &chronology,
             ),
             Err(expected)
         );
