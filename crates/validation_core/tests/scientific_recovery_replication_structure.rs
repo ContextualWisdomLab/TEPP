@@ -35,3 +35,35 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
         "64 perfectly correlated state coordinates inside each of two runs must still count as only two independent Monte Carlo replications"
     );
 }
+
+#[test]
+fn replication_structure_must_be_complete_before_promotion() {
+    let truth_rows = [[0.0], [0.0]];
+    let recovered_rows = [[0.0], [0.0]];
+    let truth = as_slices(&truth_rows);
+    let recovered = as_slices(&recovered_rows);
+
+    assert_eq!(
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered[..1], 0.01, 3.0),
+        Err(ValidationError::InvalidInput),
+        "outer replication counts must match"
+    );
+
+    let invalid_truth_rows = [[0.0, 0.0], [0.0, 0.0]];
+    let invalid_recovered_rows = [[0.0, 0.0], [0.0, 0.0]];
+    let invalid_truth = as_slices(&invalid_truth_rows);
+    let mut invalid_recovered = as_slices(&invalid_recovered_rows);
+    invalid_recovered[1] = &invalid_recovered_rows[1][..1];
+    assert_eq!(
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &invalid_truth,
+            &invalid_recovered,
+            0.01,
+            3.0,
+        ),
+        Err(ValidationError::InvalidInput),
+        "each replication must contain a valid truth/recovery pair"
+    );
+}
