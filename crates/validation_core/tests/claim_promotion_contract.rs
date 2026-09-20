@@ -2,6 +2,7 @@
 
 use validation_core::{
     ClaimAuthority, ClaimEvidence, ClaimEvidenceKind, PromotionRequest,
+    ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
     ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
     parse_commit_head, promote_claim, promote_scientific_recovery, rmse_standard_error,
     root_mean_square_error,
@@ -9,6 +10,7 @@ use validation_core::{
 
 const PROTECTED_HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
 const OTHER_HEAD: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const RECEIPT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
@@ -64,6 +66,15 @@ fn recovery_profile(
         ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
     )
     .expect("valid recovery profile")
+}
+
+fn exact_head_receipt() -> ScientificRecoveryExactHeadReceiptV1 {
+    ScientificRecoveryExactHeadReceiptV1::new(
+        PROTECTED_HEAD,
+        RECEIPT,
+        ScientificRecoveryExactHeadReceiptStatusV1::Passed,
+    )
+    .expect("valid exact-head receipt")
 }
 
 #[test]
@@ -228,7 +239,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
     let rmse = root_mean_square_error(&truth_flat, &recovered_flat).expect("rmse");
     let rmse_se = rmse_standard_error(&truth_flat, &recovered_flat).expect("se");
     let max_rmse = rmse + 3.0 * rmse_se + 0.001;
-    let exact_head = implemented_main_evidence();
+    let exact_head = exact_head_receipt();
 
     let truth_rows = [[0.70], [0.55], [0.40], [-0.20], [0.85]];
     let recovered_rows = [[0.72], [0.53], [0.41], [-0.18], [0.84]];
@@ -249,6 +260,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
         ClaimAuthority::ScientificallySupported
     );
     assert_eq!(promoted.profile_sha256(), profile.sha256());
+    assert_eq!(promoted.exact_head_receipt_sha256(), RECEIPT);
     assert!(rmse.is_finite());
     assert!(rmse_se.is_finite() && rmse_se > 0.0);
 
