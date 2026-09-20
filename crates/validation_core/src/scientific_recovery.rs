@@ -34,6 +34,73 @@ impl ScientificRecoveryFailurePolicyV1 {
     }
 }
 
+/// Terminal state of one exact-head test receipt offered for scientific promotion.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ScientificRecoveryExactHeadReceiptStatusV1 {
+    /// The exact-head test receipt is terminal and passing.
+    Passed,
+    /// The exact-head test receipt is terminal and failing.
+    Failed,
+    /// The exact-head test run has not reached a terminal result.
+    Queued,
+    /// A required exact-head test was skipped or ignored.
+    Skipped,
+}
+
+/// Immutable identity for the exact-head test evidence used by scientific recovery.
+///
+/// The receipt SHA-256 is an opaque artifact identity supplied by a trusted
+/// repository/CI adapter. This value object does not infer test truth from the
+/// digest contents; it binds the adapter's terminal state and immutable receipt
+/// identity to the exact Git commit that was tested.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScientificRecoveryExactHeadReceiptV1 {
+    head: [u8; 20],
+    receipt_sha256: String,
+    status: ScientificRecoveryExactHeadReceiptStatusV1,
+}
+
+impl ScientificRecoveryExactHeadReceiptV1 {
+    /// Construct one exact-head test receipt identity.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] when `head` is not an exact Git
+    /// commit SHA or `receipt_sha256` is not canonical lowercase SHA-256 hex.
+    pub fn new(
+        head: &str,
+        receipt_sha256: &str,
+        status: ScientificRecoveryExactHeadReceiptStatusV1,
+    ) -> Result<Self, ValidationError> {
+        if !is_canonical_sha256(receipt_sha256) {
+            return Err(ValidationError::InvalidInput);
+        }
+        Ok(Self {
+            head: claim::parse_commit_head(head)?,
+            receipt_sha256: receipt_sha256.to_owned(),
+            status,
+        })
+    }
+
+    /// Exact Git commit tested by this receipt.
+    #[must_use]
+    pub const fn head(&self) -> [u8; 20] {
+        self.head
+    }
+
+    /// Canonical SHA-256 identity of the immutable CI/test receipt artifact.
+    #[must_use]
+    pub fn receipt_sha256(&self) -> &str {
+        &self.receipt_sha256
+    }
+
+    /// Terminal receipt state supplied by the trusted adapter.
+    #[must_use]
+    pub const fn status(&self) -> ScientificRecoveryExactHeadReceiptStatusV1 {
+        self.status
+    }
+}
+
 /// Versioned scientific recovery design and acceptance policy.
 ///
 /// The value object binds the simulation denominator and practical acceptance
@@ -257,11 +324,12 @@ impl<'de> Deserialize<'de> for ScientificRecoveryProfileV1 {
     }
 }
 
-/// Scientific authority bound to one exact recovery-profile identity.
+/// Scientific authority bound to one exact recovery-profile and test-receipt identity.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScientificRecoveryPromotionV1 {
     claim: PromotedClaim,
     profile_sha256: String,
+    exact_head_receipt_sha256: String,
 }
 
 impl ScientificRecoveryPromotionV1 {
@@ -276,6 +344,12 @@ impl ScientificRecoveryPromotionV1 {
     pub fn profile_sha256(&self) -> &str {
         &self.profile_sha256
     }
+
+    /// Exact SHA-256 of the immutable exact-head test receipt used for promotion.
+    #[must_use]
+    pub fn exact_head_receipt_sha256(&self) -> &str {
+        &self.exact_head_receipt_sha256
+    }
 }
 
 /// Promote a scientific claim from grouped recovery replications under one profile.
@@ -285,25 +359,26 @@ impl ScientificRecoveryPromotionV1 {
 /// uncertainty is evaluated. The profile owns the denominator, practical target,
 /// uncertainty multiplier, dependency provenance, and explicit failure policy.
 ///
-/// `claim_evidence` supplies repository/adapter evidence other than the recovery
-/// computation itself. A passing [`ClaimEvidenceKind::ScientificRecovery`] item is
-/// appended only after the numerical/profile gate succeeds, and final authority is
-/// minted through the canonical ADR 0014 claim gate. The recovery path therefore
-/// cannot invent [`ClaimEvidenceKind::ExactHeadTests`] on its own.
+/// `exact_head_receipt` binds exact-head test evidence to the tested Git commit and
+/// an immutable receipt identity. Only a passing receipt for `candidate_head` is
+/// converted into internal [`ClaimEvidenceKind::ExactHeadTests`] evidence. A
+/// passing [`ClaimEvidenceKind::ScientificRecovery`] item is appended only after
+/// the numerical/profile gate succeeds, and final authority is minted through the
+/// canonical ADR 0014 claim gate.
 ///
 /// # Errors
 ///
 /// Returns [`ValidationError::InvalidInput`] when the presented outer denominator
 /// differs from the profile or an inner truth/recovery pair is invalid. Recovery
-/// rejection, head mismatch, missing/failing exact-head tests, queued/predecessor/
-/// skipped/LLM evidence, and other canonical claim-gate errors fail closed.
+/// rejection, head mismatch, predecessor/failed/queued/skipped exact-head receipt,
+/// and other canonical claim-gate errors fail closed.
 pub fn promote_scientific_recovery(
     candidate_head: &str,
     protected_head: &str,
     truth_replications: &[&[f64]],
     recovered_replications: &[&[f64]],
     profile: &ScientificRecoveryProfileV1,
-    claim_evidence: &[ClaimEvidence],
+    exact_head_receipt: &ScientificRecoveryExactHeadReceiptV1,
 ) -> Result<ScientificRecoveryPromotionV1, ValidationError> {
     let planned_replications = profile.planned_replications();
     if truth_replications.len() != planned_replications
@@ -328,7 +403,7 @@ pub fn promote_scientific_recovery(
     // This private numerical gate proves the recovery criterion only. Its
     // historical return value is deliberately not exposed as final authority;
     // ADR 0014 authority below is recomposed through `promote_claim` with the
-    // caller's exact-head evidence plus the computed recovery item.
+    // exact-head receipt plus the computed recovery item.
     claim::promote_scientific_recovery(
         candidate_head,
         protected_head,
@@ -338,12 +413,27 @@ pub fn promote_scientific_recovery(
         profile.se_multiplier(),
     )?;
 
-    let mut evidence = Vec::with_capacity(claim_evidence.len() + 1);
-    evidence.extend_from_slice(claim_evidence);
-    evidence.push(ClaimEvidence::new(
-        ClaimEvidenceKind::ScientificRecovery,
-        true,
-    ));
+    let candidate = claim::parse_commit_head(candidate_head)?;
+    if exact_head_receipt.head() != candidate {
+        return Err(ValidationError::ClaimPredecessorHead);
+    }
+    match exact_head_receipt.status() {
+        ScientificRecoveryExactHeadReceiptStatusV1::Passed => {}
+        ScientificRecoveryExactHeadReceiptStatusV1::Failed => {
+            return Err(ValidationError::ClaimEvidenceFailed);
+        }
+        ScientificRecoveryExactHeadReceiptStatusV1::Queued => {
+            return Err(ValidationError::ClaimQueuedEvidence);
+        }
+        ScientificRecoveryExactHeadReceiptStatusV1::Skipped => {
+            return Err(ValidationError::ClaimSkippedRequired);
+        }
+    }
+
+    let evidence = [
+        ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true),
+        ClaimEvidence::new(ClaimEvidenceKind::ScientificRecovery, true),
+    ];
     let request = PromotionRequest::new(
         ClaimAuthority::ScientificallySupported,
         candidate_head,
@@ -355,6 +445,7 @@ pub fn promote_scientific_recovery(
     Ok(ScientificRecoveryPromotionV1 {
         claim,
         profile_sha256: profile.sha256(),
+        exact_head_receipt_sha256: exact_head_receipt.receipt_sha256().to_owned(),
     })
 }
 
