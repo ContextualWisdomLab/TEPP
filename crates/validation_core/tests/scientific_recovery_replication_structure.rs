@@ -1,12 +1,13 @@
 //! Scientific recovery uncertainty is counted over independent simulation replications, not state rows.
 
 use validation_core::{
-    ClaimEvidence, ClaimEvidenceKind, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
-    rmse_standard_error, root_mean_square_error,
+    ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
+    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
+const RECEIPT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
@@ -30,8 +31,13 @@ fn profile(planned_replications: usize, max_rmse: f64) -> ScientificRecoveryProf
     .expect("valid profile")
 }
 
-fn exact_head_evidence() -> [ClaimEvidence; 1] {
-    [ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true)]
+fn exact_head_receipt() -> ScientificRecoveryExactHeadReceiptV1 {
+    ScientificRecoveryExactHeadReceiptV1::new(
+        HEAD,
+        RECEIPT,
+        ScientificRecoveryExactHeadReceiptStatusV1::Passed,
+    )
+    .expect("valid exact-head receipt")
 }
 
 #[test]
@@ -61,7 +67,7 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
             &truth,
             &recovered,
             &profile,
-            &exact_head_evidence(),
+            &exact_head_receipt(),
         ),
         Err(ValidationError::ClaimRecoveryRejected),
         "64 perfectly correlated state coordinates inside each of two runs must still count as only two independent Monte Carlo replications"
@@ -83,7 +89,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             &truth,
             &recovered[..1],
             &profile,
-            &exact_head_evidence(),
+            &exact_head_receipt(),
         ),
         Err(ValidationError::InvalidInput),
         "outer replication counts must match the declared design denominator"
@@ -101,7 +107,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             &invalid_truth,
             &invalid_recovered,
             &profile,
-            &exact_head_evidence(),
+            &exact_head_receipt(),
         ),
         Err(ValidationError::InvalidInput),
         "each replication must contain a valid truth/recovery pair"
@@ -123,7 +129,7 @@ fn planned_replication_denominator_prevents_survivor_only_promotion() {
             &truth,
             &recovered,
             &profile,
-            &exact_head_evidence(),
+            &exact_head_receipt(),
         ),
         Err(ValidationError::InvalidInput),
         "two successful survivors must not satisfy a profile that planned three independent replications"
