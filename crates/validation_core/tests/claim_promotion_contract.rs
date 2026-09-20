@@ -215,6 +215,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
         PROTECTED_HEAD,
         &truth,
         &recovered,
+        5,
         max_rmse,
         3.0,
     )
@@ -230,6 +231,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
         PROTECTED_HEAD,
         &truth,
         &truth,
+        5,
         0.001,
         3.0,
     )
@@ -243,6 +245,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
             PROTECTED_HEAD,
             &truth,
             &biased,
+            5,
             0.10,
             3.0,
         ),
@@ -254,6 +257,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
             PROTECTED_HEAD,
             &truth,
             &recovered,
+            5,
             max_rmse,
             3.0,
         ),
@@ -261,7 +265,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
     );
     let empty: [&[f64]; 0] = [];
     assert_eq!(
-        promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &empty, &empty, 0.10, 3.0),
+        promote_scientific_recovery(PROTECTED_HEAD, PROTECTED_HEAD, &empty, &empty, 2, 0.10, 3.0),
         Err(ValidationError::InvalidInput)
     );
     assert_eq!(
@@ -270,6 +274,7 @@ fn scientific_recovery_requires_explicit_accuracy_target_plus_uncertainty() {
             PROTECTED_HEAD,
             &truth,
             &recovered,
+            5,
             0.0,
             3.0,
         ),
