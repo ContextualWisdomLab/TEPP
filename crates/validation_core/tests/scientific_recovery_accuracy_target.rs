@@ -26,7 +26,7 @@ fn practical_rmse_inside_target_is_not_rejected_for_being_precisely_nonzero() {
     ];
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
-    promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 0.05, 3.0)
+    promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 8, 0.05, 3.0)
         .expect("a precisely estimated RMSE inside the explicit practical target must promote");
 }
 
@@ -48,7 +48,7 @@ fn monte_carlo_uncertainty_remains_binding_near_practical_rmse_target() {
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 0.05, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 8, 0.05, 3.0),
         Err(ValidationError::ClaimRecoveryRejected)
     );
 }
@@ -59,11 +59,11 @@ fn invalid_practical_targets_and_multipliers_fail_closed() {
     let truth = as_slices(&truth_rows);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &truth, 0.0, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &truth, 2, 0.0, 3.0),
         Err(ValidationError::InvalidConfiguration)
     );
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &truth, 0.1, -1.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &truth, 2, 0.1, -1.0),
         Err(ValidationError::InvalidConfiguration)
     );
 }
