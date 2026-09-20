@@ -67,3 +67,27 @@ fn replication_structure_must_be_complete_before_promotion() {
         "each replication must contain a valid truth/recovery pair"
     );
 }
+
+#[test]
+fn planned_replication_denominator_prevents_survivor_only_promotion() {
+    let truth_rows = [[0.0], [0.0]];
+    let recovered_rows = [[0.0], [0.0]];
+    let truth = as_slices(&truth_rows);
+    let recovered = as_slices(&recovered_rows);
+
+    assert_eq!(
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 3, 0.01, 3.0),
+        Err(ValidationError::InvalidInput),
+        "two successful survivors must not satisfy a profile that planned three independent replications"
+    );
+
+    let one_truth_rows = [[0.0]];
+    let one_recovered_rows = [[0.0]];
+    let one_truth = as_slices(&one_truth_rows);
+    let one_recovered = as_slices(&one_recovered_rows);
+    assert_eq!(
+        promote_scientific_recovery(HEAD, HEAD, &one_truth, &one_recovered, 1, 0.01, 3.0),
+        Err(ValidationError::InvalidConfiguration),
+        "one exact-recovery repetition cannot define Monte Carlo scientific support"
+    );
+}
