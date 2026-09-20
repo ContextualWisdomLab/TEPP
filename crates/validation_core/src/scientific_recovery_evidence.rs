@@ -54,9 +54,7 @@ impl ScientificRecoveryPromotionV1 {
 ///
 /// # Errors
 ///
-/// Propagates every fail-closed error from the canonical scientific recovery gate and
-/// returns [`ValidationError::InvalidInput`] if a payload cardinality cannot be encoded
-/// in the versioned evidence identity.
+/// Propagates every fail-closed error from the canonical scientific recovery gate.
 pub fn promote_scientific_recovery(
     candidate_head: &str,
     protected_head: &str,
@@ -74,7 +72,7 @@ pub fn promote_scientific_recovery(
         exact_head_receipt,
     )?;
     let recovery_evidence_sha256 =
-        recovery_evidence_sha256(profile, truth_replications, recovered_replications)?;
+        recovery_evidence_sha256(profile, truth_replications, recovered_replications);
 
     Ok(ScientificRecoveryPromotionV1 {
         inner,
@@ -86,32 +84,32 @@ fn recovery_evidence_sha256(
     profile: &scientific_recovery::ScientificRecoveryProfileV1,
     truth_replications: &[&[f64]],
     recovered_replications: &[&[f64]],
-) -> Result<String, ValidationError> {
+) -> String {
     let mut digest = Sha256::new();
-    update_digest_field(&mut digest, RECOVERY_EVIDENCE_SCHEMA.as_bytes())?;
+    update_digest_field(&mut digest, RECOVERY_EVIDENCE_SCHEMA.as_bytes());
     let profile_sha256 = profile.sha256();
-    update_digest_field(&mut digest, profile_sha256.as_bytes())?;
-    update_digest_u64(&mut digest, truth_replications.len())?;
+    update_digest_field(&mut digest, profile_sha256.as_bytes());
+    update_digest_usize(&mut digest, truth_replications.len());
 
     for (index, (truth, recovered)) in truth_replications
         .iter()
         .zip(recovered_replications.iter())
         .enumerate()
     {
-        update_digest_u64(&mut digest, index)?;
-        update_digest_field(&mut digest, b"truth")?;
-        update_digest_u64(&mut digest, truth.len())?;
+        update_digest_usize(&mut digest, index);
+        update_digest_field(&mut digest, b"truth");
+        update_digest_usize(&mut digest, truth.len());
         for value in *truth {
-            update_digest_field(&mut digest, &canonical_f64_bits(*value).to_le_bytes())?;
+            update_digest_field(&mut digest, &canonical_f64_bits(*value).to_le_bytes());
         }
-        update_digest_field(&mut digest, b"recovered")?;
-        update_digest_u64(&mut digest, recovered.len())?;
+        update_digest_field(&mut digest, b"recovered");
+        update_digest_usize(&mut digest, recovered.len());
         for value in *recovered {
-            update_digest_field(&mut digest, &canonical_f64_bits(*value).to_le_bytes())?;
+            update_digest_field(&mut digest, &canonical_f64_bits(*value).to_le_bytes());
         }
     }
 
-    Ok(hex_encode(&digest.finalize()))
+    hex_encode(&digest.finalize())
 }
 
 fn canonical_f64_bits(value: f64) -> u64 {
@@ -122,16 +120,13 @@ fn canonical_f64_bits(value: f64) -> u64 {
     }
 }
 
-fn update_digest_u64(digest: &mut Sha256, value: usize) -> Result<(), ValidationError> {
-    let value = u64::try_from(value).map_err(|_| ValidationError::InvalidInput)?;
-    update_digest_field(digest, &value.to_le_bytes())
+fn update_digest_usize(digest: &mut Sha256, value: usize) {
+    update_digest_field(digest, &value.to_le_bytes());
 }
 
-fn update_digest_field(digest: &mut Sha256, field: &[u8]) -> Result<(), ValidationError> {
-    let len = u64::try_from(field.len()).map_err(|_| ValidationError::InvalidInput)?;
-    digest.update(len.to_le_bytes());
+fn update_digest_field(digest: &mut Sha256, field: &[u8]) {
+    digest.update(field.len().to_le_bytes());
     digest.update(field);
-    Ok(())
 }
 
 fn hex_encode(bytes: &[u8]) -> String {
