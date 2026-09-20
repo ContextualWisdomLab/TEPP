@@ -35,7 +35,7 @@ fn scaled_projection_must_not_erase_positive_uncertainty_above_the_target() {
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, f64::MAX, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 2, f64::MAX, 3.0),
         Err(ValidationError::ClaimRecoveryRejected),
         "scientific authority must not be minted when positive RMSE uncertainty exceeds the remaining practical margin"
     );
@@ -56,7 +56,7 @@ fn practical_target_boundary_is_not_promoted_as_scientific_support() {
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 0.05, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 2, 0.05, 3.0),
         Err(ValidationError::ClaimRecoveryRejected),
         "promotion requires the conservative RMSE bound to remain strictly inside the caller-owned target"
     );
