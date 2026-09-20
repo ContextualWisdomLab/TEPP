@@ -8,56 +8,299 @@
 
 use crate::claim;
 use crate::{PromotedClaim, ValidationError, root_mean_square_error};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
-/// Promote a scientific claim from grouped recovery replications.
+const PROFILE_SCHEMA: &str = "tepp.scientific_recovery_profile.v1";
+
+/// Failure policy bound into a scientific recovery profile.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScientificRecoveryFailurePolicyV1 {
+    /// Every planned independent replication must have a valid recovery result.
+    RequireAllPlannedRecovered,
+}
+
+impl ScientificRecoveryFailurePolicyV1 {
+    /// Stable wire name used by the profile digest contract.
+    #[must_use]
+    pub const fn wire_name(self) -> &'static str {
+        match self {
+            Self::RequireAllPlannedRecovered => "require_all_planned_recovered",
+        }
+    }
+}
+
+/// Versioned scientific recovery design and acceptance policy.
 ///
-/// `planned_replications` is the validation-profile-owned simulation denominator.
-/// It must be at least two and must equal both outer slice lengths before any
-/// numerical aggregation occurs. A failed, missing, or silently dropped recovery
-/// repetition therefore blocks scientific promotion instead of letting survivor
-/// rows redefine `n_sim`. A future profile that tolerates estimator failures must
-/// represent attempted/recovered/failed outcomes explicitly and predeclare that
-/// failure policy; this boundary does not infer or silently discard failures.
+/// The value object binds the simulation denominator and practical acceptance
+/// settings to immutable digests for the DGP/configuration, seed stream, estimand,
+/// and within-replication state composition. Its SHA-256 is derived from canonical
+/// represented fields; callers cannot provide a detached profile digest.
 ///
-/// `truth_replications[i]` and `recovered_replications[i]` describe the same
-/// estimand state for one independent simulation repetition. Each pair is reduced
-/// to one replication-level RMSE first. The internal claim gate then computes the
-/// overall RMSE and its delta-method Monte Carlo standard error across those
-/// replication-level squared errors. Replications therefore receive equal Monte
-/// Carlo weight regardless of how many correlated state coordinates they contain.
+/// This object proves content identity only. Publication chronology remains an
+/// integration responsibility: a buyer path must separately prove that this exact
+/// profile digest was persisted/approved before the simulation execution began.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScientificRecoveryProfileV1 {
+    planned_replications: usize,
+    max_rmse: f64,
+    se_multiplier: f64,
+    dgp_sha256: String,
+    seed_manifest_sha256: String,
+    estimand_sha256: String,
+    state_composition_sha256: String,
+    failure_policy: ScientificRecoveryFailurePolicyV1,
+}
+
+impl ScientificRecoveryProfileV1 {
+    /// Construct a validated recovery profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidConfiguration`] when the planned
+    /// replication count, practical RMSE target, or uncertainty multiplier is
+    /// invalid. Returns [`ValidationError::InvalidInput`] when any dependency
+    /// digest is not canonical lowercase SHA-256 hexadecimal.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        planned_replications: usize,
+        max_rmse: f64,
+        se_multiplier: f64,
+        dgp_sha256: &str,
+        seed_manifest_sha256: &str,
+        estimand_sha256: &str,
+        state_composition_sha256: &str,
+        failure_policy: ScientificRecoveryFailurePolicyV1,
+    ) -> Result<Self, ValidationError> {
+        if planned_replications < 2
+            || !max_rmse.is_finite()
+            || max_rmse <= 0.0
+            || !se_multiplier.is_finite()
+            || se_multiplier < 0.0
+        {
+            return Err(ValidationError::InvalidConfiguration);
+        }
+        for digest in [
+            dgp_sha256,
+            seed_manifest_sha256,
+            estimand_sha256,
+            state_composition_sha256,
+        ] {
+            if !is_canonical_sha256(digest) {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+        Ok(Self {
+            planned_replications,
+            max_rmse,
+            se_multiplier,
+            dgp_sha256: dgp_sha256.to_owned(),
+            seed_manifest_sha256: seed_manifest_sha256.to_owned(),
+            estimand_sha256: estimand_sha256.to_owned(),
+            state_composition_sha256: state_composition_sha256.to_owned(),
+            failure_policy,
+        })
+    }
+
+    /// Planned independent simulation denominator.
+    #[must_use]
+    pub const fn planned_replications(&self) -> usize {
+        self.planned_replications
+    }
+
+    /// Claim-specific practical RMSE target.
+    #[must_use]
+    pub const fn max_rmse(&self) -> f64 {
+        self.max_rmse
+    }
+
+    /// Monte Carlo uncertainty multiplier.
+    #[must_use]
+    pub const fn se_multiplier(&self) -> f64 {
+        self.se_multiplier
+    }
+
+    /// Immutable DGP/configuration digest.
+    #[must_use]
+    pub fn dgp_sha256(&self) -> &str {
+        &self.dgp_sha256
+    }
+
+    /// Immutable seed-stream or seed-manifest digest.
+    #[must_use]
+    pub fn seed_manifest_sha256(&self) -> &str {
+        &self.seed_manifest_sha256
+    }
+
+    /// Immutable estimand-contract digest.
+    #[must_use]
+    pub fn estimand_sha256(&self) -> &str {
+        &self.estimand_sha256
+    }
+
+    /// Immutable within-replication state-composition digest.
+    #[must_use]
+    pub fn state_composition_sha256(&self) -> &str {
+        &self.state_composition_sha256
+    }
+
+    /// Explicit estimator-failure policy.
+    #[must_use]
+    pub const fn failure_policy(&self) -> ScientificRecoveryFailurePolicyV1 {
+        self.failure_policy
+    }
+
+    /// Deterministic domain-separated profile identity.
+    #[must_use]
+    pub fn sha256(&self) -> String {
+        let mut digest = Sha256::new();
+        update_digest_field(&mut digest, PROFILE_SCHEMA.as_bytes());
+        update_digest_field(&mut digest, &self.planned_replications.to_le_bytes());
+        update_digest_field(&mut digest, &self.max_rmse.to_bits().to_le_bytes());
+        update_digest_field(&mut digest, &self.se_multiplier.to_bits().to_le_bytes());
+        update_digest_field(&mut digest, self.dgp_sha256.as_bytes());
+        update_digest_field(&mut digest, self.seed_manifest_sha256.as_bytes());
+        update_digest_field(&mut digest, self.estimand_sha256.as_bytes());
+        update_digest_field(&mut digest, self.state_composition_sha256.as_bytes());
+        update_digest_field(&mut digest, self.failure_policy.wire_name().as_bytes());
+        hex_encode(&digest.finalize())
+    }
+
+    /// Serialize the validated profile to versioned JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] when serialization fails.
+    pub fn to_json(&self) -> Result<String, ValidationError> {
+        serde_json::to_string(self).map_err(|_| ValidationError::InvalidInput)
+    }
+
+    /// Parse and validate one versioned recovery profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] for malformed, unsupported, or
+    /// non-canonical profile JSON, and propagates invalid profile configuration.
+    pub fn from_json(value: &str) -> Result<Self, ValidationError> {
+        serde_json::from_str(value).map_err(|_| ValidationError::InvalidInput)
+    }
+}
+
+impl Serialize for ScientificRecoveryProfileV1 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        let mut state = serializer.serialize_struct("ScientificRecoveryProfileV1", 9)?;
+        state.serialize_field("schema", PROFILE_SCHEMA)?;
+        state.serialize_field("planned_replications", &self.planned_replications)?;
+        state.serialize_field("max_rmse", &self.max_rmse)?;
+        state.serialize_field("se_multiplier", &self.se_multiplier)?;
+        state.serialize_field("dgp_sha256", &self.dgp_sha256)?;
+        state.serialize_field("seed_manifest_sha256", &self.seed_manifest_sha256)?;
+        state.serialize_field("estimand_sha256", &self.estimand_sha256)?;
+        state.serialize_field(
+            "state_composition_sha256",
+            &self.state_composition_sha256,
+        )?;
+        state.serialize_field("failure_policy", &self.failure_policy)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for ScientificRecoveryProfileV1 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Raw {
+            schema: String,
+            planned_replications: usize,
+            max_rmse: f64,
+            se_multiplier: f64,
+            dgp_sha256: String,
+            seed_manifest_sha256: String,
+            estimand_sha256: String,
+            state_composition_sha256: String,
+            failure_policy: ScientificRecoveryFailurePolicyV1,
+        }
+
+        let raw = Raw::deserialize(deserializer)?;
+        if raw.schema != PROFILE_SCHEMA {
+            return Err(serde::de::Error::custom(
+                "unsupported scientific recovery profile schema",
+            ));
+        }
+        Self::new(
+            raw.planned_replications,
+            raw.max_rmse,
+            raw.se_multiplier,
+            &raw.dgp_sha256,
+            &raw.seed_manifest_sha256,
+            &raw.estimand_sha256,
+            &raw.state_composition_sha256,
+            raw.failure_policy,
+        )
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+/// Scientific authority bound to one exact recovery-profile identity.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ScientificRecoveryPromotionV1 {
+    claim: PromotedClaim,
+    profile_sha256: String,
+}
+
+impl ScientificRecoveryPromotionV1 {
+    /// Promoted scientific claim.
+    #[must_use]
+    pub const fn claim(&self) -> PromotedClaim {
+        self.claim
+    }
+
+    /// Exact SHA-256 of the versioned recovery profile used for promotion.
+    #[must_use]
+    pub fn profile_sha256(&self) -> &str {
+        &self.profile_sha256
+    }
+}
+
+/// Promote a scientific claim from grouped recovery replications under one profile.
 ///
-/// The caller-owned validation profile remains responsible for deciding which
-/// coordinates belong inside one replication, whether the outer replications are
-/// scientifically independent, and how many replications the design requires.
-/// This boundary deliberately does not infer an effective sample size from row,
-/// cluster, membership, or time counts.
+/// The outer elements are independent simulation repetitions. Coordinates within
+/// each repetition are reduced to one replication-level RMSE before Monte Carlo
+/// uncertainty is evaluated. The profile owns the denominator, practical target,
+/// uncertainty multiplier, dependency provenance, and explicit failure policy.
 ///
 /// # Errors
 ///
-/// Returns [`ValidationError::InvalidConfiguration`] when fewer than two planned
-/// independent replications are declared. Returns [`ValidationError::InvalidInput`]
-/// when the presented outer denominator differs from the planned count, the truth
-/// and recovery replication counts differ, or an inner truth/recovery pair is
-/// invalid. The underlying exact-head claim gate also rejects invalid
-/// accuracy/uncertainty configuration, head mismatch, or a conservative RMSE bound
-/// that does not remain strictly inside the practical target.
+/// Returns [`ValidationError::InvalidInput`] when the presented outer denominator
+/// differs from the profile or an inner truth/recovery pair is invalid. The
+/// underlying exact-head claim gate also rejects head mismatch or a conservative
+/// RMSE bound that does not remain strictly inside the practical target.
 pub fn promote_scientific_recovery(
     candidate_head: &str,
     protected_head: &str,
     truth_replications: &[&[f64]],
     recovered_replications: &[&[f64]],
-    planned_replications: usize,
-    max_rmse: f64,
-    se_multiplier: f64,
-) -> Result<PromotedClaim, ValidationError> {
-    if planned_replications < 2 {
-        return Err(ValidationError::InvalidConfiguration);
-    }
+    profile: &ScientificRecoveryProfileV1,
+) -> Result<ScientificRecoveryPromotionV1, ValidationError> {
+    let planned_replications = profile.planned_replications();
     if truth_replications.len() != planned_replications
         || recovered_replications.len() != planned_replications
         || truth_replications.len() != recovered_replications.len()
     {
         return Err(ValidationError::InvalidInput);
+    }
+
+    match profile.failure_policy() {
+        ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered => {}
     }
 
     let replication_rmse: Result<Vec<_>, _> = truth_replications
@@ -68,12 +311,40 @@ pub fn promote_scientific_recovery(
     let replication_rmse = replication_rmse?;
     let zero_truth = vec![0.0; replication_rmse.len()];
 
-    claim::promote_scientific_recovery(
+    let claim = claim::promote_scientific_recovery(
         candidate_head,
         protected_head,
         &zero_truth,
         &replication_rmse,
-        max_rmse,
-        se_multiplier,
-    )
+        profile.max_rmse(),
+        profile.se_multiplier(),
+    )?;
+
+    Ok(ScientificRecoveryPromotionV1 {
+        claim,
+        profile_sha256: profile.sha256(),
+    })
+}
+
+fn is_canonical_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .as_bytes()
+            .iter()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+}
+
+fn update_digest_field(digest: &mut Sha256, field: &[u8]) {
+    digest.update(field.len().to_le_bytes());
+    digest.update(field);
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut encoded = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
+        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+    encoded
 }
