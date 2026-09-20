@@ -22,6 +22,10 @@ const EXEC_0: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
 const EXEC_1: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 const EXEC_0_ALT: &str =
     "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const OTHER_PROFILE: &str =
+    "6666666666666666666666666666666666666666666666666666666666666666";
+const OTHER_MANIFEST: &str =
+    "7777777777777777777777777777777777777777777777777777777777777777";
 
 fn profile() -> ScientificRecoveryProfileV1 {
     ScientificRecoveryProfileV1::new(
@@ -67,6 +71,15 @@ fn replication_receipt(
     .expect("valid replication receipt")
 }
 
+fn exact_rows() -> (Vec<&'static [f64]>, Vec<&'static [f64]>) {
+    static TRUTH: [[f64; 1]; 2] = [[0.0], [1.0]];
+    static RECOVERED: [[f64; 1]; 2] = [[0.0], [1.0]];
+    (
+        TRUTH.iter().map(|row| row.as_slice()).collect(),
+        RECOVERED.iter().map(|row| row.as_slice()).collect(),
+    )
+}
+
 #[test]
 fn promoted_authority_retains_ordered_replication_execution_provenance() {
     let profile = profile();
@@ -79,6 +92,13 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
         replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
     ];
+
+    assert_eq!(receipts[0].replication_index(), 0);
+    assert_eq!(receipts[0].profile_sha256(), profile.sha256());
+    assert_eq!(receipts[0].seed_manifest_sha256(), SEED_MANIFEST);
+    assert_eq!(receipts[0].seed_state_sha256(), SEED_0);
+    assert_eq!(receipts[0].execution_artifact_sha256(), EXEC_0);
+    assert_eq!(receipts[0].receipt_sha256().len(), 64);
 
     let promoted = promote_scientific_recovery(
         HEAD,
@@ -133,13 +153,12 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
 }
 
 #[test]
-fn replication_receipts_fail_closed_on_order_payload_or_seed_reuse() {
+fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_reuse() {
     let profile = profile();
-    let truth_rows = [[0.0], [1.0]];
-    let recovered_rows = truth_rows;
-    let truth: Vec<&[f64]> = truth_rows.iter().map(|row| row.as_slice()).collect();
-    let recovered: Vec<&[f64]> = recovered_rows.iter().map(|row| row.as_slice()).collect();
+    let (truth, recovered) = exact_rows();
     let exact_head = exact_head_receipt();
+    let payload_0 = scientific_recovery_replication_payload_sha256(truth[0], recovered[0])
+        .expect("payload 0");
 
     let mut reversed = vec![
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
@@ -148,13 +167,45 @@ fn replication_receipts_fail_closed_on_order_payload_or_seed_reuse() {
     reversed.swap(0, 1);
     assert_eq!(
         promote_scientific_recovery(
-            HEAD,
-            HEAD,
-            &truth,
-            &recovered,
-            &profile,
-            &exact_head,
-            &reversed,
+            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &reversed,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let wrong_profile = vec![
+        ScientificRecoveryReplicationReceiptV1::new(
+            0,
+            OTHER_PROFILE,
+            profile.seed_manifest_sha256(),
+            SEED_0,
+            EXEC_0,
+            &payload_0,
+        )
+        .expect("canonical but wrong profile identity"),
+        replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
+    ];
+    assert_eq!(
+        promote_scientific_recovery(
+            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_profile,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let wrong_manifest = vec![
+        ScientificRecoveryReplicationReceiptV1::new(
+            0,
+            &profile.sha256(),
+            OTHER_MANIFEST,
+            SEED_0,
+            EXEC_0,
+            &payload_0,
+        )
+        .expect("canonical but wrong manifest identity"),
+        replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
+    ];
+    assert_eq!(
+        promote_scientific_recovery(
+            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_manifest,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -173,13 +224,7 @@ fn replication_receipts_fail_closed_on_order_payload_or_seed_reuse() {
     ];
     assert_eq!(
         promote_scientific_recovery(
-            HEAD,
-            HEAD,
-            &truth,
-            &recovered,
-            &profile,
-            &exact_head,
-            &wrong_payload,
+            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_payload,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -197,6 +242,95 @@ fn replication_receipts_fail_closed_on_order_payload_or_seed_reuse() {
             &profile,
             &exact_head,
             &duplicate_seed_state,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+}
+
+#[test]
+fn replication_receipt_cardinality_checks_cover_each_declared_population() {
+    let profile = profile();
+    let (truth, recovered) = exact_rows();
+    let exact_head = exact_head_receipt();
+    let receipts = vec![
+        replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
+        replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
+    ];
+
+    assert_eq!(
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head,
+            &receipts[..1],
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth[..1],
+            &recovered,
+            &profile,
+            &exact_head,
+            &receipts,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered[..1],
+            &profile,
+            &exact_head,
+            &receipts,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+}
+
+#[test]
+fn replication_payload_and_receipt_inputs_are_canonical_and_finite() {
+    assert_eq!(
+        scientific_recovery_replication_payload_sha256(&[], &[]),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        scientific_recovery_replication_payload_sha256(&[0.0], &[0.0, 1.0]),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        scientific_recovery_replication_payload_sha256(&[0.0], &[f64::INFINITY]),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let valid_payload = scientific_recovery_replication_payload_sha256(&[0.0], &[0.0])
+        .expect("valid payload digest");
+    assert_eq!(
+        ScientificRecoveryReplicationReceiptV1::new(
+            0,
+            "short",
+            SEED_MANIFEST,
+            SEED_0,
+            EXEC_0,
+            &valid_payload,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        ScientificRecoveryReplicationReceiptV1::new(
+            0,
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            SEED_MANIFEST,
+            SEED_0,
+            EXEC_0,
+            &valid_payload,
         ),
         Err(ValidationError::InvalidInput)
     );
