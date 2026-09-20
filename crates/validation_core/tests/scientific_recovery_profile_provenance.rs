@@ -3,7 +3,8 @@
 use validation_core::{
     ClaimAuthority, ScientificRecoveryExactHeadReceiptStatusV1,
     ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
+    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1, ValidationError,
+    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -34,6 +35,33 @@ fn exact_head_receipt() -> ScientificRecoveryExactHeadReceiptV1 {
         ScientificRecoveryExactHeadReceiptStatusV1::Passed,
     )
     .expect("valid exact-head receipt")
+}
+
+fn replication_receipts(
+    profile: &ScientificRecoveryProfileV1,
+    truth: &[&[f64]],
+    recovered: &[&[f64]],
+) -> Vec<ScientificRecoveryReplicationReceiptV1> {
+    truth
+        .iter()
+        .zip(recovered)
+        .enumerate()
+        .map(|(index, (truth, recovered))| {
+            let payload = scientific_recovery_replication_payload_sha256(truth, recovered)
+                .expect("valid replication payload");
+            let seed_state = format!("{:064x}", index + 1);
+            let execution_artifact = format!("{:064x}", index + 1024);
+            ScientificRecoveryReplicationReceiptV1::new(
+                index,
+                &profile.sha256(),
+                profile.seed_manifest_sha256(),
+                &seed_state,
+                &execution_artifact,
+                &payload,
+            )
+            .expect("valid replication receipt")
+        })
+        .collect()
 }
 
 #[test]
@@ -157,6 +185,7 @@ fn promoted_scientific_authority_retains_profile_and_exact_head_receipt_identity
     let truth: Vec<&[f64]> = truth_rows.iter().map(|row| row.as_slice()).collect();
     let recovered: Vec<&[f64]> = recovered_rows.iter().map(|row| row.as_slice()).collect();
     let receipt = exact_head_receipt();
+    let replication_receipts = replication_receipts(&profile, &truth, &recovered);
 
     let promotion = promote_scientific_recovery(
         HEAD,
@@ -165,6 +194,7 @@ fn promoted_scientific_authority_retains_profile_and_exact_head_receipt_identity
         &recovered,
         &profile,
         &receipt,
+        &replication_receipts,
     )
     .expect("exact recovery under immutable profile and exact-head receipt");
 
