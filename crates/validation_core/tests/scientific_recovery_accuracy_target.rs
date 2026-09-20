@@ -2,9 +2,11 @@
 
 use validation_core::{
     ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
-    ScientificRecoveryReplicationReceiptV1, ScientificRecoverySeedManifestV1, ValidationError,
-    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
+    ScientificRecoveryExecutionLedgerEntryV1, ScientificRecoveryFailurePolicyV1,
+    ScientificRecoveryProfileChronologyV1, ScientificRecoveryProfileRegistrationStatusV1,
+    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
+    ScientificRecoverySeedManifestV1, ValidationError, promote_scientific_recovery,
+    rmse_standard_error, root_mean_square_error,
     scientific_recovery_replication_payload_sha256,
 };
 
@@ -14,6 +16,9 @@ const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111
 const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
+const LEDGER: &str = "6666666666666666666666666666666666666666666666666666666666666666";
+const REGISTRATION_ENTRY: &str =
+    "7777777777777777777777777777777777777777777777777777777777777777";
 
 fn as_slices<const N: usize, const M: usize>(rows: &[[f64; M]; N]) -> Vec<&[f64]> {
     rows.iter().map(|row| row.as_slice()).collect()
@@ -84,6 +89,34 @@ fn replication_receipts(
         .collect()
 }
 
+fn chronology(
+    profile: &ScientificRecoveryProfileV1,
+    receipts: &[ScientificRecoveryReplicationReceiptV1],
+) -> ScientificRecoveryProfileChronologyV1 {
+    let entries: Vec<_> = receipts
+        .iter()
+        .enumerate()
+        .map(|(index, receipt)| {
+            let entry_sha = format!("{:064x}", index + 4096);
+            ScientificRecoveryExecutionLedgerEntryV1::new(
+                receipt.execution_artifact_sha256(),
+                &entry_sha,
+                101 + index as u64,
+            )
+            .expect("valid execution ledger entry")
+        })
+        .collect();
+    ScientificRecoveryProfileChronologyV1::new(
+        profile,
+        LEDGER,
+        REGISTRATION_ENTRY,
+        100,
+        ScientificRecoveryProfileRegistrationStatusV1::Approved,
+        &entries,
+    )
+    .expect("approved profile registration predates execution entries")
+}
+
 #[test]
 fn practical_rmse_inside_target_is_not_rejected_for_being_precisely_nonzero() {
     let truth_flat = [0.0; 8];
@@ -102,6 +135,7 @@ fn practical_rmse_inside_target_is_not_rejected_for_being_precisely_nonzero() {
     let recovered = as_slices(&recovered_rows);
     let profile = profile(8, 0.05, 3.0);
     let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    let chronology = chronology(&profile, &replication_receipts);
     promote_scientific_recovery(
         HEAD,
         HEAD,
@@ -110,6 +144,7 @@ fn practical_rmse_inside_target_is_not_rejected_for_being_precisely_nonzero() {
         &profile,
         &exact_head_receipt(),
         &replication_receipts,
+        &chronology,
     )
     .expect("a precisely estimated RMSE inside the explicit practical target must promote");
 }
@@ -133,6 +168,7 @@ fn monte_carlo_uncertainty_remains_binding_near_practical_rmse_target() {
     let recovered = as_slices(&recovered_rows);
     let profile = profile(8, 0.05, 3.0);
     let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    let chronology = chronology(&profile, &replication_receipts);
     assert_eq!(
         promote_scientific_recovery(
             HEAD,
@@ -142,6 +178,7 @@ fn monte_carlo_uncertainty_remains_binding_near_practical_rmse_target() {
             &profile,
             &exact_head_receipt(),
             &replication_receipts,
+            &chronology,
         ),
         Err(ValidationError::ClaimRecoveryRejected)
     );
