@@ -2,9 +2,11 @@
 
 use validation_core::{
     ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1,
-    ScientificRecoveryReplicationReceiptV1, ScientificRecoverySeedManifestV1, ValidationError,
-    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
+    ScientificRecoveryExecutionLedgerEntryV1, ScientificRecoveryFailurePolicyV1,
+    ScientificRecoveryProfileChronologyV1, ScientificRecoveryProfileRegistrationStatusV1,
+    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
+    ScientificRecoverySeedManifestV1, ValidationError, promote_scientific_recovery,
+    rmse_standard_error, root_mean_square_error,
     scientific_recovery_replication_payload_sha256,
 };
 
@@ -14,6 +16,9 @@ const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111
 const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
+const LEDGER: &str = "6666666666666666666666666666666666666666666666666666666666666666";
+const REGISTRATION_ENTRY: &str =
+    "7777777777777777777777777777777777777777777777777777777777777777";
 
 fn as_slices<const N: usize, const M: usize>(rows: &[[f64; M]; N]) -> Vec<&[f64]> {
     rows.iter().map(|row| row.as_slice()).collect()
@@ -80,6 +85,30 @@ fn replication_receipts(
         .collect()
 }
 
+fn chronology(profile: &ScientificRecoveryProfileV1) -> ScientificRecoveryProfileChronologyV1 {
+    let entries: Vec<_> = (0..profile.planned_replications())
+        .map(|index| {
+            let execution_artifact = format!("{:064x}", index + 1024);
+            let entry_sha = format!("{:064x}", index + 4096);
+            ScientificRecoveryExecutionLedgerEntryV1::new(
+                &execution_artifact,
+                &entry_sha,
+                101 + index as u64,
+            )
+            .expect("valid execution ledger entry")
+        })
+        .collect();
+    ScientificRecoveryProfileChronologyV1::new(
+        profile,
+        LEDGER,
+        REGISTRATION_ENTRY,
+        100,
+        ScientificRecoveryProfileRegistrationStatusV1::Approved,
+        &entries,
+    )
+    .expect("approved chronology")
+}
+
 #[test]
 fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_replications() {
     let flat_truth = [0.0; 128];
@@ -100,6 +129,7 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
     let recovered = as_slices(&recovered_replications);
     let profile = profile(2, 0.08);
     let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    let chronology = chronology(&profile);
 
     assert_eq!(
         promote_scientific_recovery(
@@ -110,6 +140,7 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
             &profile,
             &exact_head_receipt(),
             &replication_receipts,
+            &chronology,
         ),
         Err(ValidationError::ClaimRecoveryRejected),
         "64 perfectly correlated state coordinates inside each of two runs must still count as only two independent Monte Carlo replications"
@@ -124,6 +155,7 @@ fn replication_structure_must_be_complete_before_promotion() {
     let recovered = as_slices(&recovered_rows);
     let profile = profile(2, 0.01);
     let one_receipt = replication_receipts(&profile, &truth[..1], &recovered[..1]);
+    let chronology = chronology(&profile);
 
     assert_eq!(
         promote_scientific_recovery(
@@ -134,6 +166,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             &profile,
             &exact_head_receipt(),
             &one_receipt,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput),
         "outer replication counts must match the declared design denominator"
@@ -155,6 +188,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             &profile,
             &exact_head_receipt(),
             &replication_receipts,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput),
         "each replication must contain a valid truth/recovery pair"
@@ -169,6 +203,7 @@ fn planned_replication_denominator_prevents_survivor_only_promotion() {
     let recovered = as_slices(&recovered_rows);
     let profile = profile(3, 0.01);
     let replication_receipts = replication_receipts(&profile, &truth, &recovered);
+    let chronology = chronology(&profile);
 
     assert_eq!(
         promote_scientific_recovery(
@@ -179,6 +214,7 @@ fn planned_replication_denominator_prevents_survivor_only_promotion() {
             &profile,
             &exact_head_receipt(),
             &replication_receipts,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput),
         "two successful survivors must not satisfy a profile that planned three independent replications"
