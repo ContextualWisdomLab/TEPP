@@ -50,6 +50,12 @@ pub use claim::PromotionRequest;
 pub use claim::parse_commit_head;
 /// Promote a claim only when exact-head evidence satisfies ADR 0014.
 pub use claim::promote_claim;
+/// Failure policy bound into a versioned scientific recovery profile.
+pub use scientific_recovery::ScientificRecoveryFailurePolicyV1;
+/// Versioned scientific recovery design and acceptance policy.
+pub use scientific_recovery::ScientificRecoveryProfileV1;
+/// Scientific authority bound to one exact recovery-profile identity.
+pub use scientific_recovery::ScientificRecoveryPromotionV1;
 /// Promote a scientific claim from recovery grouped by independent simulation replication.
 pub use scientific_recovery::promote_scientific_recovery;
 /// Empirical interval coverage.
