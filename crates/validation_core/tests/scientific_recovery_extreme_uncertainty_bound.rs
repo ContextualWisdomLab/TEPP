@@ -1,12 +1,13 @@
 //! Extreme binary64 contract for scientific recovery's conservative RMSE bound.
 
 use validation_core::{
-    ClaimEvidence, ClaimEvidenceKind, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
-    rmse_standard_error, root_mean_square_error,
+    ScientificRecoveryExactHeadReceiptStatusV1, ScientificRecoveryExactHeadReceiptV1,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
+    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
+const RECEIPT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
 const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
@@ -30,8 +31,13 @@ fn profile(max_rmse: f64) -> ScientificRecoveryProfileV1 {
     .expect("valid profile")
 }
 
-fn exact_head_evidence() -> [ClaimEvidence; 1] {
-    [ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true)]
+fn exact_head_receipt() -> ScientificRecoveryExactHeadReceiptV1 {
+    ScientificRecoveryExactHeadReceiptV1::new(
+        HEAD,
+        RECEIPT,
+        ScientificRecoveryExactHeadReceiptStatusV1::Passed,
+    )
+    .expect("valid exact-head receipt")
 }
 
 #[test]
@@ -66,7 +72,7 @@ fn scaled_projection_must_not_erase_positive_uncertainty_above_the_target() {
             &truth,
             &recovered,
             &profile,
-            &exact_head_evidence(),
+            &exact_head_receipt(),
         ),
         Err(ValidationError::ClaimRecoveryRejected),
         "scientific authority must not be minted when positive RMSE uncertainty exceeds the remaining practical margin"
@@ -95,7 +101,7 @@ fn practical_target_boundary_is_not_promoted_as_scientific_support() {
             &truth,
             &recovered,
             &profile,
-            &exact_head_evidence(),
+            &exact_head_receipt(),
         ),
         Err(ValidationError::ClaimRecoveryRejected),
         "promotion requires the conservative RMSE bound to remain strictly inside the caller-owned target"
