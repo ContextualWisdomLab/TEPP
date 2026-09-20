@@ -28,6 +28,7 @@ mod monte_carlo;
 mod numeric;
 mod report;
 mod rmse;
+mod scientific_recovery;
 mod temporal_order;
 mod validation_evidence;
 
@@ -49,8 +50,8 @@ pub use claim::PromotionRequest;
 pub use claim::parse_commit_head;
 /// Promote a claim only when exact-head evidence satisfies ADR 0014.
 pub use claim::promote_claim;
-/// Promote a scientific claim from computed RMSE, not a hardcoded threshold.
-pub use claim::promote_scientific_recovery;
+/// Promote a scientific claim from recovery grouped by independent simulation replication.
+pub use scientific_recovery::promote_scientific_recovery;
 /// Empirical interval coverage.
 pub use coverage::interval_coverage;
 /// Wilson bounds for coverage proportions.
