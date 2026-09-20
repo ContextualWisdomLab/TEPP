@@ -96,44 +96,6 @@ pub use interpretation_run_collection_http::parse_interpretation_run_collection_
 pub use interpretation_run_collection_http::parse_interpretation_run_collection_page_limit;
 /// Refuse metric, evidence, and causal-score keys on collection JSON.
 pub use interpretation_run_collection_http::refuse_metrics_on_interpretation_run_collection_payload;
-/// Maximum opaque `interpretation_run_id` length on interpretation-run lookup GET.
-pub use interpretation_run_lookup_http::INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN;
-/// Reserved collection-relative prefix that names the lookup resource.
-pub use interpretation_run_lookup_http::INTERPRETATION_RUN_LOOKUP_PREFIX;
-/// Typed GET exchange for interpretation-run lookup by server-assigned id.
-pub use interpretation_run_lookup_http::InterpretationRunLookupHttpExchange;
-/// Build a credential-free contextual-orchestrator lookup GET exchange.
-pub use interpretation_run_lookup_http::contextual_orchestrator_interpretation_run_lookup_exchange;
-/// Extract the opaque `interpretation_run_id` from a lookup GET path.
-pub use interpretation_run_lookup_http::interpretation_run_lookup_path_id;
-/// Whether a path is the lookup-by-run-id resource.
-pub use interpretation_run_lookup_http::is_interpretation_run_lookup_path;
-/// Extra-segment that names the stored create on lookup stored-request GET.
-pub use interpretation_run_lookup_stored_request_http::INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_SEGMENT;
-/// Typed GET exchange for stored-request lookup by server-assigned id.
-pub use interpretation_run_lookup_stored_request_http::InterpretationRunLookupStoredRequestHttpExchange;
-/// Build a credential-free contextual-orchestrator lookup stored-request GET.
-pub use interpretation_run_lookup_stored_request_http::contextual_orchestrator_interpretation_run_lookup_stored_request_exchange;
-/// Extract the opaque `interpretation_run_id` from a lookup stored-request path.
-pub use interpretation_run_lookup_stored_request_http::interpretation_run_lookup_stored_request_path_id;
-/// Whether a path is the lookup stored-request extra-segment resource.
-pub use interpretation_run_lookup_stored_request_http::is_interpretation_run_lookup_stored_request_path;
-/// Loopback lookup stored-request CLI invocation.
-pub use interpretation_run_lookup_stored_request_cli::InterpretationRunLookupStoredRequestCliInvocation;
-/// Loopback lookup stored-request CLI verb.
-pub use interpretation_run_lookup_stored_request_cli::InterpretationRunLookupStoredRequestCliVerb;
-/// Compose HTTP/1.1 lookup stored-request GET from a CLI invocation.
-pub use interpretation_run_lookup_stored_request_cli::compose_interpretation_run_lookup_stored_request_cli_http;
-/// Dispatch a lookup stored-request CLI invocation against an in-process listener.
-pub use interpretation_run_lookup_stored_request_cli::dispatch_interpretation_run_lookup_stored_request_cli;
-/// Execute a lookup stored-request CLI invocation over loopback TCP.
-pub use interpretation_run_lookup_stored_request_cli::execute_interpretation_run_lookup_stored_request_cli;
-/// Render a typed lookup stored-request exchange onto a loopback HTTP/1.1 request.
-pub use interpretation_run_lookup_stored_request_cli::loopback_http1_from_interpretation_run_lookup_stored_request_exchange;
-/// Read leftover stdin for the lookup stored-request CLI.
-pub use interpretation_run_lookup_stored_request_cli::read_interpretation_run_lookup_stored_request_cli_stdin;
-/// Filter lookup stored-request CLI stdout so the stored create stays hypothetical.
-pub use interpretation_run_lookup_stored_request_cli::render_interpretation_run_lookup_stored_request_cli_stdout;
 /// Loopback lookup CLI invocation.
 pub use interpretation_run_lookup_cli::InterpretationRunLookupCliInvocation;
 /// Loopback lookup CLI verb.
@@ -150,6 +112,46 @@ pub use interpretation_run_lookup_cli::loopback_http1_from_interpretation_run_lo
 pub use interpretation_run_lookup_cli::read_interpretation_run_lookup_cli_stdin;
 /// Filter lookup CLI stdout so the identity stays hypothetical.
 pub use interpretation_run_lookup_cli::render_interpretation_run_lookup_cli_stdout;
+/// Maximum opaque `interpretation_run_id` length on interpretation-run lookup GET.
+pub use interpretation_run_lookup_http::INTERPRETATION_RUN_LOOKUP_ID_MAX_LEN;
+/// Reserved collection-relative prefix that names the lookup resource.
+pub use interpretation_run_lookup_http::INTERPRETATION_RUN_LOOKUP_PREFIX;
+/// Typed GET exchange for interpretation-run lookup by server-assigned id.
+pub use interpretation_run_lookup_http::InterpretationRunLookupHttpExchange;
+/// Build a credential-free contextual-orchestrator lookup GET exchange.
+pub use interpretation_run_lookup_http::contextual_orchestrator_interpretation_run_lookup_exchange;
+/// Extract the opaque `interpretation_run_id` from a lookup GET path.
+pub use interpretation_run_lookup_http::interpretation_run_lookup_path_id;
+/// Whether a path is the lookup-by-run-id resource.
+pub use interpretation_run_lookup_http::is_interpretation_run_lookup_path;
+/// Loopback lookup stored-request CLI invocation.
+pub use interpretation_run_lookup_stored_request_cli::InterpretationRunLookupStoredRequestCliInvocation;
+/// Loopback lookup stored-request CLI verb.
+pub use interpretation_run_lookup_stored_request_cli::InterpretationRunLookupStoredRequestCliVerb;
+/// Compose HTTP/1.1 lookup stored-request GET from a CLI invocation.
+pub use interpretation_run_lookup_stored_request_cli::compose_interpretation_run_lookup_stored_request_cli_http;
+/// Dispatch a lookup stored-request CLI invocation against an in-process listener.
+pub use interpretation_run_lookup_stored_request_cli::dispatch_interpretation_run_lookup_stored_request_cli;
+/// Execute a lookup stored-request CLI invocation over loopback TCP.
+pub use interpretation_run_lookup_stored_request_cli::execute_interpretation_run_lookup_stored_request_cli;
+/// Render a typed lookup stored-request exchange onto a loopback HTTP/1.1 request.
+pub use interpretation_run_lookup_stored_request_cli::loopback_http1_from_interpretation_run_lookup_stored_request_exchange;
+/// Read leftover stdin for the lookup stored-request CLI.
+pub use interpretation_run_lookup_stored_request_cli::read_interpretation_run_lookup_stored_request_cli_stdin;
+/// Filter lookup stored-request CLI stdout so the stored create stays hypothetical.
+pub use interpretation_run_lookup_stored_request_cli::render_interpretation_run_lookup_stored_request_cli_stdout;
+/// Extra-segment that names the stored create on lookup stored-request GET.
+pub use interpretation_run_lookup_stored_request_http::INTERPRETATION_RUN_LOOKUP_STORED_REQUEST_SEGMENT;
+/// Typed GET exchange for stored-request lookup by server-assigned id.
+pub use interpretation_run_lookup_stored_request_http::InterpretationRunLookupStoredRequestHttpExchange;
+/// Run-bound response envelope for stored-request lookup by server-assigned id.
+pub use interpretation_run_lookup_stored_request_http::InterpretationRunLookupStoredRequestPayload;
+/// Build a credential-free contextual-orchestrator lookup stored-request GET.
+pub use interpretation_run_lookup_stored_request_http::contextual_orchestrator_interpretation_run_lookup_stored_request_exchange;
+/// Extract the opaque `interpretation_run_id` from a lookup stored-request path.
+pub use interpretation_run_lookup_stored_request_http::interpretation_run_lookup_stored_request_path_id;
+/// Whether a path is the lookup stored-request extra-segment resource.
+pub use interpretation_run_lookup_stored_request_http::is_interpretation_run_lookup_stored_request_path;
 /// Maximum opaque idempotency-key length on interpretation-run GET-by-id.
 pub use interpretation_run_retrieval_http::INTERPRETATION_RUN_RETRIEVAL_ID_MAX_LEN;
 /// Typed GET exchange for interpretation-run GET-by-id.

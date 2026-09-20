@@ -1,12 +1,12 @@
 //! Contract tests for `tepp-interpretation-run-request get`.
 
 use orchestrator_live::{
-    compose_interpretation_run_cli_http, dispatch_interpretation_run_stored_request_cli,
-    execute_interpretation_run_stored_request_cli, render_interpretation_run_stored_request_cli_stdout,
+    CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE, INTERPRETATION_RUN_CONTRACT_VERSION,
     InterpretationRunCliInvocation, InterpretationRunRequest,
     InterpretationRunStoredRequestCliInvocation, OrchestrationMode, OrchestratorLiveError,
-    OrchestratorLiveResponse, OrchestratorLiveService, CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE,
-    INTERPRETATION_RUN_CONTRACT_VERSION,
+    OrchestratorLiveResponse, OrchestratorLiveService, compose_interpretation_run_cli_http,
+    dispatch_interpretation_run_stored_request_cli, execute_interpretation_run_stored_request_cli,
+    render_interpretation_run_stored_request_cli_stdout,
 };
 
 const ORIGIN: &str = "https://tepp.example.test";
@@ -70,8 +70,9 @@ fn dispatch_retrieves_stored_request_without_scientific_authority() {
             .status_code,
         202
     );
-    let got = dispatch_interpretation_run_stored_request_cli(&mut service, &get_invocation("idem-a"))
-        .expect("get");
+    let got =
+        dispatch_interpretation_run_stored_request_cli(&mut service, &get_invocation("idem-a"))
+            .expect("get");
     assert_eq!(got.status_code, 200, "{}", got.body);
     let stdout =
         render_interpretation_run_stored_request_cli_stdout(&get_invocation("idem-a"), &got)

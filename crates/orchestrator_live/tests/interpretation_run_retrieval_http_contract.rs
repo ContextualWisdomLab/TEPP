@@ -1,9 +1,9 @@
 //! Contract tests for contextual-orchestrator interpretation-run GET-by-id.
 
 use orchestrator_live::{
+    CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE, OrchestratorLiveError,
     contextual_orchestrator_interpretation_run_retrieval_exchange,
-    interpretation_run_retrieval_path_id, OrchestratorLiveError,
-    CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE,
+    interpretation_run_retrieval_path_id,
 };
 
 #[test]
@@ -14,20 +14,26 @@ fn interpretation_run_retrieval_is_metric_free_get_without_credentials() {
     )
     .expect("exchange");
     assert_eq!(exchange.method, "GET");
-    assert!(exchange
-        .target_url
-        .ends_with("/v1/interpretation-runs/orch-live-idem-001"));
+    assert!(
+        exchange
+            .target_url
+            .ends_with("/v1/interpretation-runs/orch-live-idem-001")
+    );
     assert!(exchange.body.is_empty());
-    assert!(exchange
-        .headers
-        .iter()
-        .any(|(name, value)| name == "tepp-consumer"
-            && value == CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE));
-    assert!(!exchange
-        .headers
-        .iter()
-        .any(|(name, _)| name.eq_ignore_ascii_case("authorization")
-            || name.eq_ignore_ascii_case("idempotency-key")));
+    assert!(
+        exchange
+            .headers
+            .iter()
+            .any(|(name, value)| name == "tepp-consumer"
+                && value == CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE)
+    );
+    assert!(
+        !exchange
+            .headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("authorization")
+                || name.eq_ignore_ascii_case("idempotency-key"))
+    );
     assert_eq!(
         interpretation_run_retrieval_path_id("/v1/interpretation-runs/orch-live-idem-001")
             .expect("id"),

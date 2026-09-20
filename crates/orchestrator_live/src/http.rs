@@ -5,7 +5,7 @@ use std::io::{Read, Write};
 
 use crate::error::OrchestratorLiveError;
 use crate::request::{
-    host_implies_table_access, require_nonempty, DEFAULT_INTERPRETATION_BYTE_LIMIT,
+    DEFAULT_INTERPRETATION_BYTE_LIMIT, host_implies_table_access, require_nonempty,
 };
 
 /// Maximum request-line plus header bytes accepted before the body.

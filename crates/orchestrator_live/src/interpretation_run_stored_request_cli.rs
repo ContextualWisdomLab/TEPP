@@ -19,17 +19,17 @@ use std::time::Duration;
 use crate::http::{header_is_credential, map_io_error};
 use crate::interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
 use crate::interpretation_run_stored_request_http::{
+    InterpretationRunStoredRequestHttpExchange,
     contextual_orchestrator_interpretation_run_stored_request_exchange,
     interpretation_run_stored_request_path_id,
     refuse_metrics_on_interpretation_run_stored_request_payload,
-    InterpretationRunStoredRequestHttpExchange,
 };
 use crate::request::{
-    require_nonempty, InterpretationRunRequest, DEFAULT_INTERPRETATION_BYTE_LIMIT,
+    DEFAULT_INTERPRETATION_BYTE_LIMIT, InterpretationRunRequest, require_nonempty,
 };
 use crate::{
-    OrchestratorLiveError, OrchestratorLiveResponse, OrchestratorLiveService,
-    LIVE_HEADER_BYTE_LIMIT, LIVE_HEADER_COUNT_LIMIT,
+    LIVE_HEADER_BYTE_LIMIT, LIVE_HEADER_COUNT_LIMIT, OrchestratorLiveError,
+    OrchestratorLiveResponse, OrchestratorLiveService,
 };
 
 const SCIENTIFIC_ACCEPTANCE_SCHEMA: &str = "tepp.scientific_acceptance.v1";
@@ -474,14 +474,14 @@ fn read_bounded(
 #[cfg(test)]
 mod tests {
     use super::{
+        InterpretationRunStoredRequestCliInvocation, InterpretationRunStoredRequestCliVerb,
         compose_interpretation_run_stored_request_cli_http,
         loopback_http1_from_interpretation_run_stored_request_exchange,
-        read_interpretation_run_stored_request_cli_stdin, InterpretationRunStoredRequestCliInvocation,
-        InterpretationRunStoredRequestCliVerb,
+        read_interpretation_run_stored_request_cli_stdin,
     };
     use crate::interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
     use crate::{
-        contextual_orchestrator_interpretation_run_stored_request_exchange, OrchestratorLiveError,
+        OrchestratorLiveError, contextual_orchestrator_interpretation_run_stored_request_exchange,
     };
 
     const ORIGIN: &str = "https://tepp.example.test";
@@ -511,7 +511,8 @@ mod tests {
             InterpretationRunStoredRequestCliVerb::parse("list"),
             Err(OrchestratorLiveError::InvalidWirePayload)
         );
-        let get = InterpretationRunStoredRequestCliInvocation::from_args(get_args(), "").expect("get");
+        let get =
+            InterpretationRunStoredRequestCliInvocation::from_args(get_args(), "").expect("get");
         assert_eq!(get.verb, InterpretationRunStoredRequestCliVerb::Get);
         let http = compose_interpretation_run_stored_request_cli_http(&get).expect("http");
         assert!(http.starts_with("GET /v1/interpretation-runs/idem-a/request HTTP/1.1"));
@@ -629,9 +630,11 @@ mod tests {
             .unwrap_err(),
             OrchestratorLiveError::InvalidWirePayload
         );
-        let leftover =
-            read_interpretation_run_stored_request_cli_stdin(false, std::io::Cursor::new(b"leftover"))
-                .expect("leftover");
+        let leftover = read_interpretation_run_stored_request_cli_stdin(
+            false,
+            std::io::Cursor::new(b"leftover"),
+        )
+        .expect("leftover");
         assert_eq!(leftover, "leftover");
         assert!(
             read_interpretation_run_stored_request_cli_stdin(true, std::io::empty())
@@ -644,8 +647,11 @@ mod tests {
         let mut posted = exchange.clone();
         posted.method = "POST";
         assert_eq!(
-            loopback_http1_from_interpretation_run_stored_request_exchange(&posted, "127.0.0.1:18082")
-                .unwrap_err(),
+            loopback_http1_from_interpretation_run_stored_request_exchange(
+                &posted,
+                "127.0.0.1:18082"
+            )
+            .unwrap_err(),
             OrchestratorLiveError::InvalidWirePayload
         );
     }

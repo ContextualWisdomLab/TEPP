@@ -3,11 +3,10 @@
 use std::io::{Read, Write};
 
 use orchestrator_live::{
-    contextual_orchestrator_interpretation_run_stored_request_exchange,
-    interpretation_run_stored_request_path_id, is_interpretation_run_stored_request_path,
-    InterpretationRunRequest, OrchestrationMode, OrchestratorLiveError, OrchestratorLiveService,
     CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE, INTERPRETATION_RUN_CONTRACT_VERSION,
-    INTERPRETATION_RUN_PATH,
+    INTERPRETATION_RUN_PATH, InterpretationRunRequest, OrchestrationMode, OrchestratorLiveError,
+    OrchestratorLiveService, contextual_orchestrator_interpretation_run_stored_request_exchange,
+    interpretation_run_stored_request_path_id, is_interpretation_run_stored_request_path,
 };
 
 fn sample_request() -> InterpretationRunRequest {
@@ -42,9 +41,11 @@ fn stored_request_exchange_is_metric_free_get_without_credentials() {
     )
     .expect("exchange");
     assert_eq!(exchange.method, "GET");
-    assert!(exchange
-        .target_url
-        .ends_with("/v1/interpretation-runs/orch-live-idem-001/request"));
+    assert!(
+        exchange
+            .target_url
+            .ends_with("/v1/interpretation-runs/orch-live-idem-001/request")
+    );
     assert!(exchange.body.is_empty());
     assert_eq!(
         interpretation_run_stored_request_path_id(
@@ -63,7 +64,9 @@ fn live_get_returns_stored_request_without_scientific_authority() {
     let request = sample_request();
     let mut service = OrchestratorLiveService::new();
     assert_eq!(
-        service.handle_http_request(&post_http(&request)).status_code,
+        service
+            .handle_http_request(&post_http(&request))
+            .status_code,
         202
     );
     let got = service.handle_http_request(
@@ -93,7 +96,9 @@ fn stored_request_serves_over_tcp() {
     let request = sample_request();
     let mut service = OrchestratorLiveService::bind_loopback().expect("bind");
     assert_eq!(
-        service.handle_http_request(&post_http(&request)).status_code,
+        service
+            .handle_http_request(&post_http(&request))
+            .status_code,
         202
     );
     let addr = service.local_addr().expect("addr");

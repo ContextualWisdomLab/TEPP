@@ -321,10 +321,13 @@ impl OrchestratorLiveService {
             return Err(OrchestratorLiveError::InvalidWirePayload);
         }
         refuse_retrieval_get_headers(headers)?;
-        let mut matches = self.accepted_runs.values().filter_map(|(request, accepted)| {
-            (accepted.interpretation_run_id() == interpretation_run_id)
-                .then_some((request, accepted))
-        });
+        let mut matches = self
+            .accepted_runs
+            .values()
+            .filter_map(|(request, accepted)| {
+                (accepted.interpretation_run_id() == interpretation_run_id)
+                    .then_some((request, accepted))
+            });
         let (stored, accepted) = matches
             .next()
             .ok_or(OrchestratorLiveError::InvalidWirePayload)?;

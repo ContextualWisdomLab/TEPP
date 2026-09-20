@@ -7,10 +7,10 @@ use std::thread;
 use std::time::Duration;
 
 use orchestrator_live::{
-    InterpretationRunAccepted, InterpretationRunCollection, InterpretationRunRequest,
-    OrchestrationMode, OrchestratorLiveError, OrchestratorLiveService,
     DEFAULT_INTERPRETATION_BYTE_LIMIT, INTERPRETATION_RUN_CONTRACT_VERSION,
-    INTERPRETATION_RUN_PATH, LIVE_HEADER_BYTE_LIMIT, LIVE_HEADER_COUNT_LIMIT,
+    INTERPRETATION_RUN_PATH, InterpretationRunAccepted, InterpretationRunCollection,
+    InterpretationRunRequest, LIVE_HEADER_BYTE_LIMIT, LIVE_HEADER_COUNT_LIMIT, OrchestrationMode,
+    OrchestratorLiveError, OrchestratorLiveService,
 };
 
 fn sample_request() -> InterpretationRunRequest {
@@ -355,10 +355,11 @@ fn handle_http_enumerates_interpretation_runs_on_collection_get() {
     assert_eq!(page.items.len(), 2);
     assert_eq!(page.items[0].idempotency_key, "orch-live-idem-001");
     assert_eq!(page.items[1].idempotency_key, "orch-live-idem-002");
-    assert!(page
-        .items
-        .iter()
-        .all(|item| item.claim_status == "hypothetical"));
+    assert!(
+        page.items
+            .iter()
+            .all(|item| item.claim_status == "hypothetical")
+    );
     assert!(page.items.iter().all(|item| !item.scientific_authority));
     assert!(!listed.body.contains("rmse"));
     assert!(!listed.body.contains("evidence_span_ids"));
@@ -413,9 +414,10 @@ fn handle_http_retrieves_one_interpretation_run_on_get_by_id() {
         "",
     ));
     assert_eq!(got.status_code, 200, "{}", got.body);
-    assert!(got
-        .body
-        .contains("\"idempotency_key\":\"orch-live-idem-001\""));
+    assert!(
+        got.body
+            .contains("\"idempotency_key\":\"orch-live-idem-001\"")
+    );
     assert!(got.body.contains("\"claim_status\":\"hypothetical\""));
     assert!(got.body.contains("\"scientific_authority\":false"));
     assert!(!got.body.contains("rmse"));

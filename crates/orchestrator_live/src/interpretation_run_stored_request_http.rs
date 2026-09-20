@@ -15,7 +15,7 @@ use crate::error::OrchestratorLiveError;
 use crate::interpretation_run_cli::CONTEXTUAL_ORCHESTRATOR_CONSUMER_CODE;
 use crate::interpretation_run_lookup_http::INTERPRETATION_RUN_LOOKUP_PREFIX;
 use crate::interpretation_run_retrieval_http::INTERPRETATION_RUN_RETRIEVAL_ID_MAX_LEN;
-use crate::request::{host_implies_table_access, require_nonempty, INTERPRETATION_RUN_PATH};
+use crate::request::{INTERPRETATION_RUN_PATH, host_implies_table_access, require_nonempty};
 
 const FORBIDDEN_STORED_REQUEST_KEYS: [&str; 12] = [
     "rmse",
@@ -254,13 +254,19 @@ mod tests {
         )
         .expect("exchange");
         assert_eq!(exchange.method, "GET");
-        assert!(exchange
-            .target_url
-            .ends_with("/v1/interpretation-runs/idem-a/request"));
+        assert!(
+            exchange
+                .target_url
+                .ends_with("/v1/interpretation-runs/idem-a/request")
+        );
         assert!(exchange.body.is_empty());
-        assert!(!exchange.headers.iter().any(|(name, _)| name
-            .eq_ignore_ascii_case("authorization")
-            || name.eq_ignore_ascii_case("idempotency-key")));
+        assert!(
+            !exchange
+                .headers
+                .iter()
+                .any(|(name, _)| name.eq_ignore_ascii_case("authorization")
+                    || name.eq_ignore_ascii_case("idempotency-key"))
+        );
         assert!(is_interpretation_run_stored_request_path(
             "/v1/interpretation-runs/idem-a/request"
         ));
