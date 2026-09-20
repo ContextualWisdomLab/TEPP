@@ -3,8 +3,9 @@
 use validation_core::{
     ClaimAuthority, ScientificRecoveryExactHeadReceiptStatusV1,
     ScientificRecoveryExactHeadReceiptV1, ScientificRecoveryFailurePolicyV1,
-    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1, ValidationError,
-    promote_scientific_recovery, scientific_recovery_replication_payload_sha256,
+    ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
+    ScientificRecoverySeedManifestV1, ValidationError, promote_scientific_recovery,
+    scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -27,13 +28,18 @@ const OTHER_PROFILE: &str =
 const OTHER_MANIFEST: &str =
     "7777777777777777777777777777777777777777777777777777777777777777";
 
+fn seed_manifest() -> ScientificRecoverySeedManifestV1 {
+    ScientificRecoverySeedManifestV1::new(&[SEED_0, SEED_1]).expect("valid seed manifest")
+}
+
 fn profile() -> ScientificRecoveryProfileV1 {
+    let manifest = seed_manifest();
     ScientificRecoveryProfileV1::new(
         2,
         0.08,
         3.0,
         DGP,
-        SEED_MANIFEST,
+        manifest.sha256(),
         ESTIMAND,
         STATE,
         ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
@@ -95,7 +101,10 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
 
     assert_eq!(receipts[0].replication_index(), 0);
     assert_eq!(receipts[0].profile_sha256(), profile.sha256());
-    assert_eq!(receipts[0].seed_manifest_sha256(), SEED_MANIFEST);
+    assert_eq!(
+        receipts[0].seed_manifest_sha256(),
+        profile.seed_manifest_sha256()
+    );
     assert_eq!(receipts[0].seed_state_sha256(), SEED_0);
     assert_eq!(receipts[0].execution_artifact_sha256(), EXEC_0);
     assert_eq!(receipts[0].receipt_sha256().len(), 64);
