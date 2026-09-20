@@ -91,7 +91,6 @@ fn promotion_requires_exact_ordered_seed_manifest_membership() {
         &recovered,
         &profile,
         &exact_head,
-        &manifest,
         &receipts,
     )
     .expect("each receipt seed is the exact manifest entry at its repetition index");
@@ -119,7 +118,6 @@ fn promotion_requires_exact_ordered_seed_manifest_membership() {
             &recovered,
             &profile,
             &exact_head,
-            &manifest,
             &substituted,
         ),
         Err(ValidationError::InvalidInput)
@@ -130,6 +128,7 @@ fn promotion_requires_exact_ordered_seed_manifest_membership() {
 fn manifest_identity_is_ordered_unique_and_canonical() {
     let manifest = seed_manifest();
     assert_eq!(manifest.len(), 2);
+    assert!(!manifest.is_empty());
     assert_eq!(manifest.seed_state_sha256(0), Some(SEED_0));
     assert_eq!(manifest.seed_state_sha256(1), Some(SEED_1));
     assert_eq!(manifest.seed_state_sha256(2), None);
@@ -145,6 +144,10 @@ fn manifest_identity_is_ordered_unique_and_canonical() {
     );
     assert_eq!(
         ScientificRecoverySeedManifestV1::new(&["short", SEED_1]),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        ScientificRecoverySeedManifestV1::new(&[SEED_0]),
         Err(ValidationError::InvalidInput)
     );
 }
