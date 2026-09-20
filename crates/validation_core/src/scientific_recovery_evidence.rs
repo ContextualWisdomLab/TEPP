@@ -525,6 +525,8 @@ pub fn promote_scientific_recovery(
         recovered_replications,
         replication_receipts,
     )?;
+    let profile_chronology_sha256 =
+        validate_profile_chronology(profile, replication_receipts, profile_chronology)?;
 
     let inner = scientific_recovery::promote_scientific_recovery(
         candidate_head,
@@ -534,8 +536,6 @@ pub fn promote_scientific_recovery(
         profile,
         exact_head_receipt,
     )?;
-    let profile_chronology_sha256 =
-        validate_profile_chronology(profile, replication_receipts, profile_chronology)?;
     let recovery_evidence_sha256 =
         recovery_evidence_sha256(profile, truth_replications, recovered_replications);
 
@@ -602,9 +602,8 @@ fn validate_profile_chronology(
     replication_receipts: &[ScientificRecoveryReplicationReceiptV1],
     chronology: &ScientificRecoveryProfileChronologyV1,
 ) -> Result<String, ValidationError> {
-    if chronology.profile_sha256() != profile.sha256()
-        || chronology.execution_entries().len() != replication_receipts.len()
-    {
+    let profile_sha256 = profile.sha256();
+    if chronology.profile_sha256() != profile_sha256.as_str() {
         return Err(ValidationError::InvalidInput);
     }
 
