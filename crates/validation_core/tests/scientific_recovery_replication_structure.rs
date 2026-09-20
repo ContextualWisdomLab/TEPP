@@ -1,13 +1,32 @@
 //! Scientific recovery uncertainty is counted over independent simulation replications, not state rows.
 
 use validation_core::{
-    ValidationError, promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
+    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
+    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
+const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+const SEEDS: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
+const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
 
 fn as_slices<const N: usize, const M: usize>(rows: &[[f64; M]; N]) -> Vec<&[f64]> {
     rows.iter().map(|row| row.as_slice()).collect()
+}
+
+fn profile(planned_replications: usize, max_rmse: f64) -> ScientificRecoveryProfileV1 {
+    ScientificRecoveryProfileV1::new(
+        planned_replications,
+        max_rmse,
+        3.0,
+        DGP,
+        SEEDS,
+        ESTIMAND,
+        STATE,
+        ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
+    )
+    .expect("valid profile")
 }
 
 #[test]
@@ -28,9 +47,10 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
     let recovered_replications = [[0.0; 64], [0.08; 64]];
     let truth = as_slices(&truth_replications);
     let recovered = as_slices(&recovered_replications);
+    let profile = profile(2, 0.08);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 2, 0.08, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile),
         Err(ValidationError::ClaimRecoveryRejected),
         "64 perfectly correlated state coordinates inside each of two runs must still count as only two independent Monte Carlo replications"
     );
@@ -42,9 +62,10 @@ fn replication_structure_must_be_complete_before_promotion() {
     let recovered_rows = [[0.0], [0.0]];
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
+    let profile = profile(2, 0.01);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered[..1], 2, 0.01, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered[..1], &profile),
         Err(ValidationError::InvalidInput),
         "outer replication counts must match the declared design denominator"
     );
@@ -60,9 +81,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             HEAD,
             &invalid_truth,
             &invalid_recovered,
-            2,
-            0.01,
-            3.0,
+            &profile,
         ),
         Err(ValidationError::InvalidInput),
         "each replication must contain a valid truth/recovery pair"
@@ -75,19 +94,25 @@ fn planned_replication_denominator_prevents_survivor_only_promotion() {
     let recovered_rows = [[0.0], [0.0]];
     let truth = as_slices(&truth_rows);
     let recovered = as_slices(&recovered_rows);
+    let profile = profile(3, 0.01);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 3, 0.01, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile),
         Err(ValidationError::InvalidInput),
         "two successful survivors must not satisfy a profile that planned three independent replications"
     );
 
-    let one_truth_rows = [[0.0]];
-    let one_recovered_rows = [[0.0]];
-    let one_truth = as_slices(&one_truth_rows);
-    let one_recovered = as_slices(&one_recovered_rows);
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &one_truth, &one_recovered, 1, 0.01, 3.0),
+        ScientificRecoveryProfileV1::new(
+            1,
+            0.01,
+            3.0,
+            DGP,
+            SEEDS,
+            ESTIMAND,
+            STATE,
+            ScientificRecoveryFailurePolicyV1::RequireAllPlannedRecovered,
+        ),
         Err(ValidationError::InvalidConfiguration),
         "one exact-recovery repetition cannot define Monte Carlo scientific support"
     );
