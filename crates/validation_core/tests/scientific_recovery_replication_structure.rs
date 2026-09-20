@@ -30,7 +30,7 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
     let recovered = as_slices(&recovered_replications);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 0.08, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, 2, 0.08, 3.0),
         Err(ValidationError::ClaimRecoveryRejected),
         "64 perfectly correlated state coordinates inside each of two runs must still count as only two independent Monte Carlo replications"
     );
@@ -44,9 +44,9 @@ fn replication_structure_must_be_complete_before_promotion() {
     let recovered = as_slices(&recovered_rows);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered[..1], 0.01, 3.0),
+        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered[..1], 2, 0.01, 3.0),
         Err(ValidationError::InvalidInput),
-        "outer replication counts must match"
+        "outer replication counts must match the declared design denominator"
     );
 
     let invalid_truth_rows = [[0.0, 0.0], [0.0, 0.0]];
@@ -60,6 +60,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             HEAD,
             &invalid_truth,
             &invalid_recovered,
+            2,
             0.01,
             3.0,
         ),
