@@ -1,8 +1,9 @@
 //! Scientific recovery uncertainty is counted over independent simulation replications, not state rows.
 
 use validation_core::{
-    ScientificRecoveryFailurePolicyV1, ScientificRecoveryProfileV1, ValidationError,
-    promote_scientific_recovery, rmse_standard_error, root_mean_square_error,
+    ClaimEvidence, ClaimEvidenceKind, ScientificRecoveryFailurePolicyV1,
+    ScientificRecoveryProfileV1, ValidationError, promote_scientific_recovery,
+    rmse_standard_error, root_mean_square_error,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -29,6 +30,10 @@ fn profile(planned_replications: usize, max_rmse: f64) -> ScientificRecoveryProf
     .expect("valid profile")
 }
 
+fn exact_head_evidence() -> [ClaimEvidence; 1] {
+    [ClaimEvidence::new(ClaimEvidenceKind::ExactHeadTests, true)]
+}
+
 #[test]
 fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_replications() {
     let flat_truth = [0.0; 128];
@@ -50,7 +55,14 @@ fn repeated_correlated_states_do_not_masquerade_as_independent_monte_carlo_repli
     let profile = profile(2, 0.08);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile),
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head_evidence(),
+        ),
         Err(ValidationError::ClaimRecoveryRejected),
         "64 perfectly correlated state coordinates inside each of two runs must still count as only two independent Monte Carlo replications"
     );
@@ -65,7 +77,14 @@ fn replication_structure_must_be_complete_before_promotion() {
     let profile = profile(2, 0.01);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered[..1], &profile),
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered[..1],
+            &profile,
+            &exact_head_evidence(),
+        ),
         Err(ValidationError::InvalidInput),
         "outer replication counts must match the declared design denominator"
     );
@@ -82,6 +101,7 @@ fn replication_structure_must_be_complete_before_promotion() {
             &invalid_truth,
             &invalid_recovered,
             &profile,
+            &exact_head_evidence(),
         ),
         Err(ValidationError::InvalidInput),
         "each replication must contain a valid truth/recovery pair"
@@ -97,7 +117,14 @@ fn planned_replication_denominator_prevents_survivor_only_promotion() {
     let profile = profile(3, 0.01);
 
     assert_eq!(
-        promote_scientific_recovery(HEAD, HEAD, &truth, &recovered, &profile),
+        promote_scientific_recovery(
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head_evidence(),
+        ),
         Err(ValidationError::InvalidInput),
         "two successful survivors must not satisfy a profile that planned three independent replications"
     );
