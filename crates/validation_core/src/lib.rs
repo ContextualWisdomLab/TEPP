@@ -59,8 +59,14 @@ pub use scientific_recovery::ScientificRecoveryExactHeadReceiptStatusV1;
 pub use scientific_recovery::ScientificRecoveryFailurePolicyV1;
 /// Versioned scientific recovery design and acceptance policy.
 pub use scientific_recovery::ScientificRecoveryProfileV1;
-/// Scientific authority bound to profile, exact-head receipt, payload, and execution identities.
+/// Owner-ledger execution entry used by scientific-recovery chronology evidence.
+pub use scientific_recovery_evidence::ScientificRecoveryExecutionLedgerEntryV1;
+/// Scientific authority bound to profile, chronology, exact-head receipt, payload, and execution identities.
 pub use scientific_recovery_evidence::ScientificRecoveryPromotionV1;
+/// Owner-ledger chronology proving represented profile approval precedes execution entries.
+pub use scientific_recovery_evidence::ScientificRecoveryProfileChronologyV1;
+/// Approval state of a recovery-profile registration ledger entry.
+pub use scientific_recovery_evidence::ScientificRecoveryProfileRegistrationStatusV1;
 /// Trusted-adapter provenance receipt for one independent scientific-recovery repetition.
 pub use scientific_recovery_evidence::ScientificRecoveryReplicationReceiptV1;
 /// Canonical ordered manifest of planned scientific-recovery RNG-state identities.
