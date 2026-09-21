@@ -1,0 +1,1 @@
+`analysis_engine::TopicLineageArtifact` now requires the historical `knowledge_cutoff` to use TEPP's canonical UTC RFC 3339 spelling. Equivalent timezone-offset aliases are rejected so one estimator cutoff instant cannot acquire multiple valid immutable artifact byte identities or SHA-256 digests.
