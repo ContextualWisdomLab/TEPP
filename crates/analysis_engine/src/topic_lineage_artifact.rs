@@ -167,8 +167,8 @@ impl TopicLineageArtifact {
         let artifact: Self = serde_json::from_str(payload)
             .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
         artifact.validate()?;
-        let canonical =
-            serde_json::to_string(&artifact).map_err(|_| AnalysisEngineError::SerializationFailure)?;
+        let canonical = serde_json::to_string(&artifact)
+            .map_err(|_| AnalysisEngineError::SerializationFailure)?;
         if canonical != payload {
             return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
         }
