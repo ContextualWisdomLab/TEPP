@@ -235,16 +235,43 @@ impl MembershipObservationSupportWire {
     }
 }
 
+/// Owner-issued local coordinate for one caller observation admitted into a support projection.
+///
+/// The coordinate is parallel to the caller's input slice and intentionally contains no raw member
+/// or group identity. It lets a downstream bounded context bind its own observation/document identity
+/// to the same projection-local member ordinal without reproducing Membership's opaque-ID ordering.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MembershipObservationSupportCoordinate {
+    member_ordinal: u32,
+    event_time: EventTime,
+}
+
+impl MembershipObservationSupportCoordinate {
+    /// Return the Membership-issued projection-local member ordinal.
+    #[must_use]
+    pub const fn member_ordinal(self) -> u32 {
+        self.member_ordinal
+    }
+
+    /// Return the exact event time supplied for this admitted observation.
+    #[must_use]
+    pub const fn event_time(self) -> EventTime {
+        self.event_time
+    }
+}
+
 /// Membership-owned authority joining canonical design classification and reconstructable support wire.
 ///
 /// Unlike [`MembershipObservationSupportWire`], this value cannot be created by parsing released
 /// bytes. It is issued only after canonical Membership state is resolved for every requested event
-/// time. Callers may serialize [`Self::wire`] for a released projection and retain
-/// [`Self::classification`] as the corresponding owner authority.
+/// time. Callers may serialize [`Self::wire`] for a released projection and zip
+/// [`Self::input_coordinates`] with their own observation identities without reconstructing raw
+/// Membership ordinal logic.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MembershipObservationSupportProjection {
     classification: MembershipDesignClassification,
     wire: MembershipObservationSupportWire,
+    input_coordinates: Vec<MembershipObservationSupportCoordinate>,
 }
 
 impl MembershipObservationSupportProjection {
@@ -259,6 +286,12 @@ impl MembershipObservationSupportProjection {
     pub const fn wire(&self) -> &MembershipObservationSupportWire {
         &self.wire
     }
+
+    /// Return Membership-issued local coordinates parallel to the admitted caller observation slice.
+    #[must_use]
+    pub fn input_coordinates(&self) -> &[MembershipObservationSupportCoordinate] {
+        &self.input_coordinates
+    }
 }
 
 /// Classify longitudinal Membership support and issue its reconstructable owner projection.
@@ -266,7 +299,9 @@ impl MembershipObservationSupportProjection {
 /// Local member/group ordinals are derived from sorted opaque owner identifiers but the identifiers
 /// themselves are not serialized. Observation and active-assignment ordering are canonicalized, while
 /// duplicate declared observations remain multiplicity-sensitive. The wire binds the exact source
-/// support digest already issued by [`classify_membership_observations_wire`].
+/// support digest already issued by [`classify_membership_observations_wire`]. The authority also
+/// returns a non-wire input-coordinate slice so downstream owners can bind their own observation
+/// identities to Membership-issued local member ordinals without reimplementing that mapping.
 ///
 /// # Errors
 ///
@@ -292,6 +327,19 @@ pub fn project_membership_observations_wire(
                 .map_err(|_| MembershipError::InvalidWirePayload)
         })
         .collect::<Result<BTreeMap<_, _>, _>>()?;
+    let input_coordinates = observations
+        .iter()
+        .map(|observation| {
+            member_ordinals
+                .get(&observation.member_id())
+                .copied()
+                .map(|member_ordinal| MembershipObservationSupportCoordinate {
+                    member_ordinal,
+                    event_time: observation.event_time(),
+                })
+                .ok_or(MembershipError::InvalidWirePayload)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     let mut active_support = Vec::with_capacity(observations.len());
     let mut group_ids = BTreeSet::new();
@@ -360,6 +408,7 @@ pub fn project_membership_observations_wire(
     Ok(MembershipObservationSupportProjection {
         classification,
         wire,
+        input_coordinates,
     })
 }
 
