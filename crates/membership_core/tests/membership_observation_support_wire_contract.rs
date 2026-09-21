@@ -108,6 +108,18 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
         projection.wire().schema_version(),
         MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION
     );
+    assert_eq!(
+        projection.wire().design_version(),
+        projection.classification().version()
+    );
+    assert_eq!(
+        projection.wire().design_name(),
+        projection.classification().name()
+    );
+    assert_eq!(
+        projection.wire().support_digest_version(),
+        projection.classification().support_digest_version()
+    );
     assert_eq!(projection.wire().observations().len(), observations.len());
 
     let expected_support_digest = projection
@@ -146,6 +158,14 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
     assert_eq!(parsed.member_count(), 2);
     assert_eq!(parsed.group_count(), 3);
     assert_eq!(parsed.observations()[1], parsed.observations()[2]);
+
+    let first_observation = &parsed.observations()[0];
+    assert_eq!(first_observation.member_ordinal(), 0);
+    assert_eq!(first_observation.event_time(), "2026-03-01T00:00:00Z");
+    let first_assignment = &first_observation.assignments()[0];
+    assert_eq!(first_assignment.role(), "department");
+    assert!(first_assignment.group_ordinal() < parsed.group_count());
+    assert_eq!(first_assignment.weight_f64_bits(), "3fe0000000000000");
 }
 
 #[test]
