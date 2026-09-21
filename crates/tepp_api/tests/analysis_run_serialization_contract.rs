@@ -36,3 +36,22 @@ fn canonical_request_serialization_still_rejects_malformed_cutoff_syntax() {
 
     assert_eq!(request.to_json(), Err(ApiError::InvalidWirePayload));
 }
+
+#[test]
+fn canonical_request_serialization_rejects_equivalent_noncanonical_cutoff_text() {
+    let canonical = AnalysisRunRequest {
+        knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+        ..future_request()
+    };
+    let mut offset_alias = canonical.clone();
+    offset_alias.knowledge_cutoff = "2026-08-01T09:00:00+09:00".into();
+
+    assert!(canonical.to_json().is_ok());
+    assert_eq!(offset_alias.to_json(), Err(ApiError::InvalidWirePayload));
+    let hostile = serde_json::to_string(&offset_alias).expect("raw hostile wire fixture");
+    assert_eq!(
+        AnalysisRunRequest::from_json(&hostile),
+        Err(ApiError::InvalidWirePayload),
+        "one absolute cutoff instant must not admit multiple request byte identities"
+    );
+}
