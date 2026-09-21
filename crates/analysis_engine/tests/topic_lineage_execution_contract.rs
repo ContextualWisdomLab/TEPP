@@ -19,7 +19,7 @@ use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState
 use topic_measurement::{ReferenceTopicInput, SparseMatrix};
 use uuid::Uuid;
 
-const CONFIG_JSON: &str = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[7,11],\"maximum_iterations\":2000,\"tolerance\":0.00001,\"prior_variance\":1.0,\"relation_strength\":0.5,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
+const CONFIG_JSON: &str = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[7,11],\"maximum_iterations\":2000,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.5,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
 
 fn event_time(day: u8) -> EventTime {
     EventTime::parse_rfc3339(&format!("2026-07-{day:02}T00:00:00Z")).expect("event time")
@@ -178,7 +178,7 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
         AnalysisRunAccepted::new("run-topic-lineage", "accepted", &request.idempotency_key)
             .expect("accepted");
     let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
-    let nonconvergent_config = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[1],\"maximum_iterations\":2,\"tolerance\":0.000000000001,\"prior_variance\":1.0,\"relation_strength\":0.25,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
+    let nonconvergent_config = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[1],\"maximum_iterations\":2,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.25,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
 
     assert_eq!(
         execute_topic_lineage_run(
