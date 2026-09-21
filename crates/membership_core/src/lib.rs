@@ -45,9 +45,13 @@ pub use ess::group_normalized_kish_ess;
 pub use ess::kish_effective_sample_size;
 /// Membership design implied by active assignments.
 pub use icc::MembershipDesign;
+/// One member/event-time coordinate in longitudinal Membership support.
+pub use icc::MembershipObservation;
 /// Finite outcome used by the nested ICC estimator.
 pub use icc::NestedOutcome;
-/// Classify nested versus cross-classified versus multiple-membership designs.
+/// Classify nested versus cross-classified versus multiple-membership designs at one event time.
 pub use icc::classify_membership_design;
+/// Classify Membership-owned design across observation-specific event times.
+pub use icc::classify_membership_observations;
 /// CPU `f64` nested ICC that refuses non-nested membership designs.
 pub use icc::nested_intraclass_correlation;
