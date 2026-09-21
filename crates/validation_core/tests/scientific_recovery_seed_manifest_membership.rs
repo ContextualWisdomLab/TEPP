@@ -10,21 +10,17 @@ use validation_core::{
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
-const TEST_ARTIFACT: &str =
-    "5555555555555555555555555555555555555555555555555555555555555555";
+const TEST_ARTIFACT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
-const ESTIMAND: &str =
-    "3333333333333333333333333333333333333333333333333333333333333333";
+const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
 const SEED_0: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SEED_1: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const SEED_OUTSIDE: &str =
-    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const SEED_OUTSIDE: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const EXEC_0: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const EXEC_1: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 const LEDGER: &str = "6666666666666666666666666666666666666666666666666666666666666666";
-const REGISTRATION_ENTRY: &str =
-    "7777777777777777777777777777777777777777777777777777777777777777";
+const REGISTRATION_ENTRY: &str = "7777777777777777777777777777777777777777777777777777777777777777";
 
 fn seed_manifest() -> ScientificRecoverySeedManifestV1 {
     ScientificRecoverySeedManifestV1::new(&[SEED_0, SEED_1]).expect("valid ordered seed manifest")
@@ -135,14 +131,7 @@ fn promotion_requires_exact_ordered_seed_manifest_membership() {
 
     let substituted = vec![
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
-        replication_receipt(
-            &profile,
-            1,
-            SEED_OUTSIDE,
-            EXEC_1,
-            truth[1],
-            recovered[1],
-        ),
+        replication_receipt(&profile, 1, SEED_OUTSIDE, EXEC_1, truth[1], recovered[1]),
     ];
     assert_eq!(
         promote_scientific_recovery(
