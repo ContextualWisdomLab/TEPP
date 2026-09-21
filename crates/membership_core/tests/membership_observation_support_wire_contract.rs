@@ -100,7 +100,10 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
     let projection = project_membership_observations_wire(&forward, &observations)
         .expect("owner-issued projection");
     require_owner_projection(&projection);
-    assert_eq!(projection.classification().design(), MembershipDesign::CrossClassifiedMultipleMembership);
+    assert_eq!(
+        projection.classification().design(),
+        MembershipDesign::CrossClassifiedMultipleMembership
+    );
     assert_eq!(
         projection.wire().schema_version(),
         MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION
@@ -122,12 +125,15 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
         second_group.as_uuid().to_string(),
         project_group.as_uuid().to_string(),
     ] {
-        assert!(!canonical.contains(&raw), "projection leaked opaque source UUID {raw}");
+        assert!(
+            !canonical.contains(&raw),
+            "projection leaked opaque source UUID {raw}"
+        );
     }
 
     let parsed = MembershipObservationSupportWire::from_json(&canonical)
         .expect("canonical released projection must parse");
-    assert_eq!(parsed, *projection.wire());
+    assert_eq!(&parsed, projection.wire());
     assert_eq!(parsed.member_count(), 2);
     assert_eq!(parsed.group_count(), 3);
     assert_eq!(parsed.observations()[1], parsed.observations()[2]);
