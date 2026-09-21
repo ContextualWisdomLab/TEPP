@@ -1,7 +1,8 @@
 use membership_core::{
     GroupId, MemberId, MembershipAssignment, MembershipDesign, MembershipDesignClassification,
     MembershipDesignWire, MembershipNetwork, MembershipObservation, MembershipRole,
-    MembershipWeight, MEMBERSHIP_DESIGN_WIRE_VERSION, classify_membership_observations_wire,
+    MembershipWeight, MEMBERSHIP_DESIGN_WIRE_VERSION,
+    MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION, classify_membership_observations_wire,
 };
 use temporal_core::EventTime;
 
@@ -50,6 +51,10 @@ fn canonical_classification_is_distinct_from_a_parsed_wire_coordinate() {
     assert_eq!(classification.observation_count(), 3);
     assert_eq!(classification.earliest_event_time(), early);
     assert_eq!(classification.latest_event_time(), late);
+    assert_eq!(
+        classification.support_digest_version(),
+        MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION
+    );
 
     let reordered = classify_membership_observations_wire(
         &network,
