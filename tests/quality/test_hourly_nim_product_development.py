@@ -36,13 +36,13 @@ def _parser_module() -> ModuleType:
 class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
     """Structural tests for the credential-separated product-development loop."""
 
-    def test_hourly_workflow_schedule_credentials_and_queue_gate(self) -> None:
-        """Run at minute 47 with provider discovery and fail closed around inventory."""
+    def test_commercial_entrypoint_credentials_and_queue_gate(self) -> None:
+        """Expose only the central manual entrypoint and fail closed around inventory."""
 
         text = _text(WORKFLOW)
         bootstrap = _text(BOOTSTRAP)
         for token in (
-            'cron: "47 * * * *"',
+            "# cwl-org-commercial-entrypoint: v1",
             "workflow_dispatch:",
             "dry_run:",
             "hourly-nim-product-development-${{ github.repository }}",
@@ -77,6 +77,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "ContextualWisdomLab/TEPP",
         ):
             self.assertIn(token, text)
+        self.assertNotIn("schedule:", text)
         for token in ("discover_all_models", "register_credential", "PROVIDER_CREDENTIAL_NAMES"):
             self.assertIn(token, bootstrap)
         self.assertNotIn("COPILOT_GITHUB_TOKEN", text)
@@ -263,7 +264,13 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
 
         runbook = _text(RUNBOOK)
         doctoring = _text(DOCTORING)
-        for token in ("OPENAI_API_KEY", "contextual-orchestrator", "proposal", "verification", "publication"):
+        for token in (
+            "OPENAI_API_KEY",
+            "contextual-orchestrator",
+            "proposal",
+            "verification",
+            "publication",
+        ):
             self.assertIn(token, runbook)
         self.assertIn("APA", doctoring)
         self.assertIn("Do not configure `COPILOT_GITHUB_TOKEN`", runbook)
@@ -278,6 +285,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         for pull_request in (93, 94, 97, 101, 102, 104, 108, 109, 111, 112):
             with self.subTest(pull_request=pull_request):
                 self.assertNotIn(f"PR #{pull_request}", runbook)
+
     def test_bootstrap_registers_each_provider_key_and_removes_environment_values(self) -> None:
         """Exercise the real bootstrap loop with a key-counting KV double."""
 
@@ -334,7 +342,11 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             def __init__(self, _store: object) -> None:
                 pass
 
-        sample = type("SampleModel", (), {"model_id": "model_one", "provider_name": "provider_one"})()
+        sample = type(
+            "SampleModel",
+            (),
+            {"model_id": "model_one", "provider_name": "provider_one"},
+        )()
         embedding = type(
             "EmbeddingModel",
             (),
@@ -401,12 +413,17 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         )
         with patch.dict(
             sys.modules,
-            {"contextual_orchestrator": fake_package, "contextual_orchestrator.server": fake_server},
+            {
+                "contextual_orchestrator": fake_package,
+                "contextual_orchestrator.server": fake_server,
+            },
         ):
             with tempfile.TemporaryDirectory() as tmp:
                 report_path = Path(tmp) / "nested" / "discovery.json"
                 bootstrap._write_report(report_path, {"discovered_count": 1})
-                self.assertEqual(report_path.read_text(encoding="utf-8"), '{"discovered_count": 1}\n')
+                self.assertEqual(
+                    report_path.read_text(encoding="utf-8"), '{"discovered_count": 1}\n'
+                )
                 self.assertEqual(report_path.stat().st_mode & 0o777, 0o600)
 
             bootstrap._start_gateway(["agent"], "gateway-token", "127.0.0.1", 18000)
@@ -420,8 +437,14 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
         ) as selected, patch.object(bootstrap, "_write_report") as written, patch.object(
             bootstrap, "_start_gateway"
         ) as started, patch.dict(
-            os.environ, {"CONTEXTUAL_ORCHESTRATOR_INFERENCE_TOKEN": "gateway-token"}, clear=False
-        ), patch.object(sys, "argv", ["run_contextual_orchestrator.py", "--report", "report.json"]):
+            os.environ,
+            {"CONTEXTUAL_ORCHESTRATOR_INFERENCE_TOKEN": "gateway-token"},
+            clear=False,
+        ), patch.object(
+            sys,
+            "argv",
+            ["run_contextual_orchestrator.py", "--report", "report.json"],
+        ):
             bootstrap.main()
             selected.assert_called_once_with()
             written.assert_called_once_with(Path("report.json"), {"discovered_count": 0})
@@ -429,7 +452,11 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
 
         with patch.object(bootstrap, "_register_bootstrap_credentials"), patch.dict(
             os.environ, {}, clear=False
-        ), patch.object(sys, "argv", ["run_contextual_orchestrator.py", "--report", "report.json"]):
+        ), patch.object(
+            sys,
+            "argv",
+            ["run_contextual_orchestrator.py", "--report", "report.json"],
+        ):
             with self.assertRaisesRegex(RuntimeError, "INFERENCE_TOKEN is required"):
                 bootstrap.main()
 

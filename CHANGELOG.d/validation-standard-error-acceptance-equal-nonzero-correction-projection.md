@@ -1,0 +1,3 @@
+### Fixed
+
+- Validation Evidence SE-aware acceptance now resolves finite ties whose error-free subtraction correction and FMA product correction project to the same nonzero binary64 value. The decision compares the represented subtraction correction with the exact dyadic roundoff of represented `k * standard_error`, preventing a strict represented-input rejection or acceptance from being collapsed into rounded equality. The change is boundary-local to equal finite nonzero ties and does not alter ordinary unequal finite decisions, zero-bound exact recovery, or the existing both-overflow comparator.

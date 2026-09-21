@@ -1,0 +1,3 @@
+### Fixed
+
+- Preserved the positive all-covered Wilson lower endpoint for durable `u64` sample counts that are not exactly representable in binary64 when a large but finite standard-normal critical value makes `z² / n > 1`. The canonical count-based producer now uses the complementary-miss form only on the small-`z² / n` side and the algebraically equivalent direct reciprocal form on the large side. On this exact-count all-covered path, represented `z²` is decomposed into its binary significand and power-of-two scale before division by the durable count, so a rounded `1 / n` product cannot shift the exposed endpoint by one ULP. This avoids false exact `1.0`, false exact `0.0`, and the RED case's reciprocal-product rounding error without changing the Wilson estimand.

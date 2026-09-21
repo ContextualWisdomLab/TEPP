@@ -1,0 +1,3 @@
+- Preserve mixed-sign Validation Evidence mean-bias compensation through the original scientific denominator so a correctly retained low term is not rounded into the numerator and lost again before division.
+- Add a public mirrored contract for the represented residual boundary `[2^-53, -2^-52, -(1 + 2^-52)]`, whose exact mean rounds to `±0x1.5555555555557p-2`.
+- Keep same-sign arithmetic, reusable psychometric estimation ownership, and `bias_standard_error` unchanged.

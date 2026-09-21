@@ -1,0 +1,3 @@
+### Validation
+
+- Scientific recovery promotion now consumes a versioned Validation-owned profile instead of request-time denominator/threshold scalars. The profile binds planned independent replications, practical RMSE target, Monte Carlo uncertainty multiplier, immutable DGP/config, seed-manifest, estimand and within-replication state-composition SHA-256 identities, plus the explicit `require_all_planned_recovered` failure policy. Promotion returns the exact derived profile SHA-256 beside the promoted claim, so changing a declared design or target changes the scientific-authority provenance. This content binding does not by itself prove the profile was published before simulation execution; that chronology remains an integration evidence requirement.

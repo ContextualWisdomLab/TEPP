@@ -8,7 +8,8 @@ use crate::input::require_paired_finite;
 /// # Errors
 ///
 /// Returns [`ValidationError::InvalidInput`] when lengths differ, inputs are
-/// empty, or any value is non-finite.
+/// empty, any value is non-finite, or a finite input pair has an absolute
+/// residual outside binary64 range.
 pub fn absolute_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, ValidationError> {
     require_paired_finite(truth, recovered)?;
     let mut residuals = Vec::with_capacity(truth.len());
@@ -23,6 +24,13 @@ pub fn absolute_residuals(truth: &[f64], recovered: &[f64]) -> Result<Vec<f64>, 
 }
 
 /// Count exact matches within absolute tolerance `epsilon`.
+///
+/// The decision metric does not require every absolute residual to be
+/// representable. If subtraction of two finite endpoints overflows, the true
+/// absolute residual is larger than `f64::MAX` and therefore larger than every
+/// admitted finite tolerance, so that pair is deterministically a mismatch.
+/// `absolute_residuals` remains fail-closed when callers request the residual
+/// magnitude itself.
 ///
 /// # Errors
 ///
@@ -39,10 +47,14 @@ pub fn match_count(
     if epsilon < 0.0 {
         return Err(ValidationError::InvalidConfiguration);
     }
-    let residuals = absolute_residuals(truth, recovered)?;
-    Ok(residuals
+    require_paired_finite(truth, recovered)?;
+    Ok(truth
         .iter()
-        .filter(|residual| **residual <= epsilon)
+        .zip(recovered)
+        .filter(|(truth_value, recovered_value)| {
+            let residual = (**truth_value - **recovered_value).abs();
+            residual.is_finite() && residual <= epsilon
+        })
         .count())
 }
 
@@ -80,10 +92,12 @@ mod tests {
             match_count(&truth, &recovered, f64::NAN),
             Err(ValidationError::InvalidInput)
         );
-        // Opposite-sign extremes overflow the residual to infinity.
+        // Opposite-sign extremes have no representable binary64 residual.
         assert_eq!(
             absolute_residuals(&[f64::MAX], &[-f64::MAX]),
             Err(ValidationError::InvalidInput)
         );
+        // The threshold decision is still exact for every finite epsilon.
+        assert_eq!(match_count(&[f64::MAX], &[-f64::MAX], f64::MAX), Ok(0));
     }
 }

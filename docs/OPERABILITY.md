@@ -1,7 +1,7 @@
 # TEPP Operability, Recovery, and Release Guide
 
 **Status:** Accepted target operating baseline with current maturity explicit.  
-**Last reviewed:** 2026-08-13
+**Last reviewed:** 2026-09-11
 
 TEPP is still an implementation-stage research/product platform. Protected main currently contains the Rust workspace/evidence foundation plus implemented-main temporal primitives (merged PRs #8 and #9). Superseded PRs #5 and #6 are historical lineage only. Database adapters are partial; model fitting, GPU, services, visual analytics, and production deployment are later targets. This guide defines the operating evidence those stages must satisfy rather than claiming they already exist. Unmerged or draft PRs are not implemented-main claims.
 
@@ -20,23 +20,7 @@ The Rust domain packages are embedded/library boundaries. They require no produc
 
 ## Planned service SLIs
 
-When corresponding services exist, track:
-
-- source ingest success/rejection and exact error class;
-- evidence/span count and lineage completeness;
-- future-evidence exclusion count at each knowledge cutoff;
-- temporal contradiction/path-consistency and budget exhaustion counts;
-- event/link/tracking confidence and calibration;
-- semantic-unit unknown/abstention rate by language;
-- model convergence/ELBO/objective and posterior diagnostics;
-- true-recovery/validation drift against release benchmark;
-- CPU/GPU parity and fallback count;
-- VRAM/RSS/transfer/kernel time;
-- model/LLM provider failures and evidence-verifier rejection;
-- artifact/export provenance completeness;
-- tenant authorization/audit anomalies.
-
-Do not expose raw PII/source text in ordinary metrics/logs merely to gain observability.
+When corresponding services exist, track source ingest success/rejection and exact error class; evidence/span count and lineage completeness; future-evidence exclusion at each knowledge cutoff; temporal contradiction/path-consistency and budget exhaustion; event/link/tracking confidence and calibration; semantic-unit unknown/abstention by language; model convergence/objective/posterior diagnostics; true-recovery drift; CPU/GPU parity and fallback; VRAM/RSS/transfer/kernel time; model/LLM provider failures and evidence-verifier rejection; artifact/export provenance completeness; and tenant authorization/audit anomalies. Do not expose raw PII/source text in ordinary metrics/logs merely to gain observability.
 
 ## Data snapshot and replay
 
@@ -48,13 +32,52 @@ Before admitting a GPU job, estimate budget and reserve margin. On OOM: classify
 
 ## LLM degradation
 
-LLM-backed semantic/interpreter functions use strict bounded requests and cached/versioned results where appropriate. Provider failure may retry only under bounded policy, route through contextual-orchestrator when configured, or return deferred/unresolved evidence. It must not corrupt deterministic/statistical results or expose credentials/source beyond approved policy.
+LLM-backed semantic/interpreter functions consume only immutable released compatible contextual-orchestrator contracts. Provider failure may retry or route only through that owner contract and its policy, or return deferred/unresolved evidence. It must not corrupt deterministic/statistical results, silently substitute a mutable owner head, or expose credentials/source beyond approved policy. Model-backed Actions use `orchestrator/free` through the approved gateway route; provider/model hard-coding and LLM numerical authority remain prohibited.
 
 ## Database target recovery
 
 Migration `0007` (active PR) contracts policy-driven retention, legal-hold blocked deletion completion, evidence tombstones without raw-source restore, deletion requests bound to the cited policy, and analysis exclusion only for `logical_revocation`/`identity_tombstone`; live PostgreSQL evidence remains pending exact-head CI.
 
 Before PostgreSQL becomes production state, prove migrations and rollback, tenant isolation/RLS, temporal/lineage constraints, idempotency/concurrency, backup/restore, retention/deletion, and reconstruction from immutable artifacts. Concurrent document first-insert and revise stress is implemented-main. `persistence_postgres::mark_restored_state_usable` and `assert_restore_integrity` are the current fail-closed restore gate (active PR): they revalidate tenant identity, canonical digests, same-tenant knowledge-cutoff eligibility, temporal window order, and enabled append-only triggers. They do not yet revalidate relation-aware splits or full lineage graphs; those remain separate post-restore scientific steps. The gate does not replace operator `pg_dump`/`pg_restore` runbooks.
+
+## Numerical proof resource budgets
+
+A numerical proof boundary is an operational resource contract when it changes asymptotic work, allocation, or buyer-path latency. It is not determined by the next sample count that happens to expose a rounding defect.
+
+Issue #491 owns the current bias-standard-error exact-proof budget. Production now attempts the checked O(n) neutral-zero exact proof for every `n >= 3` with exactly represented finite residuals. The O(n²) pairwise reference is retained only through `n <= 16` when the O(n) proof refuses; for `n > 16`, an O(n) proof refusal delegates directly to the established `bias` implementation without quadratic scratch. The work separates represented-input exactness, arithmetic width, exact-rounding width, and measured resource cost rather than treating one integer cutoff as all four.
+
+The old nonnegative minimum-anchor characterization established `Σc_i <= Σc_i² <= P` and showed why raw-scale `D=2^58,n=65` refusal disappears after common dyadic-unit normalization. Odd `D=2^58+1,n=65` remains a narrow-width witness: pair numerator fits in 123 bits while cancellation products require 129 bits. `Wide256` characterization `081000289f5a52e94863026d55696ee2a4daf923` and product-width RED `f74d9ac11cb0acf3eb8fdd9ad79ac3d2e9180993` → repair `e9a7dee29afb97542bfe2965f850c8ab5a34368e` show the characterized cancellation products need no more than two `u128` limbs.
+
+Represented-input reachability `5a19b6334487b43fb630abba7e487d7cf4c49960` reaches the wider numerator route at `n=4096` on `{0,1,2^53}`. Exact-rounding characterization `a8423173188fa53a26a16d3afdafeb76e114cc1d` shows represented `n=2050` needs 136-bit candidate-square and 140-bit adjacent-midpoint comparison operands even though its exact pair numerator is 118 bits. `aab9fe9115cee97225f2aa81e54a55ceafb23336` shows those comparisons can remain bounded as `Wide256` mantissa plus signed dyadic exponent. RED `f7717361ad8c5f0592688c1514c104cc1b4adabe` → repair `e4a85f53a611922be7492fe906d62ce65787c18e` integrates that comparison into the production exact rounder, and `1240ace8eb41a01fa72a4bb99df842fd550a1288` fixes both tie-to-even parity directions.
+
+Historical characterization `7a2ab0a1ef7a72d8cc9b9253d7f92c493e578943` proves represented pair/Wide256 exact-ratio equivalence for one family where the represented minimum is an exact anchor. That is not a universal production policy. Characterization `2bc1d2284d75154e020640adb573c1cfadf005fb` demonstrates `[0,1,2^-54,2]`, where a non-anchor pair subtraction rounds but neutral zero remains exact.
+
+Source RED `fd9f9ff2c5c395e4cc13042232f4deef018adb48` establishes the first public anchor defect with `[0,1,2,-2^53]`: minimum `-2^53` cannot exactly translate `1`, neutral zero preserves every coordinate, exact `P=243388915243820099130562543878155`, denominator `48`, and exact result `0x4320000000000001` while the predecessor translated floating-moment path returns `0x4320000000000000`. Initial repair `81ba770cc4812c8fbeb4b3529f0a73b41abbed0f` searched represented residual anchors.
+
+Follow-up RED `9f403194a2ec1636531c2dfe9229cfb34b73d747` shows that observed anchors alone are operationally incomplete. Residuals `[1,2^-54,2,3]` have no observed universal exact anchor, but neutral dyadic origin `0` preserves every residual exactly. On unit `2^-54`, exact `P=6490371073168534319490338297741315`; exact result `0x3fe4a7e9cb8a3491` differs by one ULP from the predecessor fallback `0x3fe4a7e9cb8a3492`.
+
+Correctness repair `6cf30eeb549c0df0377bda1111cf46396e8282a3` established neutral zero as an admissible exact translation origin, but its production order still paid pairwise O(n²) first and then O(n²) anchor search. Source-level route-order RED `e0b324864e48a503e2aba0d2a487a0b95f5276ed` required a linear neutral-zero proof before quadratic work; repair `2b62bd46eb0c391327d2285c2244a76f5a1e0449` added that two-pass path. A later retention criterion required conditioned observed-anchor search to demonstrate unique bounded admission after neutral-zero refusal. The checked-in corpus supplied no such represented fixture, so RED `d40bfbf98b36562164d15d505f8f8825fd1c1349` → repair `14e7862f4ddccce54f3b93d4dac89adbf047ba77` removed the unsupported O(n²) anchor route. Production order is now `neutral_zero_linear -> pairwise_reference (n <= 16 only) -> generic_fallback`.
+
+The neutral-zero kernel scans residuals once to determine the common dyadic exponent and once more to accumulate positive/negative coefficient mass and `Σc_i²`; it then computes `n*Σc_i²-(Σc_i)²` with exact `Wide256` products/subtraction. This is O(n) time with O(1) proof storage after the already-required residual vector and allocates no pair records. If the bounded neutral-zero proof refuses at `n <= 16`, pairwise O(n²) is the comparison/fail-closed authority before the established generic fallback. Above sixteen, refusal delegates directly to the established generic fallback without pair enumeration.
+
+The superseded route-order and conditioned-anchor-retention REDs did not finish hosted failing runs, so they are source-level TDD evidence only. Commit `da703fc50e136ed79e12262909c9f400a3945621` aligns the equivalence characterization with production signed neutral-zero arithmetic: represented `{0,1,2^53}` families retain exact pair/linear numerator and reduced-ratio equality at `n=4,16,17,65,257,2050` plus order invariance. Mixed-sign `[-2^53,0,1,2^53]` proves a neutral-zero-only admission: pairwise subtraction refuses, while neutral-zero yields unit exponent `0`, signed-sum magnitude `1`, `Σc_i²=2^107+1`, `P=2^109+3`, and public bits `0x432a20bd700c2c3e`.
+
+Operator implications:
+
+- attempt the neutral-zero linear proof first for every `n >= 3`; invoke quadratic proof work only after linear refusal and only for `n <= 16`;
+- do not diagnose pairwise-f64 or minimum/observed-anchor refusal as scientific invalidity when neutral zero admits the bounded dyadic proof;
+- do not reintroduce conditioned observed-anchor scanning without a represented fixture that proves unique scientific admission after neutral-zero bounded refusal; O(n²) search is not retained by assumption;
+- do not make row order part of proof semantics; forward/reversed/permuted fixtures must be bit-identical;
+- treat signed-coordinate accumulation, Wide256 subtraction/downcast, denominator reduction, or exact-rounding failure as a fail-closed proof refusal and use later proof/fallback routes rather than weakening checks;
+- keep pairwise proof as the bounded `n <= 16` comparison/fail-closed authority, not as unconditional first work;
+- separate route observability from numerical equality. The existing resource harness records characterization-specific `used_wide_product` and `used_pairwise_fallback`, but production evidence still must distinguish `neutral_zero_linear`, `pairwise_reference`, and `generic_fallback`;
+- describe storage precisely: the neutral-zero kernel uses O(1) proof storage after the residual vector, while the public exact path still materializes O(n) residual storage;
+- treat `n=2_047`, `4_095`, and `208_064` only as arithmetic envelope markers from older aligned characterizations, not service limits;
+- for the O(n) route already eligible above 16, retain raw Rust 1.98.0 `--release` timing CSV, CPU/OS/build flags, p95, actual scratch capacity/payload, allocator/RSS, and any applicable buyer-path `p95<=20 ms` evidence without sample shrinkage or omitted proof work.
+
+Exact pair-record counts remain 120 at `n=16`, 136 at `n=17`, 2,096,128 at `n=2048`, and 4,997,541 at `n=3162`. Counts above sixteen are characterization of the pairwise reference shape, not production allocation: the public route does not invoke the O(n²) pair reference above sixteen. A two-pass O(n²) implementation may remove pair-record storage but still requires exact-head scientific/resource evidence. The neutral-zero Wide256 O(n) implementation removes pair enumeration for admitted geometries but still requires broad pair-equivalence, neutral-zero-only admission, exact-rounding, refusal, route, and resource evidence on one surviving production head.
+
+No release-mode resource numbers are authoritative yet. Source-level RED runs that were superseded or cancelled are not counted as hosted RED. Pinned Rustfmt Evidence `34037910108` for predecessor `206c1789ea13759591c308705fc1f57b75c96b28` produced artifact `9991468416`, digest `sha256:cd03e7c35be9d398d86494b01306df08af94dc117b38482578d652d9e2b2283b`, with 36 formatted Rust files; it is predecessor-only evidence, not current-head formatting GREEN.
 
 ## Model release/cutover
 
@@ -66,18 +89,8 @@ Trace the first failing boundary: evidence, temporal typing/reasoning, event/rel
 
 ## Actions workflow fleet
 
-GitHub Actions registry identities survive YAML deletion. After any
-bootstrap, diagnosis, or repair workflow is removed from the tree, run
-`scripts/actions_workflow_fleet.py audit` and retain the JSON inventory
-(workflow ID, path, state, classification, default-branch SHA, timestamp,
-pagination receipts). Disable only re-fetched active orphans with
-`disable-orphans --apply`. Never disable the protected CI, documentation,
-hourly NIM, or hourly PR-maintenance paths, and never recreate deleted
-bootstrap/repair YAML. The auditor uses only `GITHUB_TOKEN`/`GH_TOKEN`.
-Product-development automation continues to use `NVIDIA_NIM_API_KEY` and
-must not receive `COPILOT_GITHUB_TOKEN`. Operator procedure:
-`docs/operations/ACTIONS_WORKFLOW_FLEET.md`.
+GitHub Actions registry identities survive YAML deletion. After any bootstrap, diagnosis, or repair workflow is removed from the tree, run `scripts/actions_workflow_fleet.py audit` and retain the JSON inventory (workflow ID, path, state, classification, default-branch SHA, timestamp, pagination receipts). Disable only re-fetched active orphans with `disable-orphans --apply`. Never disable the protected CI, documentation, hourly NIM, or hourly PR-maintenance paths, and never recreate deleted bootstrap/repair YAML. The auditor uses only `GITHUB_TOKEN`/`GH_TOKEN`. Product-development automation continues to use the owner-approved model route and must not receive unrelated provider credentials. Operator procedure: `docs/operations/ACTIONS_WORKFLOW_FLEET.md`.
 
 ## Release gate
 
-A software release requires exact protected-head CI/security/review, 100% production coverage/docs, validated migrations/rollback where present, scientific benchmark artifacts, SBOM/provenance, reproducible packages/images, operator runbooks, accessibility for product UI, CHANGELOG/version/tag consistency, and post-publish verification. TEPP has not reached that integrated release state merely because individual foundation PRs merge.
+A software release requires exact protected-head CI/security/review, 100% production coverage/docs, validated migrations/rollback where present, scientific benchmark artifacts, SBOM/provenance, reproducible packages/images, operator runbooks, accessibility for product UI, CHANGELOG/version/tag consistency, and post-publish verification. TEPP has not reached that integrated release state merely because individual foundation PRs merge. Unexecuted timing harnesses and branch-only resource characterization are not release evidence.

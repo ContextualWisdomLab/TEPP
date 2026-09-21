@@ -50,7 +50,7 @@ impl ClaimAuthority {
     }
 }
 
-/// Kind of evidence offered for a promotion request.
+/// Kind of evidence offered for promotion.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ClaimEvidenceKind {
     /// Exact-head unit/integration tests on the candidate commit.
@@ -314,19 +314,28 @@ pub fn promote_claim(request: &PromotionRequest<'_>) -> Result<PromotedClaim, Va
     Ok(PromotedClaim::new(request.target, request.candidate_head))
 }
 
-/// Promote a scientific claim from computed RMSE, not a hardcoded threshold.
+/// Promote a scientific claim from computed RMSE against an explicit accuracy target.
 ///
-/// The candidate must equal the protected head. RMSE is accepted only when it
-/// lies within `se_multiplier` standard errors of exact recovery.
+/// The candidate must equal the protected head. `max_rmse` is the claim-specific
+/// practical recovery target owned by the validation profile; `se_multiplier`
+/// controls how much uncertainty around the estimated RMSE is included. Promotion
+/// requires the conservative bound `RMSE + se_multiplier * SE(RMSE) < max_rmse`.
+/// The strict boundary prevents a rounded equality at the practical target from
+/// being promoted and lets the existing exact residual-vs-standard-error comparator
+/// decide the margin without overflow-prone rescaling. This crate deliberately does
+/// not define a universal RMSE cutoff.
 ///
 /// # Errors
 ///
-/// Returns head, input, configuration, or recovery-rejection errors.
+/// Returns head, input, configuration, or recovery-rejection errors. The
+/// practical target must be finite and strictly positive; the uncertainty
+/// multiplier must be finite and non-negative.
 pub fn promote_scientific_recovery(
     candidate_head: &str,
     protected_head: &str,
     truth: &[f64],
     recovered: &[f64],
+    max_rmse: f64,
     se_multiplier: f64,
 ) -> Result<PromotedClaim, ValidationError> {
     let candidate = parse_commit_head(candidate_head)?;
@@ -334,9 +343,13 @@ pub fn promote_scientific_recovery(
     if candidate != protected {
         return Err(ValidationError::ClaimHeadMismatch);
     }
+    if !max_rmse.is_finite() || max_rmse <= 0.0 || !se_multiplier.is_finite() || se_multiplier < 0.0
+    {
+        return Err(ValidationError::InvalidConfiguration);
+    }
     let rmse = root_mean_square_error(truth, recovered)?;
     let rmse_se = rmse_standard_error(truth, recovered)?;
-    if !accept_within_standard_errors(rmse, 0.0, rmse_se, se_multiplier)? {
+    if rmse >= max_rmse || accept_within_standard_errors(max_rmse, rmse, rmse_se, se_multiplier)? {
         return Err(ValidationError::ClaimRecoveryRejected);
     }
     Ok(PromotedClaim::new(
@@ -408,7 +421,11 @@ mod tests {
             Err(ValidationError::InvalidInput)
         );
         assert_eq!(
-            promote_scientific_recovery(HEAD, HEAD, &[1.0, 2.0], &[1.0, 2.0], -1.0),
+            promote_scientific_recovery(HEAD, HEAD, &[1.0, 2.0], &[1.0, 2.0], 0.1, -1.0),
+            Err(ValidationError::InvalidConfiguration)
+        );
+        assert_eq!(
+            promote_scientific_recovery(HEAD, HEAD, &[1.0, 2.0], &[1.0, 2.0], 0.0, 3.0),
             Err(ValidationError::InvalidConfiguration)
         );
         let extra = [

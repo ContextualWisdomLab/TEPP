@@ -1,0 +1,148 @@
+//! RMSE-slot validation contracts for otherwise valid scalar Monte Carlo summaries.
+
+use validation_core::{MonteCarloSummary, ValidationError, ValidationReport};
+
+fn report_with(summary: MonteCarloSummary) -> ValidationReport {
+    ValidationReport {
+        study_label: "rmse-support-contract".into(),
+        rmse: 1.0,
+        rmse_standard_error: 0.0,
+        mean_bias: 0.0,
+        bias_standard_error: 0.0,
+        interval_coverage: 0.0,
+        coverage_wilson_lower: 0.0,
+        coverage_wilson_upper: 1.0,
+        temporal_order_accuracy: 1.0,
+        monte_carlo_rmse: Some(summary),
+    }
+}
+
+#[test]
+fn rmse_slot_rejects_generic_signed_scalar_support() {
+    let summary = MonteCarloSummary {
+        replication_count: 2,
+        mean: 0.0,
+        standard_deviation: 2.0_f64.sqrt(),
+        standard_error: 1.0,
+        percentile_lower: -1.0,
+        percentile_upper: 1.0,
+    };
+    summary
+        .validate()
+        .expect("signed scalar summary is generically coherent");
+
+    assert_eq!(
+        report_with(summary).validate(),
+        Err(ValidationError::InvalidInput)
+    );
+}
+
+#[test]
+fn rmse_slot_rejects_zero_mean_positive_spread() {
+    let summary = MonteCarloSummary {
+        replication_count: 4,
+        mean: 0.0,
+        standard_deviation: 1.0,
+        standard_error: 0.5,
+        percentile_lower: 0.0,
+        percentile_upper: 0.0,
+    };
+    summary
+        .validate()
+        .expect("generic summary permits equal percentile endpoints inside positive spread");
+
+    assert_eq!(
+        report_with(summary).validate(),
+        Err(ValidationError::InvalidInput)
+    );
+}
+
+#[test]
+fn rmse_slot_rejects_nonfinite_relative_standard_error() {
+    let summary = MonteCarloSummary {
+        replication_count: 4,
+        mean: f64::MIN_POSITIVE,
+        standard_deviation: f64::MAX,
+        standard_error: f64::MAX / 2.0,
+        percentile_lower: f64::MIN_POSITIVE,
+        percentile_upper: f64::MIN_POSITIVE,
+    };
+    summary
+        .validate()
+        .expect("generic summary is coherent before applying nonnegative RMSE support");
+
+    assert_eq!(
+        report_with(summary).validate(),
+        Err(ValidationError::InvalidInput)
+    );
+}
+
+#[test]
+fn rmse_slot_accepts_finite_percentile_ratio_at_maximum_replication_count() {
+    #[cfg(target_pointer_width = "64")]
+    const REPLICATION_SUPPORT: f64 = 18_446_744_073_709_551_616.0;
+    #[cfg(target_pointer_width = "32")]
+    const REPLICATION_SUPPORT: f64 = 4_294_967_295.0;
+    #[cfg(target_pointer_width = "16")]
+    const REPLICATION_SUPPORT: f64 = 65_535.0;
+
+    let summary = MonteCarloSummary {
+        replication_count: usize::MAX,
+        mean: 1.0,
+        standard_deviation: REPLICATION_SUPPORT.sqrt(),
+        standard_error: 1.0,
+        percentile_lower: 1.0,
+        percentile_upper: REPLICATION_SUPPORT,
+    };
+    summary
+        .validate()
+        .expect("maximum-count summary remains within generic empirical support");
+
+    assert!(
+        (summary.percentile_upper / summary.mean).is_finite(),
+        "an addressable replication count cannot overflow the RMSE percentile ratio"
+    );
+    report_with(summary)
+        .validate()
+        .expect("maximum-count endpoint remains inside nonnegative RMSE support");
+}
+
+#[test]
+fn rmse_slot_rejects_standard_error_beyond_nonnegative_support() {
+    let summary = MonteCarloSummary {
+        replication_count: 4,
+        mean: 1.0,
+        standard_deviation: 4.0,
+        standard_error: 2.0,
+        percentile_lower: 1.0,
+        percentile_upper: 1.0,
+    };
+    summary
+        .validate()
+        .expect("generic summary is coherent before applying RMSE support");
+
+    assert_eq!(
+        report_with(summary).validate(),
+        Err(ValidationError::InvalidInput)
+    );
+}
+
+#[test]
+fn rmse_slot_rejects_percentile_beyond_replication_sum_support() {
+    let summary = MonteCarloSummary {
+        replication_count: 4,
+        mean: 1.0,
+        standard_deviation: 2.0,
+        standard_error: 1.0,
+        percentile_lower: 1.0,
+        percentile_upper: 4.1,
+    };
+    summary
+        .validate()
+        .expect("generic summary is coherent before applying RMSE support");
+
+    assert_eq!(
+        report_with(summary).validate(),
+        Err(ValidationError::InvalidInput)
+    );
+}

@@ -1,0 +1,3 @@
+### Validation
+
+- Scientific recovery metrics and a matching candidate/protected SHA no longer mint `ScientificallySupported` authority by themselves. `promote_scientific_recovery` now derives the `ScientificRecovery` evidence item only after the grouped/profile recovery gate succeeds, then composes it with caller/adapter-supplied claim evidence through the canonical ADR 0014 `promote_claim` gate. Missing or failing exact-head tests and queued, predecessor-head, skipped-required, or LLM evidence therefore fail closed instead of being bypassed by the specialized numerical path. Recovery arithmetic, practical targets, Monte Carlo uncertainty, replication/profile provenance, and the canonical zero-multiplier rule are unchanged.

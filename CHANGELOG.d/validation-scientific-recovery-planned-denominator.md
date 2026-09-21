@@ -1,0 +1,3 @@
+### Validation
+
+- `validation_core::promote_scientific_recovery` now binds scientific recovery evidence to a caller/profile-owned planned simulation-replication count before computing RMSE or Monte Carlo uncertainty. The planned count must be at least two and must equal both grouped truth and recovery denominators, so failed, missing, or silently dropped repetitions cannot be removed from both survivor slices and still mint `ScientificallySupported` authority. This change does not define a universal `n_sim` or tolerated failure rate; profiles that permit estimator failures need an explicit attempted/recovered/failed policy rather than survivor-only analysis.
