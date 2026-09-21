@@ -12,6 +12,7 @@
 
 mod admission;
 mod assignment;
+mod design_wire;
 mod error;
 mod ess;
 mod icc;
