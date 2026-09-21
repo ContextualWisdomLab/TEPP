@@ -1,4 +1,9 @@
-use membership_core::{MembershipDesign, MembershipError};
+use membership_core::{MEMBERSHIP_DESIGN_WIRE_VERSION, MembershipDesign, MembershipError};
+
+#[test]
+fn membership_design_wire_contract_has_explicit_owner_version() {
+    assert_eq!(MEMBERSHIP_DESIGN_WIRE_VERSION, "tepp.membership_design.v1");
+}
 
 #[test]
 fn membership_design_wire_names_are_owner_issued_and_round_trip() {
