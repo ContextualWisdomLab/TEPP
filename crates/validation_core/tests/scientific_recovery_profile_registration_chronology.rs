@@ -10,25 +10,19 @@ use validation_core::{
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
-const TEST_ARTIFACT: &str =
-    "5555555555555555555555555555555555555555555555555555555555555555";
+const TEST_ARTIFACT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
-const ESTIMAND: &str =
-    "3333333333333333333333333333333333333333333333333333333333333333";
+const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
 const SEED_0: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SEED_1: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const EXEC_0: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const EXEC_1: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-const EXEC_OTHER: &str =
-    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const EXEC_OTHER: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 const LEDGER: &str = "6666666666666666666666666666666666666666666666666666666666666666";
-const REGISTRATION_ENTRY: &str =
-    "7777777777777777777777777777777777777777777777777777777777777777";
-const EXEC_ENTRY_0: &str =
-    "8888888888888888888888888888888888888888888888888888888888888888";
-const EXEC_ENTRY_1: &str =
-    "9999999999999999999999999999999999999999999999999999999999999999";
+const REGISTRATION_ENTRY: &str = "7777777777777777777777777777777777777777777777777777777777777777";
+const EXEC_ENTRY_0: &str = "8888888888888888888888888888888888888888888888888888888888888888";
+const EXEC_ENTRY_1: &str = "9999999999999999999999999999999999999999999999999999999999999999";
 
 fn profile_with_target(max_rmse: f64) -> ScientificRecoveryProfileV1 {
     let manifest = ScientificRecoverySeedManifestV1::new(&[SEED_0, SEED_1])
@@ -78,11 +72,9 @@ fn replication_receipts(
         .zip([EXEC_0, EXEC_1])
         .enumerate()
         .map(|(index, (seed, execution))| {
-            let payload = scientific_recovery_replication_payload_sha256(
-                truth[index],
-                recovered[index],
-            )
-            .expect("valid represented payload");
+            let payload =
+                scientific_recovery_replication_payload_sha256(truth[index], recovered[index])
+                    .expect("valid represented payload");
             ScientificRecoveryReplicationReceiptV1::new(
                 index,
                 &profile.sha256(),
