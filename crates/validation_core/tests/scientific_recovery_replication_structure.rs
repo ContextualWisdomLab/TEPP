@@ -6,8 +6,7 @@ use validation_core::{
     ScientificRecoveryProfileChronologyV1, ScientificRecoveryProfileRegistrationStatusV1,
     ScientificRecoveryProfileV1, ScientificRecoveryReplicationReceiptV1,
     ScientificRecoverySeedManifestV1, ValidationError, promote_scientific_recovery,
-    rmse_standard_error, root_mean_square_error,
-    scientific_recovery_replication_payload_sha256,
+    rmse_standard_error, root_mean_square_error, scientific_recovery_replication_payload_sha256,
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
@@ -17,8 +16,7 @@ const SEEDS: &str = "22222222222222222222222222222222222222222222222222222222222
 const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
 const LEDGER: &str = "6666666666666666666666666666666666666666666666666666666666666666";
-const REGISTRATION_ENTRY: &str =
-    "7777777777777777777777777777777777777777777777777777777777777777";
+const REGISTRATION_ENTRY: &str = "7777777777777777777777777777777777777777777777777777777777777777";
 
 fn as_slices<const N: usize, const M: usize>(rows: &[[f64; M]; N]) -> Vec<&[f64]> {
     rows.iter().map(|row| row.as_slice()).collect()
