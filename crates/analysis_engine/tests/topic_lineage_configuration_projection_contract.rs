@@ -17,6 +17,7 @@ fn artifact_json(config_json: &str, config_sha256: &str) -> String {
         "method_configuration_json": config_json,
         "method_configuration_sha256": config_sha256,
         "estimator_backend": "cpu_f64_reference",
+        "posterior_approximation": "diagonal_laplace",
         "selected_seed": 7,
         "iterations": 4,
         "objective": -1.0,
@@ -45,6 +46,7 @@ fn v2_artifact_carries_reconstructable_exact_method_configuration() {
     assert_eq!(artifact.method_configuration_json, CONFIG_JSON);
     assert_eq!(artifact.method_configuration_sha256, CONFIG_SHA256);
     assert_eq!(artifact.estimator_backend, "cpu_f64_reference");
+    assert_eq!(artifact.posterior_approximation, "diagonal_laplace");
 }
 
 #[test]
