@@ -24,9 +24,18 @@ with `σ²_e = MSW` and `σ²_u = max(0, (MSB − MSW) / n₀)`, where `n₀` is
 
 A member who is active in two roles is cross-classified. A member who is active in two groups of one role has multiple membership. Neither design may be collapsed into a nested ICC.
 
+## Longitudinal observation support
+
+A longitudinal analytical support is not equivalent to one global `as_of` snapshot. Each requested observation is resolved against Membership state at that observation's own event time. The owner classifier then aggregates the same structural signals used by the single-instant classifier: local role multiplicity, same-role group multiplicity, partial membership weight, and classification heterogeneity across the declared support.
+
+This preserves the distinction emphasized by Browne, Goldstein, and Rasbash (2001): crossed classifications and multiple memberships are properties of the data-generating membership structure, not labels a downstream estimator may collapse for convenience. A requested observation with no active membership at its own event time therefore fails closed instead of being dropped from the support. Time-varying re-entry into different groups of the same role remains nested when each observation is locally single, full-weight, and the observation support does not span different classification roles.
+
+`MembershipObservation` contains only opaque `MemberId` and `EventTime`. It does not copy HR/person truth, authorize an estimator, or substitute for the evidence-to-member mapping owned by the consuming bounded context.
+
 ## Verification
 
 - balanced four-by-two ANOVA recovers ICC `1/4` with computed RMSE versus that known truth;
 - zero within-cluster residual recovers ICC `1`; equal cluster means recover ICC `0`;
 - cross-classified and multiple-membership networks return `NestedIccInapplicable`;
-- empty, inactive, duplicate, unknown, singleton, and constant samples fail closed.
+- empty, inactive, duplicate, unknown, singleton, and constant samples fail closed;
+- longitudinal observation support preserves leave/re-entry at observation-specific event times, detects role heterogeneity across time, retains mixed cross-classified/multiple-membership structure, and refuses any requested observation that lacks active Membership context.

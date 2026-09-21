@@ -6,7 +6,7 @@ use std::fmt;
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum MembershipError {
-    /// A membership weight was negative, non-finite, or otherwise invalid.
+    /// A membership weight was outside `[0, 1]`, non-finite, or otherwise invalid.
     InvalidMembershipWeight,
     /// A validity interval was empty, ordered backward, or open-ended where a
     /// known interval is required.
@@ -17,8 +17,14 @@ pub enum MembershipError {
     UnsupportedWireVersion,
     /// An assignment referenced a role string that is not a TEPP membership role.
     UnknownMembershipRole,
-    /// A duplicate assignment key was rejected by the membership network.
+    /// A released projection referenced a design name not owned by Membership.
+    UnknownMembershipDesign,
+    /// The same member/group/role identity had overlapping or endpoint-touching validity.
     DuplicateMembershipAssignment,
+    /// A full single-membership estimator cannot represent the active membership design without loss.
+    SingleMembershipProfileInapplicable,
+    /// A requested longitudinal observation has no active membership at its own event time.
+    MissingObservationMembership,
     /// Nested ICC is undefined for cross-classified or multiple-membership designs.
     NestedIccInapplicable,
     /// Clusters or within-group residual degrees of freedom are insufficient.
@@ -39,7 +45,14 @@ impl fmt::Display for MembershipError {
             Self::InvalidWirePayload => "invalid membership wire payload",
             Self::UnsupportedWireVersion => "unsupported membership wire version",
             Self::UnknownMembershipRole => "unknown membership role",
+            Self::UnknownMembershipDesign => "unknown membership design",
             Self::DuplicateMembershipAssignment => "duplicate membership assignment",
+            Self::SingleMembershipProfileInapplicable => {
+                "single-membership profile is inapplicable to this membership design"
+            }
+            Self::MissingObservationMembership => {
+                "longitudinal observation has no active membership at its event time"
+            }
             Self::NestedIccInapplicable => "nested ICC is inapplicable to this membership design",
             Self::InsufficientClusterStructure => "insufficient cluster structure for nested ICC",
             Self::InvalidOutcome => "invalid nested ICC outcome",
@@ -80,8 +93,20 @@ mod tests {
                 "unknown membership role",
             ),
             (
+                MembershipError::UnknownMembershipDesign,
+                "unknown membership design",
+            ),
+            (
                 MembershipError::DuplicateMembershipAssignment,
                 "duplicate membership assignment",
+            ),
+            (
+                MembershipError::SingleMembershipProfileInapplicable,
+                "single-membership profile is inapplicable to this membership design",
+            ),
+            (
+                MembershipError::MissingObservationMembership,
+                "longitudinal observation has no active membership at its event time",
             ),
             (
                 MembershipError::NestedIccInapplicable,
