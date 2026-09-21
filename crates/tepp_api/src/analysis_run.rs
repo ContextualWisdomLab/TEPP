@@ -116,6 +116,8 @@ impl AnalysisRunRequest {
     /// Serialization intentionally does not consult the current wall clock.
     /// This keeps immutable request evidence reproducible while live admission
     /// remains responsible for refusing a not-yet-available knowledge cutoff.
+    /// The cutoff text itself must already be TEPP's canonical UTC spelling so
+    /// one absolute instant cannot produce multiple valid request byte strings.
     ///
     /// # Errors
     ///
@@ -146,9 +148,12 @@ impl AnalysisRunRequest {
 
 fn require_rfc3339_knowledge_cutoff_syntax(knowledge_cutoff: &str) -> Result<(), ApiError> {
     require_nonempty(knowledge_cutoff)?;
-    KnowledgeCutoff::parse_rfc3339(knowledge_cutoff)
-        .map(|_| ())
-        .map_err(|_| ApiError::InvalidWirePayload)
+    let cutoff = KnowledgeCutoff::parse_rfc3339(knowledge_cutoff)
+        .map_err(|_| ApiError::InvalidWirePayload)?;
+    if knowledge_cutoff != cutoff.to_rfc3339() {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    Ok(())
 }
 
 /// Parse `knowledge_cutoff` as a TEPP clock and refuse a cutoff after now.
