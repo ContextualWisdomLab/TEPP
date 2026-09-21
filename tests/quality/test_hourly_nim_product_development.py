@@ -79,7 +79,7 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             self.assertIn(token, text)
         for token in ("discover_all_models", "register_credential", "PROVIDER_CREDENTIAL_NAMES"):
             self.assertIn(token, bootstrap)
-        self.assertNotIn("\nschedule:", text)
+        self.assertNotIn("schedule:", text)
         self.assertNotIn("cron:", text)
         self.assertNotIn("COPILOT_GITHUB_TOKEN", text)
         self.assertNotIn("CONTEXTUAL_ORCHESTRATOR_TOKEN=", text)
