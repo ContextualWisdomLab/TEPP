@@ -248,7 +248,7 @@ pub fn execute_topic_lineage_run(
         "trsl_topic_lineage",
         evidence_count,
         statistic_count,
-        "reference_estimator_converged",
+        "validated",
     );
     let summary = summary?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
