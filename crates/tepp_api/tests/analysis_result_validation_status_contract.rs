@@ -49,7 +49,7 @@ fn validated_success_round_trips_with_canonical_status() {
 }
 
 #[test]
-fn non_verifiable_and_non_converged_cannot_deserialize_as_success() {
+fn non_verifiable_and_unknown_states_cannot_deserialize_as_success() {
     let validated =
         AnalysisResultSummary::new("temporal_topic_measurement", 120, 42, "validated")
             .expect("validated summary");
@@ -65,7 +65,13 @@ fn non_verifiable_and_non_converged_cannot_deserialize_as_success() {
     .expect("validated success");
     let json = success.to_json().expect("json");
 
-    for refused in ["not_verifiable", "non_converged", "insufficient_evidence", "failed"] {
+    for refused in [
+        "not_verifiable",
+        "non_converged",
+        "insufficient_evidence",
+        "failed",
+        "provider_custom_success",
+    ] {
         assert_eq!(
             AnalysisResultSummary::new("temporal_topic_measurement", 120, 42, refused),
             Err(ApiError::InvalidWirePayload),
