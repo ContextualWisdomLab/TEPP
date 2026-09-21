@@ -1,17 +1,22 @@
 # Hourly Contextual Orchestrator Product Development
 
-The hourly contextual-orchestrator product-development workflow proposes one bounded
+The contextual-orchestrator product-development workflow proposes one bounded
 commercial-quality increment when the repository has no open pull request or open
-issue. It is
-separate from the deterministic minute-17 quality sentinel and never merges,
-releases, deploys, approves, or changes reviewer credentials.
+issue. It is a manual-only repository entrypoint selected by the organization-level
+commercial-readiness loop in `ContextualWisdomLab/.github`; repository-local cadence
+is intentionally absent. It is separate from the deterministic minute-17 quality
+sentinel and never merges, releases, deploys, approves, or changes reviewer
+credentials.
 
-## Schedule and queue behavior
+## Central scheduling and queue behavior
 
-`.github/workflows/hourly-nim-product-development.yml` runs at minute 47 of every
-hour and supports `workflow_dispatch` with `dry_run=true`. The nonzero minute
-avoids the busiest scheduler boundary. A repository-scoped concurrency group
-does not cancel an active run.
+`.github/workflows/hourly-nim-product-development.yml` exposes
+`# cwl-org-commercial-entrypoint: v1` plus `workflow_dispatch` with
+`dry_run=true`. It must not define a local `schedule:` block. The organization
+commercial-readiness owner decides when to dispatch a marked repository only after
+its queue is eligible, which avoids competing repository-local schedulers and keeps
+cadence policy in one versioned owner. A repository-scoped concurrency group does
+not cancel an active run.
 
 Before checkout or model execution, the proposal job reads at most one open pull
 request and one open issue. Unreadable inventory, any open PR or issue, any
@@ -19,7 +24,7 @@ missing provider key, or a missing Maintainer App configuration produces a stabl
 fail-closed no-op. A dry run may print the task contract without credentials.
 
 When a PR or issue exists, normal review → repair → exact-head Checks → merge
-governance owns the hour. The scheduler does not create a competing branch.
+governance owns the hour. The central scheduler does not create a competing branch.
 
 Current executable queue (2026-08-27T10:20Z snapshot; live state supersedes):
 
@@ -32,7 +37,7 @@ Current executable queue (2026-08-27T10:20Z snapshot; live state supersedes):
 2. Then the open Driver p.16 `std`-family restorations
    #267/#268/#270/#271/#272, the TDT/CHRONOS composition #269, and the gap
    baseline refresh #273 — each after a rerun on the fixed main base.
-3. Do not open a competing hourly proposal while the open-PR inventory is
+3. Do not open a competing product proposal while the open-PR inventory is
    non-empty; review → repair → exact-head Checks → merge governs the hour.
 
 Preferred buyer-visible gaps once the queue drains: GAP-169 longitudinal
@@ -55,9 +60,9 @@ Do not place GitHub App credentials in the proposal or verifier jobs. Do not
 reuse the existing review App or alter its variable, secret, identity, or
 provider route. Do not configure `COPILOT_GITHUB_TOKEN`.
 
-A manual dry run verifies scheduling, queue, and prompt contracts without model
-or publication credentials. Missing production credentials leave the hourly
-developer disabled rather than falling back to `GITHUB_TOKEN`.
+A manual dry run verifies the entrypoint, queue, and prompt contracts without
+model or publication credentials. Missing production credentials leave product
+development disabled rather than falling back to `GITHUB_TOKEN`.
 
 ## Three-runner trust boundary
 
@@ -160,10 +165,13 @@ write token.
 
 ## Disablement and rollback
 
-Disable scheduled development by disabling the workflow, removing its schedule,
-or removing any one of the five provider credentials. Removing any provider key
-stops model execution; removing the Maintainer App values stops publication.
-The minute-17 deterministic quality sentinel continues independently.
+Disable repository product-development execution by disabling the workflow,
+removing the `# cwl-org-commercial-entrypoint: v1` marker so the central owner
+stops selecting it, or removing any one of the five provider credentials.
+Repository-local cron is not an enable/disable control because cadence belongs
+to the organization commercial-readiness owner. Removing any provider key stops
+model execution; removing the Maintainer App values stops publication. The
+minute-17 deterministic quality sentinel continues independently.
 
 Rollback a faulty workflow through a reviewed revert PR. Do not edit branch
 protection, review workflows, or release workflows as an incident shortcut.
@@ -177,7 +185,7 @@ references them.
   inference broker could keep upstream secrets outside the runner.
 - Each configured provider may process repository source; operators must review
   confidentiality, retention, regional, and contractual obligations for every
-  provider before enabling the schedule.
+  provider before enabling the central entrypoint.
 - The verifier executes untrusted code on an ephemeral hosted runner with
   outbound network access, but receives no publication, provider, OIDC,
   artifact/cache runtime, command-file, or reviewer credential.
