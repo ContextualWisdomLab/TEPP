@@ -85,6 +85,32 @@ fn canonical_classification_is_distinct_from_a_parsed_wire_coordinate() {
         classification.support_sha256()
     );
 
+    let mut different_topology = MembershipNetwork::new();
+    let different_group = GroupId::new();
+    for member_id in [member, other_member] {
+        different_topology
+            .insert(
+                MembershipAssignment::new(
+                    member_id,
+                    different_group,
+                    MembershipRole::Department,
+                    MembershipWeight::full().expect("full weight"),
+                    start,
+                    end,
+                )
+                .expect("valid assignment"),
+            )
+            .expect("insert alternative assignment");
+    }
+    let same_support_different_topology =
+        classify_membership_observations_wire(&different_topology, &observations)
+            .expect("same support with different active topology");
+    assert_eq!(same_support_different_topology.design(), classification.design());
+    assert_ne!(
+        same_support_different_topology.support_sha256(),
+        classification.support_sha256()
+    );
+
     let duplicated = classify_membership_observations_wire(
         &network,
         &[
@@ -105,4 +131,52 @@ fn canonical_classification_is_distinct_from_a_parsed_wire_coordinate() {
     let parsed = MembershipDesignWire::parse(MEMBERSHIP_DESIGN_WIRE_VERSION, "nested")
         .expect("released coordinate must deserialize");
     assert_eq!(parsed, wire);
+}
+
+#[test]
+fn support_digest_is_independent_of_active_assignment_insertion_order() {
+    let start = event_time("2026-01-01T00:00:00Z");
+    let end = event_time("2026-12-31T23:59:59Z");
+    let as_of = event_time("2026-06-01T00:00:00Z");
+    let member = MemberId::new();
+    let first_group = GroupId::new();
+    let second_group = GroupId::new();
+    let half = MembershipWeight::new(0.5).expect("half membership");
+    let first = MembershipAssignment::new(
+        member,
+        first_group,
+        MembershipRole::Department,
+        half,
+        start,
+        end,
+    )
+    .expect("first assignment");
+    let second = MembershipAssignment::new(
+        member,
+        second_group,
+        MembershipRole::Department,
+        half,
+        start,
+        end,
+    )
+    .expect("second assignment");
+
+    let mut forward = MembershipNetwork::new();
+    forward.insert(first).expect("insert first");
+    forward.insert(second).expect("insert second");
+    let mut reverse = MembershipNetwork::new();
+    reverse.insert(second).expect("insert second first");
+    reverse.insert(first).expect("insert first second");
+
+    let support = [MembershipObservation::new(member, as_of)];
+    let forward_classification = classify_membership_observations_wire(&forward, &support)
+        .expect("forward classification");
+    let reverse_classification = classify_membership_observations_wire(&reverse, &support)
+        .expect("reverse classification");
+    assert_eq!(forward_classification.design(), MembershipDesign::MultipleMembership);
+    assert_eq!(reverse_classification.design(), MembershipDesign::MultipleMembership);
+    assert_eq!(
+        forward_classification.support_sha256(),
+        reverse_classification.support_sha256()
+    );
 }
