@@ -205,6 +205,33 @@ fn parsed_wire_refuses_noncanonical_or_malformed_support_payloads() {
     .expect("owner projection");
     let canonical = projection.wire().to_json().expect("canonical JSON");
 
+    let duplicate_same_edge = canonical
+        .replacen(
+            "\"design_name\":\"nested\"",
+            "\"design_name\":\"multiple_membership\"",
+            1,
+        )
+        .replacen(
+            "\"assignments\":[{\"role\":\"department\",\"group_ordinal\":0,\"weight_f64_bits\":\"3ff0000000000000\"}]",
+            "\"assignments\":[{\"role\":\"department\",\"group_ordinal\":0,\"weight_f64_bits\":\"3fd0000000000000\"},{\"role\":\"department\",\"group_ordinal\":0,\"weight_f64_bits\":\"3fe0000000000000\"}]",
+            1,
+        );
+    assert!(MembershipObservationSupportWire::from_json(&duplicate_same_edge).is_err());
+
+    let exact_share_overrun = canonical
+        .replacen(
+            "\"design_name\":\"nested\"",
+            "\"design_name\":\"multiple_membership\"",
+            1,
+        )
+        .replacen("\"group_count\":1", "\"group_count\":2", 1)
+        .replacen(
+            "\"assignments\":[{\"role\":\"department\",\"group_ordinal\":0,\"weight_f64_bits\":\"3ff0000000000000\"}]",
+            "\"assignments\":[{\"role\":\"department\",\"group_ordinal\":0,\"weight_f64_bits\":\"3ff0000000000000\"},{\"role\":\"department\",\"group_ordinal\":1,\"weight_f64_bits\":\"0000000000000001\"}]",
+            1,
+        );
+    assert!(MembershipObservationSupportWire::from_json(&exact_share_overrun).is_err());
+
     assert!(MembershipObservationSupportWire::from_json(&(canonical.clone() + "\n")).is_err());
     assert!(
         MembershipObservationSupportWire::from_json(&canonical.replacen(
