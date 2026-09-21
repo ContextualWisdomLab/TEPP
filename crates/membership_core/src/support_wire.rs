@@ -1,6 +1,7 @@
 //! Privacy-reduced reconstructable wire projection for longitudinal Membership support.
 
 use crate::icc::MembershipDesignSignals;
+use crate::network::exact_nonnegative_binary64_sum_exceeds_one;
 use crate::{
     MembershipDesignClassification, MembershipDesignWire, MembershipError, MembershipNetwork,
     MembershipObservation, MembershipRole, MembershipWeight,
@@ -212,16 +213,29 @@ impl MembershipObservationSupportWire {
             }
             members.insert(observation.member_ordinal);
             let mut topology = Vec::with_capacity(observation.assignments.len());
+            let mut active_edges = BTreeSet::new();
+            let mut weights_by_role: BTreeMap<MembershipRole, Vec<f64>> = BTreeMap::new();
             for assignment in &observation.assignments {
                 let role = MembershipRole::from_wire_name(&assignment.role)?;
                 let bits = parse_weight_bits(&assignment.weight_f64_bits)?;
-                MembershipWeight::new(f64::from_bits(bits))?;
+                let weight = f64::from_bits(bits);
+                MembershipWeight::new(weight)?;
+                if !active_edges.insert((role, assignment.group_ordinal)) {
+                    return Err(MembershipError::InvalidWirePayload);
+                }
+                weights_by_role.entry(role).or_default().push(weight);
                 groups.insert(assignment.group_ordinal);
                 topology.push((
                     role,
                     assignment.group_ordinal,
                     bits != 1.0_f64.to_bits(),
                 ));
+            }
+            if weights_by_role
+                .values()
+                .any(|weights| exact_nonnegative_binary64_sum_exceeds_one(weights.iter().copied()))
+            {
+                return Err(MembershipError::InvalidWirePayload);
             }
             signals.observe_tokens(topology);
         }
