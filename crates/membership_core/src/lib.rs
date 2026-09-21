@@ -25,9 +25,10 @@ mod weight;
 pub use admission::{SingleMembershipAdmission, admit_single_membership};
 /// One weighted, role-typed, time-varying membership assignment.
 pub use assignment::MembershipAssignment;
-/// Membership-owned classification result, wire coordinate, and vocabulary version.
+/// Membership-owned classification result, wire coordinate, and versioned provenance contracts.
 pub use design_wire::{
-    MEMBERSHIP_DESIGN_WIRE_VERSION, MembershipDesignClassification, MembershipDesignWire,
+    MEMBERSHIP_DESIGN_WIRE_VERSION, MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION,
+    MembershipDesignClassification, MembershipDesignWire,
 };
 /// Issue a Membership-owned classification result from longitudinal canonical state.
 pub use design_wire::classify_membership_observations_wire;
