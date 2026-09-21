@@ -101,10 +101,10 @@ impl MembershipDesignClassification {
         network: &MembershipNetwork,
         design: MembershipDesign,
         observations: &[MembershipObservation],
-    ) -> Result<Self, MembershipError> {
-        let Some(first) = observations.first().copied() else {
-            return Err(MembershipError::InsufficientClusterStructure);
-        };
+    ) -> Self {
+        // `classify_membership_observations` has already rejected empty support before this owner
+        // authority can be issued, so index 0 is an invariant rather than a second admission branch.
+        let first = observations[0];
         let mut earliest_event_time = first.event_time();
         let mut latest_event_time = first.event_time();
         for observation in &observations[1..] {
@@ -112,13 +112,13 @@ impl MembershipDesignClassification {
             earliest_event_time = earliest_event_time.min(event_time);
             latest_event_time = latest_event_time.max(event_time);
         }
-        Ok(Self {
+        Self {
             wire: MembershipDesignWire::from_design(design),
             observation_count: observations.len(),
             earliest_event_time,
             latest_event_time,
             support_sha256: canonical_observation_support_sha256(network, observations),
-        })
+        }
     }
 
     /// Return the stable wire coordinate for released projections.
@@ -193,7 +193,11 @@ pub fn classify_membership_observations_wire(
     observations: &[MembershipObservation],
 ) -> Result<MembershipDesignClassification, MembershipError> {
     let design = classify_membership_observations(network, observations)?;
-    MembershipDesignClassification::from_design_and_observations(network, design, observations)
+    Ok(MembershipDesignClassification::from_design_and_observations(
+        network,
+        design,
+        observations,
+    ))
 }
 
 fn canonical_observation_support_sha256(
@@ -231,12 +235,12 @@ fn canonical_observation_support_sha256(
         &mut hasher,
         MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION.as_bytes(),
     );
-    hasher.update((support.len() as u128).to_be_bytes());
+    hash_count(&mut hasher, support.len());
     for (observation, active) in support {
         hasher.update(observation.member_id().as_uuid().as_bytes());
         let event_time = observation.event_time().to_rfc3339();
         hash_frame(&mut hasher, event_time.as_bytes());
-        hasher.update((active.len() as u128).to_be_bytes());
+        hash_count(&mut hasher, active.len());
         for assignment in active {
             hash_assignment(&mut hasher, assignment);
         }
@@ -250,8 +254,13 @@ fn hash_assignment(hasher: &mut Sha256, assignment: MembershipAssignment) {
     hasher.update(assignment.weight().value().to_bits().to_be_bytes());
 }
 
+fn hash_count(hasher: &mut Sha256, value: usize) {
+    let value = u128::try_from(value).expect("usize must fit in u128");
+    hasher.update(value.to_be_bytes());
+}
+
 fn hash_frame(hasher: &mut Sha256, value: &[u8]) {
-    hasher.update((value.len() as u128).to_be_bytes());
+    hash_count(hasher, value.len());
     hasher.update(value);
 }
 
