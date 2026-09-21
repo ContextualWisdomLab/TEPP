@@ -36,13 +36,13 @@ def _parser_module() -> ModuleType:
 class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
     """Structural tests for the credential-separated product-development loop."""
 
-    def test_hourly_workflow_schedule_credentials_and_queue_gate(self) -> None:
-        """Run at minute 47 with provider discovery and fail closed around inventory."""
+    def test_product_workflow_dispatch_credentials_and_queue_gate(self) -> None:
+        """Keep the leaf entrypoint manual and fail closed around inventory."""
 
         text = _text(WORKFLOW)
         bootstrap = _text(BOOTSTRAP)
         for token in (
-            'cron: "47 * * * *"',
+            "# cwl-org-commercial-entrypoint: v1",
             "workflow_dispatch:",
             "dry_run:",
             "hourly-nim-product-development-${{ github.repository }}",
@@ -77,6 +77,8 @@ class HourlyNimProductDevelopmentContractTests(unittest.TestCase):
             "ContextualWisdomLab/TEPP",
         ):
             self.assertIn(token, text)
+        self.assertNotIn("\n  schedule:", text)
+        self.assertNotIn("cron:", text)
         for token in ("discover_all_models", "register_credential", "PROVIDER_CREDENTIAL_NAMES"):
             self.assertIn(token, bootstrap)
         self.assertNotIn("COPILOT_GITHUB_TOKEN", text)

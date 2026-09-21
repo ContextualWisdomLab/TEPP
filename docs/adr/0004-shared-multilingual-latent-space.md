@@ -1,22 +1,7 @@
 # ADR 0004 — Shared multilingual latent semantic space
 
 **Decision status:** Accepted  
-**Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; shared-space estimators, language profiles, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
-**Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; shared-space estimators remain accepted-target  
-**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; shared-space estimators remain accepted-target  
-**Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; shared-space estimators remain accepted-target  
-**Implementation maturity:** accepted-target — prompt-versus-unique-content identity in `prompt_source` on the active PR; shared-space estimators remain accepted-target  
-**Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; shared-space estimators remain accepted-target  
-**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; shared-space estimators remain accepted-target  
-**Implementation maturity:** accepted-target — copied-versus-unique-content identity in `copied_text` on the active PR; shared-space estimators remain accepted-target  
-**Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; shared-space estimators remain accepted-target  
-**Decision status:** Accepted
-**Implementation maturity:** accepted-target — prompt-versus-unique-content identity in `prompt_source` on the active PR; shared-space estimators remain accepted-target
-**Implementation maturity:** accepted-target — corpus-background-versus-unique-content identity in `corpus_background` on the active PR; shared-space estimators remain accepted-target
-**Implementation maturity:** accepted-target — modality-versus-unique-content identity in `modality_source` on the active PR; shared-space estimators remain accepted-target
-**Implementation maturity:** accepted-target — copied-versus-unique-content identity in `copied_text` on the active PR; shared-space estimators remain accepted-target
-**Implementation maturity:** accepted-target — style-versus-unique-content identity in `style_source` on the active PR; shared-space estimators remain accepted-target
-**Implementation maturity:** partial — default stopword-deletion refusal is `stopword_deletion` on the active PR; shared-space estimators, language profiles, and TF-IDF/BM25 inferential-weight refusal remain accepted-target
+**Implementation maturity:** partial — span/source-method refusal slices are active-PR evidence; shared-space estimators, language profiles, and TF-IDF/BM25 inferential-weight refusal remain accepted-target  
 **Date:** 2026-08-05
 **Supersedes:** None. ADR 0012 governs the complete topic-estimator/backend/global-topic contract built on this multilingual measurement decision. ADR 0020 owns the first span-grounded unit-identity slice as an active-PR; it is not shared-latent estimation.
 
@@ -30,7 +15,7 @@ The product therefore needs a language-independent analytical contract while pre
 
 TEPP learns one shared latent semantic and topic space across languages. Equivalent meanings share concept prototypes, topic identities, and document coordinates. Language-specific morphology, script, syntax, lexical emissions, and content deviations remain explicit rather than being forced to match.
 
-This ADR owns the multilingual measurement substrate. The product topic-estimator contract is **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** under ADR 0012. Temporal topic identity follows the dynamic topic-model family (Blei & Lafferty, 2006). An STM-style logistic-normal document-coordinate model (Roberts et al., 2014, 2019) is the **reference family**, not a claim that every compliant backend is already shipped. Implementation maturity for this ADR and for TRSL-TM remains accepted-target.
+This ADR owns the multilingual measurement substrate. The product topic-estimator contract is **Temporal Relational Shared-Latent Topic Measurement (TRSL-TM)** under ADR 0012. Temporal topic identity follows the dynamic topic-model family (Blei & Lafferty, 2006). An STM-style logistic-normal document-coordinate model (Roberts et al., 2014, 2019) is the **reference family**, not a claim that every compliant backend is already shipped. Implementation maturity remains partial: bounded refusal/identity slices exist on active PRs while shared-space estimation and language-profile validation remain accepted-target.
 
 Original text and exact source spans are preserved. Segmentation and morphology are language-tailored. Universal POS/dependency information may act as soft source evidence or priors but does not authorize irreversible deletion. LLM-proposed semantic units must resolve to exact source evidence and a versioned concept/semantic contract; unknown meaning can remain unresolved rather than being forced into a known concept.
 
