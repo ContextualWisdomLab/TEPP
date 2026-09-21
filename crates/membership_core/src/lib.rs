@@ -46,8 +46,9 @@ pub use role::MembershipRole;
 /// Reconstructable longitudinal support projection and wire contracts.
 pub use support_wire::{
     MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION, MembershipObservationSupportAssignmentWire,
-    MembershipObservationSupportObservationWire, MembershipObservationSupportProjection,
-    MembershipObservationSupportWire, project_membership_observations_wire,
+    MembershipObservationSupportCoordinate, MembershipObservationSupportObservationWire,
+    MembershipObservationSupportProjection, MembershipObservationSupportWire,
+    project_membership_observations_wire,
 };
 /// Finite, strictly positive membership share in `(0, 1]`.
 pub use weight::MembershipWeight;
