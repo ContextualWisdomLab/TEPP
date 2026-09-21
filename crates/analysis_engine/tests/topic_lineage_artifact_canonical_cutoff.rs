@@ -16,6 +16,7 @@ fn artifact() -> TopicLineageArtifact {
         method_configuration_json: CONFIG_JSON.into(),
         method_configuration_sha256: CONFIG_SHA256.into(),
         estimator_backend: "cpu_f64_reference".into(),
+        posterior_approximation: "diagonal_laplace".into(),
         selected_seed: 7,
         iterations: 4,
         objective: -1.0,
