@@ -119,7 +119,7 @@ pub struct AnalysisRunTerminalResult {
     pub result_sha256: Option<String>,
     /// Versioned result-schema identity.
     pub result_schema_version: Option<String>,
-    /// Strict RFC 3339 system time at terminal completion.
+    /// Canonical UTC RFC 3339 system time at terminal completion.
     pub completed_at: String,
     /// Bounded summary for a succeeded run.
     pub summary: Option<AnalysisResultSummary>,
@@ -247,7 +247,11 @@ impl AnalysisRunTerminalResult {
             require_nonempty(value)?;
         }
         require_rfc3339_knowledge_cutoff(&self.knowledge_cutoff)?;
-        SystemTime::parse_rfc3339(&self.completed_at).map_err(|_| ApiError::InvalidWirePayload)?;
+        let completed_at = SystemTime::parse_rfc3339(&self.completed_at)
+            .map_err(|_| ApiError::InvalidWirePayload)?;
+        if self.completed_at != completed_at.to_rfc3339() {
+            return Err(ApiError::InvalidWirePayload);
+        }
 
         match self.run_state {
             AnalysisRunTerminalState::Succeeded => self.validate_succeeded(),
