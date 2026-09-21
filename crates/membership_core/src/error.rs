@@ -21,6 +21,8 @@ pub enum MembershipError {
     DuplicateMembershipAssignment,
     /// A full single-membership estimator cannot represent the active membership design without loss.
     SingleMembershipProfileInapplicable,
+    /// A requested longitudinal observation has no active membership at its own event time.
+    MissingObservationMembership,
     /// Nested ICC is undefined for cross-classified or multiple-membership designs.
     NestedIccInapplicable,
     /// Clusters or within-group residual degrees of freedom are insufficient.
@@ -44,6 +46,9 @@ impl fmt::Display for MembershipError {
             Self::DuplicateMembershipAssignment => "duplicate membership assignment",
             Self::SingleMembershipProfileInapplicable => {
                 "single-membership profile is inapplicable to this membership design"
+            }
+            Self::MissingObservationMembership => {
+                "longitudinal observation has no active membership at its event time"
             }
             Self::NestedIccInapplicable => "nested ICC is inapplicable to this membership design",
             Self::InsufficientClusterStructure => "insufficient cluster structure for nested ICC",
@@ -91,6 +96,10 @@ mod tests {
             (
                 MembershipError::SingleMembershipProfileInapplicable,
                 "single-membership profile is inapplicable to this membership design",
+            ),
+            (
+                MembershipError::MissingObservationMembership,
+                "longitudinal observation has no active membership at its event time",
             ),
             (
                 MembershipError::NestedIccInapplicable,
