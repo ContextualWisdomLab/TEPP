@@ -464,7 +464,10 @@ pub fn scientific_recovery_replication_payload_sha256(
 ) -> Result<String, ValidationError> {
     if truth.is_empty()
         || truth.len() != recovered.len()
-        || truth.iter().chain(recovered).any(|value| !value.is_finite())
+        || truth
+            .iter()
+            .chain(recovered)
+            .any(|value| !value.is_finite())
     {
         return Err(ValidationError::InvalidInput);
     }
@@ -664,11 +667,7 @@ fn recovery_evidence_sha256(
 }
 
 fn canonical_f64_bits(value: f64) -> u64 {
-    if value == 0.0 {
-        0
-    } else {
-        value.to_bits()
-    }
+    if value == 0.0 { 0 } else { value.to_bits() }
 }
 
 fn is_canonical_sha256(value: &str) -> bool {
