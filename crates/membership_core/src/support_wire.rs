@@ -2,7 +2,7 @@
 
 use crate::{
     MembershipDesignClassification, MembershipDesignWire, MembershipError, MembershipNetwork,
-    MembershipObservation, MembershipRole, MembershipWeight, MEMBERSHIP_DESIGN_WIRE_VERSION,
+    MembershipObservation, MembershipRole, MembershipWeight,
     MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION, classify_membership_observations_wire,
 };
 use serde::{Deserialize, Serialize};
@@ -330,16 +330,18 @@ pub fn project_membership_observations_wire(
     }
     wire_observations.sort();
 
+    let support_sha256 = classification
+        .support_sha256()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join("");
     let wire = MembershipObservationSupportWire {
         schema_version: MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION.to_owned(),
         design_version: classification.version().to_owned(),
         design_name: classification.name().to_owned(),
         support_digest_version: classification.support_digest_version().to_owned(),
-        support_sha256: classification
-            .support_sha256()
-            .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect(),
+        support_sha256,
         member_count,
         group_count,
         observations: wire_observations,
@@ -374,5 +376,7 @@ fn nondecreasing<T: Ord>(values: &[T]) -> bool {
 }
 
 fn is_contiguous_zero_based(values: &BTreeSet<u32>, count: u32) -> bool {
-    values.len() == count as usize && values.iter().copied().eq(0..count)
+    usize::try_from(count).is_ok_and(|expected| {
+        values.len() == expected && values.iter().copied().eq(0..count)
+    })
 }
