@@ -1,10 +1,12 @@
 //! Nested ICC with fail-closed cross-classified and multiple-membership gates.
 
-use crate::{MemberId, MembershipError, MembershipNetwork, MembershipRole};
+use crate::{
+    MemberId, MembershipAssignment, MembershipError, MembershipNetwork, MembershipRole,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use temporal_core::EventTime;
 
-/// Membership design implied by active assignments at one event time.
+/// Membership design implied by active assignments at one event time or across longitudinal observations.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
 pub enum MembershipDesign {
@@ -34,6 +36,40 @@ impl MembershipDesign {
             | Self::HeterogeneousClassification
             | Self::HeterogeneousClassificationMultipleMembership => false,
         }
+    }
+}
+
+/// One member/event-time coordinate included in a longitudinal analytical support.
+///
+/// The coordinate is intentionally narrow: Membership owns contextual assignment semantics, while
+/// downstream bounded contexts retain their own observation/evidence identity. A consumer supplies
+/// only the opaque member and the event time at which Membership should resolve active assignments.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MembershipObservation {
+    member_id: MemberId,
+    event_time: EventTime,
+}
+
+impl MembershipObservation {
+    /// Construct one longitudinal membership observation coordinate.
+    #[must_use]
+    pub const fn new(member_id: MemberId, event_time: EventTime) -> Self {
+        Self {
+            member_id,
+            event_time,
+        }
+    }
+
+    /// Return the opaque member identity.
+    #[must_use]
+    pub const fn member_id(self) -> MemberId {
+        self.member_id
+    }
+
+    /// Return the event time at which active membership must be resolved.
+    #[must_use]
+    pub const fn event_time(self) -> EventTime {
+        self.event_time
     }
 }
 
@@ -76,6 +112,8 @@ impl NestedOutcome {
 /// Cross-classification, population-level classification heterogeneity, and
 /// multiple-membership signals are tracked independently. A one-way nested
 /// design requires every active member to belong to one common role/classification.
+/// Members with no active assignment at the shared instant are outside this
+/// single-instant population view and are ignored.
 ///
 /// # Errors
 ///
@@ -90,6 +128,38 @@ pub fn classify_membership_design(
         members.insert(assignment.member_id());
     }
     classify_members(network, instant, members.iter().copied())
+}
+
+/// Classify Membership-owned structure across a longitudinal observation support.
+///
+/// Each coordinate is resolved at its own event time. This preserves time-varying re-entry,
+/// cross-classification, multiple membership, and classification heterogeneity without forcing a
+/// consumer to choose one global `as_of` instant or to reimplement Membership-domain semantics.
+/// A requested observation is part of the declared support, so it may not silently disappear when
+/// no assignment is active at that observation's event time.
+///
+/// # Errors
+///
+/// Returns [`MembershipError::InsufficientClusterStructure`] for an empty observation support and
+/// [`MembershipError::MissingObservationMembership`] when any requested coordinate has no active
+/// membership at its own event time.
+pub fn classify_membership_observations(
+    network: &MembershipNetwork,
+    observations: &[MembershipObservation],
+) -> Result<MembershipDesign, MembershipError> {
+    if observations.is_empty() {
+        return Err(MembershipError::InsufficientClusterStructure);
+    }
+
+    let mut signals = MembershipDesignSignals::default();
+    for observation in observations {
+        let active = network.active_memberships_for(observation.member_id(), observation.event_time());
+        if active.is_empty() {
+            return Err(MembershipError::MissingObservationMembership);
+        }
+        signals.observe(&active);
+    }
+    signals.finish()
 }
 
 /// Recover the one-way random-intercept ICC for a nested membership design.
@@ -142,6 +212,58 @@ pub fn nested_intraclass_correlation(
     anova_nested_icc(&groups)
 }
 
+#[derive(Default)]
+struct MembershipDesignSignals {
+    saw_active: bool,
+    saw_cross: bool,
+    saw_multiple: bool,
+    active_roles: BTreeSet<MembershipRole>,
+}
+
+impl MembershipDesignSignals {
+    fn observe(&mut self, active: &[MembershipAssignment]) {
+        if active.is_empty() {
+            return;
+        }
+        self.saw_active = true;
+        let mut groups_by_role: BTreeMap<MembershipRole, BTreeSet<crate::GroupId>> =
+            BTreeMap::new();
+        let mut has_partial_weight = false;
+        for assignment in active {
+            has_partial_weight |= assignment.weight().value().to_bits() != 1.0_f64.to_bits();
+            self.active_roles.insert(assignment.role());
+            groups_by_role
+                .entry(assignment.role())
+                .or_default()
+                .insert(assignment.group_id());
+        }
+        self.saw_multiple |=
+            has_partial_weight || groups_by_role.values().any(|groups| groups.len() >= 2);
+        self.saw_cross |= groups_by_role.len() >= 2;
+    }
+
+    fn finish(self) -> Result<MembershipDesign, MembershipError> {
+        if !self.saw_active {
+            return Err(MembershipError::InsufficientClusterStructure);
+        }
+        let saw_heterogeneous_classification = self.active_roles.len() >= 2;
+        match (
+            self.saw_cross,
+            saw_heterogeneous_classification,
+            self.saw_multiple,
+        ) {
+            (true, _, true) => Ok(MembershipDesign::CrossClassifiedMultipleMembership),
+            (true, _, false) => Ok(MembershipDesign::CrossClassified),
+            (false, true, true) => {
+                Ok(MembershipDesign::HeterogeneousClassificationMultipleMembership)
+            }
+            (false, true, false) => Ok(MembershipDesign::HeterogeneousClassification),
+            (false, false, true) => Ok(MembershipDesign::MultipleMembership),
+            (false, false, false) => Ok(MembershipDesign::Nested),
+        }
+    }
+}
+
 fn classify_members<I>(
     network: &MembershipNetwork,
     instant: EventTime,
@@ -150,42 +272,12 @@ fn classify_members<I>(
 where
     I: IntoIterator<Item = MemberId>,
 {
-    let mut saw_active = false;
-    let mut saw_cross = false;
-    let mut saw_multiple = false;
-    let mut active_roles = BTreeSet::new();
+    let mut signals = MembershipDesignSignals::default();
     for member_id in members {
         let active = network.active_memberships_for(member_id, instant);
-        if active.is_empty() {
-            continue;
-        }
-        saw_active = true;
-        let mut groups_by_role: BTreeMap<MembershipRole, BTreeSet<crate::GroupId>> =
-            BTreeMap::new();
-        let mut has_partial_weight = false;
-        for assignment in active {
-            has_partial_weight |= assignment.weight().value().to_bits() != 1.0_f64.to_bits();
-            active_roles.insert(assignment.role());
-            groups_by_role
-                .entry(assignment.role())
-                .or_default()
-                .insert(assignment.group_id());
-        }
-        saw_multiple |= has_partial_weight || groups_by_role.values().any(|groups| groups.len() >= 2);
-        saw_cross |= groups_by_role.len() >= 2;
+        signals.observe(&active);
     }
-    if !saw_active {
-        return Err(MembershipError::InsufficientClusterStructure);
-    }
-    let saw_heterogeneous_classification = active_roles.len() >= 2;
-    match (saw_cross, saw_heterogeneous_classification, saw_multiple) {
-        (true, _, true) => Ok(MembershipDesign::CrossClassifiedMultipleMembership),
-        (true, _, false) => Ok(MembershipDesign::CrossClassified),
-        (false, true, true) => Ok(MembershipDesign::HeterogeneousClassificationMultipleMembership),
-        (false, true, false) => Ok(MembershipDesign::HeterogeneousClassification),
-        (false, false, true) => Ok(MembershipDesign::MultipleMembership),
-        (false, false, false) => Ok(MembershipDesign::Nested),
-    }
+    signals.finish()
 }
 
 fn anova_nested_icc(groups: &BTreeMap<crate::GroupId, Vec<f64>>) -> Result<f64, MembershipError> {
