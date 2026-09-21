@@ -67,6 +67,8 @@ fn longitudinal_support_preserves_reentry_without_inventing_multiple_membership(
         MembershipObservation::new(member, feb),
         MembershipObservation::new(member, oct),
     ];
+    assert_eq!(observations[0].member_id(), member);
+    assert_eq!(observations[0].event_time(), feb);
     assert_eq!(
         classify_membership_observations(&network, &observations).expect("longitudinal design"),
         MembershipDesign::Nested,
