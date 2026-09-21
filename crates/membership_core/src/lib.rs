@@ -45,6 +45,7 @@ pub use network::MembershipNetwork;
 pub use role::MembershipRole;
 /// Reconstructable longitudinal support projection and wire contracts.
 pub use support_wire::{
+    MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_DIGEST_VERSION,
     MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION, MembershipObservationSupportAssignmentWire,
     MembershipObservationSupportCoordinate, MembershipObservationSupportObservationWire,
     MembershipObservationSupportProjection, MembershipObservationSupportWire,
