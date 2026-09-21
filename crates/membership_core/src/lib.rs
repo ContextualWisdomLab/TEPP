@@ -19,6 +19,7 @@ mod icc;
 mod identifier;
 mod network;
 mod role;
+mod support_wire;
 mod weight;
 
 /// Fail-closed admission for estimators that only support full single membership.
@@ -42,6 +43,12 @@ pub use identifier::MemberId;
 pub use network::MembershipNetwork;
 /// Contextual membership roles (not permanent entity classes).
 pub use role::MembershipRole;
+/// Reconstructable longitudinal support projection and wire contracts.
+pub use support_wire::{
+    MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION, MembershipObservationSupportAssignmentWire,
+    MembershipObservationSupportObservationWire, MembershipObservationSupportProjection,
+    MembershipObservationSupportWire, project_membership_observations_wire,
+};
 /// Finite, strictly positive membership share in `(0, 1]`.
 pub use weight::MembershipWeight;
 
