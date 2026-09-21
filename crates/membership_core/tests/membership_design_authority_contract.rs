@@ -15,7 +15,9 @@ fn require_owner_classification(_: MembershipDesignClassification) {}
 fn canonical_classification_is_distinct_from_a_parsed_wire_coordinate() {
     let start = event_time("2026-01-01T00:00:00Z");
     let end = event_time("2026-12-31T23:59:59Z");
+    let early = event_time("2026-03-01T00:00:00Z");
     let as_of = event_time("2026-06-01T00:00:00Z");
+    let late = event_time("2026-09-01T00:00:00Z");
     let member = MemberId::new();
     let mut network = MembershipNetwork::new();
     network
@@ -34,10 +36,18 @@ fn canonical_classification_is_distinct_from_a_parsed_wire_coordinate() {
 
     let classification = classify_membership_observations_wire(
         &network,
-        &[MembershipObservation::new(member, as_of)],
+        &[
+            MembershipObservation::new(member, late),
+            MembershipObservation::new(member, early),
+            MembershipObservation::new(member, as_of),
+        ],
     )
     .expect("canonical owner classification");
     require_owner_classification(classification);
+
+    assert_eq!(classification.observation_count(), 3);
+    assert_eq!(classification.earliest_event_time(), early);
+    assert_eq!(classification.latest_event_time(), late);
 
     let wire = classification.wire();
     assert_eq!(wire.version(), MEMBERSHIP_DESIGN_WIRE_VERSION);
