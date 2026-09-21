@@ -2,6 +2,7 @@
 
 use crate::icc::{MembershipDesign, MembershipObservation, classify_membership_observations};
 use crate::{MembershipError, MembershipNetwork};
+use temporal_core::EventTime;
 
 /// Version identifier for the stable Membership design wire vocabulary.
 ///
@@ -71,17 +72,42 @@ impl MembershipDesignWire {
 ///
 /// Unlike [`MembershipDesignWire`], this type cannot be reconstructed from a `{version, name}` pair.
 /// Its private state is issued only after [`classify_membership_observations`] evaluates canonical
-/// Membership state at every observation's own event time.
+/// Membership state at every observation's own event time. The retained support count and event-time
+/// bounds are derived from the same observation slice and prevent the classification from becoming a
+/// completely detached design label.
+///
+/// These coordinates are not a complete reconstruction of the classified cohort. Distinct supports
+/// can share the same count and bounds, so released analytical projections still need their own
+/// privacy-appropriate observation-support evidence and exact identity binding where required.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MembershipDesignClassification {
     wire: MembershipDesignWire,
+    observation_count: usize,
+    earliest_event_time: EventTime,
+    latest_event_time: EventTime,
 }
 
 impl MembershipDesignClassification {
-    const fn from_design(design: MembershipDesign) -> Self {
-        Self {
-            wire: MembershipDesignWire::from_design(design),
+    fn from_design_and_observations(
+        design: MembershipDesign,
+        observations: &[MembershipObservation],
+    ) -> Result<Self, MembershipError> {
+        let Some(first) = observations.first().copied() else {
+            return Err(MembershipError::InsufficientClusterStructure);
+        };
+        let mut earliest_event_time = first.event_time();
+        let mut latest_event_time = first.event_time();
+        for observation in &observations[1..] {
+            let event_time = observation.event_time();
+            earliest_event_time = earliest_event_time.min(event_time);
+            latest_event_time = latest_event_time.max(event_time);
         }
+        Ok(Self {
+            wire: MembershipDesignWire::from_design(design),
+            observation_count: observations.len(),
+            earliest_event_time,
+            latest_event_time,
+        })
     }
 
     /// Return the stable wire coordinate for released projections.
@@ -107,6 +133,24 @@ impl MembershipDesignClassification {
     pub const fn name(self) -> &'static str {
         self.wire.name()
     }
+
+    /// Return the number of longitudinal observation coordinates classified.
+    #[must_use]
+    pub const fn observation_count(self) -> usize {
+        self.observation_count
+    }
+
+    /// Return the earliest event time in the classified observation support.
+    #[must_use]
+    pub const fn earliest_event_time(self) -> EventTime {
+        self.earliest_event_time
+    }
+
+    /// Return the latest event time in the classified observation support.
+    #[must_use]
+    pub const fn latest_event_time(self) -> EventTime {
+        self.latest_event_time
+    }
 }
 
 /// Classify longitudinal Membership support and issue an owner-derived classification result.
@@ -114,7 +158,8 @@ impl MembershipDesignClassification {
 /// Each observation is resolved at its own event time by the canonical Membership classifier. The
 /// returned [`MembershipDesignClassification`] is distinct from a parsed wire coordinate, so callers
 /// cannot turn an arbitrary supported `{version, name}` pair into owner-derived classification
-/// authority.
+/// authority. Support cardinality and event-time bounds are derived from the exact observation slice
+/// passed to classification rather than accepted as caller-supplied metadata.
 ///
 /// # Errors
 ///
@@ -124,8 +169,8 @@ pub fn classify_membership_observations_wire(
     network: &MembershipNetwork,
     observations: &[MembershipObservation],
 ) -> Result<MembershipDesignClassification, MembershipError> {
-    classify_membership_observations(network, observations)
-        .map(MembershipDesignClassification::from_design)
+    let design = classify_membership_observations(network, observations)?;
+    MembershipDesignClassification::from_design_and_observations(design, observations)
 }
 
 impl MembershipDesign {
