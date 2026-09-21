@@ -343,14 +343,13 @@ pub fn promote_scientific_recovery(
     if candidate != protected {
         return Err(ValidationError::ClaimHeadMismatch);
     }
-    if !max_rmse.is_finite() || max_rmse <= 0.0 || !se_multiplier.is_finite() || se_multiplier < 0.0 {
+    if !max_rmse.is_finite() || max_rmse <= 0.0 || !se_multiplier.is_finite() || se_multiplier < 0.0
+    {
         return Err(ValidationError::InvalidConfiguration);
     }
     let rmse = root_mean_square_error(truth, recovered)?;
     let rmse_se = rmse_standard_error(truth, recovered)?;
-    if rmse >= max_rmse
-        || accept_within_standard_errors(max_rmse, rmse, rmse_se, se_multiplier)?
-    {
+    if rmse >= max_rmse || accept_within_standard_errors(max_rmse, rmse, rmse_se, se_multiplier)? {
         return Err(ValidationError::ClaimRecoveryRejected);
     }
     Ok(PromotedClaim::new(
