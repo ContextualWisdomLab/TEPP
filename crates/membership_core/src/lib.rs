@@ -27,6 +27,8 @@ pub use admission::{SingleMembershipAdmission, admit_single_membership};
 pub use assignment::MembershipAssignment;
 /// Membership-owned design wire coordinate and vocabulary version.
 pub use design_wire::{MEMBERSHIP_DESIGN_WIRE_VERSION, MembershipDesignWire};
+/// Issue a Membership-owned wire coordinate from longitudinal canonical state.
+pub use design_wire::classify_membership_observations_wire;
 /// Fail-closed membership-domain validation errors.
 pub use error::MembershipError;
 /// Opaque analytical group identifier.
