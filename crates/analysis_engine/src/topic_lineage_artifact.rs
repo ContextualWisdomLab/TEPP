@@ -114,10 +114,12 @@ impl TopicLineageArtifact {
     }
 
     fn validate(&self) -> Result<(), AnalysisEngineError> {
+        let knowledge_cutoff = KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff)
+            .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
         if self.schema_version != TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION
             || !valid_identifier(&self.run_id)
             || !valid_identifier(&self.snapshot_id)
-            || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
+            || self.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
             || self.iterations == 0
             || !self.objective.is_finite()
             || self.topic_count < 2
