@@ -2,6 +2,12 @@
 
 use crate::{MembershipDesign, MembershipError};
 
+/// Version identifier for the stable Membership design wire vocabulary.
+///
+/// Released projections should bind this owner-issued version beside [`MembershipDesign::wire_name`]
+/// instead of inventing a consumer-local vocabulary version.
+pub const MEMBERSHIP_DESIGN_WIRE_VERSION: &str = "tepp.membership_design.v1";
+
 impl MembershipDesign {
     /// Parse one stable Membership-owned design name.
     ///
