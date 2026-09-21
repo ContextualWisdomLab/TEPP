@@ -19,35 +19,78 @@ fn canonical_classification_is_distinct_from_a_parsed_wire_coordinate() {
     let as_of = event_time("2026-06-01T00:00:00Z");
     let late = event_time("2026-09-01T00:00:00Z");
     let member = MemberId::new();
+    let other_member = MemberId::new();
+    let group = GroupId::new();
     let mut network = MembershipNetwork::new();
-    network
-        .insert(
-            MembershipAssignment::new(
-                member,
-                GroupId::new(),
-                MembershipRole::Department,
-                MembershipWeight::full().expect("full weight"),
-                start,
-                end,
+    for member_id in [member, other_member] {
+        network
+            .insert(
+                MembershipAssignment::new(
+                    member_id,
+                    group,
+                    MembershipRole::Department,
+                    MembershipWeight::full().expect("full weight"),
+                    start,
+                    end,
+                )
+                .expect("valid assignment"),
             )
-            .expect("valid assignment"),
-        )
-        .expect("insert assignment");
+            .expect("insert assignment");
+    }
 
-    let classification = classify_membership_observations_wire(
-        &network,
-        &[
-            MembershipObservation::new(member, late),
-            MembershipObservation::new(member, early),
-            MembershipObservation::new(member, as_of),
-        ],
-    )
-    .expect("canonical owner classification");
+    let observations = [
+        MembershipObservation::new(member, late),
+        MembershipObservation::new(member, early),
+        MembershipObservation::new(member, as_of),
+    ];
+    let classification = classify_membership_observations_wire(&network, &observations)
+        .expect("canonical owner classification");
     require_owner_classification(classification);
 
     assert_eq!(classification.observation_count(), 3);
     assert_eq!(classification.earliest_event_time(), early);
     assert_eq!(classification.latest_event_time(), late);
+
+    let reordered = classify_membership_observations_wire(
+        &network,
+        &[
+            MembershipObservation::new(member, as_of),
+            MembershipObservation::new(member, late),
+            MembershipObservation::new(member, early),
+        ],
+    )
+    .expect("reordered support");
+    assert_eq!(classification.support_sha256(), reordered.support_sha256());
+
+    let same_window_different_support = classify_membership_observations_wire(
+        &network,
+        &[
+            MembershipObservation::new(member, late),
+            MembershipObservation::new(member, early),
+            MembershipObservation::new(other_member, as_of),
+        ],
+    )
+    .expect("different support with same window");
+    assert_eq!(same_window_different_support.observation_count(), 3);
+    assert_eq!(same_window_different_support.earliest_event_time(), early);
+    assert_eq!(same_window_different_support.latest_event_time(), late);
+    assert_eq!(same_window_different_support.design(), classification.design());
+    assert_ne!(
+        same_window_different_support.support_sha256(),
+        classification.support_sha256()
+    );
+
+    let duplicated = classify_membership_observations_wire(
+        &network,
+        &[
+            MembershipObservation::new(member, late),
+            MembershipObservation::new(member, early),
+            MembershipObservation::new(member, as_of),
+            MembershipObservation::new(member, as_of),
+        ],
+    )
+    .expect("duplicate coordinates remain part of declared support");
+    assert_ne!(duplicated.support_sha256(), classification.support_sha256());
 
     let wire = classification.wire();
     assert_eq!(wire.version(), MEMBERSHIP_DESIGN_WIRE_VERSION);
