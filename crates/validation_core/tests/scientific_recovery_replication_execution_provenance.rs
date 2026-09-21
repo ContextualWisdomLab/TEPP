@@ -10,27 +10,20 @@ use validation_core::{
 };
 
 const HEAD: &str = "b2a3f879ca61daefa534f122647074666d5604bc";
-const TEST_ARTIFACT: &str =
-    "5555555555555555555555555555555555555555555555555555555555555555";
+const TEST_ARTIFACT: &str = "5555555555555555555555555555555555555555555555555555555555555555";
 const DGP: &str = "1111111111111111111111111111111111111111111111111111111111111111";
-const SEED_MANIFEST: &str =
-    "2222222222222222222222222222222222222222222222222222222222222222";
-const ESTIMAND: &str =
-    "3333333333333333333333333333333333333333333333333333333333333333";
+const SEED_MANIFEST: &str = "2222222222222222222222222222222222222222222222222222222222222222";
+const ESTIMAND: &str = "3333333333333333333333333333333333333333333333333333333333333333";
 const STATE: &str = "4444444444444444444444444444444444444444444444444444444444444444";
 const SEED_0: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const SEED_1: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 const EXEC_0: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 const EXEC_1: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-const EXEC_0_ALT: &str =
-    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
-const OTHER_PROFILE: &str =
-    "6666666666666666666666666666666666666666666666666666666666666666";
-const OTHER_MANIFEST: &str =
-    "7777777777777777777777777777777777777777777777777777777777777777";
+const EXEC_0_ALT: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const OTHER_PROFILE: &str = "6666666666666666666666666666666666666666666666666666666666666666";
+const OTHER_MANIFEST: &str = "7777777777777777777777777777777777777777777777777777777777777777";
 const LEDGER: &str = "8888888888888888888888888888888888888888888888888888888888888888";
-const REGISTRATION_ENTRY: &str =
-    "9999999999999999999999999999999999999999999999999999999999999999";
+const REGISTRATION_ENTRY: &str = "9999999999999999999999999999999999999999999999999999999999999999";
 
 fn seed_manifest() -> ScientificRecoverySeedManifestV1 {
     ScientificRecoverySeedManifestV1::new(&[SEED_0, SEED_1]).expect("valid seed manifest")
@@ -130,7 +123,7 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
         replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
     ];
-    let chronology = chronology(&profile, &receipts);
+    let profile_chronology = chronology(&profile, &receipts);
 
     assert_eq!(receipts[0].replication_index(), 0);
     assert_eq!(receipts[0].profile_sha256(), profile.sha256());
@@ -150,7 +143,7 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         &profile,
         &exact_head,
         &receipts,
-        &chronology,
+        &profile_chronology,
     )
     .expect("planned seed-state and execution receipts match exact recovery payloads");
 
@@ -159,7 +152,10 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         ClaimAuthority::ScientificallySupported
     );
     assert_eq!(promoted.replication_provenance_sha256().len(), 64);
-    assert_eq!(promoted.profile_chronology_sha256(), chronology.sha256());
+    assert_eq!(
+        promoted.profile_chronology_sha256(),
+        profile_chronology.sha256()
+    );
 
     let repeated = promote_scientific_recovery(
         HEAD,
@@ -169,7 +165,7 @@ fn promoted_authority_retains_ordered_replication_execution_provenance() {
         &profile,
         &exact_head,
         &receipts,
-        &chronology,
+        &profile_chronology,
     )
     .expect("same represented execution provenance is deterministic");
     assert_eq!(
@@ -208,8 +204,8 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     let profile = profile();
     let (truth, recovered) = exact_rows();
     let exact_head = exact_head_receipt();
-    let payload_0 = scientific_recovery_replication_payload_sha256(truth[0], recovered[0])
-        .expect("payload 0");
+    let payload_0 =
+        scientific_recovery_replication_payload_sha256(truth[0], recovered[0]).expect("payload 0");
     let valid_receipts = vec![
         replication_receipt(&profile, 0, SEED_0, EXEC_0, truth[0], recovered[0]),
         replication_receipt(&profile, 1, SEED_1, EXEC_1, truth[1], recovered[1]),
@@ -220,7 +216,14 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     reversed.swap(0, 1);
     assert_eq!(
         promote_scientific_recovery(
-            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &reversed, &chronology,
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head,
+            &reversed,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -239,7 +242,14 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     ];
     assert_eq!(
         promote_scientific_recovery(
-            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_profile, &chronology,
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head,
+            &wrong_profile,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -258,7 +268,14 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     ];
     assert_eq!(
         promote_scientific_recovery(
-            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_manifest, &chronology,
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head,
+            &wrong_manifest,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
@@ -277,7 +294,14 @@ fn replication_receipts_fail_closed_on_order_payload_profile_manifest_or_seed_re
     ];
     assert_eq!(
         promote_scientific_recovery(
-            HEAD, HEAD, &truth, &recovered, &profile, &exact_head, &wrong_payload, &chronology,
+            HEAD,
+            HEAD,
+            &truth,
+            &recovered,
+            &profile,
+            &exact_head,
+            &wrong_payload,
+            &chronology,
         ),
         Err(ValidationError::InvalidInput)
     );
