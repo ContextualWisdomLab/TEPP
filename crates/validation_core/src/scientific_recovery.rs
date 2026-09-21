@@ -306,10 +306,7 @@ impl Serialize for ScientificRecoveryProfileV1 {
         state.serialize_field("dgp_sha256", &self.dgp_sha256)?;
         state.serialize_field("seed_manifest_sha256", &self.seed_manifest_sha256)?;
         state.serialize_field("estimand_sha256", &self.estimand_sha256)?;
-        state.serialize_field(
-            "state_composition_sha256",
-            &self.state_composition_sha256,
-        )?;
+        state.serialize_field("state_composition_sha256", &self.state_composition_sha256)?;
         state.serialize_field("failure_policy", &self.failure_policy)?;
         state.end()
     }
