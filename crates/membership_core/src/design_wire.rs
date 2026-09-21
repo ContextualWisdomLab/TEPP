@@ -9,28 +9,29 @@ use crate::{MembershipError, MembershipNetwork};
 /// instead of inventing a consumer-local vocabulary version.
 pub const MEMBERSHIP_DESIGN_WIRE_VERSION: &str = "tepp.membership_design.v1";
 
-/// Membership-owned wire coordinate for one analytical design classification.
+/// Stable Membership design coordinate used at serialization boundaries.
 ///
-/// The coordinate binds the supported vocabulary version and owner-issued design name as one
-/// immutable value object. Authoritative coordinates are issued by Membership-owned classification
-/// over canonical network state; parsing an existing wire pair does not establish that authority.
+/// This value object binds the supported vocabulary version and design name. It can be reconstructed
+/// from released payloads, so possession of this type alone does not establish that the design was
+/// classified from canonical Membership state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MembershipDesignWire {
     design: MembershipDesign,
 }
 
 impl MembershipDesignWire {
-    /// Bind an already owner-derived design to the current Membership wire vocabulary.
+    /// Bind an already validated design to the current Membership wire vocabulary.
     #[must_use]
-    pub(crate) const fn from_design(design: MembershipDesign) -> Self {
+    const fn from_design(design: MembershipDesign) -> Self {
         Self { design }
     }
 
     /// Parse one complete Membership design wire coordinate.
     ///
     /// This is a deserialization boundary only. Parsing does not prove that the design describes any
-    /// particular network or observation support; authoritative classification must still originate
-    /// from Membership-owned domain state.
+    /// particular network or observation support. New authoritative classifications are represented
+    /// by [`MembershipDesignClassification`] and are issued only through Membership-owned domain
+    /// classification.
     ///
     /// # Errors
     ///
@@ -56,18 +57,64 @@ impl MembershipDesignWire {
         self.design.wire_name()
     }
 
-    /// Return the recovered Membership-domain design.
+    /// Return the design encoded by this wire coordinate.
+    ///
+    /// The returned enum reflects only the parsed/serialized coordinate. It is not proof that the
+    /// design was derived from canonical Membership state.
     #[must_use]
     pub const fn design(self) -> MembershipDesign {
         self.design
     }
 }
 
-/// Classify longitudinal Membership support and issue its stable wire coordinate.
+/// Membership-owned result of classifying canonical longitudinal observation support.
 ///
-/// Each observation is resolved at its own event time by the canonical Membership classifier. This
-/// function is the owner-issued path for new analytical evidence; callers cannot mint a coordinate
-/// from a freely chosen [`MembershipDesign`] enum value.
+/// Unlike [`MembershipDesignWire`], this type cannot be reconstructed from a `{version, name}` pair.
+/// Its private state is issued only after [`classify_membership_observations`] evaluates canonical
+/// Membership state at every observation's own event time.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MembershipDesignClassification {
+    wire: MembershipDesignWire,
+}
+
+impl MembershipDesignClassification {
+    const fn from_design(design: MembershipDesign) -> Self {
+        Self {
+            wire: MembershipDesignWire::from_design(design),
+        }
+    }
+
+    /// Return the stable wire coordinate for released projections.
+    #[must_use]
+    pub const fn wire(self) -> MembershipDesignWire {
+        self.wire
+    }
+
+    /// Return the Membership-domain design derived from canonical state.
+    #[must_use]
+    pub const fn design(self) -> MembershipDesign {
+        self.wire.design()
+    }
+
+    /// Return the bound Membership vocabulary version.
+    #[must_use]
+    pub const fn version(self) -> &'static str {
+        self.wire.version()
+    }
+
+    /// Return the stable design name for released projections.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        self.wire.name()
+    }
+}
+
+/// Classify longitudinal Membership support and issue an owner-derived classification result.
+///
+/// Each observation is resolved at its own event time by the canonical Membership classifier. The
+/// returned [`MembershipDesignClassification`] is distinct from a parsed wire coordinate, so callers
+/// cannot turn an arbitrary supported `{version, name}` pair into owner-derived classification
+/// authority.
 ///
 /// # Errors
 ///
@@ -76,16 +123,17 @@ impl MembershipDesignWire {
 pub fn classify_membership_observations_wire(
     network: &MembershipNetwork,
     observations: &[MembershipObservation],
-) -> Result<MembershipDesignWire, MembershipError> {
-    classify_membership_observations(network, observations).map(MembershipDesignWire::from_design)
+) -> Result<MembershipDesignClassification, MembershipError> {
+    classify_membership_observations(network, observations)
+        .map(MembershipDesignClassification::from_design)
 }
 
 impl MembershipDesign {
     /// Parse one stable Membership-owned design name.
     ///
     /// This parser is a serialization boundary only. It does not derive or authorize a design;
-    /// estimators and projections must still obtain the authoritative enum from Membership-owned
-    /// classification over canonical network state.
+    /// estimators and projections must still obtain authoritative classification from Membership-owned
+    /// domain state.
     ///
     /// # Errors
     ///
