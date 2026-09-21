@@ -1,5 +1,6 @@
 //! Privacy-reduced reconstructable wire projection for longitudinal Membership support.
 
+use crate::icc::MembershipDesignSignals;
 use crate::{
     MembershipDesignClassification, MembershipDesignWire, MembershipError, MembershipNetwork,
     MembershipObservation, MembershipRole, MembershipWeight,
@@ -186,7 +187,7 @@ impl MembershipObservationSupportWire {
         if self.schema_version != MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION {
             return Err(MembershipError::UnsupportedWireVersion);
         }
-        let _design = MembershipDesignWire::parse(&self.design_version, &self.design_name)?;
+        let design = MembershipDesignWire::parse(&self.design_version, &self.design_name)?;
         if self.support_digest_version != MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION
             || !valid_lower_hex(&self.support_sha256, 64)
             || self.member_count == 0
@@ -199,6 +200,7 @@ impl MembershipObservationSupportWire {
 
         let mut members = BTreeSet::new();
         let mut groups = BTreeSet::new();
+        let mut signals = MembershipDesignSignals::default();
         for observation in &self.observations {
             let event_time = EventTime::parse_rfc3339(&observation.event_time)
                 .map_err(|_| MembershipError::InvalidWirePayload)?;
@@ -209,15 +211,23 @@ impl MembershipObservationSupportWire {
                 return Err(MembershipError::InvalidWirePayload);
             }
             members.insert(observation.member_ordinal);
+            let mut topology = Vec::with_capacity(observation.assignments.len());
             for assignment in &observation.assignments {
-                MembershipRole::from_wire_name(&assignment.role)?;
+                let role = MembershipRole::from_wire_name(&assignment.role)?;
                 let bits = parse_weight_bits(&assignment.weight_f64_bits)?;
                 MembershipWeight::new(f64::from_bits(bits))?;
                 groups.insert(assignment.group_ordinal);
+                topology.push((
+                    role,
+                    assignment.group_ordinal,
+                    bits != 1.0_f64.to_bits(),
+                ));
             }
+            signals.observe_tokens(topology);
         }
         if !is_contiguous_zero_based(&members, self.member_count)
             || !is_contiguous_zero_based(&groups, self.group_count)
+            || signals.finish()? != design.design()
         {
             return Err(MembershipError::InvalidWirePayload);
         }
