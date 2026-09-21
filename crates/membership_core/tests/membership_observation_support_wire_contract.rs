@@ -1,7 +1,8 @@
 use membership_core::{
     GroupId, MemberId, MembershipAssignment, MembershipDesign, MembershipNetwork,
-    MembershipObservation, MembershipObservationSupportProjection, MembershipObservationSupportWire,
-    MembershipRole, MembershipWeight, MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION,
+    MembershipObservation, MembershipObservationSupportCoordinate,
+    MembershipObservationSupportProjection, MembershipObservationSupportWire, MembershipRole,
+    MembershipWeight, MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION,
     project_membership_observations_wire,
 };
 use temporal_core::EventTime;
@@ -37,6 +38,7 @@ fn assignment(
 }
 
 fn require_owner_projection(_: &MembershipObservationSupportProjection) {}
+fn require_support_coordinate(_: MembershipObservationSupportCoordinate) {}
 
 #[test]
 fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
@@ -122,6 +124,17 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
     );
     assert_eq!(projection.wire().observations().len(), observations.len());
 
+    let input_coordinates = projection.input_coordinates();
+    assert_eq!(input_coordinates.len(), observations.len());
+    for coordinate in input_coordinates {
+        require_support_coordinate(*coordinate);
+    }
+    assert_eq!(input_coordinates[0].member_ordinal(), 1);
+    assert_eq!(input_coordinates[0].event_time(), late);
+    assert_eq!(input_coordinates[1].member_ordinal(), 0);
+    assert_eq!(input_coordinates[1].event_time(), early);
+    assert_eq!(input_coordinates[2], input_coordinates[3]);
+
     let expected_support_digest = projection
         .classification()
         .support_sha256()
@@ -132,12 +145,15 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
     assert_eq!(projection.wire().support_sha256(), expected_support_digest);
 
     let canonical = projection.wire().to_json().expect("canonical JSON");
-    let same = project_membership_observations_wire(&reverse, &reordered)
-        .expect("equivalent owner-issued projection")
+    let reordered_projection = project_membership_observations_wire(&reverse, &reordered)
+        .expect("equivalent owner-issued projection");
+    let same = reordered_projection
         .wire()
         .to_json()
         .expect("canonical JSON");
     assert_eq!(canonical, same);
+    assert_eq!(reordered_projection.input_coordinates()[0].member_ordinal(), 0);
+    assert_eq!(reordered_projection.input_coordinates()[2].member_ordinal(), 1);
 
     for raw in [
         first_member.as_uuid().to_string(),
