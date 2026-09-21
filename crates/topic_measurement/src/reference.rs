@@ -55,7 +55,7 @@ impl ReferenceTopicInput {
     /// `document_term` may be CSR or CSC. `covariates`, when present, may also
     /// use either orientation. Every document must occur in `snapshot`, have a
     /// nonempty nonnegative term row, span at least two event times, and have at
-    /// least one active membership across the modeled corpus. Only validated
+    /// least one active membership at its own event time. Only validated
     /// forward transition edges with both endpoints in the corpus affect the
     /// relational objective; all other relation kinds remain provenance only.
     ///
@@ -237,6 +237,9 @@ fn build_design(
         .zip(event_times)
         .map(|(id, time)| memberships.active_memberships_for(MemberId::from_uuid(*id), *time))
         .collect();
+    if active.iter().any(Vec::is_empty) {
+        return Err(TopicMeasurementError::InvalidModelInput);
+    }
     let membership_keys: BTreeSet<_> = active
         .iter()
         .flatten()
