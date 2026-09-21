@@ -228,7 +228,9 @@ impl TopicLineageArtifact {
                 .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
             let successor = Uuid::parse_str(&edge.successor_document_id)
                 .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
-            if predecessor == successor
+            if edge.predecessor_document_id != predecessor.to_string()
+                || edge.successor_document_id != successor.to_string()
+                || predecessor == successor
                 || edge.topic_index >= self.topic_count
                 || !edge.association_strength.is_finite()
                 || edge.association_strength <= 0.0
