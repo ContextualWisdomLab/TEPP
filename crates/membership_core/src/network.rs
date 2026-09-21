@@ -176,7 +176,7 @@ fn collect_known_boundary(
 /// represented value without introducing another rounding step. This keeps the
 /// membership admission boundary exact while leaving estimator arithmetic to its
 /// numerical owner.
-fn exact_nonnegative_binary64_sum_exceeds_one<I>(weights: I) -> bool
+pub(crate) fn exact_nonnegative_binary64_sum_exceeds_one<I>(weights: I) -> bool
 where
     I: IntoIterator<Item = f64>,
 {
@@ -276,7 +276,9 @@ mod tests {
     fn exact_share_budget_comparison_covers_zero_subnormal_unity_and_overrun() {
         let minimum_subnormal = f64::from_bits(1);
         assert!(!exact_nonnegative_binary64_sum_exceeds_one([
-            0.0, -0.0, minimum_subnormal
+            0.0,
+            -0.0,
+            minimum_subnormal
         ]));
         assert!(!exact_nonnegative_binary64_sum_exceeds_one([0.75, 0.25]));
         assert!(exact_nonnegative_binary64_sum_exceeds_one([
