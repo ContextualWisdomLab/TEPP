@@ -51,7 +51,8 @@ impl TopicLineageMethodConfiguration {
             return Err(());
         }
         let value: Self = serde_json::from_str(payload).map_err(|_| ())?;
-        if value.seeds.iter().copied().collect::<BTreeSet<_>>().len() != value.seeds.len()
+        if value.seeds.contains(&0)
+            || value.seeds.iter().copied().collect::<BTreeSet<_>>().len() != value.seeds.len()
             || (value.relation_strength == 0.0 && value.relation_strength.is_sign_negative())
             || (value.ridge == 0.0 && value.ridge.is_sign_negative())
         {
