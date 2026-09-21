@@ -223,13 +223,16 @@ impl TopicLineageArtifact {
         let mut pairs = BTreeSet::new();
         let mut connected = BTreeSet::new();
         let mut lineages = BTreeSet::new();
+        let mut previous_edge_coordinate = None;
         for edge in &self.sequence_edges {
             let predecessor = Uuid::parse_str(&edge.predecessor_document_id)
                 .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
             let successor = Uuid::parse_str(&edge.successor_document_id)
                 .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+            let edge_coordinate = (predecessor, successor, edge.topic_index);
             if edge.predecessor_document_id != predecessor.to_string()
                 || edge.successor_document_id != successor.to_string()
+                || previous_edge_coordinate.is_some_and(|previous| previous >= edge_coordinate)
                 || predecessor == successor
                 || edge.topic_index >= self.topic_count
                 || !edge.association_strength.is_finite()
@@ -239,6 +242,7 @@ impl TopicLineageArtifact {
             {
                 return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
             }
+            previous_edge_coordinate = Some(edge_coordinate);
             connected.insert(predecessor);
             connected.insert(successor);
             lineages.insert(edge.topic_index);
@@ -313,7 +317,7 @@ pub fn execute_topic_lineage_run(
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let lineage_count =
         u64::try_from(model.lineage_count).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
-    let sequence_edges: Vec<_> = model
+    let mut sequence_edges: Vec<_> = model
         .sequence_edges
         .iter()
         .map(|edge| {
@@ -326,6 +330,12 @@ pub fn execute_topic_lineage_run(
             })
         })
         .collect::<Result<_, AnalysisEngineError>>()?;
+    sequence_edges.sort_by(|left, right| {
+        left.predecessor_document_id
+            .cmp(&right.predecessor_document_id)
+            .then_with(|| left.successor_document_id.cmp(&right.successor_document_id))
+            .then_with(|| left.topic_index.cmp(&right.topic_index))
+    });
     let artifact = TopicLineageArtifact {
         schema_version: TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION.into(),
         run_id: accepted.run_id.clone(),
