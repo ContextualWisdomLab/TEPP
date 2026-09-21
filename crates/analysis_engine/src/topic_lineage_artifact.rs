@@ -28,6 +28,7 @@ const TOPIC_LINEAGE_CONFIGURATION_BYTE_LIMIT: usize = 8 * 1024;
 const TOPIC_LINEAGE_CONFIGURATION_SCHEMA_VERSION: &str =
     "tepp.trsl_topic_lineage.reference_config.v1";
 const TOPIC_LINEAGE_ESTIMATOR_BACKEND: &str = "cpu_f64_reference";
+const TOPIC_LINEAGE_POSTERIOR_APPROXIMATION: &str = "diagonal_laplace";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -124,6 +125,8 @@ pub struct TopicLineageArtifact {
     pub method_configuration_sha256: String,
     /// Runtime/backend identity whose numerical parity is part of this contract.
     pub estimator_backend: String,
+    /// Posterior uncertainty approximation retained by this result.
+    pub posterior_approximation: String,
     /// Selected deterministic initialization seed.
     pub selected_seed: u64,
     /// Iterations used by the selected converged fit.
@@ -202,6 +205,7 @@ impl TopicLineageArtifact {
             || self.model_contract_version != TOPIC_LINEAGE_MODEL_CONTRACT_VERSION
             || self.method_configuration_sha256 != configuration_sha256
             || self.estimator_backend != TOPIC_LINEAGE_ESTIMATOR_BACKEND
+            || self.posterior_approximation != TOPIC_LINEAGE_POSTERIOR_APPROXIMATION
             || self.topic_count != method_configuration.topic_count
             || !method_configuration.seeds.contains(&self.selected_seed)
             || self.iterations == 0
@@ -329,6 +333,7 @@ pub fn execute_topic_lineage_run(
         method_configuration_json: method_configuration_json.to_owned(),
         method_configuration_sha256,
         estimator_backend: TOPIC_LINEAGE_ESTIMATOR_BACKEND.into(),
+        posterior_approximation: TOPIC_LINEAGE_POSTERIOR_APPROXIMATION.into(),
         selected_seed: model.seed,
         iterations: u64::try_from(model.iterations)
             .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
@@ -390,6 +395,7 @@ mod tests {
             method_configuration_json: CONFIG_JSON.into(),
             method_configuration_sha256: CONFIG_SHA256.into(),
             estimator_backend: "cpu_f64_reference".into(),
+            posterior_approximation: "diagonal_laplace".into(),
             selected_seed: 7,
             iterations: 4,
             objective: -1.0,
@@ -483,6 +489,11 @@ mod tests {
             {
                 let mut value = artifact.clone();
                 value.estimator_backend = "unknown".into();
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.posterior_approximation = "joint_gauss_newton_laplace".into();
                 value
             },
             {
