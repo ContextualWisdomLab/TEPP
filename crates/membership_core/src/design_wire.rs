@@ -214,12 +214,6 @@ fn canonical_observation_support_sha256(
                 left.role()
                     .cmp(&right.role())
                     .then_with(|| left.group_id().cmp(&right.group_id()))
-                    .then_with(|| {
-                        left.weight()
-                            .value()
-                            .to_bits()
-                            .cmp(&right.weight().value().to_bits())
-                    })
             });
             (observation, active)
         })
