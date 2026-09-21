@@ -382,8 +382,7 @@ mod tests {
     use crate::AnalysisEngineError;
 
     const CONFIG_JSON: &str = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[7,11],\"maximum_iterations\":2000,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.5,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
-    const CONFIG_SHA256: &str =
-        "c99da5cab3050e3d5e357bcdccca5405b05263ca2493fdfc74f3080948a3763b";
+    const CONFIG_SHA256: &str = "c99da5cab3050e3d5e357bcdccca5405b05263ca2493fdfc74f3080948a3763b";
 
     fn artifact() -> TopicLineageArtifact {
         TopicLineageArtifact {
@@ -437,7 +436,6 @@ mod tests {
             TopicLineageArtifact::from_json(&"x".repeat(TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT + 1)),
             Err(AnalysisEngineError::LimitExceeded)
         );
-
         let mut oversized = artifact;
         oversized.sequence_edges = (1_u128..=2_000)
             .map(|index| TopicLineageArtifactEdge {
