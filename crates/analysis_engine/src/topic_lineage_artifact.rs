@@ -20,7 +20,7 @@ pub const TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION: &str = "tepp.trsl_topic_lineage
 /// Model contract required by the CPU `f64` reference execution path.
 pub const TOPIC_LINEAGE_MODEL_CONTRACT_VERSION: &str = "trsl_tm_cpu_f64_v1";
 /// Analysis-run output profile required for a topic-lineage artifact.
-pub const TOPIC_LINEAGE_OUTPUT_PROFILE: &str = "trsl_topic_lineage_v1";
+pub const TOPIC_LINEAGE_OUTPUT_PROFILE: &str = "trsl_topic_lineage_v2";
 /// Maximum canonical artifact JSON size.
 pub const TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const TOPIC_LINEAGE_EDGE_LIMIT: usize = 100_000;
