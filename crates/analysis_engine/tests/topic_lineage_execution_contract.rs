@@ -140,6 +140,7 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     assert_eq!(execution.artifact.model_contract_version, TOPIC_LINEAGE_MODEL_CONTRACT_VERSION);
     assert_eq!(execution.artifact.method_configuration_json, CONFIG_JSON);
     assert_eq!(execution.artifact.estimator_backend, "cpu_f64_reference");
+    assert_eq!(execution.artifact.posterior_approximation, "diagonal_laplace");
     assert_eq!(execution.artifact.connected_post_count, 4);
     assert_eq!(execution.artifact.lineage_count, 2);
     assert_eq!(execution.artifact.sequence_edges.len(), 2);
