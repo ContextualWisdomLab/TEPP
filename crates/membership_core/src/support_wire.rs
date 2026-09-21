@@ -8,12 +8,17 @@ use crate::{
     MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION, classify_membership_observations_wire,
 };
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 use temporal_core::EventTime;
 
 /// Version identifier for the reconstructable longitudinal Membership support wire projection.
 pub const MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION: &str =
     "tepp.membership_observation_support_projection.v1";
+
+/// Version identifier for the recomputable privacy-reduced wire-content SHA-256 contract.
+pub const MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_DIGEST_VERSION: &str =
+    "tepp.membership_observation_support_projection_digest.v1";
 
 const MAX_SUPPORT_JSON_BYTES: usize = 4 * 1024 * 1024;
 
@@ -81,9 +86,10 @@ impl MembershipObservationSupportObservationWire {
 /// Versioned, reconstructable, privacy-reduced serialization value for longitudinal Membership support.
 ///
 /// The wire intentionally omits raw [`crate::MemberId`] and [`crate::GroupId`] UUIDs. Local ordinals
-/// preserve repeated-member and repeated-group linkage only within this projection. The bound source
-/// support digest remains an owner-side provenance fingerprint and should not be interpreted as
-/// anonymity or as a natural-person identifier.
+/// preserve repeated-member and repeated-group linkage only within this projection. `support_sha256`
+/// remains an owner-side provenance fingerprint over opaque source identity and is not recomputable
+/// after UUID redaction. `wire_sha256` separately binds the complete privacy-reduced projection state
+/// and is recomputed by the parser; neither digest is a signature or proof of owner authority.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct MembershipObservationSupportWire {
@@ -92,9 +98,24 @@ pub struct MembershipObservationSupportWire {
     design_name: String,
     support_digest_version: String,
     support_sha256: String,
+    wire_digest_version: String,
+    wire_sha256: String,
     member_count: u32,
     group_count: u32,
     observations: Vec<MembershipObservationSupportObservationWire>,
+}
+
+#[derive(Serialize)]
+struct MembershipObservationSupportWireDigestPayload<'a> {
+    schema_version: &'a str,
+    design_version: &'a str,
+    design_name: &'a str,
+    support_digest_version: &'a str,
+    support_sha256: &'a str,
+    wire_digest_version: &'a str,
+    member_count: u32,
+    group_count: u32,
+    observations: &'a [MembershipObservationSupportObservationWire],
 }
 
 impl MembershipObservationSupportWire {
@@ -102,12 +123,14 @@ impl MembershipObservationSupportWire {
     ///
     /// Parsed wire values are serialization data only. Parsing does not prove that the support was
     /// derived from canonical Membership state; new owner authority is issued through
-    /// [`project_membership_observations_wire`].
+    /// [`project_membership_observations_wire`]. The wire digest catches detached or internally
+    /// inconsistent serialized evidence but is not an authentication mechanism.
     ///
     /// # Errors
     ///
-    /// Returns [`MembershipError::InvalidWirePayload`] for malformed or byte-noncanonical payloads,
-    /// and [`MembershipError::UnsupportedWireVersion`] for an unsupported projection version.
+    /// Returns [`MembershipError::InvalidWirePayload`] for malformed, digest-detached, or
+    /// byte-noncanonical payloads, and [`MembershipError::UnsupportedWireVersion`] for an unsupported
+    /// projection version.
     pub fn from_json(payload: &str) -> Result<Self, MembershipError> {
         if payload.len() > MAX_SUPPORT_JSON_BYTES {
             return Err(MembershipError::InvalidWirePayload);
@@ -125,8 +148,8 @@ impl MembershipObservationSupportWire {
     ///
     /// # Errors
     ///
-    /// Returns a fail-closed Membership wire error when any coordinate is invalid or the bounded
-    /// payload size is exceeded.
+    /// Returns a fail-closed Membership wire error when any coordinate is invalid, the recomputable
+    /// content digest is detached, or the bounded payload size is exceeded.
     pub fn to_json(&self) -> Result<String, MembershipError> {
         self.validate()?;
         let payload = serde_json::to_string(self).map_err(|_| MembershipError::InvalidWirePayload)?;
@@ -160,10 +183,26 @@ impl MembershipObservationSupportWire {
         &self.support_digest_version
     }
 
-    /// Return the lowercase source-support SHA-256 owned by Membership classification.
+    /// Return the lowercase owner-attested source-support SHA-256.
+    ///
+    /// This digest includes opaque source identifiers that are intentionally absent from the released
+    /// projection, so parsed wire bytes cannot recompute it. Use [`Self::wire_sha256`] for a
+    /// consumer-recomputable content identity.
     #[must_use]
     pub fn support_sha256(&self) -> &str {
         &self.support_sha256
+    }
+
+    /// Return the wire-content digest contract version.
+    #[must_use]
+    pub fn wire_digest_version(&self) -> &str {
+        &self.wire_digest_version
+    }
+
+    /// Return the lowercase SHA-256 recomputable from this privacy-reduced projection.
+    #[must_use]
+    pub fn wire_sha256(&self) -> &str {
+        &self.wire_sha256
     }
 
     /// Return the number of projection-local members.
@@ -191,6 +230,8 @@ impl MembershipObservationSupportWire {
         let design = MembershipDesignWire::parse(&self.design_version, &self.design_name)?;
         if self.support_digest_version != MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION
             || !valid_lower_hex(&self.support_sha256, 64)
+            || self.wire_digest_version != MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_DIGEST_VERSION
+            || !valid_lower_hex(&self.wire_sha256, 64)
             || self.member_count == 0
             || self.group_count == 0
             || self.observations.is_empty()
@@ -242,10 +283,28 @@ impl MembershipObservationSupportWire {
         if !is_contiguous_zero_based(&members, self.member_count)
             || !is_contiguous_zero_based(&groups, self.group_count)
             || signals.finish()? != design.design()
+            || self.compute_wire_sha256()? != self.wire_sha256
         {
             return Err(MembershipError::InvalidWirePayload);
         }
         Ok(())
+    }
+
+    fn compute_wire_sha256(&self) -> Result<String, MembershipError> {
+        let digest_payload = MembershipObservationSupportWireDigestPayload {
+            schema_version: &self.schema_version,
+            design_version: &self.design_version,
+            design_name: &self.design_name,
+            support_digest_version: &self.support_digest_version,
+            support_sha256: &self.support_sha256,
+            wire_digest_version: &self.wire_digest_version,
+            member_count: self.member_count,
+            group_count: self.group_count,
+            observations: &self.observations,
+        };
+        let canonical =
+            serde_json::to_vec(&digest_payload).map_err(|_| MembershipError::InvalidWirePayload)?;
+        Ok(lower_hex(&Sha256::digest(canonical)))
     }
 }
 
@@ -312,10 +371,11 @@ impl MembershipObservationSupportProjection {
 ///
 /// Local member/group ordinals are derived from sorted opaque owner identifiers but the identifiers
 /// themselves are not serialized. Observation and active-assignment ordering are canonicalized, while
-/// duplicate declared observations remain multiplicity-sensitive. The wire binds the exact source
-/// support digest already issued by [`classify_membership_observations_wire`]. The authority also
-/// returns a non-wire input-coordinate slice so downstream owners can bind their own observation
-/// identities to Membership-issued local member ordinals without reimplementing that mapping.
+/// duplicate declared observations remain multiplicity-sensitive. The wire carries the exact source
+/// support digest already issued by [`classify_membership_observations_wire`] and a separate digest
+/// recomputable from the privacy-reduced serialized coordinates. The authority also returns a non-wire
+/// input-coordinate slice so downstream owners can bind their own observation identities to
+/// Membership-issued local member ordinals without reimplementing that mapping.
 ///
 /// # Errors
 ///
@@ -402,22 +462,20 @@ pub fn project_membership_observations_wire(
     }
     wire_observations.sort();
 
-    let support_sha256 = classification
-        .support_sha256()
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<Vec<_>>()
-        .join("");
-    let wire = MembershipObservationSupportWire {
+    let support_sha256 = lower_hex(&classification.support_sha256());
+    let mut wire = MembershipObservationSupportWire {
         schema_version: MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION.to_owned(),
         design_version: classification.version().to_owned(),
         design_name: classification.name().to_owned(),
         support_digest_version: classification.support_digest_version().to_owned(),
         support_sha256,
+        wire_digest_version: MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_DIGEST_VERSION.to_owned(),
+        wire_sha256: String::new(),
         member_count,
         group_count,
         observations: wire_observations,
     };
+    wire.wire_sha256 = wire.compute_wire_sha256()?;
     let _canonical_json = wire.to_json()?;
     Ok(MembershipObservationSupportProjection {
         classification,
@@ -438,6 +496,14 @@ fn valid_lower_hex(value: &str, width: usize) -> bool {
         && value
             .bytes()
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+fn lower_hex(bytes: &[u8]) -> String {
+    bytes
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 fn strictly_increasing<T: Ord>(values: &[T]) -> bool {
