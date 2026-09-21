@@ -282,3 +282,35 @@ fn parsed_wire_refuses_noncanonical_or_malformed_support_payloads() {
         .is_err()
     );
 }
+
+#[test]
+fn parsed_wire_refuses_detached_valid_source_support_digest() {
+    let member_id = member(0xabc);
+    let group_id = group(0xdef);
+    let as_of = event_time("2026-06-01T00:00:00Z");
+    let mut network = MembershipNetwork::new();
+    network
+        .insert(assignment(
+            member_id,
+            group_id,
+            MembershipRole::Department,
+            1.0,
+        ))
+        .expect("membership");
+    let projection = project_membership_observations_wire(
+        &network,
+        &[MembershipObservation::new(member_id, as_of)],
+    )
+    .expect("owner projection");
+    let canonical = projection.wire().to_json().expect("canonical JSON");
+    let original_digest = projection.wire().support_sha256();
+    let replacement_digest = "0".repeat(64);
+    assert_ne!(original_digest, replacement_digest);
+
+    let detached = canonical.replacen(original_digest, &replacement_digest, 1);
+    assert_ne!(canonical, detached);
+    assert!(
+        MembershipObservationSupportWire::from_json(&detached).is_err(),
+        "a valid-looking owner support digest must not detach from serialized reconstruction bytes"
+    );
+}
