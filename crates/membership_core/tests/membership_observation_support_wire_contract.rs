@@ -2,8 +2,8 @@ use membership_core::{
     GroupId, MemberId, MembershipAssignment, MembershipDesign, MembershipNetwork,
     MembershipObservation, MembershipObservationSupportCoordinate,
     MembershipObservationSupportProjection, MembershipObservationSupportWire, MembershipRole,
-    MembershipWeight, MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION,
-    project_membership_observations_wire,
+    MembershipWeight, MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_DIGEST_VERSION,
+    MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION, project_membership_observations_wire,
 };
 use temporal_core::EventTime;
 use uuid::Uuid;
@@ -122,6 +122,14 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
         projection.wire().support_digest_version(),
         projection.classification().support_digest_version()
     );
+    assert_eq!(
+        projection.wire().wire_digest_version(),
+        MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_DIGEST_VERSION
+    );
+    assert_eq!(projection.wire().wire_sha256().len(), 64);
+    assert!(projection.wire().wire_sha256().bytes().all(|byte| {
+        byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+    }));
     assert_eq!(projection.wire().observations().len(), observations.len());
 
     let input_coordinates = projection.input_coordinates();
@@ -152,6 +160,10 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
         .to_json()
         .expect("canonical JSON");
     assert_eq!(canonical, same);
+    assert_eq!(
+        projection.wire().wire_sha256(),
+        reordered_projection.wire().wire_sha256()
+    );
     assert_eq!(reordered_projection.input_coordinates()[0].member_ordinal(), 0);
     assert_eq!(reordered_projection.input_coordinates()[2].member_ordinal(), 1);
 
@@ -307,10 +319,21 @@ fn parsed_wire_refuses_detached_valid_source_support_digest() {
     let replacement_digest = "0".repeat(64);
     assert_ne!(original_digest, replacement_digest);
 
-    let detached = canonical.replacen(original_digest, &replacement_digest, 1);
-    assert_ne!(canonical, detached);
+    let detached_support_digest = canonical.replacen(original_digest, &replacement_digest, 1);
+    assert_ne!(canonical, detached_support_digest);
     assert!(
-        MembershipObservationSupportWire::from_json(&detached).is_err(),
+        MembershipObservationSupportWire::from_json(&detached_support_digest).is_err(),
         "a valid-looking owner support digest must not detach from serialized reconstruction bytes"
+    );
+
+    let detached_event_time = canonical.replacen(
+        "2026-06-01T00:00:00Z",
+        "2026-06-02T00:00:00Z",
+        1,
+    );
+    assert_ne!(canonical, detached_event_time);
+    assert!(
+        MembershipObservationSupportWire::from_json(&detached_event_time).is_err(),
+        "reconstructable support coordinates must stay bound to the wire content digest"
     );
 }
