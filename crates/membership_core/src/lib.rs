@@ -25,6 +25,8 @@ mod weight;
 pub use admission::{SingleMembershipAdmission, admit_single_membership};
 /// One weighted, role-typed, time-varying membership assignment.
 pub use assignment::MembershipAssignment;
+/// Version identifier for the Membership-owned analytical-design wire vocabulary.
+pub use design_wire::MEMBERSHIP_DESIGN_WIRE_VERSION;
 /// Fail-closed membership-domain validation errors.
 pub use error::MembershipError;
 /// Opaque analytical group identifier.
