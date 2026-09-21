@@ -158,7 +158,8 @@ impl TopicLineageArtifact {
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::InvalidTopicLineageArtifact`] when the
-    /// schema, dimensions, identifiers, counts, edges, or claim boundary fail.
+    /// schema, dimensions, identifiers, counts, edges, claim boundary, or
+    /// canonical JSON byte identity fails.
     pub fn from_json(payload: &str) -> Result<Self, AnalysisEngineError> {
         if payload.len() > TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT {
             return Err(AnalysisEngineError::LimitExceeded);
@@ -166,6 +167,11 @@ impl TopicLineageArtifact {
         let artifact: Self = serde_json::from_str(payload)
             .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
         artifact.validate()?;
+        let canonical =
+            serde_json::to_string(&artifact).map_err(|_| AnalysisEngineError::SerializationFailure)?;
+        if canonical != payload {
+            return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+        }
         Ok(artifact)
     }
 
