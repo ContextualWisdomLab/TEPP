@@ -110,6 +110,15 @@ fn owner_projection_is_canonical_reconstructable_and_redacts_raw_opaque_ids() {
     );
     assert_eq!(projection.wire().observations().len(), observations.len());
 
+    let expected_support_digest = projection
+        .classification()
+        .support_sha256()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join("");
+    assert_eq!(projection.wire().support_sha256(), expected_support_digest);
+
     let canonical = projection.wire().to_json().expect("canonical JSON");
     let same = project_membership_observations_wire(&reverse, &reordered)
         .expect("equivalent owner-issued projection")
@@ -165,6 +174,14 @@ fn parsed_wire_refuses_noncanonical_or_malformed_support_payloads() {
         MembershipObservationSupportWire::from_json(&canonical.replacen(
             MEMBERSHIP_OBSERVATION_SUPPORT_WIRE_VERSION,
             "tepp.membership_observation_support_projection.v2",
+            1,
+        ))
+        .is_err()
+    );
+    assert!(
+        MembershipObservationSupportWire::from_json(&canonical.replacen(
+            "\"design_name\":\"nested\"",
+            "\"design_name\":\"multiple_membership\"",
             1,
         ))
         .is_err()
