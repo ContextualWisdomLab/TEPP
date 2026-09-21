@@ -17,6 +17,8 @@ pub enum MembershipError {
     UnsupportedWireVersion,
     /// An assignment referenced a role string that is not a TEPP membership role.
     UnknownMembershipRole,
+    /// A released projection referenced a design name not owned by Membership.
+    UnknownMembershipDesign,
     /// The same member/group/role identity had overlapping or endpoint-touching validity.
     DuplicateMembershipAssignment,
     /// A full single-membership estimator cannot represent the active membership design without loss.
@@ -43,6 +45,7 @@ impl fmt::Display for MembershipError {
             Self::InvalidWirePayload => "invalid membership wire payload",
             Self::UnsupportedWireVersion => "unsupported membership wire version",
             Self::UnknownMembershipRole => "unknown membership role",
+            Self::UnknownMembershipDesign => "unknown membership design",
             Self::DuplicateMembershipAssignment => "duplicate membership assignment",
             Self::SingleMembershipProfileInapplicable => {
                 "single-membership profile is inapplicable to this membership design"
@@ -88,6 +91,10 @@ mod tests {
             (
                 MembershipError::UnknownMembershipRole,
                 "unknown membership role",
+            ),
+            (
+                MembershipError::UnknownMembershipDesign,
+                "unknown membership design",
             ),
             (
                 MembershipError::DuplicateMembershipAssignment,
