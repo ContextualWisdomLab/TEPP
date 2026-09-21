@@ -51,30 +51,6 @@ pub use claim::PromotionRequest;
 pub use claim::parse_commit_head;
 /// Promote a claim only when exact-head evidence satisfies ADR 0014.
 pub use claim::promote_claim;
-/// Exact-head test receipt identity used by scientific recovery promotion.
-pub use scientific_recovery::ScientificRecoveryExactHeadReceiptV1;
-/// Terminal state carried by an exact-head scientific-recovery test receipt.
-pub use scientific_recovery::ScientificRecoveryExactHeadReceiptStatusV1;
-/// Failure policy bound into a versioned scientific recovery profile.
-pub use scientific_recovery::ScientificRecoveryFailurePolicyV1;
-/// Versioned scientific recovery design and acceptance policy.
-pub use scientific_recovery::ScientificRecoveryProfileV1;
-/// Owner-ledger execution entry used by scientific-recovery chronology evidence.
-pub use scientific_recovery_evidence::ScientificRecoveryExecutionLedgerEntryV1;
-/// Scientific authority bound to profile, chronology, exact-head receipt, payload, and execution identities.
-pub use scientific_recovery_evidence::ScientificRecoveryPromotionV1;
-/// Owner-ledger chronology proving represented profile approval precedes execution entries.
-pub use scientific_recovery_evidence::ScientificRecoveryProfileChronologyV1;
-/// Approval state of a recovery-profile registration ledger entry.
-pub use scientific_recovery_evidence::ScientificRecoveryProfileRegistrationStatusV1;
-/// Trusted-adapter provenance receipt for one independent scientific-recovery repetition.
-pub use scientific_recovery_evidence::ScientificRecoveryReplicationReceiptV1;
-/// Canonical ordered manifest of planned scientific-recovery RNG-state identities.
-pub use scientific_recovery_evidence::ScientificRecoverySeedManifestV1;
-/// Promote a scientific claim from recovery grouped by independent simulation replication.
-pub use scientific_recovery_evidence::promote_scientific_recovery;
-/// Derive the canonical identity of one represented scientific-recovery repetition payload.
-pub use scientific_recovery_evidence::scientific_recovery_replication_payload_sha256;
 /// Empirical interval coverage.
 pub use coverage::interval_coverage;
 /// Wilson bounds for coverage proportions.
@@ -105,6 +81,30 @@ pub use report::ValidationReport;
 pub use rmse::rmse_standard_error;
 /// Root-mean-square error.
 pub use rmse::root_mean_square_error;
+/// Terminal state carried by an exact-head scientific-recovery test receipt.
+pub use scientific_recovery::ScientificRecoveryExactHeadReceiptStatusV1;
+/// Exact-head test receipt identity used by scientific recovery promotion.
+pub use scientific_recovery::ScientificRecoveryExactHeadReceiptV1;
+/// Failure policy bound into a versioned scientific recovery profile.
+pub use scientific_recovery::ScientificRecoveryFailurePolicyV1;
+/// Versioned scientific recovery design and acceptance policy.
+pub use scientific_recovery::ScientificRecoveryProfileV1;
+/// Owner-ledger execution entry used by scientific-recovery chronology evidence.
+pub use scientific_recovery_evidence::ScientificRecoveryExecutionLedgerEntryV1;
+/// Owner-ledger chronology proving represented profile approval precedes execution entries.
+pub use scientific_recovery_evidence::ScientificRecoveryProfileChronologyV1;
+/// Approval state of a recovery-profile registration ledger entry.
+pub use scientific_recovery_evidence::ScientificRecoveryProfileRegistrationStatusV1;
+/// Scientific authority bound to profile, chronology, exact-head receipt, payload, and execution identities.
+pub use scientific_recovery_evidence::ScientificRecoveryPromotionV1;
+/// Trusted-adapter provenance receipt for one independent scientific-recovery repetition.
+pub use scientific_recovery_evidence::ScientificRecoveryReplicationReceiptV1;
+/// Canonical ordered manifest of planned scientific-recovery RNG-state identities.
+pub use scientific_recovery_evidence::ScientificRecoverySeedManifestV1;
+/// Promote a scientific claim from recovery grouped by independent simulation replication.
+pub use scientific_recovery_evidence::promote_scientific_recovery;
+/// Derive the canonical identity of one represented scientific-recovery repetition payload.
+pub use scientific_recovery_evidence::scientific_recovery_replication_payload_sha256;
 /// Pairwise temporal-order accuracy.
 pub use temporal_order::temporal_order_accuracy;
 /// Versioned durable validation envelope binding projections to scientific provenance.
