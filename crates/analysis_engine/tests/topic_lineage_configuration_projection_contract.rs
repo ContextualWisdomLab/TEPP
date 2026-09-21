@@ -1,6 +1,8 @@
 //! Release-contract RED for reconstructable topic-lineage estimator configuration.
 
-use analysis_engine::{AnalysisEngineError, TopicLineageArtifact};
+use analysis_engine::{
+    AnalysisEngineError, TOPIC_LINEAGE_OUTPUT_PROFILE, TopicLineageArtifact,
+};
 
 const CONFIG_JSON: &str = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[7,11],\"maximum_iterations\":2000,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.5,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
 const CONFIG_SHA256: &str = "c99da5cab3050e3d5e357bcdccca5405b05263ca2493fdfc74f3080948a3763b";
@@ -35,6 +37,7 @@ fn artifact_json(config_json: &str, config_sha256: &str) -> String {
 
 #[test]
 fn v2_artifact_carries_reconstructable_exact_method_configuration() {
+    assert_eq!(TOPIC_LINEAGE_OUTPUT_PROFILE, "trsl_topic_lineage_v2");
     let artifact = TopicLineageArtifact::from_json(&artifact_json(CONFIG_JSON, CONFIG_SHA256))
         .expect("configuration-bound v2 artifact");
     assert_eq!(artifact.schema_version, "tepp.trsl_topic_lineage.v2");
