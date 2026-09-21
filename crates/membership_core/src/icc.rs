@@ -213,7 +213,7 @@ pub fn nested_intraclass_correlation(
 }
 
 #[derive(Default)]
-struct MembershipDesignSignals {
+pub(crate) struct MembershipDesignSignals {
     saw_active: bool,
     saw_cross: bool,
     saw_multiple: bool,
@@ -222,27 +222,39 @@ struct MembershipDesignSignals {
 
 impl MembershipDesignSignals {
     fn observe(&mut self, active: &[MembershipAssignment]) {
-        if active.is_empty() {
+        self.observe_tokens(active.iter().map(|assignment| {
+            (
+                assignment.role(),
+                assignment.group_id(),
+                assignment.weight().value().to_bits() != 1.0_f64.to_bits(),
+            )
+        }));
+    }
+
+    pub(crate) fn observe_tokens<G, I>(&mut self, active: I)
+    where
+        G: Ord,
+        I: IntoIterator<Item = (MembershipRole, G, bool)>,
+    {
+        let mut groups_by_role: BTreeMap<MembershipRole, BTreeSet<G>> = BTreeMap::new();
+        let mut saw_any = false;
+        let mut has_partial_weight = false;
+        for (role, group, is_partial_weight) in active {
+            saw_any = true;
+            has_partial_weight |= is_partial_weight;
+            self.active_roles.insert(role);
+            groups_by_role.entry(role).or_default().insert(group);
+        }
+        if !saw_any {
             return;
         }
         self.saw_active = true;
-        let mut groups_by_role: BTreeMap<MembershipRole, BTreeSet<crate::GroupId>> =
-            BTreeMap::new();
-        let mut has_partial_weight = false;
-        for assignment in active {
-            has_partial_weight |= assignment.weight().value().to_bits() != 1.0_f64.to_bits();
-            self.active_roles.insert(assignment.role());
-            groups_by_role
-                .entry(assignment.role())
-                .or_default()
-                .insert(assignment.group_id());
-        }
         self.saw_multiple |=
             has_partial_weight || groups_by_role.values().any(|groups| groups.len() >= 2);
         self.saw_cross |= groups_by_role.len() >= 2;
     }
 
-    fn finish(self) -> Result<MembershipDesign, MembershipError> {
+    pub(crate) fn finish(self) -> Result<MembershipDesign, MembershipError> {
         if !self.saw_active {
             return Err(MembershipError::InsufficientClusterStructure);
         }
