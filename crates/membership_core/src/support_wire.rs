@@ -243,6 +243,10 @@ impl MembershipObservationSupportWire {
         let mut members = BTreeSet::new();
         let mut groups = BTreeSet::new();
         let mut signals = MembershipDesignSignals::default();
+        let mut assignments_by_coordinate: BTreeMap<
+            (u32, EventTime),
+            &[MembershipObservationSupportAssignmentWire],
+        > = BTreeMap::new();
         for observation in &self.observations {
             let event_time = EventTime::parse_rfc3339(&observation.event_time)
                 .map_err(|_| MembershipError::InvalidWirePayload)?;
@@ -251,6 +255,16 @@ impl MembershipObservationSupportWire {
                 || !strictly_increasing(&observation.assignments)
             {
                 return Err(MembershipError::InvalidWirePayload);
+            }
+            let coordinate = (observation.member_ordinal, event_time);
+            match assignments_by_coordinate.get(&coordinate) {
+                Some(assignments) if *assignments != observation.assignments.as_slice() => {
+                    return Err(MembershipError::InvalidWirePayload);
+                }
+                Some(_) => {}
+                None => {
+                    assignments_by_coordinate.insert(coordinate, observation.assignments.as_slice());
+                }
             }
             members.insert(observation.member_ordinal);
             let mut topology = Vec::with_capacity(observation.assignments.len());
