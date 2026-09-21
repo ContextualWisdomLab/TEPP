@@ -1,7 +1,8 @@
 //! Stable Membership-owned wire vocabulary for analytical design classification.
 
 use crate::icc::{MembershipDesign, MembershipObservation, classify_membership_observations};
-use crate::{MembershipError, MembershipNetwork};
+use crate::{MembershipAssignment, MembershipError, MembershipNetwork};
+use sha2::{Digest, Sha256};
 use temporal_core::EventTime;
 
 /// Version identifier for the stable Membership design wire vocabulary.
@@ -9,6 +10,13 @@ use temporal_core::EventTime;
 /// Released projections should bind this owner-issued version beside [`MembershipDesign::wire_name`]
 /// instead of inventing a consumer-local vocabulary version.
 pub const MEMBERSHIP_DESIGN_WIRE_VERSION: &str = "tepp.membership_design.v1";
+
+/// Version identifier for canonical longitudinal observation-support SHA-256 evidence.
+///
+/// The digest is identity binding for the classified opaque support and active Membership topology.
+/// It is not a substitute for reconstructable cohort/window evidence in a released analysis result.
+pub const MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION: &str =
+    "tepp.membership_observation_support.v1";
 
 /// Stable Membership design coordinate used at serialization boundaries.
 ///
@@ -72,23 +80,25 @@ impl MembershipDesignWire {
 ///
 /// Unlike [`MembershipDesignWire`], this type cannot be reconstructed from a `{version, name}` pair.
 /// Its private state is issued only after [`classify_membership_observations`] evaluates canonical
-/// Membership state at every observation's own event time. The retained support count and event-time
-/// bounds are derived from the same observation slice and prevent the classification from becoming a
-/// completely detached design label.
+/// Membership state at every observation's own event time. The retained support count, event-time
+/// bounds, and canonical SHA-256 are all derived from the same observation slice and canonical active
+/// Membership topology.
 ///
-/// These coordinates are not a complete reconstruction of the classified cohort. Distinct supports
-/// can share the same count and bounds, so released analytical projections still need their own
-/// privacy-appropriate observation-support evidence and exact identity binding where required.
+/// The digest binds exact opaque support identity but does not reconstruct the cohort by itself.
+/// Released analytical projections still need privacy-appropriate observation-support coordinates
+/// that a consumer can interpret and compare against this owner-derived identity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MembershipDesignClassification {
     wire: MembershipDesignWire,
     observation_count: usize,
     earliest_event_time: EventTime,
     latest_event_time: EventTime,
+    support_sha256: [u8; 32],
 }
 
 impl MembershipDesignClassification {
     fn from_design_and_observations(
+        network: &MembershipNetwork,
         design: MembershipDesign,
         observations: &[MembershipObservation],
     ) -> Result<Self, MembershipError> {
@@ -107,6 +117,7 @@ impl MembershipDesignClassification {
             observation_count: observations.len(),
             earliest_event_time,
             latest_event_time,
+            support_sha256: canonical_observation_support_sha256(network, observations),
         })
     }
 
@@ -151,6 +162,18 @@ impl MembershipDesignClassification {
     pub const fn latest_event_time(self) -> EventTime {
         self.latest_event_time
     }
+
+    /// Return the version of the canonical observation-support digest contract.
+    #[must_use]
+    pub const fn support_digest_version(self) -> &'static str {
+        MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION
+    }
+
+    /// Return the canonical SHA-256 of the classified opaque support and active Membership topology.
+    #[must_use]
+    pub const fn support_sha256(self) -> [u8; 32] {
+        self.support_sha256
+    }
 }
 
 /// Classify longitudinal Membership support and issue an owner-derived classification result.
@@ -158,8 +181,8 @@ impl MembershipDesignClassification {
 /// Each observation is resolved at its own event time by the canonical Membership classifier. The
 /// returned [`MembershipDesignClassification`] is distinct from a parsed wire coordinate, so callers
 /// cannot turn an arbitrary supported `{version, name}` pair into owner-derived classification
-/// authority. Support cardinality and event-time bounds are derived from the exact observation slice
-/// passed to classification rather than accepted as caller-supplied metadata.
+/// authority. Support cardinality, event-time bounds, and exact support identity are derived from the
+/// observation slice and canonical active Membership state rather than accepted as caller metadata.
 ///
 /// # Errors
 ///
@@ -170,7 +193,66 @@ pub fn classify_membership_observations_wire(
     observations: &[MembershipObservation],
 ) -> Result<MembershipDesignClassification, MembershipError> {
     let design = classify_membership_observations(network, observations)?;
-    MembershipDesignClassification::from_design_and_observations(design, observations)
+    MembershipDesignClassification::from_design_and_observations(network, design, observations)
+}
+
+fn canonical_observation_support_sha256(
+    network: &MembershipNetwork,
+    observations: &[MembershipObservation],
+) -> [u8; 32] {
+    let mut support = observations
+        .iter()
+        .copied()
+        .map(|observation| {
+            let mut active =
+                network.active_memberships_for(observation.member_id(), observation.event_time());
+            active.sort_by(|left, right| {
+                left.role()
+                    .cmp(&right.role())
+                    .then_with(|| left.group_id().cmp(&right.group_id()))
+                    .then_with(|| {
+                        left.weight()
+                            .value()
+                            .to_bits()
+                            .cmp(&right.weight().value().to_bits())
+                    })
+            });
+            (observation, active)
+        })
+        .collect::<Vec<_>>();
+    support.sort_by(|(left, _), (right, _)| {
+        left.member_id()
+            .cmp(&right.member_id())
+            .then_with(|| left.event_time().cmp(&right.event_time()))
+    });
+
+    let mut hasher = Sha256::new();
+    hash_frame(
+        &mut hasher,
+        MEMBERSHIP_OBSERVATION_SUPPORT_DIGEST_VERSION.as_bytes(),
+    );
+    hasher.update((support.len() as u128).to_be_bytes());
+    for (observation, active) in support {
+        hasher.update(observation.member_id().as_uuid().as_bytes());
+        let event_time = observation.event_time().to_rfc3339();
+        hash_frame(&mut hasher, event_time.as_bytes());
+        hasher.update((active.len() as u128).to_be_bytes());
+        for assignment in active {
+            hash_assignment(&mut hasher, assignment);
+        }
+    }
+    hasher.finalize().into()
+}
+
+fn hash_assignment(hasher: &mut Sha256, assignment: MembershipAssignment) {
+    hash_frame(hasher, assignment.role().wire_name().as_bytes());
+    hasher.update(assignment.group_id().as_uuid().as_bytes());
+    hasher.update(assignment.weight().value().to_bits().to_be_bytes());
+}
+
+fn hash_frame(hasher: &mut Sha256, value: &[u8]) {
+    hasher.update((value.len() as u128).to_be_bytes());
+    hasher.update(value);
 }
 
 impl MembershipDesign {
