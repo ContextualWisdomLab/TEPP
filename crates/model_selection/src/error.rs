@@ -26,8 +26,6 @@ pub enum ModelSelectionError {
     DuplicateCandidateK,
     /// Rolling-origin windows were not a contiguous chronological sequence.
     RollingOriginWindowMismatch,
-    /// A later rolling-origin training set forgot evidence from the preceding history.
-    RollingOriginTrainingHistoryMismatch,
     /// Rolling-origin windows did not expose the same unique candidate-K set.
     PredictiveCandidateSetMismatch,
 }
@@ -47,9 +45,6 @@ impl fmt::Display for ModelSelectionError {
             Self::PartitionInputMismatch => "rolling-origin partition input mismatch",
             Self::DuplicateCandidateK => "duplicate predictive candidate k",
             Self::RollingOriginWindowMismatch => "rolling-origin window sequence mismatch",
-            Self::RollingOriginTrainingHistoryMismatch => {
-                "rolling-origin training history is not cumulative"
-            }
             Self::PredictiveCandidateSetMismatch => {
                 "rolling-origin predictive candidate set mismatch"
             }
@@ -106,10 +101,6 @@ mod tests {
             (
                 ModelSelectionError::RollingOriginWindowMismatch,
                 "rolling-origin window sequence mismatch",
-            ),
-            (
-                ModelSelectionError::RollingOriginTrainingHistoryMismatch,
-                "rolling-origin training history is not cumulative",
             ),
             (
                 ModelSelectionError::PredictiveCandidateSetMismatch,
