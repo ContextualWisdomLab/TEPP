@@ -1,4 +1,4 @@
-//! Release-contract RED for coordinate-bound diagonal-Laplace quantities.
+//! Release-contract tests for coordinate-bound diagonal-Laplace quantities.
 
 use analysis_engine::{AnalysisEngineError, TopicLineageArtifact};
 use serde_json::{Value, json};
@@ -62,7 +62,34 @@ fn v2_accepts_coordinate_bound_diagonal_laplace_quantities() {
     let payload = artifact_json(canonical_uncertainty());
     let artifact = TopicLineageArtifact::from_json(&payload)
         .expect("coordinate-bound diagonal uncertainty");
+    assert_eq!(artifact.diagonal_laplace_uncertainty.len(), 2);
+    assert_eq!(
+        artifact.diagonal_laplace_uncertainty[0].document_id,
+        "00000000-0000-0000-0000-000000000001"
+    );
+    assert_eq!(
+        artifact.diagonal_laplace_uncertainty[0].coordinates[0].numerator_topic_index,
+        0
+    );
+    assert_eq!(
+        artifact.diagonal_laplace_uncertainty[0].coordinates[0].reference_topic_index,
+        1
+    );
     assert_eq!(artifact.to_json().expect("canonical artifact"), payload);
+}
+
+#[test]
+fn missing_uncertainty_projection_fails_closed() {
+    let mut value: Value =
+        serde_json::from_str(&artifact_json(canonical_uncertainty())).expect("artifact fixture");
+    value
+        .as_object_mut()
+        .expect("artifact object")
+        .remove("diagonal_laplace_uncertainty");
+    assert_eq!(
+        TopicLineageArtifact::from_json(&value.to_string()),
+        Err(AnalysisEngineError::InvalidTopicLineageArtifact)
+    );
 }
 
 #[test]
@@ -75,7 +102,7 @@ fn malformed_or_detached_uncertainty_coordinates_fail_closed() {
         json!([canonical[1].clone(), canonical[0].clone()]),
         {
             let mut value = canonical.clone();
-            value[0]["document_id"] = json!("00000000-0000-0000-0000-000000000003");
+            value[1]["document_id"] = json!("00000000-0000-0000-0000-000000000003");
             value
         },
         {
