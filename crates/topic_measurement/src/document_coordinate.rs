@@ -2,9 +2,10 @@
 //!
 //! The reference estimator retains document topic proportions and one diagonal
 //! variance per additive log-ratio coordinate. This module keeps those two
-//! numerical quantities in one coordinate view so downstream code cannot
-//! publish curvature while silently dropping the fitted location it
-//! approximates. The public projection path accepts only an owner-issued
+//! numerical quantities together with the exact fitted topic-basis identity so
+//! downstream code cannot publish curvature while silently dropping either the
+//! fitted location it approximates or the numerical basis that gives local topic
+//! indexes meaning. The public projection path accepts only an owner-issued
 //! [`ReferenceTopicFit`], preventing a caller from pairing a model from one fit
 //! with document coordinates from another. The view remains fit-local numerical
 //! evidence; it does not authenticate source/vocabulary provenance or represent
@@ -80,13 +81,15 @@ impl FittedDocumentCoordinateRow {
 /// Fit-local document ALR locations and diagonal variances in input row order.
 ///
 /// This summary is deliberately narrower than an externally released posterior
-/// artifact. It binds each retained diagonal variance to its fitted ALR location
-/// and document row inside one owner-issued fit aggregate, but it does not supply
-/// joint covariance, plausible values, calibration evidence, semantic topic
-/// labels, or Evidence-owned source/vocabulary provenance.
+/// artifact. It binds each retained diagonal variance to its fitted ALR location,
+/// document row, and exact fitted topic basis inside one owner-issued fit
+/// aggregate, but it does not supply joint covariance, plausible values,
+/// calibration evidence, semantic topic labels, or Evidence-owned
+/// source/vocabulary provenance.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FittedDocumentCoordinateSummary {
     topic_count: usize,
+    topic_basis_identity: FittedTopicBasisIdentity,
     rows: Vec<FittedDocumentCoordinateRow>,
 }
 
@@ -113,7 +116,8 @@ impl FittedDocumentCoordinateSummary {
         if topic_count < 2 {
             return Err(TopicMeasurementError::InvalidModelInput);
         }
-        FittedTopicBasisIdentity::from_model(model, input.vocabulary_size())?;
+        let topic_basis_identity =
+            FittedTopicBasisIdentity::from_model(model, input.vocabulary_size())?;
         if model.document_topic_proportions.len() != input.document_count() {
             return Err(TopicMeasurementError::InvalidModelInput);
         }
@@ -159,7 +163,11 @@ impl FittedDocumentCoordinateSummary {
             });
         }
 
-        Ok(Self { topic_count, rows })
+        Ok(Self {
+            topic_count,
+            topic_basis_identity,
+            rows,
+        })
     }
 
     /// Return this fit-local contract's exact version.
@@ -172,6 +180,12 @@ impl FittedDocumentCoordinateSummary {
     #[must_use]
     pub const fn topic_count(&self) -> usize {
         self.topic_count
+    }
+
+    /// Return the exact fitted topic basis that gives coordinate indexes meaning.
+    #[must_use]
+    pub const fn topic_basis_identity(&self) -> &FittedTopicBasisIdentity {
+        &self.topic_basis_identity
     }
 
     /// Return document rows in the retained estimator input order.
