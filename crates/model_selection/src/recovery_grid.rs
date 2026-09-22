@@ -13,6 +13,17 @@ use crate::{
     select_rolling_origin_predictive_candidate_k_across_windows,
 };
 
+fn unique_candidate_topic_counts(
+    topic_counts: impl IntoIterator<Item = usize>,
+    candidate_fit_count: usize,
+) -> Result<BTreeSet<usize>, ModelSelectionError> {
+    let topic_counts: BTreeSet<_> = topic_counts.into_iter().collect();
+    if topic_counts.len() != candidate_fit_count {
+        return Err(ModelSelectionError::DuplicateCandidateK);
+    }
+    Ok(topic_counts)
+}
+
 /// One rolling-origin evaluation whose fitted candidate dimensions are retained
 /// for comparison against the predeclared recovery design.
 ///
@@ -41,18 +52,15 @@ impl<'a> RollingOriginRecoveryEvaluation<'a> {
         evaluation_covariates: Option<&'a SparseMatrix>,
         memberships: &'a MembershipNetwork,
     ) -> Result<Self, ModelSelectionError> {
-        let candidate_topic_counts: BTreeSet<_> = candidate_training_fits
-            .iter()
-            .map(|fit| {
+        let candidate_topic_counts = unique_candidate_topic_counts(
+            candidate_training_fits.iter().map(|fit| {
                 fit.reference_fit()
                     .model()
                     .topic_term_probabilities
                     .len()
-            })
-            .collect();
-        if candidate_topic_counts.len() != candidate_training_fits.len() {
-            return Err(ModelSelectionError::DuplicateCandidateK);
-        }
+            }),
+            candidate_training_fits.len(),
+        )?;
 
         Ok(Self {
             predictive: RollingOriginPredictiveEvaluation::new(
@@ -116,4 +124,22 @@ pub fn select_declared_rolling_origin_recovery_candidate_k(
         .map(|evaluation| evaluation.predictive)
         .collect();
     select_rolling_origin_predictive_candidate_k_across_windows(&predictive)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unique_candidate_topic_counts;
+    use crate::ModelSelectionError;
+
+    #[test]
+    fn candidate_dimension_set_is_unique() {
+        assert_eq!(
+            unique_candidate_topic_counts([2, 3], 2).expect("unique dimensions"),
+            [2_usize, 3].into_iter().collect()
+        );
+        assert_eq!(
+            unique_candidate_topic_counts([2, 2], 2),
+            Err(ModelSelectionError::DuplicateCandidateK)
+        );
+    }
 }
