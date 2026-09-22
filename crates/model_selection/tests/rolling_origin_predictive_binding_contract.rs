@@ -51,6 +51,36 @@ fn relation(source: Uuid, target: Uuid, source_day: u8, target_day: u8) -> Relat
     .expect("forward relation")
 }
 
+fn partition_for_training_ids(training_ids: &[Uuid], evaluation_ids: &[Uuid]) -> RollingOriginPartition {
+    let train_cutoff = cutoff(10);
+    let test_cutoff = cutoff(20);
+    let mut train_snapshot = CorpusSnapshot::new();
+    let mut evaluation_snapshot = CorpusSnapshot::new();
+    for document_id in (1_u128..=4).map(Uuid::from_u128) {
+        train_snapshot
+            .insert_if_eligible(CorpusDocument::new(document_id, available(1)), &train_cutoff)
+            .expect("training snapshot document");
+        evaluation_snapshot
+            .insert_if_eligible(CorpusDocument::new(document_id, available(1)), &test_cutoff)
+            .expect("cumulative evaluation snapshot training document");
+    }
+    for document_id in evaluation_ids {
+        evaluation_snapshot
+            .insert_if_eligible(CorpusDocument::new(*document_id, available(15)), &test_cutoff)
+            .expect("new evaluation document");
+    }
+    admit_rolling_origin_partition(
+        &[train_cutoff, test_cutoff],
+        0,
+        &train_snapshot,
+        &evaluation_snapshot,
+        training_ids,
+        evaluation_ids,
+        &[],
+    )
+    .expect("rolling-origin partition")
+}
+
 fn fixture() -> (
     RollingOriginPartition,
     ReferenceTopicTrainingFit,
@@ -60,33 +90,14 @@ fn fixture() -> (
 ) {
     let training_ids: Vec<_> = (1_u128..=4).map(Uuid::from_u128).collect();
     let evaluation_ids = [Uuid::from_u128(50), Uuid::from_u128(51)];
+    let partition = partition_for_training_ids(&training_ids, &evaluation_ids);
     let train_cutoff = cutoff(10);
-    let test_cutoff = cutoff(20);
     let mut train_snapshot = CorpusSnapshot::new();
-    let mut evaluation_snapshot = CorpusSnapshot::new();
     for document_id in &training_ids {
         train_snapshot
             .insert_if_eligible(CorpusDocument::new(*document_id, available(1)), &train_cutoff)
-            .expect("training snapshot document");
-        evaluation_snapshot
-            .insert_if_eligible(CorpusDocument::new(*document_id, available(1)), &test_cutoff)
-            .expect("cumulative evaluation snapshot training document");
+            .expect("training input snapshot document");
     }
-    for document_id in evaluation_ids {
-        evaluation_snapshot
-            .insert_if_eligible(CorpusDocument::new(document_id, available(15)), &test_cutoff)
-            .expect("new evaluation document");
-    }
-    let partition = admit_rolling_origin_partition(
-        &[train_cutoff, test_cutoff],
-        0,
-        &train_snapshot,
-        &evaluation_snapshot,
-        &training_ids,
-        &evaluation_ids,
-        &[],
-    )
-    .expect("rolling-origin partition");
 
     let group = GroupId::from_uuid(Uuid::from_u128(100));
     let mut memberships = MembershipNetwork::new();
@@ -212,26 +223,77 @@ fn predictive_diagnostic_rejects_partition_row_substitution() {
 
 #[test]
 fn predictive_diagnostic_rejects_training_fit_from_another_partition() {
-    let (partition, training_fit, memberships, evaluation_ids, evaluation_counts) = fixture();
-    let reduced_partition = RollingOriginPartition::clone(&partition);
-    let _ = reduced_partition;
+    let (_, training_fit, memberships, evaluation_ids, evaluation_counts) = fixture();
+    let reduced_training_ids = [
+        Uuid::from_u128(1),
+        Uuid::from_u128(2),
+        Uuid::from_u128(3),
+    ];
+    let reduced_partition = partition_for_training_ids(&reduced_training_ids, &evaluation_ids);
+    assert_eq!(
+        rolling_origin_prevalence_mean_predictive_log_likelihood(
+            &reduced_partition,
+            &training_fit,
+            &evaluation_ids,
+            &evaluation_counts,
+            &[event_time(15), event_time(16)],
+            None,
+            &memberships,
+        ),
+        Err(ModelSelectionError::PartitionInputMismatch)
+    );
+}
 
-    // A valid partition can name a strict subset of the snapshot's training rows,
-    // but it must not be rebound to a fit trained on a different identity set.
-    let training_ids = training_fit.reference_fit().input().document_ids();
-    assert!(training_ids.len() > 1);
-
-    // Using the exact partition succeeds; the source-level RED for this file also
-    // requires the public boundary to expose a typed mismatch for substituted sets.
-    let score = rolling_origin_prevalence_mean_predictive_log_likelihood(
-        &partition,
-        &training_fit,
-        &evaluation_ids,
-        &evaluation_counts,
-        &[event_time(15), event_time(16)],
-        None,
-        &memberships,
-    )
-    .expect("bound diagnostic");
-    assert!(score.is_finite());
+#[test]
+fn predictive_diagnostic_fails_closed_when_finite_document_scores_overflow_in_sum() {
+    let (partition, training_fit, memberships, evaluation_ids, _) = fixture();
+    let mut found_partition_overflow = false;
+    for term in 0..4 {
+        let mut count = f64::MAX;
+        for _ in 0..32 {
+            let one_row = SparseMatrix::from_csr(
+                1,
+                4,
+                vec![0, 1],
+                vec![term],
+                vec![count],
+            )
+            .expect("single extreme count");
+            let one_score = training_fit.prevalence_mean_predictive_log_likelihoods(
+                &[evaluation_ids[0]],
+                &one_row,
+                &[event_time(15)],
+                None,
+                &memberships,
+            );
+            if one_score.is_ok() {
+                let two_rows = SparseMatrix::from_csr(
+                    2,
+                    4,
+                    vec![0, 1, 2],
+                    vec![term, term],
+                    vec![count, count],
+                )
+                .expect("two extreme counts");
+                if rolling_origin_prevalence_mean_predictive_log_likelihood(
+                    &partition,
+                    &training_fit,
+                    &evaluation_ids,
+                    &two_rows,
+                    &[event_time(15), event_time(16)],
+                    None,
+                    &memberships,
+                ) == Err(ModelSelectionError::InvalidDiagnostic)
+                {
+                    found_partition_overflow = true;
+                    break;
+                }
+            }
+            count *= 0.5;
+        }
+        if found_partition_overflow {
+            break;
+        }
+    }
+    assert!(found_partition_overflow);
 }
