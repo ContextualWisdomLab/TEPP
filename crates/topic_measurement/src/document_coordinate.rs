@@ -4,8 +4,11 @@
 //! variance per additive log-ratio coordinate. This module keeps those two
 //! numerical quantities in one coordinate view so downstream code cannot
 //! publish curvature while silently dropping the fitted location it
-//! approximates. The view is fit-local numerical evidence only; it does not
-//! authenticate source/vocabulary provenance or represent joint covariance.
+//! approximates. The public projection path accepts only an owner-issued
+//! [`ReferenceTopicFit`], preventing a caller from pairing a model from one fit
+//! with document coordinates from another. The view remains fit-local numerical
+//! evidence; it does not authenticate source/vocabulary provenance or represent
+//! joint covariance.
 
 use uuid::Uuid;
 
@@ -78,9 +81,9 @@ impl FittedDocumentCoordinateRow {
 ///
 /// This summary is deliberately narrower than an externally released posterior
 /// artifact. It binds each retained diagonal variance to its fitted ALR location
-/// and a document row, but it does not supply joint covariance, plausible values,
-/// calibration evidence, semantic topic labels, or Evidence-owned
-/// source/vocabulary provenance.
+/// and document row inside one owner-issued fit aggregate, but it does not supply
+/// joint covariance, plausible values, calibration evidence, semantic topic
+/// labels, or Evidence-owned source/vocabulary provenance.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FittedDocumentCoordinateSummary {
     topic_count: usize,
@@ -92,30 +95,17 @@ impl FittedDocumentCoordinateSummary {
     ///
     /// [`ReferenceTopicFit`] can only be minted by executing the reference
     /// estimator over the input/configuration retained inside that aggregate,
-    /// so this path does not accept a detached model/input pair.
+    /// so this public path does not accept a detached model/input pair.
     ///
     /// # Errors
     ///
     /// Returns [`TopicMeasurementError::InvalidModelInput`] if retained fitted
     /// dimensions or numerical state violate the coordinate contract.
     pub fn from_bound_fit(fit: &ReferenceTopicFit) -> Result<Self, TopicMeasurementError> {
-        Self::from_unbound_pair(fit.input(), fit.model())
+        Self::from_pair(fit.input(), fit.model())
     }
 
-    /// Validate a detached input/model pair for hostile-state diagnostics.
-    ///
-    /// This entry point exists so edge-case tests and numerical diagnostics can
-    /// exercise malformed model states. It is **not** release authority because
-    /// it cannot prove that `model` was produced from `input`; release code must
-    /// use [`Self::from_bound_fit`] with an owner-issued [`ReferenceTopicFit`].
-    ///
-    /// # Errors
-    ///
-    /// Returns [`TopicMeasurementError::InvalidModelInput`] when fitted topic,
-    /// document, or coordinate dimensions disagree, a fitted topic proportion
-    /// cannot be represented in ALR coordinates, or a retained diagonal
-    /// variance is non-finite or not strictly positive.
-    pub fn from_unbound_pair(
+    fn from_pair(
         input: &ReferenceTopicInput,
         model: &ReferenceTopicModel,
     ) -> Result<Self, TopicMeasurementError> {
@@ -184,9 +174,204 @@ impl FittedDocumentCoordinateSummary {
         self.topic_count
     }
 
-    /// Return document rows in the retained/supplied estimator input order.
+    /// Return document rows in the retained estimator input order.
     #[must_use]
     pub fn rows(&self) -> &[FittedDocumentCoordinateRow] {
         &self.rows
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use corpus_split::{CorpusDocument, CorpusSnapshot};
+    use membership_core::{
+        GroupId, MemberId, MembershipAssignment, MembershipNetwork, MembershipRole,
+        MembershipWeight,
+    };
+    use relation_graph::{
+        RelationEdge, RelationEndpointId, RelationEvidenceStatus, RelationGraph, RelationKind,
+    };
+    use temporal_core::{
+        AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
+        TemporalPrecision,
+    };
+    use uuid::Uuid;
+
+    use super::FittedDocumentCoordinateSummary;
+    use crate::{
+        ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, SparseMatrix,
+        TopicMeasurementError, fit_reference_topic_model,
+    };
+
+    fn event_time(day: u8) -> EventTime {
+        EventTime::parse_rfc3339(&format!("2026-07-{day:02}T00:00:00Z")).expect("event time")
+    }
+
+    fn relation(source: Uuid, target: Uuid, source_day: u8, target_day: u8) -> RelationEdge {
+        let interval = |day| {
+            TemporalInterval::bounded(
+                TemporalBoundary::Included(event_time(day)),
+                TemporalBoundary::Included(
+                    EventTime::parse_rfc3339(&format!("2026-07-{day:02}T12:00:00Z"))
+                        .expect("end"),
+                ),
+                TemporalPrecision::Second,
+            )
+            .expect("interval")
+        };
+        RelationEdge::new(
+            RelationKind::TransitionsTo,
+            RelationEndpointId::from_uuid(source),
+            RelationEndpointId::from_uuid(target),
+            RelationEvidenceStatus::Observed,
+            interval(source_day),
+            interval(target_day),
+        )
+        .expect("forward relation")
+    }
+
+    fn fitted_input_and_model() -> (ReferenceTopicInput, ReferenceTopicModel) {
+        let ids: Vec<_> = (1_u128..=4).map(Uuid::from_u128).collect();
+        let times: Vec<_> = (1_u8..=4).map(event_time).collect();
+        let available =
+            AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available");
+        let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
+        let mut snapshot = CorpusSnapshot::new();
+        let mut memberships = MembershipNetwork::new();
+        for id in &ids {
+            snapshot
+                .insert_if_eligible(CorpusDocument::new(*id, available), &cutoff)
+                .expect("eligible document");
+            memberships
+                .insert(
+                    MembershipAssignment::new(
+                        MemberId::from_uuid(*id),
+                        GroupId::from_uuid(Uuid::from_u128(100)),
+                        MembershipRole::Project,
+                        MembershipWeight::full().expect("full membership"),
+                        event_time(1),
+                        event_time(9),
+                    )
+                    .expect("membership"),
+                )
+                .expect("insert membership");
+        }
+
+        let mut relations = RelationGraph::new();
+        for (source, target, source_day, target_day) in
+            [(0, 1, 1, 2), (1, 2, 2, 3), (2, 3, 3, 4)]
+        {
+            relations
+                .insert(relation(ids[source], ids[target], source_day, target_day))
+                .expect("insert relation");
+        }
+
+        let counts = SparseMatrix::from_csr(
+            4,
+            4,
+            vec![0, 2, 4, 6, 8],
+            vec![0, 1, 0, 1, 2, 3, 2, 3],
+            vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0],
+        )
+        .expect("counts");
+        let input = ReferenceTopicInput::new(
+            &snapshot,
+            ids,
+            &counts,
+            &times,
+            None,
+            &memberships,
+            &relations,
+        )
+        .expect("reference input");
+        let config = ReferenceTopicModelConfig::new(2, vec![7, 11], 2_000, 0.001)
+            .and_then(|config| config.with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2))
+            .expect("reference config");
+        let model = fit_reference_topic_model(&input, &config).expect("converged reference fit");
+        (input, model)
+    }
+
+    #[test]
+    fn private_pair_validation_preserves_location_and_refuses_malformed_state() {
+        let (input, model) = fitted_input_and_model();
+        let baseline = FittedDocumentCoordinateSummary::from_pair(&input, &model)
+            .expect("coordinate summary");
+
+        let mut shifted = model.clone();
+        shifted.document_topic_proportions[0] = vec![0.8, 0.2];
+        let shifted_summary = FittedDocumentCoordinateSummary::from_pair(&input, &shifted)
+            .expect("shifted summary");
+        assert_ne!(
+            baseline.rows()[0].coordinates()[0].location().to_bits(),
+            shifted_summary.rows()[0].coordinates()[0].location().to_bits(),
+            "equal diagonal variance must not erase a changed fitted ALR location"
+        );
+        assert_eq!(
+            baseline.rows()[0].coordinates()[0].variance().to_bits(),
+            shifted_summary.rows()[0].coordinates()[0].variance().to_bits()
+        );
+
+        let mut one_topic = model.clone();
+        one_topic.topic_term_probabilities.truncate(1);
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &one_topic),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut malformed_basis = model.clone();
+        malformed_basis.topic_term_probabilities[0].pop();
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &malformed_basis),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut missing_document = model.clone();
+        missing_document.document_topic_proportions.pop();
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &missing_document),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut missing_variance_document = model.clone();
+        missing_variance_document.document_coordinate_variances.pop();
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &missing_variance_document),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut malformed_topic_width = model.clone();
+        malformed_topic_width.document_topic_proportions[0].pop();
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &malformed_topic_width),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut malformed_variance_width = model.clone();
+        malformed_variance_width.document_coordinate_variances[0].clear();
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &malformed_variance_width),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut non_finite_variance = model.clone();
+        non_finite_variance.document_coordinate_variances[0][0] = f64::NAN;
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &non_finite_variance),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut non_positive_variance = model.clone();
+        non_positive_variance.document_coordinate_variances[0][0] = 0.0;
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &non_positive_variance),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+
+        let mut invalid_location = model;
+        invalid_location.document_topic_proportions[0] = vec![1.0, 0.0];
+        assert_eq!(
+            FittedDocumentCoordinateSummary::from_pair(&input, &invalid_location),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
     }
 }
