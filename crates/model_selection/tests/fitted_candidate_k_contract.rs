@@ -363,10 +363,5 @@ fn statistical_candidate_from_fit_scores_owner_issued_fit() {
     let fit = ReferenceTopicFit::fit(&input, &config).expect("owner-issued reference fit");
     let candidate = statistical_candidate_from_fit(&fit).expect("statistical candidate");
     assert_eq!(candidate.candidate_k(), 2);
-    assert!(
-        candidate
-            .held_out_log_likelihood()
-            .expect("statistical score")
-            .is_finite()
-    );
+    assert!(candidate.schwarz_score().expect("Schwarz score").is_finite());
 }
