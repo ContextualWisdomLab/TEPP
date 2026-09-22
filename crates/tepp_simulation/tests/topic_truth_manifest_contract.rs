@@ -1,6 +1,6 @@
 //! Integration contract for deterministic known-topic simulation truth.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use tepp_simulation::{SimulationConfig, TopicDgpConfig, generate};
 
@@ -63,4 +63,41 @@ fn generated_manifest_owns_digest_bound_topic_truth() {
     .expect("changed corpus");
     assert_ne!(manifest.config_digest(), changed.config_digest());
     assert_ne!(manifest.content_digest(), changed.content_digest());
+}
+
+#[test]
+fn membership_truth_is_weighted_and_cross_classified() {
+    let config = SimulationConfig::new(2027, 4, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0)
+        .expect("simulation config");
+    let manifest = generate(config).expect("known-membership corpus");
+
+    let mut group_events: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+    for document in manifest.documents() {
+        assert_eq!(
+            document
+                .memberships()
+                .iter()
+                .map(tepp_simulation::SimulatedMembership::weight_bps)
+                .sum::<u32>(),
+            10_000
+        );
+        for membership in document.memberships() {
+            group_events
+                .entry(membership.group_id())
+                .or_default()
+                .insert(document.event_id());
+        }
+    }
+    assert!(
+        group_events.values().any(|event_ids| event_ids.len() > 1),
+        "at least one classification must recur across events"
+    );
+    assert!(
+        manifest
+            .topic_truth()
+            .document_states()
+            .iter()
+            .flat_map(tepp_simulation::DocumentTopicTruth::membership_contribution)
+            .any(|value| value.abs() > f64::EPSILON)
+    );
 }
