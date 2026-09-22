@@ -51,8 +51,12 @@ pub use inferential_weight::refuse_inferential_retrieval_weight;
 pub use rolling_origin::RollingOriginWindow;
 /// Build ordered rolling-origin windows.
 pub use rolling_origin::rolling_origin_windows;
+/// Leakage-safe expanding-history rolling-origin admission with audited exclusions.
+pub use rolling_origin_partition::ExpandingRollingOriginPartition;
 /// Leakage-checked newly available rolling-origin train/evaluation partition.
 pub use rolling_origin_partition::RollingOriginPartition;
+/// Admit one leakage-safe expanding-history rolling-origin partition.
+pub use rolling_origin_partition::admit_expanding_rolling_origin_partition;
 /// Admit one rolling-origin partition through canonical cutoff and leakage owners.
 pub use rolling_origin_partition::admit_rolling_origin_partition;
 /// Cutoff-filtered corpus snapshot.
