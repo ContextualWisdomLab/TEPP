@@ -18,6 +18,8 @@ pub enum ModelSelectionError {
     LexicalWeightForbidden,
     /// Every fitted candidate failed to converge or produced a typed numeric failure.
     NoSuccessfulFit,
+    /// Fewer than two successful recovery replications remain after failures.
+    InsufficientRecoveryReplications,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -29,6 +31,9 @@ impl fmt::Display for ModelSelectionError {
             Self::LlmVoteIsNotStatisticalAuthority => "llm vote is not statistical authority",
             Self::LexicalWeightForbidden => "lexical inferential weights are forbidden",
             Self::NoSuccessfulFit => "no fitted candidate produced a finite diagnostic",
+            Self::InsufficientRecoveryReplications => {
+                "at least two successful recovery replications are required"
+            }
         };
         formatter.write_str(message)
     }
@@ -66,6 +71,10 @@ mod tests {
             (
                 ModelSelectionError::NoSuccessfulFit,
                 "no fitted candidate produced a finite diagnostic",
+            ),
+            (
+                ModelSelectionError::InsufficientRecoveryReplications,
+                "at least two successful recovery replications are required",
             ),
         ] {
             assert_eq!(error.to_string(), message);
