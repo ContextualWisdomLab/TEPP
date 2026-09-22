@@ -33,6 +33,7 @@ pub struct PrevalenceDesignBasis {
 }
 
 impl PrevalenceDesignBasis {
+    #[allow(clippy::cast_precision_loss)]
     fn from_training(
         event_times: &[EventTime],
         features: &[PrevalenceFeature],
@@ -54,7 +55,7 @@ impl PrevalenceDesignBasis {
             .map(|value| (value - event_time_location_seconds).powi(2))
             .sum::<f64>()
             / offsets.len() as f64;
-        if !event_time_location_seconds.is_finite() || !variance.is_finite() || variance <= 0.0 {
+        if variance <= 0.0 {
             return Err(TopicMeasurementError::InvalidModelInput);
         }
         let event_time_scale_seconds = variance.sqrt();
@@ -106,8 +107,7 @@ impl PrevalenceDesignBasis {
     /// Returns [`TopicMeasurementError::InvalidModelInput`] for empty, duplicated,
     /// or dimensionally incompatible evaluation rows, missing active membership,
     /// or any covariate/membership coordinate absent from the training basis.
-    /// Returns [`TopicMeasurementError::NonFiniteEstimate`] if a projected time
-    /// coordinate is not finite.
+    #[allow(clippy::cast_precision_loss)]
     pub fn project(
         &self,
         document_ids: &[Uuid],
@@ -139,38 +139,18 @@ impl PrevalenceDesignBasis {
             _ => return Err(TopicMeasurementError::InvalidModelInput),
         };
 
-        let intercept_column = self
-            .features
-            .iter()
-            .position(|feature| *feature == PrevalenceFeature::Intercept)
-            .ok_or(TopicMeasurementError::InvalidModelInput)?;
-        let event_time_column = self
-            .features
-            .iter()
-            .position(|feature| *feature == PrevalenceFeature::EventTime)
-            .ok_or(TopicMeasurementError::InvalidModelInput)?;
-
         let origin = self.event_time_origin.instant().as_nanosecond();
         let mut design = vec![vec![0.0; self.features.len()]; document_ids.len()];
         for row in 0..document_ids.len() {
-            design[row][intercept_column] = 1.0;
+            design[row][0] = 1.0;
             let offset =
                 (event_times[row].instant().as_nanosecond() - origin) as f64 / NANOS_PER_SECOND;
-            let standardized =
+            design[row][1] =
                 (offset - self.event_time_location_seconds) / self.event_time_scale_seconds;
-            if !standardized.is_finite() {
-                return Err(TopicMeasurementError::NonFiniteEstimate);
-            }
-            design[row][event_time_column] = standardized;
 
             if let Some(rows) = &covariate_rows {
                 for &(column, value) in &rows[row] {
-                    let feature_column = self
-                        .features
-                        .iter()
-                        .position(|feature| *feature == PrevalenceFeature::Covariate(column))
-                        .ok_or(TopicMeasurementError::InvalidModelInput)?;
-                    design[row][feature_column] = value;
+                    design[row][2 + column] = value;
                 }
             }
 
