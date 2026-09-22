@@ -26,6 +26,8 @@ pub enum ModelSelectionError {
     DuplicateCandidateK,
     /// Rolling-origin windows were not a contiguous chronological sequence.
     RollingOriginWindowMismatch,
+    /// One document identity appeared in more than one evaluation window.
+    RepeatedEvaluationDocument,
     /// Rolling-origin windows did not expose the same unique candidate-K set.
     PredictiveCandidateSetMismatch,
 }
@@ -45,6 +47,7 @@ impl fmt::Display for ModelSelectionError {
             Self::PartitionInputMismatch => "rolling-origin partition input mismatch",
             Self::DuplicateCandidateK => "duplicate predictive candidate k",
             Self::RollingOriginWindowMismatch => "rolling-origin window sequence mismatch",
+            Self::RepeatedEvaluationDocument => "repeated rolling-origin evaluation document",
             Self::PredictiveCandidateSetMismatch => {
                 "rolling-origin predictive candidate set mismatch"
             }
@@ -101,6 +104,10 @@ mod tests {
             (
                 ModelSelectionError::RollingOriginWindowMismatch,
                 "rolling-origin window sequence mismatch",
+            ),
+            (
+                ModelSelectionError::RepeatedEvaluationDocument,
+                "repeated rolling-origin evaluation document",
             ),
             (
                 ModelSelectionError::PredictiveCandidateSetMismatch,
