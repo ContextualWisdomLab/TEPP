@@ -177,29 +177,69 @@ fn predictive_score_reuses_training_coordinates_and_never_depends_on_future_batc
 #[test]
 fn predictive_score_fails_closed_on_evaluation_count_geometry() {
     let (fit, memberships, focal, _, _) = training_fit();
+    let wrong_rows = SparseMatrix::from_csr(
+        2,
+        4,
+        vec![0, 1, 2],
+        vec![0, 1],
+        vec![1.0, 1.0],
+    )
+    .expect("wrong rows");
     let wrong_vocabulary =
         SparseMatrix::from_csr(1, 3, vec![0, 1], vec![0], vec![1.0]).expect("wrong vocab");
+    let empty = SparseMatrix::from_csr(1, 4, vec![0, 0], vec![], vec![]).expect("empty row");
     let negative =
         SparseMatrix::from_csr(1, 4, vec![0, 1], vec![0], vec![-1.0]).expect("negative count");
+    let zero = SparseMatrix::from_csr(1, 4, vec![0, 1], vec![0], vec![0.0]).expect("zero count");
+    let overflowed_total = SparseMatrix::from_csr(
+        1,
+        4,
+        vec![0, 2],
+        vec![0, 1],
+        vec![f64::MAX, f64::MAX],
+    )
+    .expect("overflowed row total");
 
-    assert_eq!(
+    for invalid in [
+        &wrong_rows,
+        &wrong_vocabulary,
+        &empty,
+        &negative,
+        &zero,
+        &overflowed_total,
+    ] {
+        assert_eq!(
+            fit.prevalence_mean_predictive_log_likelihoods(
+                &[focal],
+                invalid,
+                &[event_time(5)],
+                None,
+                &memberships,
+            ),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+    }
+}
+
+#[test]
+fn predictive_score_rejects_finite_counts_that_overflow_log_likelihood() {
+    let (fit, memberships, focal, _, _) = training_fit();
+    let found_overflow = (0..4).any(|term| {
+        let counts = SparseMatrix::from_csr(
+            1,
+            4,
+            vec![0, 1],
+            vec![term],
+            vec![f64::MAX],
+        )
+        .expect("finite extreme count");
         fit.prevalence_mean_predictive_log_likelihoods(
             &[focal],
-            &wrong_vocabulary,
+            &counts,
             &[event_time(5)],
             None,
             &memberships,
-        ),
-        Err(TopicMeasurementError::InvalidModelInput)
-    );
-    assert_eq!(
-        fit.prevalence_mean_predictive_log_likelihoods(
-            &[focal],
-            &negative,
-            &[event_time(5)],
-            None,
-            &memberships,
-        ),
-        Err(TopicMeasurementError::InvalidModelInput)
-    );
+        ) == Err(TopicMeasurementError::NonFiniteEstimate)
+    });
+    assert!(found_overflow);
 }
