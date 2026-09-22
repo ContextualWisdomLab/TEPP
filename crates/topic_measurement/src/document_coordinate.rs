@@ -6,19 +6,12 @@
 //! publish curvature while silently dropping the fitted location it
 //! approximates. The view is fit-local numerical evidence only; it does not
 //! authenticate source/vocabulary provenance or represent joint covariance.
-//!
-//! `ReferenceTopicModel` does not yet retain a nominal binding to the exact
-//! [`ReferenceTopicInput`] that produced it. Accordingly, this view validates
-//! the supplied pair but does not prove that a dimension-compatible model came
-//! from that input. Release consumers must wait for the owner-issued fit/input
-//! integrity boundary tracked by TEPP #665 rather than treating this view as
-//! authoritative provenance.
 
 use uuid::Uuid;
 
 use crate::{
-    FittedTopicBasisIdentity, ReferenceTopicInput, ReferenceTopicModel, TopicMeasurementError,
-    additive_log_ratio,
+    FittedTopicBasisIdentity, ReferenceTopicFit, ReferenceTopicInput, ReferenceTopicModel,
+    TopicMeasurementError, additive_log_ratio,
 };
 
 /// Version of the fit-local document-coordinate summary contract.
@@ -85,10 +78,9 @@ impl FittedDocumentCoordinateRow {
 ///
 /// This summary is deliberately narrower than an externally released posterior
 /// artifact. It binds each retained diagonal variance to its fitted ALR location
-/// and a supplied admitted document row, but it does not prove that the model
-/// was produced from that particular input. It also does not supply joint
-/// covariance, plausible values, calibration evidence, semantic topic labels,
-/// or Evidence-owned source/vocabulary provenance.
+/// and a document row, but it does not supply joint covariance, plausible values,
+/// calibration evidence, semantic topic labels, or Evidence-owned
+/// source/vocabulary provenance.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FittedDocumentCoordinateSummary {
     topic_count: usize,
@@ -96,12 +88,26 @@ pub struct FittedDocumentCoordinateSummary {
 }
 
 impl FittedDocumentCoordinateSummary {
-    /// Build the coordinate summary from one supplied admitted input/model pair.
+    /// Build a coordinate summary from an owner-issued nominal fit aggregate.
     ///
-    /// The method validates compatible fitted dimensions and numerical state.
-    /// It does not authenticate the model-to-input relationship; callers that
-    /// need release authority must use the owner-issued fit/input binding once
-    /// that contract exists.
+    /// [`ReferenceTopicFit`] can only be minted by executing the reference
+    /// estimator over the input/configuration retained inside that aggregate,
+    /// so this path does not accept a detached model/input pair.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] if retained fitted
+    /// dimensions or numerical state violate the coordinate contract.
+    pub fn from_bound_fit(fit: &ReferenceTopicFit) -> Result<Self, TopicMeasurementError> {
+        Self::from_unbound_pair(fit.input(), fit.model())
+    }
+
+    /// Validate a detached input/model pair for hostile-state diagnostics.
+    ///
+    /// This entry point exists so edge-case tests and numerical diagnostics can
+    /// exercise malformed model states. It is **not** release authority because
+    /// it cannot prove that `model` was produced from `input`; release code must
+    /// use [`Self::from_bound_fit`] with an owner-issued [`ReferenceTopicFit`].
     ///
     /// # Errors
     ///
@@ -109,7 +115,7 @@ impl FittedDocumentCoordinateSummary {
     /// document, or coordinate dimensions disagree, a fitted topic proportion
     /// cannot be represented in ALR coordinates, or a retained diagonal
     /// variance is non-finite or not strictly positive.
-    pub fn from_fit(
+    pub fn from_unbound_pair(
         input: &ReferenceTopicInput,
         model: &ReferenceTopicModel,
     ) -> Result<Self, TopicMeasurementError> {
@@ -178,7 +184,7 @@ impl FittedDocumentCoordinateSummary {
         self.topic_count
     }
 
-    /// Return document rows in the supplied estimator input order.
+    /// Return document rows in the retained/supplied estimator input order.
     #[must_use]
     pub fn rows(&self) -> &[FittedDocumentCoordinateRow] {
         &self.rows
