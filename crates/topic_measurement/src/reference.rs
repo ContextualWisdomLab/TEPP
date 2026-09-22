@@ -121,6 +121,16 @@ impl ReferenceTopicInput {
         self.document_ids.len()
     }
 
+    /// Return modeled document identities in estimator row order.
+    ///
+    /// These read-only coordinates preserve the binding between admitted input
+    /// rows and fit-owned quantities; they do not create source-snapshot
+    /// provenance authority outside the evidence owner boundary.
+    #[must_use]
+    pub fn document_ids(&self) -> &[Uuid] {
+        &self.document_ids
+    }
+
     /// Return the vocabulary size.
     #[must_use]
     pub const fn vocabulary_size(&self) -> usize {
