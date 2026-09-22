@@ -151,7 +151,12 @@ fn held_out_rows_use_only_the_frozen_training_time_transform() {
         Err(TopicMeasurementError::InvalidModelInput)
     );
     assert_eq!(
-        basis.project(&[focal, focal], &[event_time(5), event_time(5)], None, &memberships),
+        basis.project(
+            &[focal, focal],
+            &[event_time(5), event_time(5)],
+            None,
+            &memberships,
+        ),
         Err(TopicMeasurementError::InvalidModelInput)
     );
     let unexpected_covariates = SparseMatrix::from_csr(
