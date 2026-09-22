@@ -16,6 +16,7 @@ mod error;
 mod lexical;
 mod posterior_draw;
 mod reference;
+mod reference_fit;
 mod sparse;
 mod topic_basis;
 
@@ -35,7 +36,7 @@ pub use document_coordinate::FITTED_DOCUMENT_COORDINATE_SUMMARY_VERSION;
 pub use document_coordinate::FittedDocumentCoordinate;
 /// All fitted ALR coordinates for one admitted modeled document.
 pub use document_coordinate::FittedDocumentCoordinateRow;
-/// Fit-owned document ALR locations and diagonal variances.
+/// Fit-local document ALR locations and diagonal variances.
 pub use document_coordinate::FittedDocumentCoordinateSummary;
 /// Fail-closed topic-coordinate errors.
 pub use error::TopicMeasurementError;
@@ -63,6 +64,8 @@ pub use reference::ReferenceTopicModelConfig;
 pub use reference::TopicSequenceEdge;
 /// Fit the bounded deterministic CPU `f64` TRSL-TM reference estimator.
 pub use reference::fit_reference_topic_model;
+/// Owner-issued aggregate binding one admitted input, configuration, and fit.
+pub use reference_fit::ReferenceTopicFit;
 /// Validated compressed sparse numeric matrix.
 pub use sparse::SparseMatrix;
 /// Whether compressed values are grouped by row or by column.
