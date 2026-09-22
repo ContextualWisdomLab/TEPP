@@ -61,6 +61,12 @@ R(\Theta,G)=\frac{1}{2}\sum_{(d,e)\in E}a_{de}
 so absent relations remain unobserved rather than negative. This follows the
 document-network regularization estimand of Mei et al. (2008); it is not a
 causal edge, an event-identity promotion, or an RTM link-probability claim.
+An observed transition enters this numerical relation set only when the modeled
+`EventTime` for each admitted endpoint is contained by that edge's already
+validated source/target event-time interval. Contradictory relation timing fails
+closed rather than being silently dropped or widening an interval. This local
+consistency check does not authenticate a caller-supplied event time against
+Evidence/source truth; that remains an Evidence/Temporal Semantics boundary.
 The full bounded MAP objective is
 
 \[
