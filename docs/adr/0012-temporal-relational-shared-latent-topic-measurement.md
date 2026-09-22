@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-24
 **Decision status:** Accepted
-**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring is this PR; method effects and GPU remain accepted-target.
+**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring and frozen training-prevalence projection are active-PR; method effects and GPU remain accepted-target.
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
 ## Context
@@ -49,6 +49,20 @@ prevalence covariates, while the second term retains every active weighted
 cross-classified/multiple-membership assignment. This is the logistic-normal
 prevalence boundary of correlated/structural topic models, not a raw-simplex
 regression (Blei & Lafferty, 2007; Roberts et al., 2019).
+
+The standardized event-time coordinate and ordered prevalence-feature basis are
+training-state parameters. Held-out or rolling-origin evaluation must reuse the
+training `EventTime` origin/location/scale and the exact ordered
+`PrevalenceFeature` basis; evaluation-horizon rows must not be re-standardized
+against their own batch or combined with training rows merely to recover a
+shared transform. Evaluation covariate or membership coordinates that cannot be
+represented by the training basis fail closed rather than being reordered or
+dropped. This frozen basis is numerical coordinate authority only. It does not
+authenticate source evidence, Membership provenance, relation promotion, or the
+validity/availability clocks. A future `EventTime` is therefore not rejected
+solely because it is later than the training cutoff; leakage safety depends on
+the separate Evidence/availability authority and on keeping the training
+preprocessing state fixed (Roberts et al., 2019).
 
 For explicit observed predecessor/successor relations only, the reference
 objective adds the harmonic network penalty
@@ -125,7 +139,7 @@ Backend changes require a versioned model contract, migration notes, reproducibi
 
 ## Verification
 
-Required evidence includes known-truth topic/covariate/covariance recovery, bias/RMSE/interval coverage, held-out predictive evidence, seed/bootstrap stability, relation-aware split integrity, language alignment/invariance, method-effect recovery, known-K/acceptable-set behavior, posterior calibration, and downstream coordinate compatibility. CPU/GPU implementations additionally require parity under ADR 0001/0006.
+Required evidence includes known-truth topic/covariate/covariance recovery, bias/RMSE/interval coverage, held-out predictive evidence, seed/bootstrap stability, relation-aware split integrity, language alignment/invariance, method-effect recovery, known-K/acceptable-set behavior, posterior calibration, and downstream coordinate compatibility. Held-out evidence additionally requires a frozen training prevalence basis so the same evaluation observation has the same projected design row regardless of which other evaluation-horizon observations share its batch. CPU/GPU implementations additionally require parity under ADR 0001/0006.
 
 ## Rollback and supersession
 
