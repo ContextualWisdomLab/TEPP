@@ -36,3 +36,5 @@ pub use gate::selected_k_recovery_summary;
 pub use gate::selected_k_root_mean_square_error;
 /// Score one admitted rolling-origin evaluation partition under a fixed training fit.
 pub use rolling_origin_predictive::rolling_origin_prevalence_mean_predictive_log_likelihood;
+/// Select candidate `K` from one admitted rolling-origin predictive partition.
+pub use rolling_origin_predictive::select_rolling_origin_predictive_candidate_k;
