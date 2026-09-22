@@ -16,6 +16,7 @@ mod lexical;
 mod posterior_draw;
 mod reference;
 mod sparse;
+mod topic_basis;
 
 /// Additive log-ratio map from a simplex vector.
 pub use coordinates::additive_log_ratio;
@@ -57,3 +58,9 @@ pub use reference::fit_reference_topic_model;
 pub use sparse::SparseMatrix;
 /// Whether compressed values are grouped by row or by column.
 pub use sparse::SparseOrientation;
+/// Version of the fit-local topic-basis identity contract.
+pub use topic_basis::FITTED_TOPIC_BASIS_IDENTITY_VERSION;
+/// Ordered identity of the exact fitted topic-term basis.
+pub use topic_basis::FittedTopicBasisIdentity;
+/// Content-bound identity for one fitted topic row.
+pub use topic_basis::FittedTopicCoordinateIdentity;
