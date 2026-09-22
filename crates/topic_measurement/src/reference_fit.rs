@@ -177,13 +177,17 @@ impl ReferenceTopicTrainingFit {
     /// source admission remain owner responsibilities outside this numerical
     /// primitive.
     ///
+    /// The private training-fit fields make fitted coefficient/basis/topic-term
+    /// dimensional agreement an owner invariant. Evaluation-controlled geometry
+    /// and counts are still validated here and fail closed.
+    ///
     /// # Errors
     ///
     /// Returns [`TopicMeasurementError::InvalidModelInput`] when evaluation row
-    /// geometry, vocabulary width, count support, frozen-feature coordinates, or
-    /// fitted coefficient dimensions are incompatible. Returns
-    /// [`TopicMeasurementError::NonFiniteEstimate`] when a projected coordinate
-    /// or resulting mixture probability is not finite and strictly positive.
+    /// geometry, vocabulary width, count support, or frozen-feature coordinates
+    /// are incompatible. Returns [`TopicMeasurementError::NonFiniteEstimate`]
+    /// when finite evaluation counts overflow the log-likelihood accumulation;
+    /// ALR conversion errors propagate unchanged.
     pub fn prevalence_mean_predictive_log_likelihoods(
         &self,
         document_ids: &[Uuid],
@@ -195,41 +199,22 @@ impl ReferenceTopicTrainingFit {
         let basis = self.prevalence_design_basis();
         let model = self.reference_fit.model();
         let topic_count = model.topic_term_probabilities.len();
-        let coordinate_count = topic_count
-            .checked_sub(1)
-            .ok_or(TopicMeasurementError::InvalidModelInput)?;
-        let vocabulary_size = model.topic_term_probabilities.first().map_or(0, Vec::len);
-        if topic_count < 2
-            || vocabulary_size < 2
-            || document_term.rows() != document_ids.len()
+        let coordinate_count = topic_count - 1;
+        let vocabulary_size = model.topic_term_probabilities[0].len();
+        if document_term.rows() != document_ids.len()
             || document_term.columns() != vocabulary_size
-            || model
-                .topic_term_probabilities
-                .iter()
-                .any(|row| row.len() != vocabulary_size)
-            || model.prevalence_features.as_slice() != basis.features()
-            || model.prevalence_coefficients.len() != basis.features().len()
-            || model
-                .prevalence_coefficients
-                .iter()
-                .any(|row| row.len() != coordinate_count)
         {
             return Err(TopicMeasurementError::InvalidModelInput);
         }
 
         let design = basis.project(document_ids, event_times, covariates, memberships)?;
-        if design.len() != document_ids.len()
-            || design.iter().any(|row| row.len() != basis.features().len())
-        {
-            return Err(TopicMeasurementError::InvalidModelInput);
-        }
-
         let term_rows = document_term.row_entries();
         let mut scores = Vec::with_capacity(document_ids.len());
         for (row_index, terms) in term_rows.iter().enumerate() {
             let row_total = terms.iter().map(|(_, count)| count).sum::<f64>();
             if terms.is_empty()
                 || terms.iter().any(|(_, count)| *count < 0.0)
+                || !row_total.is_finite()
                 || row_total <= 0.0
             {
                 return Err(TopicMeasurementError::InvalidModelInput);
@@ -245,21 +230,12 @@ impl ReferenceTopicTrainingFit {
                     alr_mean[coordinate] += value * coefficient;
                 }
             }
-            if alr_mean.iter().any(|value| !value.is_finite()) {
-                return Err(TopicMeasurementError::NonFiniteEstimate);
-            }
             let theta = from_additive_log_ratio(&alr_mean)?;
             let mut log_likelihood = 0.0_f64;
             for &(term, count) in terms {
-                if term >= vocabulary_size {
-                    return Err(TopicMeasurementError::InvalidModelInput);
-                }
                 let probability = (0..topic_count)
                     .map(|topic| theta[topic] * model.topic_term_probabilities[topic][term])
                     .sum::<f64>();
-                if !probability.is_finite() || probability <= 0.0 {
-                    return Err(TopicMeasurementError::NonFiniteEstimate);
-                }
                 log_likelihood += count * probability.ln();
             }
             if !log_likelihood.is_finite() {
