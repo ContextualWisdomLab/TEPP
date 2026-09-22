@@ -194,3 +194,16 @@ fn bound_fit_coordinates_pair_alr_location_with_diagonal_variance() {
         );
     }
 }
+
+#[test]
+fn public_basis_identity_is_minted_from_owner_issued_fit() {
+    let (input, config) = fitted_input_and_config();
+    let fit = ReferenceTopicFit::fit(&input, &config).expect("owner-issued fit");
+
+    let identity = FittedTopicBasisIdentity::from_bound_fit(&fit).expect("basis identity");
+    let repeated = FittedTopicBasisIdentity::from_bound_fit(&fit).expect("repeated basis identity");
+
+    assert_eq!(identity, repeated);
+    assert_eq!(identity.vocabulary_size(), fit.input().vocabulary_size());
+    assert_eq!(identity.topics().len(), fit.model().topic_term_probabilities.len());
+}
