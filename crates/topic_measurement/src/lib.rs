@@ -15,6 +15,7 @@ mod document_coordinate;
 mod error;
 mod lexical;
 mod posterior_draw;
+mod prevalence_design;
 mod reference;
 mod reference_fit;
 mod sparse;
@@ -22,7 +23,7 @@ mod topic_basis;
 
 /// Additive log-ratio map from a simplex vector.
 pub use coordinates::additive_log_ratio;
-/// Aitchison distance between two simplex vectors.
+/// Aitchison distance between two simplex vector.
 pub use coordinates::aitchison_distance;
 /// Inverse additive log-ratio map back to the simplex.
 pub use coordinates::from_additive_log_ratio;
@@ -48,6 +49,10 @@ pub use posterior_draw::JOINT_POSTERIOR_DRAW_ALGORITHM_VERSION;
 pub use posterior_draw::JointPosteriorDrawSet;
 /// One exact fit-bound plausible value before artifact provenance binding.
 pub use posterior_draw::JointPosteriorPlausibleValue;
+/// Frozen numerical coordinate system for structural prevalence projection.
+pub use prevalence_design::PrevalenceDesignBasis;
+/// Training admission that binds a reference input to its frozen prevalence basis.
+pub use prevalence_design::ReferenceTopicTrainingInput;
 /// Identified joint precision in document-major ALR coordinate order.
 pub use reference::JointCoordinatePrecision;
 /// Posterior uncertainty representation retained by a fitted reference model.
