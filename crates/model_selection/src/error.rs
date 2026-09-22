@@ -45,7 +45,9 @@ impl fmt::Display for ModelSelectionError {
             Self::PartitionInputMismatch => "rolling-origin partition input mismatch",
             Self::DuplicateCandidateK => "duplicate predictive candidate k",
             Self::RollingOriginWindowMismatch => "rolling-origin window sequence mismatch",
-            Self::PredictiveCandidateSetMismatch => "rolling-origin predictive candidate set mismatch",
+            Self::PredictiveCandidateSetMismatch => {
+                "rolling-origin predictive candidate set mismatch"
+            }
         };
         formatter.write_str(message)
     }
