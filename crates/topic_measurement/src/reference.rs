@@ -620,6 +620,21 @@ fn softmax_jacobian(theta: &[f64], coordinate_count: usize) -> Vec<Vec<f64>> {
         .collect()
 }
 
+fn relation_precision_entry(
+    left_jacobian: &[Vec<f64>],
+    right_jacobian: &[Vec<f64>],
+    row: usize,
+    column: usize,
+    strength: f64,
+) -> f64 {
+    strength
+        * left_jacobian
+            .iter()
+            .zip(right_jacobian)
+            .map(|(left, right)| left[row] * right[column])
+            .sum::<f64>()
+}
+
 fn add_relation_precision(
     precision: &mut [Vec<f64>],
     source: usize,
@@ -632,22 +647,27 @@ fn add_relation_precision(
     let target_jacobian = softmax_jacobian(&theta[target], coordinate_count);
     for row in 0..coordinate_count {
         for column in 0..coordinate_count {
-            let source_source = strength
-                * source_jacobian
-                    .iter()
-                    .map(|topic| topic[row] * topic[column])
-                    .sum::<f64>();
-            let target_target = strength
-                * target_jacobian
-                    .iter()
-                    .map(|topic| topic[row] * topic[column])
-                    .sum::<f64>();
-            let source_target = -strength
-                * source_jacobian
-                    .iter()
-                    .zip(&target_jacobian)
-                    .map(|(left, right)| left[row] * right[column])
-                    .sum::<f64>();
+            let source_source = relation_precision_entry(
+                &source_jacobian,
+                &source_jacobian,
+                row,
+                column,
+                strength,
+            );
+            let target_target = relation_precision_entry(
+                &target_jacobian,
+                &target_jacobian,
+                row,
+                column,
+                strength,
+            );
+            let source_target = -relation_precision_entry(
+                &source_jacobian,
+                &target_jacobian,
+                row,
+                column,
+                strength,
+            );
             let source_row = source * coordinate_count + row;
             let source_column = source * coordinate_count + column;
             let target_row = target * coordinate_count + row;
@@ -658,6 +678,36 @@ fn add_relation_precision(
             precision[target_column][source_row] += source_target;
         }
     }
+}
+
+fn relation_precision_diagonal(
+    theta: &[Vec<f64>],
+    transition_pairs: &[(usize, usize)],
+    coordinate_count: usize,
+    strength: f64,
+) -> Vec<Vec<f64>> {
+    let mut diagonal = vec![vec![0.0; coordinate_count]; theta.len()];
+    for &(source, target) in transition_pairs {
+        let source_jacobian = softmax_jacobian(&theta[source], coordinate_count);
+        let target_jacobian = softmax_jacobian(&theta[target], coordinate_count);
+        for coordinate in 0..coordinate_count {
+            diagonal[source][coordinate] += relation_precision_entry(
+                &source_jacobian,
+                &source_jacobian,
+                coordinate,
+                coordinate,
+                strength,
+            );
+            diagonal[target][coordinate] += relation_precision_entry(
+                &target_jacobian,
+                &target_jacobian,
+                coordinate,
+                coordinate,
+                strength,
+            );
+        }
+    }
+    diagonal
 }
 
 pub(crate) fn cholesky(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, TopicMeasurementError> {
@@ -974,25 +1024,27 @@ fn build_result(
     state: FitState,
 ) -> Result<ReferenceTopicModel, TopicMeasurementError> {
     let theta = topic_proportions(&state.eta)?;
-    let mut degrees = vec![0_usize; input.document_ids.len()];
-    for &(source, target) in &input.transition_pairs {
-        degrees[source] += 1;
-        degrees[target] += 1;
-    }
+    let coordinate_count = config.topic_count - 1;
+    let relation_diagonal = relation_precision_diagonal(
+        &theta,
+        &input.transition_pairs,
+        coordinate_count,
+        config.relation_strength,
+    );
     let mut variances = Vec::with_capacity(theta.len());
     for (document, proportions) in theta.iter().enumerate() {
         let token_count = input.term_rows[document]
             .iter()
             .map(|(_, count)| count)
             .sum::<f64>();
-        let degree = bounded_count(degrees[document])?;
         variances.push(
-            proportions[..config.topic_count - 1]
+            proportions[..coordinate_count]
                 .iter()
-                .map(|value| {
+                .enumerate()
+                .map(|(coordinate, value)| {
                     1.0 / (token_count * value * (1.0 - value)
                         + 1.0 / config.prior_variance
-                        + degree * config.relation_strength)
+                        + relation_diagonal[document][coordinate])
                 })
                 .collect(),
         );
