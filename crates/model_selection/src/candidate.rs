@@ -6,13 +6,16 @@ use crate::ModelSelectionError;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ModelCandidate {
     candidate_k: u32,
-    held_out_log_likelihood: Option<f64>,
+    schwarz_score: Option<f64>,
     complexity: Option<f64>,
     llm_vote_only: bool,
 }
 
 impl ModelCandidate {
     /// Construct a statistically supported candidate.
+    ///
+    /// `schwarz_score` is a higher-is-better model-selection score such as
+    /// `ℓ - (p ln N)/2`; it is not a held-out predictive likelihood.
     ///
     /// # Errors
     ///
@@ -21,18 +24,18 @@ impl ModelCandidate {
     /// diagnostic is non-finite.
     pub fn statistical(
         candidate_k: u32,
-        held_out_log_likelihood: f64,
+        schwarz_score: f64,
         complexity: f64,
     ) -> Result<Self, ModelSelectionError> {
         if candidate_k < 2 {
             return Err(ModelSelectionError::NonPositiveCandidateK);
         }
-        if !held_out_log_likelihood.is_finite() || !complexity.is_finite() || complexity < 0.0 {
+        if !schwarz_score.is_finite() || !complexity.is_finite() || complexity < 0.0 {
             return Err(ModelSelectionError::InvalidDiagnostic);
         }
         Ok(Self {
             candidate_k,
-            held_out_log_likelihood: Some(held_out_log_likelihood),
+            schwarz_score: Some(schwarz_score),
             complexity: Some(complexity),
             llm_vote_only: false,
         })
@@ -53,7 +56,7 @@ impl ModelCandidate {
         }
         Ok(Self {
             candidate_k,
-            held_out_log_likelihood: None,
+            schwarz_score: None,
             complexity: None,
             llm_vote_only: true,
         })
@@ -68,16 +71,16 @@ impl ModelCandidate {
     /// Return whether this candidate carries finite statistical diagnostics.
     #[must_use]
     pub const fn is_statistically_supported(self) -> bool {
-        match (self.held_out_log_likelihood, self.complexity) {
+        match (self.schwarz_score, self.complexity) {
             (Some(_), Some(_)) => !self.llm_vote_only,
             _ => false,
         }
     }
 
-    /// Held-out log-likelihood when the candidate is statistically supported.
+    /// Return the higher-is-better Schwarz model-selection score.
     #[must_use]
-    pub const fn held_out_log_likelihood(self) -> Option<f64> {
-        self.held_out_log_likelihood
+    pub const fn schwarz_score(self) -> Option<f64> {
+        self.schwarz_score
     }
 
     /// Complexity penalty (larger is worse) when statistically supported.
@@ -92,19 +95,19 @@ impl ModelCandidate {
         self.llm_vote_only
     }
 
-    /// Return whether `self` Pareto-dominates `other` on likelihood and complexity.
+    /// Return whether `self` Pareto-dominates `other` on score and complexity.
     #[must_use]
     pub fn dominates(self, other: Self) -> bool {
-        let (Some(self_ll), Some(self_complexity), Some(other_ll), Some(other_complexity)) = (
-            self.held_out_log_likelihood,
+        let (Some(self_score), Some(self_complexity), Some(other_score), Some(other_complexity)) = (
+            self.schwarz_score,
             self.complexity,
-            other.held_out_log_likelihood,
+            other.schwarz_score,
             other.complexity,
         ) else {
             return false;
         };
-        let no_worse = self_ll >= other_ll && self_complexity <= other_complexity;
-        let strictly_better = self_ll > other_ll || self_complexity < other_complexity;
+        let no_worse = self_score >= other_score && self_complexity <= other_complexity;
+        let strictly_better = self_score > other_score || self_complexity < other_complexity;
         no_worse && strictly_better
     }
 }
@@ -119,7 +122,7 @@ mod tests {
         let better = ModelCandidate::statistical(4, -10.0, 5.0).expect("better");
         let worse = ModelCandidate::statistical(8, -20.0, 9.0).expect("worse");
         assert_eq!(better.candidate_k(), 4);
-        assert_eq!(better.held_out_log_likelihood(), Some(-10.0));
+        assert_eq!(better.schwarz_score(), Some(-10.0));
         assert_eq!(better.complexity(), Some(5.0));
         assert!(better.is_statistically_supported());
         assert!(!better.is_llm_vote_only());
