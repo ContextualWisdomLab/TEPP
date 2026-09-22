@@ -340,9 +340,9 @@ mod tests {
             "stopworddeletion",
             "llm",
             "llmlabel",
-            "llmlabels",
+            "llm-labels",
             "llm_vote",
-            "llmvoteonly",
+            "llm_vote_only",
         ] {
             assert_eq!(
                 refuse_nonstatistical_method(method),
