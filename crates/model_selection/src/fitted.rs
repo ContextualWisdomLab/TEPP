@@ -320,7 +320,10 @@ fn free_parameter_count(model: &ReferenceTopicModel) -> Result<f64, ModelSelecti
 
 #[cfg(test)]
 mod tests {
-    use super::{FittedCandidateKConfig, free_parameter_count, refuse_nonstatistical_method};
+    use super::{
+        FittedCandidateKConfig, ReferenceTopicModelConfig, free_parameter_count,
+        refuse_nonstatistical_method,
+    };
     use crate::ModelSelectionError;
     use topic_measurement::{PrevalenceFeature, ReferenceTopicModel};
 
