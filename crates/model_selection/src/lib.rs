@@ -23,7 +23,7 @@ pub use error::ModelSelectionError;
 pub use fitted::FittedCandidateKConfig;
 /// Fit each candidate `K` and select from the actual statistical diagnostics.
 pub use fitted::select_fitted_candidate_k;
-/// Build a statistical candidate from one actual fitted model.
+/// Build a statistical candidate from one owner-issued reference fit.
 pub use fitted::statistical_candidate_from_fit;
 /// Select the admissible candidate `K` from a Pareto-filtered statistical front.
 pub use gate::select_candidate_k;
