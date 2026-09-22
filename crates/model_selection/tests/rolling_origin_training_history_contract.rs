@@ -5,7 +5,8 @@ use membership_core::{
     GroupId, MemberId, MembershipAssignment, MembershipNetwork, MembershipRole, MembershipWeight,
 };
 use model_selection::{
-    RollingOriginPredictiveEvaluation, select_rolling_origin_predictive_candidate_k_across_windows,
+    ModelSelectionError, RollingOriginPredictiveEvaluation,
+    select_rolling_origin_predictive_candidate_k_across_windows,
 };
 use relation_graph::{
     RelationEdge, RelationEndpointId, RelationEvidenceStatus, RelationGraph, RelationKind,
@@ -202,8 +203,8 @@ fn multi_window_selection_rejects_training_history_that_forgets_prior_evaluation
         ),
     ];
 
-    assert!(
-        select_rolling_origin_predictive_candidate_k_across_windows(&windows).is_err(),
-        "a later rolling-origin training state must not forget evidence evaluated in the preceding window"
+    assert_eq!(
+        select_rolling_origin_predictive_candidate_k_across_windows(&windows),
+        Err(ModelSelectionError::RollingOriginTrainingHistoryMismatch)
     );
 }
