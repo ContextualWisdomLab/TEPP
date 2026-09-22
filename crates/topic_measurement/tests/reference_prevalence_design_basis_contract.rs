@@ -120,6 +120,17 @@ fn held_out_rows_use_only_the_frozen_training_time_transform() {
     assert!((basis.event_time_location_seconds() - 86_400.0).abs() < f64::EPSILON);
     assert!((basis.event_time_scale_seconds() - 86_400.0).abs() < f64::EPSILON);
 
+    let training_rows = basis
+        .project(
+            &[Uuid::from_u128(1), Uuid::from_u128(2)],
+            &[event_time(1), event_time(3)],
+            None,
+            &memberships,
+        )
+        .expect("training projection");
+    assert!((training_rows[0][1] + 1.0).abs() < f64::EPSILON);
+    assert!((training_rows[1][1] - 1.0).abs() < f64::EPSILON);
+
     let focal = Uuid::from_u128(3);
     let batch_a = basis
         .project(
@@ -224,6 +235,24 @@ fn projection_fails_closed_on_coordinates_absent_from_training_basis() {
             &[Uuid::from_u128(3)],
             &[event_time(5)],
             Some(&wider_covariates),
+            &memberships,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
+    let wrong_row_count = SparseMatrix::from_csr(
+        2,
+        1,
+        vec![0, 1, 2],
+        vec![0, 0],
+        vec![1.0, 1.0],
+    )
+    .expect("wrong-row covariates");
+    assert_eq!(
+        basis.project(
+            &[Uuid::from_u128(3)],
+            &[event_time(5)],
+            Some(&wrong_row_count),
             &memberships,
         ),
         Err(TopicMeasurementError::InvalidModelInput)
