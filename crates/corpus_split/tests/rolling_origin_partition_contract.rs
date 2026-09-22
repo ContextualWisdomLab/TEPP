@@ -91,6 +91,18 @@ fn rolling_origin_partition_rejects_temporal_and_connected_group_leakage() {
             0,
             &train,
             &evaluation,
+            &[ids[0]],
+            &[ids[1], ids[2]],
+            &[],
+        ),
+        Err(CorpusSplitError::InvalidSplitConfiguration)
+    );
+    assert_eq!(
+        admit_rolling_origin_partition(
+            &cutoffs,
+            0,
+            &train,
+            &evaluation,
             &[ids[0], ids[1]],
             &[ids[2], ids[3]],
             &[LeakageLink {
@@ -113,14 +125,58 @@ fn rolling_origin_partition_rejects_temporal_and_connected_group_leakage() {
         ),
         Err(CorpusSplitError::UnavailableAtCutoff)
     );
+    assert_eq!(
+        admit_rolling_origin_partition(
+            &cutoffs,
+            0,
+            &train,
+            &evaluation,
+            &[ids[0], ids[1]],
+            &[Uuid::from_u128(999)],
+            &[],
+        ),
+        Err(CorpusSplitError::UnavailableAtCutoff)
+    );
+}
+
+#[test]
+fn rolling_origin_partition_rejects_empty_and_duplicate_identity_sets() {
+    let (train, evaluation, ids) = snapshots();
+    let cutoffs = [cutoff(10), cutoff(20)];
+
+    assert_eq!(
+        admit_rolling_origin_partition(
+            &cutoffs,
+            0,
+            &train,
+            &evaluation,
+            &[],
+            &[ids[2]],
+            &[],
+        ),
+        Err(CorpusSplitError::InvalidSplitConfiguration)
+    );
+    assert_eq!(
+        admit_rolling_origin_partition(
+            &cutoffs,
+            0,
+            &train,
+            &evaluation,
+            &[ids[0], ids[0]],
+            &[ids[2]],
+            &[],
+        ),
+        Err(CorpusSplitError::DuplicateDocumentIdentity)
+    );
 }
 
 #[test]
 fn rolling_origin_partition_rejects_wrong_window_and_snapshot_horizon() {
     let (train, evaluation, ids) = snapshots();
+    let cutoffs = [cutoff(10), cutoff(20)];
     assert_eq!(
         admit_rolling_origin_partition(
-            &[cutoff(10), cutoff(20)],
+            &cutoffs,
             1,
             &train,
             &evaluation,
@@ -131,13 +187,30 @@ fn rolling_origin_partition_rejects_wrong_window_and_snapshot_horizon() {
         Err(CorpusSplitError::InvalidSplitConfiguration)
     );
 
+    let mut wrong_train = CorpusSnapshot::new();
+    wrong_train
+        .insert_if_eligible(document(1, 1), &cutoff(9))
+        .expect("wrong-horizon train document");
+    assert_eq!(
+        admit_rolling_origin_partition(
+            &cutoffs,
+            0,
+            &wrong_train,
+            &evaluation,
+            &[ids[0]],
+            &[ids[2]],
+            &[],
+        ),
+        Err(CorpusSplitError::KnowledgeCutoffMismatch)
+    );
+
     let mut wrong_evaluation = CorpusSnapshot::new();
     wrong_evaluation
         .insert_if_eligible(document(3, 15), &cutoff(25))
         .expect("wrong-horizon evaluation document");
     assert_eq!(
         admit_rolling_origin_partition(
-            &[cutoff(10), cutoff(20)],
+            &cutoffs,
             0,
             &train,
             &wrong_evaluation,
