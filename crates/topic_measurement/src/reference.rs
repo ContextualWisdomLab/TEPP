@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use corpus_split::CorpusSnapshot;
 use membership_core::{GroupId, MemberId, MembershipNetwork, MembershipRole};
-use relation_graph::RelationGraph;
+use relation_graph::{RelationEvidenceStatus, RelationGraph};
 use temporal_core::EventTime;
 use uuid::Uuid;
 
@@ -55,9 +55,10 @@ impl ReferenceTopicInput {
     /// `document_term` may be CSR or CSC. `covariates`, when present, may also
     /// use either orientation. Every document must occur in `snapshot`, have a
     /// nonempty nonnegative term row, span at least two event times, and have at
-    /// least one active membership at its own event time. Only validated
-    /// forward transition edges with both endpoints in the corpus affect the
-    /// relational objective; all other relation kinds remain provenance only.
+    /// least one active membership at its own event time. Only directly observed,
+    /// validated forward transition edges with both endpoints in the corpus affect
+    /// the relational objective; inferred transitions remain provenance until
+    /// explicitly promoted by their owner.
     ///
     /// # Errors
     ///
@@ -297,7 +298,9 @@ fn collect_transition_pairs(
     relations: &RelationGraph,
 ) -> Result<Vec<(usize, usize)>, TopicMeasurementError> {
     let mut transition_pairs = BTreeSet::new();
-    for edge in relations.edges().filter(|edge| edge.is_transition_edge()) {
+    for edge in relations.edges().filter(|edge| {
+        edge.is_transition_edge() && edge.evidence_status() == RelationEvidenceStatus::Observed
+    }) {
         let Some(&source) = index_by_id.get(&edge.source().as_uuid()) else {
             continue;
         };
