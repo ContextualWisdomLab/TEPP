@@ -2,10 +2,17 @@
 //!
 //! The reference estimator retains document topic proportions and one diagonal
 //! variance per additive log-ratio coordinate. This module keeps those two
-//! numerical quantities in one owner-issued coordinate view so downstream code
-//! cannot publish curvature while silently dropping the fitted location it
+//! numerical quantities in one coordinate view so downstream code cannot
+//! publish curvature while silently dropping the fitted location it
 //! approximates. The view is fit-local numerical evidence only; it does not
 //! authenticate source/vocabulary provenance or represent joint covariance.
+//!
+//! `ReferenceTopicModel` does not yet retain a nominal binding to the exact
+//! [`ReferenceTopicInput`] that produced it. Accordingly, this view validates
+//! the supplied pair but does not prove that a dimension-compatible model came
+//! from that input. Release consumers must wait for the owner-issued fit/input
+//! integrity boundary tracked by TEPP #665 rather than treating this view as
+//! authoritative provenance.
 
 use uuid::Uuid;
 
@@ -74,13 +81,14 @@ impl FittedDocumentCoordinateRow {
     }
 }
 
-/// Fit-owned document ALR locations and diagonal variances in admitted row order.
+/// Fit-local document ALR locations and diagonal variances in input row order.
 ///
 /// This summary is deliberately narrower than an externally released posterior
 /// artifact. It binds each retained diagonal variance to its fitted ALR location
-/// and the admitted document row, but does not supply joint covariance,
-/// plausible values, calibration evidence, semantic topic labels, or
-/// Evidence-owned source/vocabulary provenance.
+/// and a supplied admitted document row, but it does not prove that the model
+/// was produced from that particular input. It also does not supply joint
+/// covariance, plausible values, calibration evidence, semantic topic labels,
+/// or Evidence-owned source/vocabulary provenance.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FittedDocumentCoordinateSummary {
     topic_count: usize,
@@ -88,7 +96,12 @@ pub struct FittedDocumentCoordinateSummary {
 }
 
 impl FittedDocumentCoordinateSummary {
-    /// Build the coordinate summary from one admitted input and fitted model.
+    /// Build the coordinate summary from one supplied admitted input/model pair.
+    ///
+    /// The method validates compatible fitted dimensions and numerical state.
+    /// It does not authenticate the model-to-input relationship; callers that
+    /// need release authority must use the owner-issued fit/input binding once
+    /// that contract exists.
     ///
     /// # Errors
     ///
@@ -165,7 +178,7 @@ impl FittedDocumentCoordinateSummary {
         self.topic_count
     }
 
-    /// Return document rows in the admitted estimator input order.
+    /// Return document rows in the supplied estimator input order.
     #[must_use]
     pub fn rows(&self) -> &[FittedDocumentCoordinateRow] {
         &self.rows
