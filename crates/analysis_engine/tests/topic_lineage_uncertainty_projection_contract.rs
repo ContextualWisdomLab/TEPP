@@ -16,6 +16,24 @@ fn artifact_json(posterior_approximation: &str) -> String {
         "method_configuration_sha256": CONFIG_SHA256,
         "estimator_backend": "cpu_f64_reference",
         "posterior_approximation": posterior_approximation,
+        "diagonal_laplace_uncertainty": [
+            {
+                "document_id": "00000000-0000-0000-0000-000000000001",
+                "coordinates": [{
+                    "numerator_topic_index": 0,
+                    "reference_topic_index": 1,
+                    "variance": 0.125
+                }]
+            },
+            {
+                "document_id": "00000000-0000-0000-0000-000000000002",
+                "coordinates": [{
+                    "numerator_topic_index": 0,
+                    "reference_topic_index": 1,
+                    "variance": 0.25
+                }]
+            }
+        ],
         "selected_seed": 7,
         "iterations": 4,
         "objective": -1.0,
