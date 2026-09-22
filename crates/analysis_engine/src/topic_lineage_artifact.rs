@@ -112,6 +112,28 @@ pub struct TopicLineageArtifactEdge {
     pub association_strength: f64,
 }
 
+/// One diagonal-Laplace variance bound to an explicit ALR coordinate.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TopicLineageArtifactUncertaintyCoordinate {
+    /// Numerator topic index in the artifact-local global topic order.
+    pub numerator_topic_index: u64,
+    /// Reference topic index used as the ALR denominator.
+    pub reference_topic_index: u64,
+    /// Strictly positive finite diagonal-Laplace variance.
+    pub variance: f64,
+}
+
+/// Diagonal-Laplace coordinates for one modeled evidence document.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TopicLineageArtifactDocumentUncertainty {
+    /// Canonical lowercase UUID for the modeled document.
+    pub document_id: String,
+    /// Ordered ALR-coordinate variances for this document.
+    pub coordinates: Vec<TopicLineageArtifactUncertaintyCoordinate>,
+}
+
 /// Completed, bounded topic-lineage result consumed by product-history clients.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -134,6 +156,8 @@ pub struct TopicLineageArtifact {
     pub estimator_backend: String,
     /// Posterior uncertainty approximation retained by this result.
     pub posterior_approximation: String,
+    /// Document- and ALR-coordinate-bound diagonal-Laplace variances.
+    pub diagonal_laplace_uncertainty: Vec<TopicLineageArtifactDocumentUncertainty>,
     /// Selected deterministic initialization seed.
     pub selected_seed: u64,
     /// Iterations used by the selected converged fit.
@@ -160,8 +184,8 @@ impl TopicLineageArtifact {
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::InvalidTopicLineageArtifact`] when the
-    /// schema, dimensions, identifiers, counts, edges, claim boundary, or
-    /// canonical JSON byte identity fails.
+    /// schema, dimensions, identifiers, counts, uncertainty coordinates, edges,
+    /// claim boundary, or canonical JSON byte identity fails.
     pub fn from_json(payload: &str) -> Result<Self, AnalysisEngineError> {
         if payload.len() > TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT {
             return Err(AnalysisEngineError::LimitExceeded);
@@ -234,6 +258,41 @@ impl TopicLineageArtifact {
         {
             return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
         }
+
+        let uncertainty_row_count = u64::try_from(self.diagonal_laplace_uncertainty.len())
+            .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+        let coordinate_count = usize::try_from(self.topic_count - 1)
+            .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+        let reference_topic_index = self.topic_count - 1;
+        if uncertainty_row_count != self.evidence_count {
+            return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+        }
+        let mut uncertainty_documents = BTreeSet::new();
+        let mut previous_uncertainty_document = None;
+        for row in &self.diagonal_laplace_uncertainty {
+            let document = Uuid::parse_str(&row.document_id)
+                .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+            if row.document_id != document.to_string()
+                || previous_uncertainty_document.is_some_and(|previous| previous >= document)
+                || row.coordinates.len() != coordinate_count
+                || !uncertainty_documents.insert(document)
+            {
+                return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+            }
+            for (index, coordinate) in row.coordinates.iter().enumerate() {
+                let numerator_topic_index = u64::try_from(index)
+                    .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+                if coordinate.numerator_topic_index != numerator_topic_index
+                    || coordinate.reference_topic_index != reference_topic_index
+                    || !coordinate.variance.is_finite()
+                    || coordinate.variance <= 0.0
+                {
+                    return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+                }
+            }
+            previous_uncertainty_document = Some(document);
+        }
+
         let mut pairs = BTreeSet::new();
         let mut connected = BTreeSet::new();
         let mut lineages = BTreeSet::new();
@@ -263,6 +322,7 @@ impl TopicLineageArtifact {
         }
         if self.connected_post_count != connected.len() as u64
             || self.lineage_count != lineages.len() as u64
+            || !connected.is_subset(&uncertainty_documents)
         {
             return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
         }
@@ -331,6 +391,38 @@ pub fn execute_topic_lineage_run(
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let lineage_count =
         u64::try_from(model.lineage_count).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
+    if input.document_ids().len() != model.document_coordinate_variances.len() {
+        return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+    }
+    let reference_topic_index = topic_count
+        .checked_sub(1)
+        .ok_or(AnalysisEngineError::InvalidTopicLineageArtifact)?;
+    let mut diagonal_laplace_uncertainty: Vec<_> = input
+        .document_ids()
+        .iter()
+        .zip(&model.document_coordinate_variances)
+        .map(|(document_id, variances)| {
+            let coordinates = variances
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, variance)| {
+                    Ok(TopicLineageArtifactUncertaintyCoordinate {
+                        numerator_topic_index: u64::try_from(index)
+                            .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
+                        reference_topic_index,
+                        variance,
+                    })
+                })
+                .collect::<Result<Vec<_>, AnalysisEngineError>>()?;
+            Ok(TopicLineageArtifactDocumentUncertainty {
+                document_id: document_id.to_string(),
+                coordinates,
+            })
+        })
+        .collect::<Result<_, AnalysisEngineError>>()?;
+    diagonal_laplace_uncertainty.sort_by(|left, right| left.document_id.cmp(&right.document_id));
+
     let mut sequence_edges: Vec<_> = model
         .sequence_edges
         .iter()
@@ -360,6 +452,7 @@ pub fn execute_topic_lineage_run(
         method_configuration_sha256,
         estimator_backend: TOPIC_LINEAGE_ESTIMATOR_BACKEND.into(),
         posterior_approximation: TOPIC_LINEAGE_POSTERIOR_APPROXIMATION.into(),
+        diagonal_laplace_uncertainty,
         selected_seed: model.seed,
         iterations: u64::try_from(model.iterations)
             .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
@@ -403,12 +496,24 @@ pub fn execute_topic_lineage_run(
 mod tests {
     use super::{
         TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
-        TOPIC_LINEAGE_EDGE_LIMIT, TopicLineageArtifact, TopicLineageArtifactEdge,
+        TOPIC_LINEAGE_EDGE_LIMIT, TopicLineageArtifact, TopicLineageArtifactDocumentUncertainty,
+        TopicLineageArtifactEdge, TopicLineageArtifactUncertaintyCoordinate,
     };
     use crate::AnalysisEngineError;
 
     const CONFIG_JSON: &str = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[7,11],\"maximum_iterations\":2000,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.5,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
     const CONFIG_SHA256: &str = "c99da5cab3050e3d5e357bcdccca5405b05263ca2493fdfc74f3080948a3763b";
+
+    fn uncertainty_row(document_id: u128, variance: f64) -> TopicLineageArtifactDocumentUncertainty {
+        TopicLineageArtifactDocumentUncertainty {
+            document_id: uuid::Uuid::from_u128(document_id).to_string(),
+            coordinates: vec![TopicLineageArtifactUncertaintyCoordinate {
+                numerator_topic_index: 0,
+                reference_topic_index: 1,
+                variance,
+            }],
+        }
+    }
 
     fn artifact() -> TopicLineageArtifact {
         TopicLineageArtifact {
@@ -421,6 +526,10 @@ mod tests {
             method_configuration_sha256: CONFIG_SHA256.into(),
             estimator_backend: "cpu_f64_reference".into(),
             posterior_approximation: "diagonal_laplace".into(),
+            diagonal_laplace_uncertainty: vec![
+                uncertainty_row(1, 0.125),
+                uncertainty_row(2, 0.25),
+            ],
             selected_seed: 7,
             iterations: 4,
             objective: -1.0,
@@ -470,6 +579,9 @@ mod tests {
                 topic_index: 0,
                 association_strength: 0.8,
             })
+            .collect();
+        oversized.diagonal_laplace_uncertainty = (1_u128..=2_001)
+            .map(|index| uncertainty_row(index, 0.125))
             .collect();
         oversized.evidence_count = 2_001;
         oversized.connected_post_count = 2_001;
