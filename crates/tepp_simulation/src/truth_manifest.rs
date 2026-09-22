@@ -122,29 +122,31 @@ impl TruthManifest {
             .collect()
     }
 
-    /// Project event-level transition truth onto canonical generated document identities.
+    /// Project event-level transition truth onto canonical original documents.
     ///
     /// The generator records `TransitionsTo` at the latent-event layer, while the
     /// reference topic estimator consumes transition edges between modeled document
-    /// UUIDs. This projection chooses the lexicographically smallest generated
-    /// document UUID for each event and maps every true event transition onto that
-    /// document pair. The underlying truth relation is unchanged and remains the
-    /// authoritative simulation event edge; this projection is only a deterministic
+    /// UUIDs. This projection chooses the lexicographically smallest original report
+    /// for each event and maps every true event transition onto that document pair.
+    /// Revisions, translations, and template/copy variants remain under their own
+    /// method/provenance semantics and never become event-transition representatives.
+    /// The underlying truth relation is unchanged; this is only a deterministic
     /// known-truth analytical bridge for recovery fixtures.
     ///
     /// # Errors
     ///
     /// Returns [`SimulationError::ManifestInvariantViolation`] when a true event
-    /// transition references an event for which the manifest owns no document.
+    /// transition references an event for which the manifest owns no original report.
     pub fn document_transition_pairs(&self) -> Result<Vec<(Uuid, Uuid)>, SimulationError> {
         let mut canonical_document_by_event = BTreeMap::new();
         for document in &self.documents {
+            if document.method_effect().is_derivative() {
+                continue;
+            }
             canonical_document_by_event
                 .entry(document.event_id())
                 .and_modify(|current: &mut Uuid| {
-                    if document.document_id() < *current {
-                        *current = document.document_id();
-                    }
+                    *current = (*current).min(document.document_id());
                 })
                 .or_insert_with(|| document.document_id());
         }
