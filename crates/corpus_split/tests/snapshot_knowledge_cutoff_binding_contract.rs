@@ -1,6 +1,6 @@
 //! Contract for one knowledge horizon per cutoff-qualified corpus snapshot.
 
-use corpus_split::{CorpusDocument, CorpusSnapshot};
+use corpus_split::{CorpusDocument, CorpusSnapshot, CorpusSplitError};
 use temporal_core::{AvailableTime, KnowledgeCutoff};
 use uuid::Uuid;
 
@@ -17,6 +17,7 @@ fn one_snapshot_cannot_mix_distinct_knowledge_cutoffs() {
     let first_cutoff = cutoff("2026-02-01T00:00:00Z");
     let later_cutoff = cutoff("2026-04-01T00:00:00Z");
     let mut snapshot = CorpusSnapshot::new();
+    assert_eq!(snapshot.knowledge_cutoff(), None);
 
     snapshot
         .insert_if_eligible(
@@ -27,6 +28,7 @@ fn one_snapshot_cannot_mix_distinct_knowledge_cutoffs() {
             &first_cutoff,
         )
         .expect("first eligible document binds the snapshot horizon");
+    assert_eq!(snapshot.knowledge_cutoff(), Some(first_cutoff));
 
     let mixed_horizon = snapshot.insert_if_eligible(
         CorpusDocument::new(
@@ -35,10 +37,12 @@ fn one_snapshot_cannot_mix_distinct_knowledge_cutoffs() {
         ),
         &later_cutoff,
     );
-    assert!(
-        mixed_horizon.is_err(),
+    assert_eq!(
+        mixed_horizon,
+        Err(CorpusSplitError::KnowledgeCutoffMismatch),
         "one snapshot must not combine documents admitted under different knowledge cutoffs"
     );
+    assert_eq!(snapshot.knowledge_cutoff(), Some(first_cutoff));
 
     snapshot
         .insert_if_eligible(
@@ -49,4 +53,5 @@ fn one_snapshot_cannot_mix_distinct_knowledge_cutoffs() {
             &first_cutoff,
         )
         .expect("the bound knowledge cutoff remains reusable");
+    assert_eq!(snapshot.knowledge_cutoff(), Some(first_cutoff));
 }
