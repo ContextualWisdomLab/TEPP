@@ -219,6 +219,13 @@ fn malformed_document_coordinate_state_fails_closed() {
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
+    let mut malformed_basis = model.clone();
+    malformed_basis.topic_term_probabilities[0].pop();
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &malformed_basis),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
     let mut missing_document = model.clone();
     missing_document.document_topic_proportions.pop();
     assert_eq!(
