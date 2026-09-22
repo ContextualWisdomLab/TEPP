@@ -32,6 +32,8 @@ pub enum ModelSelectionError {
     PredictiveCandidateSetMismatch,
     /// Predictive fits did not cover the predeclared scientific candidate-K grid exactly.
     PredictiveCandidateGridMismatch,
+    /// A recovery fit used a numerical configuration other than the declared design.
+    PredictiveCandidateConfigurationMismatch,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -55,6 +57,9 @@ impl fmt::Display for ModelSelectionError {
             }
             Self::PredictiveCandidateGridMismatch => {
                 "rolling-origin predictive fits do not match the declared candidate k grid"
+            }
+            Self::PredictiveCandidateConfigurationMismatch => {
+                "rolling-origin predictive fit configuration does not match the declared recovery design"
             }
         };
         formatter.write_str(message)
@@ -121,6 +126,10 @@ mod tests {
             (
                 ModelSelectionError::PredictiveCandidateGridMismatch,
                 "rolling-origin predictive fits do not match the declared candidate k grid",
+            ),
+            (
+                ModelSelectionError::PredictiveCandidateConfigurationMismatch,
+                "rolling-origin predictive fit configuration does not match the declared recovery design",
             ),
         ] {
             assert_eq!(error.to_string(), message);
