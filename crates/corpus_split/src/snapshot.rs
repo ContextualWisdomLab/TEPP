@@ -7,37 +7,60 @@ use std::collections::BTreeMap;
 use temporal_core::KnowledgeCutoff;
 use uuid::Uuid;
 
-/// Immutable snapshot of documents eligible under a knowledge cutoff.
+/// Immutable snapshot of documents eligible under one knowledge cutoff.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct CorpusSnapshot {
+    knowledge_cutoff: Option<KnowledgeCutoff>,
     documents: BTreeMap<Uuid, CorpusDocument>,
 }
 
 impl CorpusSnapshot {
-    /// Create an empty snapshot.
+    /// Create an empty snapshot whose knowledge horizon is not bound yet.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Insert a document if it is eligible under `knowledge_cutoff`.
+    /// Insert a document if it is eligible under this snapshot's knowledge cutoff.
+    ///
+    /// The first successful insertion binds the snapshot to `knowledge_cutoff`.
+    /// Every later insertion must use that exact same cutoff so one snapshot can
+    /// never combine evidence admitted under different historical horizons.
     ///
     /// # Errors
     ///
-    /// Returns unavailability or duplicate-identity errors.
+    /// Returns cutoff-mismatch, unavailability, or duplicate-identity errors.
     pub fn insert_if_eligible(
         &mut self,
         document: CorpusDocument,
         knowledge_cutoff: &KnowledgeCutoff,
     ) -> Result<(), CorpusSplitError> {
+        if self
+            .knowledge_cutoff
+            .is_some_and(|bound_cutoff| bound_cutoff != *knowledge_cutoff)
+        {
+            return Err(CorpusSplitError::KnowledgeCutoffMismatch);
+        }
         if !cutoff_eligible(&document.available_time, knowledge_cutoff) {
             return Err(CorpusSplitError::UnavailableAtCutoff);
         }
         if self.documents.contains_key(&document.document_id) {
             return Err(CorpusSplitError::DuplicateDocumentIdentity);
         }
+        if self.knowledge_cutoff.is_none() {
+            self.knowledge_cutoff = Some(*knowledge_cutoff);
+        }
         self.documents.insert(document.document_id, document);
         Ok(())
+    }
+
+    /// Return the historical knowledge horizon bound to this snapshot.
+    ///
+    /// Empty snapshots return `None` until the first document is successfully
+    /// admitted. Once bound, the cutoff cannot change.
+    #[must_use]
+    pub const fn knowledge_cutoff(&self) -> Option<KnowledgeCutoff> {
+        self.knowledge_cutoff
     }
 
     /// Return whether the snapshot contains a document identity.
@@ -83,9 +106,11 @@ mod tests {
             Uuid::now_v7(),
             AvailableTime::parse_rfc3339("2026-08-01T00:00:00Z").expect("a"),
         );
+        assert_eq!(snapshot.knowledge_cutoff(), None);
         snapshot
             .insert_if_eligible(early.clone(), &cutoff)
             .expect("early");
+        assert_eq!(snapshot.knowledge_cutoff(), Some(cutoff));
         assert_eq!(
             snapshot.insert_if_eligible(late, &cutoff),
             Err(CorpusSplitError::UnavailableAtCutoff)
