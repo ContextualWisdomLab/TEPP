@@ -6,8 +6,9 @@ use crate::latent_event::LatentEvent;
 use crate::relation_process::{ObservedRelation, TrueRelation};
 use crate::topic_process::TopicTruthManifest;
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use temporal_core::KnowledgeCutoff;
+use uuid::Uuid;
 
 /// Immutable known-truth corpus bound to an explicit seed and content digest.
 #[derive(Clone, Debug, PartialEq)]
@@ -119,6 +120,52 @@ impl TruthManifest {
             .iter()
             .filter(|document| document.available_time().instant() <= cutoff.instant())
             .collect()
+    }
+
+    /// Project event-level transition truth onto canonical generated document identities.
+    ///
+    /// The generator records `TransitionsTo` at the latent-event layer, while the
+    /// reference topic estimator consumes transition edges between modeled document
+    /// UUIDs. This projection chooses the lexicographically smallest generated
+    /// document UUID for each event and maps every true event transition onto that
+    /// document pair. The underlying truth relation is unchanged and remains the
+    /// authoritative simulation event edge; this projection is only a deterministic
+    /// known-truth analytical bridge for recovery fixtures.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimulationError::ManifestInvariantViolation`] when a true event
+    /// transition references an event for which the manifest owns no document.
+    pub fn document_transition_pairs(&self) -> Result<Vec<(Uuid, Uuid)>, SimulationError> {
+        let mut canonical_document_by_event = BTreeMap::new();
+        for document in &self.documents {
+            canonical_document_by_event
+                .entry(document.event_id())
+                .and_modify(|current: &mut Uuid| {
+                    if document.document_id() < *current {
+                        *current = document.document_id();
+                    }
+                })
+                .or_insert_with(|| document.document_id());
+        }
+
+        let mut document_pairs = BTreeSet::new();
+        for relation in self
+            .true_relations
+            .iter()
+            .filter(|relation| relation.kind().is_transition())
+        {
+            let source = canonical_document_by_event
+                .get(&relation.source_id())
+                .copied()
+                .ok_or(SimulationError::ManifestInvariantViolation)?;
+            let target = canonical_document_by_event
+                .get(&relation.target_id())
+                .copied()
+                .ok_or(SimulationError::ManifestInvariantViolation)?;
+            document_pairs.insert((source, target));
+        }
+        Ok(document_pairs.into_iter().collect())
     }
 
     /// Verify scientific invariants required of every truth corpus.
