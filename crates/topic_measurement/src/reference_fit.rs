@@ -17,12 +17,14 @@
 //! authentication. They do not prove the external source snapshot, vocabulary
 //! lineage, Membership provenance, relation activation, or availability clock.
 
+use membership_core::MembershipNetwork;
+use temporal_core::EventTime;
 use uuid::Uuid;
 
 use crate::{
     JointCoordinatePrecision, PrevalenceDesignBasis, ReferenceTopicInput, ReferenceTopicModel,
-    ReferenceTopicModelConfig, ReferenceTopicTrainingInput, TopicMeasurementError,
-    fit_reference_topic_model,
+    ReferenceTopicModelConfig, ReferenceTopicTrainingInput, SparseMatrix, TopicMeasurementError,
+    fit_reference_topic_model, from_additive_log_ratio,
 };
 
 /// Owner-issued nominal aggregate for one admitted CPU reference fit.
@@ -156,5 +158,115 @@ impl ReferenceTopicTrainingFit {
     #[must_use]
     pub const fn reference_fit(&self) -> &ReferenceTopicFit {
         &self.reference_fit
+    }
+
+    /// Score evaluation counts under the fitted training prevalence mean.
+    ///
+    /// Evaluation EventTime, covariates, and Membership are projected through
+    /// the frozen training [`PrevalenceDesignBasis`]. The retained prevalence
+    /// coefficients then produce one ALR mean per evaluation row, which is
+    /// transformed to topic proportions and scored against the retained training
+    /// topic-term probabilities. No evaluation count updates topic-term
+    /// probabilities, prevalence coefficients, training document coordinates,
+    /// or relation parameters.
+    ///
+    /// The returned vector is one log likelihood per evaluation document. This
+    /// quantity is deliberately named a prevalence-mean predictive score: it is
+    /// not STM document-completion likelihood, not the in-sample Schwarz score,
+    /// and not evidence that a rolling-origin cutoff was respected. Cutoff and
+    /// source admission remain owner responsibilities outside this numerical
+    /// primitive.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] when evaluation row
+    /// geometry, vocabulary width, count support, frozen-feature coordinates, or
+    /// fitted coefficient dimensions are incompatible. Returns
+    /// [`TopicMeasurementError::NonFiniteEstimate`] when a projected coordinate
+    /// or resulting mixture probability is not finite and strictly positive.
+    pub fn prevalence_mean_predictive_log_likelihoods(
+        &self,
+        document_ids: &[Uuid],
+        document_term: &SparseMatrix,
+        event_times: &[EventTime],
+        covariates: Option<&SparseMatrix>,
+        memberships: &MembershipNetwork,
+    ) -> Result<Vec<f64>, TopicMeasurementError> {
+        let basis = self.prevalence_design_basis();
+        let model = self.reference_fit.model();
+        let topic_count = model.topic_term_probabilities.len();
+        let coordinate_count = topic_count
+            .checked_sub(1)
+            .ok_or(TopicMeasurementError::InvalidModelInput)?;
+        let vocabulary_size = model.topic_term_probabilities.first().map_or(0, Vec::len);
+        if topic_count < 2
+            || vocabulary_size < 2
+            || document_term.rows() != document_ids.len()
+            || document_term.columns() != vocabulary_size
+            || model
+                .topic_term_probabilities
+                .iter()
+                .any(|row| row.len() != vocabulary_size)
+            || model.prevalence_features.as_slice() != basis.features()
+            || model.prevalence_coefficients.len() != basis.features().len()
+            || model
+                .prevalence_coefficients
+                .iter()
+                .any(|row| row.len() != coordinate_count)
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+
+        let design = basis.project(document_ids, event_times, covariates, memberships)?;
+        if design.len() != document_ids.len()
+            || design.iter().any(|row| row.len() != basis.features().len())
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+
+        let term_rows = document_term.row_entries();
+        let mut scores = Vec::with_capacity(document_ids.len());
+        for (row_index, terms) in term_rows.iter().enumerate() {
+            let row_total = terms.iter().map(|(_, count)| count).sum::<f64>();
+            if terms.is_empty()
+                || terms.iter().any(|(_, count)| *count < 0.0)
+                || row_total <= 0.0
+            {
+                return Err(TopicMeasurementError::InvalidModelInput);
+            }
+
+            let mut alr_mean = vec![0.0; coordinate_count];
+            for (feature, value) in design[row_index].iter().copied().enumerate() {
+                for (coordinate, coefficient) in model.prevalence_coefficients[feature]
+                    .iter()
+                    .copied()
+                    .enumerate()
+                {
+                    alr_mean[coordinate] += value * coefficient;
+                }
+            }
+            if alr_mean.iter().any(|value| !value.is_finite()) {
+                return Err(TopicMeasurementError::NonFiniteEstimate);
+            }
+            let theta = from_additive_log_ratio(&alr_mean)?;
+            let mut log_likelihood = 0.0_f64;
+            for &(term, count) in terms {
+                if term >= vocabulary_size {
+                    return Err(TopicMeasurementError::InvalidModelInput);
+                }
+                let probability = (0..topic_count)
+                    .map(|topic| theta[topic] * model.topic_term_probabilities[topic][term])
+                    .sum::<f64>();
+                if !probability.is_finite() || probability <= 0.0 {
+                    return Err(TopicMeasurementError::NonFiniteEstimate);
+                }
+                log_likelihood += count * probability.ln();
+            }
+            if !log_likelihood.is_finite() {
+                return Err(TopicMeasurementError::NonFiniteEstimate);
+            }
+            scores.push(log_likelihood);
+        }
+        Ok(scores)
     }
 }
