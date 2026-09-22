@@ -43,6 +43,33 @@ impl RollingOriginPartition {
     }
 }
 
+/// Leakage-safe expanding-history admission plus its owner-derived exclusions.
+///
+/// The wrapped partition starts from every document in the training snapshot,
+/// then removes only historical identities whose governed leakage component
+/// intersects the current evaluation set. The exclusion set therefore records
+/// why an otherwise cutoff-eligible historical document was withheld from this
+/// expanding-history fit.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExpandingRollingOriginPartition {
+    partition: RollingOriginPartition,
+    leakage_excluded_training_document_ids: BTreeSet<Uuid>,
+}
+
+impl ExpandingRollingOriginPartition {
+    /// Return the canonical leakage-checked partition consumed by estimators.
+    #[must_use]
+    pub const fn partition(&self) -> &RollingOriginPartition {
+        &self.partition
+    }
+
+    /// Return historical identities excluded because their leakage component touches evaluation.
+    #[must_use]
+    pub const fn leakage_excluded_training_document_ids(&self) -> &BTreeSet<Uuid> {
+        &self.leakage_excluded_training_document_ids
+    }
+}
+
 fn canonical_nonempty_document_set(
     document_ids: &[Uuid],
 ) -> Result<BTreeSet<Uuid>, CorpusSplitError> {
@@ -131,5 +158,86 @@ pub fn admit_rolling_origin_partition(
         window,
         training_document_ids: training,
         evaluation_document_ids: evaluation,
+    })
+}
+
+/// Admit one leakage-safe expanding-history rolling-origin partition.
+///
+/// Unlike [`admit_rolling_origin_partition`], callers do not choose training
+/// identities. The owner begins with every identity in the cutoff-bound training
+/// snapshot. It then removes complete governed leakage components that intersect
+/// the current evaluation set, so a historical revision/translation/copied
+/// variant/episode/canonical equivalent cannot be trained against its related
+/// evaluation row. Every other historical identity is retained.
+///
+/// The returned [`ExpandingRollingOriginPartition`] preserves the exact set of
+/// historical identities withheld for that leakage reason. Final cutoff,
+/// newly-available evaluation, duplicate, overlap, and relation-leakage checks
+/// are delegated to [`admit_rolling_origin_partition`].
+///
+/// # Errors
+///
+/// Propagates the canonical rolling-origin admission errors, including
+/// [`CorpusSplitError::InvalidSplitConfiguration`] when the evaluation request is
+/// invalid or leakage-safe exclusion leaves no training document.
+pub fn admit_expanding_rolling_origin_partition(
+    ordered_cutoffs: &[KnowledgeCutoff],
+    window_index: usize,
+    training_snapshot: &CorpusSnapshot,
+    evaluation_snapshot: &CorpusSnapshot,
+    evaluation_document_ids: &[Uuid],
+    leakage_links: &[LeakageLink],
+) -> Result<ExpandingRollingOriginPartition, CorpusSplitError> {
+    let all_training_document_ids: Vec<_> = training_snapshot.document_ids().collect();
+    let preflight = admit_rolling_origin_partition(
+        ordered_cutoffs,
+        window_index,
+        training_snapshot,
+        evaluation_snapshot,
+        &all_training_document_ids,
+        evaluation_document_ids,
+        &[],
+    )?;
+
+    let universe: Vec<_> = preflight
+        .training_document_ids()
+        .iter()
+        .chain(preflight.evaluation_document_ids())
+        .copied()
+        .collect();
+    let groups = build_connected_groups(&universe, leakage_links);
+    let mut leakage_excluded_training_document_ids = BTreeSet::new();
+    for group in groups {
+        if !group
+            .members()
+            .is_disjoint(preflight.evaluation_document_ids())
+        {
+            leakage_excluded_training_document_ids.extend(
+                group
+                    .members()
+                    .intersection(preflight.training_document_ids())
+                    .copied(),
+            );
+        }
+    }
+
+    let training_document_ids: Vec<_> = preflight
+        .training_document_ids()
+        .difference(&leakage_excluded_training_document_ids)
+        .copied()
+        .collect();
+    let partition = admit_rolling_origin_partition(
+        ordered_cutoffs,
+        window_index,
+        training_snapshot,
+        evaluation_snapshot,
+        &training_document_ids,
+        evaluation_document_ids,
+        leakage_links,
+    )?;
+
+    Ok(ExpandingRollingOriginPartition {
+        partition,
+        leakage_excluded_training_document_ids,
     })
 }
