@@ -6,11 +6,14 @@ use crate::{ModelCandidate, ModelSelectionError};
 ///
 /// RMSE and bias are conditional on successful replications. The total,
 /// successful, and failed counts remain explicit so failed fits cannot disappear
-/// from the scientific denominator. Monte Carlo standard errors quantify finite-
-/// replication uncertainty for the failure proportion and for conditional recovery
-/// measures. Bias uses the usual sample-variance estimator across successful
-/// replications; RMSE uncertainty applies the delta method to the mean squared
-/// error and is exactly zero when every successful replication recovers the truth.
+/// from the scientific denominator. Conditional recovery measures are optional:
+/// zero successful replications preserve the failure evidence with no fabricated
+/// bias/RMSE, while one successful replication can report bias/RMSE but not an
+/// empirical Monte Carlo standard error. Failure-rate Monte Carlo uncertainty
+/// continues to use every attempted replication. With at least two successful
+/// replications, bias uses the usual sample-variance estimator and RMSE uncertainty
+/// applies the delta method; RMSE MCSE is exactly zero when every successful
+/// replication recovers the truth.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SelectedKRecoverySummary {
     truth_k: u32,
@@ -18,10 +21,10 @@ pub struct SelectedKRecoverySummary {
     success_count: usize,
     failure_count: usize,
     failure_rate_monte_carlo_standard_error: f64,
-    bias: f64,
-    root_mean_square_error: f64,
-    bias_monte_carlo_standard_error: f64,
-    rmse_monte_carlo_standard_error: f64,
+    bias: Option<f64>,
+    root_mean_square_error: Option<f64>,
+    bias_monte_carlo_standard_error: Option<f64>,
+    rmse_monte_carlo_standard_error: Option<f64>,
 }
 
 impl SelectedKRecoverySummary {
@@ -66,27 +69,34 @@ impl SelectedKRecoverySummary {
         self.failure_rate_monte_carlo_standard_error
     }
 
-    /// Return mean selected-`K` error conditional on successful replications.
+    /// Return mean selected-`K` error conditional on at least one success.
     #[must_use]
-    pub const fn bias(self) -> f64 {
+    pub const fn bias(self) -> Option<f64> {
         self.bias
     }
 
-    /// Return selected-`K` RMSE conditional on successful replications.
+    /// Return selected-`K` RMSE conditional on at least one success.
     #[must_use]
-    pub const fn root_mean_square_error(self) -> f64 {
+    pub const fn root_mean_square_error(self) -> Option<f64> {
         self.root_mean_square_error
     }
 
     /// Return the Monte Carlo standard error of conditional selected-`K` bias.
+    ///
+    /// At least two successful replications are required for an empirical sample
+    /// variance; otherwise this returns `None` while the unconditional failure
+    /// denominator remains available.
     #[must_use]
-    pub const fn bias_monte_carlo_standard_error(self) -> f64 {
+    pub const fn bias_monte_carlo_standard_error(self) -> Option<f64> {
         self.bias_monte_carlo_standard_error
     }
 
     /// Return the delta-method Monte Carlo standard error of conditional RMSE.
+    ///
+    /// At least two successful replications are required; otherwise this returns
+    /// `None` rather than manufacturing zero or NaN.
     #[must_use]
-    pub const fn rmse_monte_carlo_standard_error(self) -> f64 {
+    pub const fn rmse_monte_carlo_standard_error(self) -> Option<f64> {
         self.rmse_monte_carlo_standard_error
     }
 }
@@ -145,9 +155,11 @@ pub fn select_candidate_k(candidates: &[ModelCandidate]) -> Result<u32, ModelSel
 /// success while [`SelectedKRecoverySummary::failure_count`] and
 /// [`SelectedKRecoverySummary::failure_rate`] preserve the unconditional
 /// failure denominator required for scientific acceptance. The failure-rate
-/// Monte Carlo standard error uses all attempted replications. At least two
-/// successful replications are required because a one-run result cannot carry
-/// an empirical Monte Carlo standard error for conditional recovery.
+/// Monte Carlo standard error uses all attempted replications. Zero-success
+/// experiments still return a summary with unavailable conditional recovery
+/// measures; one-success experiments return conditional bias/RMSE while their
+/// empirical MCSE remains unavailable. At least two successes are required only
+/// for the success-conditional Monte Carlo standard errors.
 ///
 /// This function does not itself establish temporal leakage safety: callers
 /// must obtain each replication from the canonical rolling-origin owner path.
@@ -156,10 +168,8 @@ pub fn select_candidate_k(candidates: &[ModelCandidate]) -> Result<u32, ModelSel
 ///
 /// Returns [`ModelSelectionError::EmptyCandidateSet`] when no replication was
 /// attempted, [`ModelSelectionError::NonPositiveCandidateK`] when `truth_k` is
-/// less than two, [`ModelSelectionError::InvalidDiagnostic`] when any successful
-/// selected `K` is less than two, or
-/// [`ModelSelectionError::InsufficientRecoveryReplications`] when fewer than two
-/// successful replications remain.
+/// less than two, or [`ModelSelectionError::InvalidDiagnostic`] when any successful
+/// selected `K` is less than two.
 pub fn selected_k_recovery_summary(
     selected: &[Option<u32>],
     truth_k: u32,
@@ -182,9 +192,6 @@ pub fn selected_k_recovery_summary(
             None => failure_count += 1,
         }
     }
-    if residuals.len() < 2 {
-        return Err(ModelSelectionError::InsufficientRecoveryReplications);
-    }
 
     let success_count = residuals.len();
     let replication_count = selected.len();
@@ -192,28 +199,46 @@ pub fn selected_k_recovery_summary(
     let failure_rate = failure_count as f64 / replication_count_f64;
     let failure_rate_monte_carlo_standard_error =
         (failure_rate * (1.0 - failure_rate) / replication_count_f64).sqrt();
-    let n = success_count as f64;
-    let bias = residuals.iter().sum::<f64>() / n;
-    let mean_squared_error = residuals.iter().map(|value| value * value).sum::<f64>() / n;
-    let root_mean_square_error = mean_squared_error.sqrt();
-    let sample_denominator = (success_count - 1) as f64;
-    let residual_sample_variance = residuals
-        .iter()
-        .map(|value| (value - bias).powi(2))
-        .sum::<f64>()
-        / sample_denominator;
-    let bias_monte_carlo_standard_error = (residual_sample_variance / n).sqrt();
-    let squared_error_sample_variance = residuals
-        .iter()
-        .map(|value| ((value * value) - mean_squared_error).powi(2))
-        .sum::<f64>()
-        / sample_denominator;
-    let mse_monte_carlo_standard_error = (squared_error_sample_variance / n).sqrt();
-    let rmse_monte_carlo_standard_error = if root_mean_square_error == 0.0 {
-        0.0
-    } else {
-        mse_monte_carlo_standard_error / (2.0 * root_mean_square_error)
-    };
+
+    let (bias, root_mean_square_error, bias_monte_carlo_standard_error, rmse_monte_carlo_standard_error) =
+        if residuals.is_empty() {
+            (None, None, None, None)
+        } else {
+            let n = success_count as f64;
+            let bias = residuals.iter().sum::<f64>() / n;
+            let mean_squared_error = residuals.iter().map(|value| value * value).sum::<f64>() / n;
+            let root_mean_square_error = mean_squared_error.sqrt();
+
+            if success_count < 2 {
+                (Some(bias), Some(root_mean_square_error), None, None)
+            } else {
+                let sample_denominator = (success_count - 1) as f64;
+                let residual_sample_variance = residuals
+                    .iter()
+                    .map(|value| (value - bias).powi(2))
+                    .sum::<f64>()
+                    / sample_denominator;
+                let bias_monte_carlo_standard_error = (residual_sample_variance / n).sqrt();
+                let squared_error_sample_variance = residuals
+                    .iter()
+                    .map(|value| ((value * value) - mean_squared_error).powi(2))
+                    .sum::<f64>()
+                    / sample_denominator;
+                let mse_monte_carlo_standard_error =
+                    (squared_error_sample_variance / n).sqrt();
+                let rmse_monte_carlo_standard_error = if root_mean_square_error == 0.0 {
+                    0.0
+                } else {
+                    mse_monte_carlo_standard_error / (2.0 * root_mean_square_error)
+                };
+                (
+                    Some(bias),
+                    Some(root_mean_square_error),
+                    Some(bias_monte_carlo_standard_error),
+                    Some(rmse_monte_carlo_standard_error),
+                )
+            }
+        };
 
     Ok(SelectedKRecoverySummary {
         truth_k,
