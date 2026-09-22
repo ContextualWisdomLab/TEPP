@@ -60,7 +60,7 @@ fn fit(training_input: &ReferenceTopicTrainingInput, topic_count: usize) -> Refe
 }
 
 #[test]
-fn multi_window_selection_rejects_training_history_that_forgets_prior_evaluation_rows() {
+fn multi_window_selection_rejects_non_cumulative_training_history() {
     let cutoffs = [cutoff(10), cutoff(20), cutoff(30)];
     let training_ids: Vec<_> = (1_u128..=6).map(Uuid::from_u128).collect();
     let first_evaluation_ids = [Uuid::from_u128(50)];
@@ -111,7 +111,19 @@ fn multi_window_selection_rejects_training_history_that_forgets_prior_evaluation
         &second_evaluation_ids,
         &[],
     )
-    .expect("locally valid but non-cumulative second partition");
+    .expect("locally valid but missing prior evaluation history");
+    let mut dropped_training_ids = training_ids[1..].to_vec();
+    dropped_training_ids.push(first_evaluation_ids[0]);
+    let dropped_training_second_partition = admit_rolling_origin_partition(
+        &cutoffs,
+        1,
+        &snapshot20,
+        &snapshot30,
+        &dropped_training_ids,
+        &second_evaluation_ids,
+        &[],
+    )
+    .expect("locally valid but missing prior training history");
 
     let group = GroupId::from_uuid(Uuid::from_u128(100));
     let mut memberships = MembershipNetwork::new();
@@ -182,7 +194,7 @@ fn multi_window_selection_rejects_training_history_that_forgets_prior_evaluation
     let first_evaluation_times = [event_time(15)];
     let second_evaluation_times = [event_time(25)];
 
-    let windows = [
+    let stale_evaluation_windows = [
         RollingOriginPredictiveEvaluation::new(
             &first_partition,
             &candidates,
@@ -202,9 +214,25 @@ fn multi_window_selection_rejects_training_history_that_forgets_prior_evaluation
             &memberships,
         ),
     ];
-
     assert_eq!(
-        select_rolling_origin_predictive_candidate_k_across_windows(&windows),
+        select_rolling_origin_predictive_candidate_k_across_windows(&stale_evaluation_windows),
+        Err(ModelSelectionError::RollingOriginTrainingHistoryMismatch)
+    );
+
+    let dropped_training_windows = [
+        stale_evaluation_windows[0],
+        RollingOriginPredictiveEvaluation::new(
+            &dropped_training_second_partition,
+            &candidates,
+            &second_evaluation_ids,
+            &second_evaluation_counts,
+            &second_evaluation_times,
+            None,
+            &memberships,
+        ),
+    ];
+    assert_eq!(
+        select_rolling_origin_predictive_candidate_k_across_windows(&dropped_training_windows),
         Err(ModelSelectionError::RollingOriginTrainingHistoryMismatch)
     );
 }
