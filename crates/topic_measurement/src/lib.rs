@@ -71,6 +71,8 @@ pub use reference::TopicSequenceEdge;
 pub use reference::fit_reference_topic_model;
 /// Owner-issued aggregate binding one admitted input, configuration, and fit.
 pub use reference_fit::ReferenceTopicFit;
+/// Owner-issued aggregate binding one frozen training basis to its exact fitted state.
+pub use reference_fit::ReferenceTopicTrainingFit;
 /// Validated compressed sparse numeric matrix.
 pub use sparse::SparseMatrix;
 /// Whether compressed values are grouped by row or by column.
