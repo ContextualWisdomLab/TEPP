@@ -1,10 +1,10 @@
-//! Candidate labels must identify the fitted topic dimension they score.
+//! Statistical candidate identity comes from the owner-issued reference fit.
 
 use corpus_split::{CorpusDocument, CorpusSnapshot};
 use membership_core::{
     GroupId, MemberId, MembershipAssignment, MembershipNetwork, MembershipRole, MembershipWeight,
 };
-use model_selection::{ModelSelectionError, statistical_candidate_from_fit};
+use model_selection::statistical_candidate_from_fit;
 use relation_graph::{
     RelationEdge, RelationEndpointId, RelationEvidenceStatus, RelationGraph, RelationKind,
 };
@@ -12,7 +12,9 @@ use temporal_core::{
     AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
     TemporalPrecision,
 };
-use topic_measurement::{PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModel, SparseMatrix};
+use topic_measurement::{
+    ReferenceTopicFit, ReferenceTopicInput, ReferenceTopicModelConfig, SparseMatrix,
+};
 use uuid::Uuid;
 
 fn event_time(day: u8) -> EventTime {
@@ -81,7 +83,7 @@ fn admitted_input() -> ReferenceTopicInput {
         2,
         vec![0, 2, 4],
         vec![0, 1, 0, 1],
-        vec![3.0, 1.0, 1.0, 3.0],
+        vec![30.0, 10.0, 10.0, 30.0],
     )
     .expect("term counts");
     ReferenceTopicInput::new(
@@ -96,38 +98,13 @@ fn admitted_input() -> ReferenceTopicInput {
     .expect("admitted input")
 }
 
-fn two_topic_model() -> ReferenceTopicModel {
-    ReferenceTopicModel {
-        seed: 7,
-        iterations: 4,
-        objective: -1.0,
-        topic_term_probabilities: vec![vec![0.75, 0.25], vec![0.25, 0.75]],
-        document_topic_proportions: vec![vec![0.8, 0.2], vec![0.2, 0.8]],
-        document_coordinate_variances: vec![vec![0.1], vec![0.1]],
-        prevalence_coefficients: vec![vec![0.0]; 3],
-        prevalence_features: vec![
-            PrevalenceFeature::Intercept,
-            PrevalenceFeature::EventTime,
-            PrevalenceFeature::Membership {
-                role: MembershipRole::Organization,
-                group_id: GroupId::from_uuid(Uuid::from_u128(100)),
-            },
-        ],
-        sequence_edges: Vec::new(),
-        connected_post_count: 0,
-        lineage_count: 0,
-    }
-}
-
 #[test]
-fn statistical_candidate_rejects_a_k_label_from_another_topic_dimension() {
+fn statistical_candidate_uses_the_owner_issued_fit_identity() {
     let input = admitted_input();
-    let model = two_topic_model();
+    let config = ReferenceTopicModelConfig::new(2, vec![7, 11], 2_000, 1e-5)
+        .expect("reference configuration");
+    let fit = ReferenceTopicFit::fit(&input, &config).expect("owner-issued reference fit");
 
-    let matching = statistical_candidate_from_fit(&input, 2, &model).expect("matching K");
-    assert_eq!(matching.candidate_k(), 2);
-    assert_eq!(
-        statistical_candidate_from_fit(&input, 3, &model),
-        Err(ModelSelectionError::InvalidDiagnostic)
-    );
+    let candidate = statistical_candidate_from_fit(&fit).expect("owner-bound candidate");
+    assert_eq!(candidate.candidate_k(), 2);
 }
