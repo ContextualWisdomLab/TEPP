@@ -14,6 +14,7 @@ mod candidate;
 mod error;
 mod fitted;
 mod gate;
+mod rolling_origin_predictive;
 
 /// One candidate `K` with statistical or LLM-only support.
 pub use candidate::ModelCandidate;
@@ -33,3 +34,5 @@ pub use gate::select_candidate_k;
 pub use gate::selected_k_recovery_summary;
 /// RMSE of selected `K` replications against known truth.
 pub use gate::selected_k_root_mean_square_error;
+/// Score one admitted rolling-origin evaluation partition under a fixed training fit.
+pub use rolling_origin_predictive::rolling_origin_prevalence_mean_predictive_log_likelihood;
