@@ -224,6 +224,7 @@ impl TopicLineageArtifact {
             || self.iterations == 0
             || self.iterations > method_configuration.maximum_iterations
             || !self.objective.is_finite()
+            || (self.objective == 0.0 && self.objective.is_sign_negative())
             || self.topic_count < 2
             || self.evidence_count < 2
             || self.connected_post_count > self.evidence_count
