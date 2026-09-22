@@ -71,3 +71,77 @@ pub fn rolling_origin_prevalence_mean_predictive_log_likelihood(
     }
     Ok(diagnostic)
 }
+
+/// Select candidate `K` from one admitted rolling-origin predictive partition.
+///
+/// Every candidate is an owner-issued [`ReferenceTopicTrainingFit`]. Its topic
+/// dimension defines `K`; callers cannot attach a detached label. Each candidate
+/// is scored only through [`rolling_origin_prevalence_mean_predictive_log_likelihood`],
+/// so the exact training/evaluation identities and frozen training prevalence
+/// basis remain enforced. The highest finite predictive score wins, with the
+/// smaller `K` winning an exact tie. Candidate order therefore has no authority.
+///
+/// This gate is intentionally separate from the in-sample Schwarz selector. The
+/// score is a prevalence-mean fixed-training predictive log likelihood, not STM
+/// document-completion likelihood and not a complete multi-window recovery
+/// acceptance result.
+///
+/// # Errors
+///
+/// Returns [`ModelSelectionError::EmptyCandidateSet`] when no fitted candidate
+/// is supplied, [`ModelSelectionError::DuplicateCandidateK`] when two candidates
+/// have the same fitted topic dimension, and propagates the fail-closed partition
+/// or numerical diagnostic errors from the rolling-origin predictive scorer.
+pub fn select_rolling_origin_predictive_candidate_k(
+    partition: &RollingOriginPartition,
+    candidate_training_fits: &[ReferenceTopicTrainingFit],
+    evaluation_document_ids: &[Uuid],
+    evaluation_document_term: &SparseMatrix,
+    evaluation_event_times: &[EventTime],
+    evaluation_covariates: Option<&SparseMatrix>,
+    memberships: &MembershipNetwork,
+) -> Result<u32, ModelSelectionError> {
+    if candidate_training_fits.is_empty() {
+        return Err(ModelSelectionError::EmptyCandidateSet);
+    }
+
+    let mut seen_candidate_k = BTreeSet::new();
+    let mut best: Option<(u32, f64)> = None;
+    for training_fit in candidate_training_fits {
+        let topic_count = training_fit
+            .reference_fit()
+            .model()
+            .topic_term_probabilities
+            .len();
+        let candidate_k =
+            u32::try_from(topic_count).map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+        if candidate_k < 2 {
+            return Err(ModelSelectionError::InvalidDiagnostic);
+        }
+        if !seen_candidate_k.insert(candidate_k) {
+            return Err(ModelSelectionError::DuplicateCandidateK);
+        }
+
+        let score = rolling_origin_prevalence_mean_predictive_log_likelihood(
+            partition,
+            training_fit,
+            evaluation_document_ids,
+            evaluation_document_term,
+            evaluation_event_times,
+            evaluation_covariates,
+            memberships,
+        )?;
+        match best {
+            None => best = Some((candidate_k, score)),
+            Some((best_k, best_score))
+                if score > best_score || (score == best_score && candidate_k < best_k) =>
+            {
+                best = Some((candidate_k, score));
+            }
+            Some(_) => {}
+        }
+    }
+
+    best.map(|(candidate_k, _)| candidate_k)
+        .ok_or(ModelSelectionError::EmptyCandidateSet)
+}
