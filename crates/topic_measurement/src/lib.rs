@@ -23,7 +23,7 @@ mod topic_basis;
 
 /// Additive log-ratio map from a simplex vector.
 pub use coordinates::additive_log_ratio;
-/// Aitchison distance between two simplex vector.
+/// Aitchison distance between two simplex vectors.
 pub use coordinates::aitchison_distance;
 /// Inverse additive log-ratio map back to the simplex.
 pub use coordinates::from_additive_log_ratio;
