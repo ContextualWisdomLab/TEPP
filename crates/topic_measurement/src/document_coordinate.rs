@@ -9,7 +9,10 @@
 
 use uuid::Uuid;
 
-use crate::{ReferenceTopicInput, ReferenceTopicModel, TopicMeasurementError, additive_log_ratio};
+use crate::{
+    FittedTopicBasisIdentity, ReferenceTopicInput, ReferenceTopicModel, TopicMeasurementError,
+    additive_log_ratio,
+};
 
 /// Version of the fit-local document-coordinate summary contract.
 pub const FITTED_DOCUMENT_COORDINATE_SUMMARY_VERSION: &str =
@@ -89,10 +92,10 @@ impl FittedDocumentCoordinateSummary {
     ///
     /// # Errors
     ///
-    /// Returns [`TopicMeasurementError::InvalidModelInput`] when document/topic
-    /// dimensions disagree, a fitted topic proportion cannot be represented in
-    /// ALR coordinates, or a retained diagonal variance is non-finite or not
-    /// strictly positive.
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] when fitted topic,
+    /// document, or coordinate dimensions disagree, a fitted topic proportion
+    /// cannot be represented in ALR coordinates, or a retained diagonal
+    /// variance is non-finite or not strictly positive.
     pub fn from_fit(
         input: &ReferenceTopicInput,
         model: &ReferenceTopicModel,
@@ -101,6 +104,7 @@ impl FittedDocumentCoordinateSummary {
         if topic_count < 2 {
             return Err(TopicMeasurementError::InvalidModelInput);
         }
+        FittedTopicBasisIdentity::from_model(model, input.vocabulary_size())?;
         if model.document_topic_proportions.len() != input.document_count() {
             return Err(TopicMeasurementError::InvalidModelInput);
         }
