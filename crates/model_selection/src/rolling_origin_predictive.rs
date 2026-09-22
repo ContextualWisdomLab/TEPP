@@ -257,21 +257,25 @@ pub fn select_rolling_origin_predictive_candidate_k_across_windows(
     }
 
     let first_scores = predictive_candidate_scores(first)?;
-    let expected_candidate_k: BTreeSet<_> =
-        first_scores.iter().map(|(candidate_k, _)| *candidate_k).collect();
+    let expected_candidate_k: BTreeSet<_> = first_scores
+        .iter()
+        .map(|(candidate_k, _)| *candidate_k)
+        .collect();
     let mut totals: BTreeMap<u32, f64> = first_scores.into_iter().collect();
 
     for evaluation in evaluations.iter().copied().skip(1) {
         let scores = predictive_candidate_scores(evaluation)?;
-        let current_candidate_k: BTreeSet<_> =
-            scores.iter().map(|(candidate_k, _)| *candidate_k).collect();
+        let current_candidate_k: BTreeSet<_> = scores
+            .iter()
+            .map(|(candidate_k, _)| *candidate_k)
+            .collect();
         if current_candidate_k != expected_candidate_k {
             return Err(ModelSelectionError::PredictiveCandidateSetMismatch);
         }
         for (candidate_k, score) in scores {
-            let Some(total) = totals.get_mut(&candidate_k) else {
-                return Err(ModelSelectionError::PredictiveCandidateSetMismatch);
-            };
+            let total = totals
+                .get_mut(&candidate_k)
+                .expect("candidate-set equality was checked before aggregation");
             add_predictive_score(total, score)?;
         }
     }
