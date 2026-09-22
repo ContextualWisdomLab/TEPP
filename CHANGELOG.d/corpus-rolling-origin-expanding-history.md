@@ -1,0 +1,3 @@
+### Added
+
+- `corpus_split` now owns an explicit leakage-safe expanding-history rolling-origin admission. Training identities are derived from the complete cutoff-bound training snapshot rather than a caller-selected subset, while complete governed leakage components touching the current evaluation set are withheld from training and returned as an auditable exclusion set. Unrelated historical evidence remains retained, including rows evaluated at an earlier origin once they are historically available. Generic multi-window model selection remains policy-neutral instead of silently imposing an expanding-window design. (#691)
