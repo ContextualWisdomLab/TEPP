@@ -169,6 +169,7 @@ fn fitted_document_coordinates_pair_alr_location_with_diagonal_variance() {
     let summary =
         FittedDocumentCoordinateSummary::from_fit(&input, &model).expect("coordinate summary");
 
+    assert_eq!(summary.version(), "tepp.fitted_document_coordinate_summary.v1");
     assert_eq!(summary.topic_count(), 2);
     assert_eq!(summary.rows().len(), input.document_count());
     for (document_index, (row, document_id)) in summary
