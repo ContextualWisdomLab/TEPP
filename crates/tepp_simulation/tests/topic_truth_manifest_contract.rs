@@ -104,7 +104,7 @@ fn membership_truth_is_weighted_and_cross_classified() {
 
 #[test]
 fn event_transition_truth_projects_to_owned_document_identities() {
-    let config = SimulationConfig::new(2028, 4, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0)
+    let config = SimulationConfig::new(2028, 4, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0)
         .expect("simulation config");
     let manifest = generate(config).expect("known-relation corpus");
 
@@ -133,7 +133,9 @@ fn event_transition_truth_projects_to_owned_document_identities() {
             && !document_ids.contains(target)
     }));
 
-    let projected = manifest.document_transition_pairs();
+    let projected = manifest
+        .document_transition_pairs()
+        .expect("document transition projection");
     assert_eq!(projected.len(), raw_transition_pairs.len());
     assert!(projected.iter().all(|(source, target)| {
         document_ids.contains(source) && document_ids.contains(target)
@@ -144,6 +146,20 @@ fn event_transition_truth_projects_to_owned_document_identities() {
         .iter()
         .map(|document| (document.document_id(), document.event_id()))
         .collect();
+    let canonical_document_by_event: BTreeMap<_, _> = manifest
+        .documents()
+        .iter()
+        .fold(BTreeMap::new(), |mut canonical, document| {
+            canonical
+                .entry(document.event_id())
+                .and_modify(|current| {
+                    if document.document_id() < *current {
+                        *current = document.document_id();
+                    }
+                })
+                .or_insert_with(|| document.document_id());
+            canonical
+        });
     let event_order: BTreeMap<_, _> = manifest
         .events()
         .iter()
@@ -153,6 +169,8 @@ fn event_transition_truth_projects_to_owned_document_identities() {
         let source_event = document_event[&source_document];
         let target_event = document_event[&target_document];
         assert!(raw_transition_pairs.contains(&(source_event, target_event)));
+        assert_eq!(source_document, canonical_document_by_event[&source_event]);
+        assert_eq!(target_document, canonical_document_by_event[&target_event]);
         assert!(event_order[&source_event] < event_order[&target_event]);
     }
 }
