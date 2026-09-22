@@ -117,7 +117,8 @@ fn held_out_rows_use_only_the_frozen_training_time_transform() {
     let basis = training.prevalence_design_basis();
     assert_eq!(basis.features(), training.input().features());
     assert_eq!(basis.event_time_origin(), &event_time(1));
-    assert!(basis.event_time_scale_seconds() > 0.0);
+    assert!((basis.event_time_location_seconds() - 86_400.0).abs() < f64::EPSILON);
+    assert!((basis.event_time_scale_seconds() - 86_400.0).abs() < f64::EPSILON);
 
     let focal = Uuid::from_u128(3);
     let batch_a = basis
@@ -138,7 +139,47 @@ fn held_out_rows_use_only_the_frozen_training_time_transform() {
         .expect("second evaluation batch");
 
     assert_eq!(batch_a[0], batch_b[0]);
+    assert!((batch_a[0][1] - 3.0).abs() < f64::EPSILON);
     assert!(batch_b[1][1] > batch_b[0][1]);
+
+    assert_eq!(
+        basis.project(&[], &[], None, &memberships),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    assert_eq!(
+        basis.project(&[focal], &[], None, &memberships),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    assert_eq!(
+        basis.project(&[focal, focal], &[event_time(5), event_time(5)], None, &memberships),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    let unexpected_covariates = SparseMatrix::from_csr(
+        1,
+        1,
+        vec![0, 1],
+        vec![0],
+        vec![1.0],
+    )
+    .expect("unexpected covariates");
+    assert_eq!(
+        basis.project(
+            &[focal],
+            &[event_time(5)],
+            Some(&unexpected_covariates),
+            &memberships,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    assert_eq!(
+        basis.project(
+            &[Uuid::from_u128(77)],
+            &[event_time(5)],
+            None,
+            &MembershipNetwork::new(),
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
 }
 
 #[test]
@@ -154,6 +195,16 @@ fn projection_fails_closed_on_coordinates_absent_from_training_basis() {
     let (training, memberships) = training_input(Some(&training_covariates));
     let basis = training.prevalence_design_basis();
     assert!(basis.features().contains(&PrevalenceFeature::Covariate(0)));
+
+    assert_eq!(
+        basis.project(
+            &[Uuid::from_u128(3)],
+            &[event_time(5)],
+            None,
+            &memberships,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
 
     let wider_covariates = SparseMatrix::from_csr(
         1,
