@@ -11,6 +11,7 @@
 //! forbidden inferential coordinates.
 
 mod coordinates;
+mod document_coordinate;
 mod error;
 mod lexical;
 mod posterior_draw;
@@ -28,6 +29,14 @@ pub use coordinates::from_additive_log_ratio;
 pub use coordinates::from_isometric_log_ratio;
 /// Isometric log-ratio map from a simplex vector.
 pub use coordinates::isometric_log_ratio;
+/// Version of the fit-local document-coordinate summary contract.
+pub use document_coordinate::FITTED_DOCUMENT_COORDINATE_SUMMARY_VERSION;
+/// One fitted ALR location paired with its diagonal-Laplace variance.
+pub use document_coordinate::FittedDocumentCoordinate;
+/// All fitted ALR coordinates for one admitted modeled document.
+pub use document_coordinate::FittedDocumentCoordinateRow;
+/// Fit-owned document ALR locations and diagonal variances.
+pub use document_coordinate::FittedDocumentCoordinateSummary;
 /// Fail-closed topic-coordinate errors.
 pub use error::TopicMeasurementError;
 /// Refuse lexical retrieval weights as inferential coordinates.
