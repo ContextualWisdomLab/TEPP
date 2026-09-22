@@ -178,6 +178,20 @@ fn predictive_candidate_scores(
     Ok(scores)
 }
 
+fn validate_evaluation_identity_sequence(
+    evaluations: &[RollingOriginPredictiveEvaluation<'_>],
+) -> Result<(), ModelSelectionError> {
+    let mut seen_evaluation_document_ids = BTreeSet::new();
+    for evaluation in evaluations {
+        for document_id in evaluation.partition.evaluation_document_ids() {
+            if !seen_evaluation_document_ids.insert(*document_id) {
+                return Err(ModelSelectionError::RepeatedEvaluationDocument);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Select candidate `K` from one admitted rolling-origin predictive partition.
 ///
 /// Every candidate is an owner-issued [`ReferenceTopicTrainingFit`]. Its topic
@@ -223,7 +237,9 @@ pub fn select_rolling_origin_predictive_candidate_k(
 /// Select candidate `K` from predictive evidence accumulated across windows.
 ///
 /// Adjacent partitions must form one contiguous chronological sequence: each
-/// next training cutoff equals the previous evaluation cutoff. Every window must
+/// next training cutoff equals the previous evaluation cutoff. Evaluation
+/// document identities must be disjoint across windows, so one held-out row
+/// cannot be rebound to a later snapshot and counted twice. Every window must
 /// expose the same unique fitted candidate-K set. Each `(window, K)` score is
 /// obtained through the same partition-bound fixed-training scorer used by the
 /// one-window gate, then finite log likelihoods are summed by `K`. The largest
@@ -233,23 +249,28 @@ pub fn select_rolling_origin_predictive_candidate_k(
 /// does not silently convert every rolling-origin design into an expanding
 /// history; leakage-safe expanding history for #680 is a `corpus_split` owner
 /// policy so governed connected groups may be excluded without being mistaken
-/// for arbitrary numerical omission.
+/// for arbitrary numerical omission. A document evaluated in one window may
+/// therefore still appear later in training when the split owner admits it.
 ///
 /// This is score aggregation across admitted rolling-origin windows, not a vote
 /// over per-window winners, not the in-sample Schwarz criterion, and not STM
-/// document-completion likelihood. It also does not itself establish realistic
-/// repeated-simulation recovery acceptance.
+/// document-completion likelihood. It also does not authenticate cross-snapshot
+/// availability provenance or establish realistic repeated-simulation recovery
+/// acceptance.
 ///
 /// # Errors
 ///
 /// Returns [`ModelSelectionError::EmptyCandidateSet`] for no windows or a window
 /// without fitted candidates; [`ModelSelectionError::RollingOriginWindowMismatch`]
-/// for a noncontiguous window sequence; [`ModelSelectionError::DuplicateCandidateK`]
-/// for repeated fitted dimensions within a window;
-/// [`ModelSelectionError::PredictiveCandidateSetMismatch`] when candidate-K sets
-/// differ across windows; or [`ModelSelectionError::InvalidDiagnostic`] when
-/// finite per-window scores overflow during cross-window aggregation. Partition
-/// and numerical input failures propagate from the one-window scorer.
+/// for a noncontiguous window sequence;
+/// [`ModelSelectionError::RepeatedEvaluationDocument`] when one identity is
+/// presented as held-out evidence in more than one window;
+/// [`ModelSelectionError::DuplicateCandidateK`] for repeated fitted dimensions
+/// within a window; [`ModelSelectionError::PredictiveCandidateSetMismatch`] when
+/// candidate-K sets differ across windows; or
+/// [`ModelSelectionError::InvalidDiagnostic`] when finite per-window scores
+/// overflow during cross-window aggregation. Partition and numerical input
+/// failures propagate from the one-window scorer.
 pub fn select_rolling_origin_predictive_candidate_k_across_windows(
     evaluations: &[RollingOriginPredictiveEvaluation<'_>],
 ) -> Result<u32, ModelSelectionError> {
@@ -262,6 +283,7 @@ pub fn select_rolling_origin_predictive_candidate_k_across_windows(
             return Err(ModelSelectionError::RollingOriginWindowMismatch);
         }
     }
+    validate_evaluation_identity_sequence(evaluations)?;
 
     let first_scores = predictive_candidate_scores(first)?;
     let expected_candidate_k: BTreeSet<_> = first_scores
