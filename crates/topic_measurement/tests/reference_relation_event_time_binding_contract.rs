@@ -28,7 +28,12 @@ fn interval(day: u8) -> TemporalInterval<EventTime> {
     .expect("bounded interval")
 }
 
-fn observed_transition(source: Uuid, target: Uuid, source_day: u8, target_day: u8) -> RelationEdge {
+fn observed_transition(
+    source: Uuid,
+    target: Uuid,
+    source_day: u8,
+    target_day: u8,
+) -> RelationEdge {
     RelationEdge::new(
         RelationKind::TransitionsTo,
         RelationEndpointId::from_uuid(source),
