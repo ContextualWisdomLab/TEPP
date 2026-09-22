@@ -22,6 +22,8 @@ pub enum ModelSelectionError {
     InsufficientRecoveryReplications,
     /// A rolling-origin numerical input did not match the admitted split identities.
     PartitionInputMismatch,
+    /// More than one predictive candidate represented the same fitted topic dimension.
+    DuplicateCandidateK,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -37,6 +39,7 @@ impl fmt::Display for ModelSelectionError {
                 "at least two successful recovery replications are required"
             }
             Self::PartitionInputMismatch => "rolling-origin partition input mismatch",
+            Self::DuplicateCandidateK => "duplicate predictive candidate k",
         };
         formatter.write_str(message)
     }
@@ -82,6 +85,10 @@ mod tests {
             (
                 ModelSelectionError::PartitionInputMismatch,
                 "rolling-origin partition input mismatch",
+            ),
+            (
+                ModelSelectionError::DuplicateCandidateK,
+                "duplicate predictive candidate k",
             ),
         ] {
             assert_eq!(error.to_string(), message);
