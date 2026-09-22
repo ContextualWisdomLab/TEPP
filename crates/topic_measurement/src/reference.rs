@@ -56,9 +56,10 @@ impl ReferenceTopicInput {
     /// use either orientation. Every document must occur in `snapshot`, have a
     /// nonempty nonnegative term row, span at least two event times, and have at
     /// least one active membership at its own event time. Only directly observed,
-    /// validated forward transition edges with both endpoints in the corpus affect
-    /// the relational objective; inferred transitions remain provenance until
-    /// explicitly promoted by their owner.
+    /// validated forward transition edges with both endpoints in the corpus and
+    /// endpoint intervals containing the modeled event times affect the relational
+    /// objective; inferred transitions remain provenance until explicitly promoted
+    /// by their owner.
     ///
     /// # Errors
     ///
@@ -103,7 +104,7 @@ impl ReferenceTopicInput {
         }
 
         let (design, features) = build_design(&document_ids, event_times, covariates, memberships)?;
-        let transition_pairs = collect_transition_pairs(&index_by_id, relations)?;
+        let transition_pairs = collect_transition_pairs(&index_by_id, event_times, relations)?;
 
         Ok(Self {
             document_ids,
@@ -295,6 +296,7 @@ fn build_design(
 
 fn collect_transition_pairs(
     index_by_id: &HashMap<Uuid, usize>,
+    event_times: &[EventTime],
     relations: &RelationGraph,
 ) -> Result<Vec<(usize, usize)>, TopicMeasurementError> {
     let mut transition_pairs = BTreeSet::new();
@@ -307,6 +309,11 @@ fn collect_transition_pairs(
         let Some(&target) = index_by_id.get(&edge.target().as_uuid()) else {
             continue;
         };
+        if !edge.source_event_time().contains(event_times[source])
+            || !edge.target_event_time().contains(event_times[target])
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
         transition_pairs.insert((source, target));
     }
     if transition_pairs.is_empty() {
