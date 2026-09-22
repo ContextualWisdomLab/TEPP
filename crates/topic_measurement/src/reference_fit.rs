@@ -75,6 +75,15 @@ impl ReferenceTopicFit {
     /// Evidence-owned vocabulary provenance and released topic-basis contract
     /// are settled; this method does not promote them to semantic authority.
     ///
+    /// The detached input/model/config builder is intentionally unavailable to
+    /// downstream consumers. This compile-fail contract prevents the owner
+    /// aggregate from being bypassed through the input type:
+    ///
+    /// ```compile_fail
+    /// use topic_measurement::ReferenceTopicInput;
+    /// let _ = ReferenceTopicInput::build_joint_coordinate_precision;
+    /// ```
+    ///
     /// # Errors
     ///
     /// Propagates invalid dimension, identity, non-finite, symmetry, or
