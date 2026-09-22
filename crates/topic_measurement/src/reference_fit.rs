@@ -1,4 +1,4 @@
-//! Owner-issued binding of an admitted reference input, configuration, and fit.
+//! Owner-issued binding of admitted reference inputs, configurations, and fits.
 //!
 //! `ReferenceTopicModel` remains a numerical result type whose fields are useful
 //! for scientific inspection and hostile-case testing. A release projection,
@@ -7,14 +7,22 @@
 //! retaining private clones of the exact admitted input and configuration beside
 //! the model returned by the reference estimator.
 //!
-//! This is fit-local integrity, not Evidence authentication. It does not prove
-//! the external source snapshot, vocabulary lineage, or availability clock.
+//! Held-out evaluation has an additional coordinate requirement: fitted
+//! prevalence coefficients must stay paired with the frozen training prevalence
+//! basis that defined them. `ReferenceTopicTrainingFit` composes the exact
+//! `ReferenceTopicTrainingInput` with the `ReferenceTopicFit` minted from that
+//! same input; no public constructor accepts pre-existing detached components.
+//!
+//! These are fit-local numerical integrity contracts, not Evidence
+//! authentication. They do not prove the external source snapshot, vocabulary
+//! lineage, Membership provenance, relation activation, or availability clock.
 
 use uuid::Uuid;
 
 use crate::{
-    JointCoordinatePrecision, ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig,
-    TopicMeasurementError, fit_reference_topic_model,
+    JointCoordinatePrecision, PrevalenceDesignBasis, ReferenceTopicInput, ReferenceTopicModel,
+    ReferenceTopicModelConfig, ReferenceTopicTrainingInput, TopicMeasurementError,
+    fit_reference_topic_model,
 };
 
 /// Owner-issued nominal aggregate for one admitted CPU reference fit.
@@ -94,5 +102,59 @@ impl ReferenceTopicFit {
     ) -> Result<JointCoordinatePrecision, TopicMeasurementError> {
         self.input
             .build_joint_coordinate_precision(&self.model, &self.config, topic_ids)
+    }
+}
+
+/// Owner-issued fitted training state for leakage-safe prevalence projection.
+///
+/// This aggregate retains the exact [`ReferenceTopicTrainingInput`] that minted
+/// the frozen prevalence basis together with the [`ReferenceTopicFit`] produced
+/// from that input. Downstream predictive evaluation can therefore consume one
+/// nominal owner value instead of independently pairing a fit and a
+/// dimension-compatible basis from different training states.
+#[derive(Clone, Debug)]
+pub struct ReferenceTopicTrainingFit {
+    training_input: ReferenceTopicTrainingInput,
+    reference_fit: ReferenceTopicFit,
+}
+
+impl ReferenceTopicTrainingFit {
+    /// Fit one owner-issued training input and retain its frozen prevalence basis.
+    ///
+    /// No public constructor accepts an existing [`ReferenceTopicFit`] or
+    /// [`PrevalenceDesignBasis`], so detached A-fit/B-basis substitution cannot
+    /// preserve this owner-issued type.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the CPU reference estimator's invalid-input, non-finite, and
+    /// convergence failures. No aggregate is returned for a partial fit.
+    pub fn fit(
+        training_input: &ReferenceTopicTrainingInput,
+        config: &ReferenceTopicModelConfig,
+    ) -> Result<Self, TopicMeasurementError> {
+        let reference_fit = ReferenceTopicFit::fit(training_input.input(), config)?;
+        Ok(Self {
+            training_input: training_input.clone(),
+            reference_fit,
+        })
+    }
+
+    /// Return the exact admitted training input and frozen prevalence basis owner.
+    #[must_use]
+    pub const fn training_input(&self) -> &ReferenceTopicTrainingInput {
+        &self.training_input
+    }
+
+    /// Return the frozen prevalence coordinate system used by the training input.
+    #[must_use]
+    pub const fn prevalence_design_basis(&self) -> &PrevalenceDesignBasis {
+        self.training_input.prevalence_design_basis()
+    }
+
+    /// Return the reference fit minted from this exact training input.
+    #[must_use]
+    pub const fn reference_fit(&self) -> &ReferenceTopicFit {
+        &self.reference_fit
     }
 }
