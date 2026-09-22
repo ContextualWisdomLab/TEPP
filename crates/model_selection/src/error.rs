@@ -30,6 +30,8 @@ pub enum ModelSelectionError {
     RepeatedEvaluationDocument,
     /// Rolling-origin windows did not expose the same unique candidate-K set.
     PredictiveCandidateSetMismatch,
+    /// Predictive fits did not cover the predeclared scientific candidate-K grid exactly.
+    PredictiveCandidateGridMismatch,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -50,6 +52,9 @@ impl fmt::Display for ModelSelectionError {
             Self::RepeatedEvaluationDocument => "repeated rolling-origin evaluation document",
             Self::PredictiveCandidateSetMismatch => {
                 "rolling-origin predictive candidate set mismatch"
+            }
+            Self::PredictiveCandidateGridMismatch => {
+                "rolling-origin predictive fits do not match the declared candidate k grid"
             }
         };
         formatter.write_str(message)
@@ -112,6 +117,10 @@ mod tests {
             (
                 ModelSelectionError::PredictiveCandidateSetMismatch,
                 "rolling-origin predictive candidate set mismatch",
+            ),
+            (
+                ModelSelectionError::PredictiveCandidateGridMismatch,
+                "rolling-origin predictive fits do not match the declared candidate k grid",
             ),
         ] {
             assert_eq!(error.to_string(), message);
