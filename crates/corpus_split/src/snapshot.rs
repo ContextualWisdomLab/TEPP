@@ -4,7 +4,7 @@ use crate::CorpusDocument;
 use crate::CorpusSplitError;
 use crate::cutoff_eligible;
 use std::collections::BTreeMap;
-use temporal_core::KnowledgeCutoff;
+use temporal_core::{AvailableTime, KnowledgeCutoff};
 use uuid::Uuid;
 
 /// Immutable snapshot of documents eligible under one knowledge cutoff.
@@ -69,6 +69,18 @@ impl CorpusSnapshot {
         self.documents.contains_key(&document_id)
     }
 
+    /// Return the availability time retained for one admitted document.
+    ///
+    /// This preserves the distinction between a document omitted from another
+    /// snapshot and a document that was genuinely unavailable at that earlier
+    /// horizon. Absence alone is not evidence of future availability.
+    #[must_use]
+    pub fn available_time(&self, document_id: Uuid) -> Option<&AvailableTime> {
+        self.documents
+            .get(&document_id)
+            .map(|document| &document.available_time)
+    }
+
     /// Return the number of eligible documents.
     #[must_use]
     pub fn len(&self) -> usize {
@@ -107,10 +119,12 @@ mod tests {
             AvailableTime::parse_rfc3339("2026-08-01T00:00:00Z").expect("a"),
         );
         assert_eq!(snapshot.knowledge_cutoff(), None);
+        assert_eq!(snapshot.available_time(early.document_id), None);
         snapshot
             .insert_if_eligible(early.clone(), &cutoff)
             .expect("early");
         assert_eq!(snapshot.knowledge_cutoff(), Some(cutoff));
+        assert_eq!(snapshot.available_time(early.document_id), Some(&early.available_time));
         assert_eq!(
             snapshot.insert_if_eligible(late, &cutoff),
             Err(CorpusSplitError::UnavailableAtCutoff)
