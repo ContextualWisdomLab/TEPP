@@ -24,6 +24,10 @@ pub enum ModelSelectionError {
     PartitionInputMismatch,
     /// More than one predictive candidate represented the same fitted topic dimension.
     DuplicateCandidateK,
+    /// Rolling-origin windows were not a contiguous chronological sequence.
+    RollingOriginWindowMismatch,
+    /// Rolling-origin windows did not expose the same unique candidate-K set.
+    PredictiveCandidateSetMismatch,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -40,6 +44,8 @@ impl fmt::Display for ModelSelectionError {
             }
             Self::PartitionInputMismatch => "rolling-origin partition input mismatch",
             Self::DuplicateCandidateK => "duplicate predictive candidate k",
+            Self::RollingOriginWindowMismatch => "rolling-origin window sequence mismatch",
+            Self::PredictiveCandidateSetMismatch => "rolling-origin predictive candidate set mismatch",
         };
         formatter.write_str(message)
     }
@@ -89,6 +95,14 @@ mod tests {
             (
                 ModelSelectionError::DuplicateCandidateK,
                 "duplicate predictive candidate k",
+            ),
+            (
+                ModelSelectionError::RollingOriginWindowMismatch,
+                "rolling-origin window sequence mismatch",
+            ),
+            (
+                ModelSelectionError::PredictiveCandidateSetMismatch,
+                "rolling-origin predictive candidate set mismatch",
             ),
         ] {
             assert_eq!(error.to_string(), message);
