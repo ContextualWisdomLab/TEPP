@@ -101,3 +101,58 @@ fn membership_truth_is_weighted_and_cross_classified() {
             .any(|value| value.abs() > f64::EPSILON)
     );
 }
+
+#[test]
+fn event_transition_truth_projects_to_owned_document_identities() {
+    let config = SimulationConfig::new(2028, 4, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0)
+        .expect("simulation config");
+    let manifest = generate(config).expect("known-relation corpus");
+
+    let event_ids: BTreeSet<_> = manifest
+        .events()
+        .iter()
+        .map(tepp_simulation::LatentEvent::event_id)
+        .collect();
+    let document_ids: BTreeSet<_> = manifest
+        .documents()
+        .iter()
+        .map(tepp_simulation::SimulatedDocument::document_id)
+        .collect();
+    let raw_transition_pairs: BTreeSet<_> = manifest
+        .true_relations()
+        .iter()
+        .filter(|relation| relation.kind().is_transition())
+        .map(|relation| (relation.source_id(), relation.target_id()))
+        .collect();
+
+    assert!(!raw_transition_pairs.is_empty());
+    assert!(raw_transition_pairs.iter().all(|(source, target)| {
+        event_ids.contains(source)
+            && event_ids.contains(target)
+            && !document_ids.contains(source)
+            && !document_ids.contains(target)
+    }));
+
+    let projected = manifest.document_transition_pairs();
+    assert_eq!(projected.len(), raw_transition_pairs.len());
+    assert!(projected.iter().all(|(source, target)| {
+        document_ids.contains(source) && document_ids.contains(target)
+    }));
+
+    let document_event: BTreeMap<_, _> = manifest
+        .documents()
+        .iter()
+        .map(|document| (document.document_id(), document.event_id()))
+        .collect();
+    let event_order: BTreeMap<_, _> = manifest
+        .events()
+        .iter()
+        .map(|event| (event.event_id(), event.ordinal()))
+        .collect();
+    for (source_document, target_document) in projected {
+        let source_event = document_event[&source_document];
+        let target_event = document_event[&target_document];
+        assert!(raw_transition_pairs.contains(&(source_event, target_event)));
+        assert!(event_order[&source_event] < event_order[&target_event]);
+    }
+}
