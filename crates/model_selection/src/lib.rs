@@ -25,7 +25,11 @@ pub use fitted::FittedCandidateKConfig;
 pub use fitted::select_fitted_candidate_k;
 /// Build a statistical candidate from one owner-issued reference fit.
 pub use fitted::statistical_candidate_from_fit;
+/// Monte Carlo recovery summary that retains failed-replication denominators.
+pub use gate::SelectedKRecoverySummary;
 /// Select the admissible candidate `K` from a Pareto-filtered statistical front.
 pub use gate::select_candidate_k;
+/// Summarize selected-`K` recovery with bias, RMSE, failures, and Monte Carlo error.
+pub use gate::selected_k_recovery_summary;
 /// RMSE of selected `K` replications against known truth.
 pub use gate::selected_k_root_mean_square_error;
