@@ -149,14 +149,10 @@ fn multi_window_selection_rejects_non_cumulative_training_history() {
     }
 
     let mut relations = RelationGraph::new();
-    for index in 0..training_ids.len() - 1 {
+    for (index, pair) in training_ids.windows(2).enumerate() {
+        let source_day = u8::try_from(index + 1).expect("bounded training index");
         relations
-            .insert(relation(
-                training_ids[index],
-                training_ids[index + 1],
-                index as u8 + 1,
-                index as u8 + 2,
-            ))
+            .insert(relation(pair[0], pair[1], source_day, source_day + 1))
             .expect("insert relation");
     }
 
