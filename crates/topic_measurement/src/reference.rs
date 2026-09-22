@@ -333,8 +333,8 @@ impl ReferenceTopicModelConfig {
     /// # Errors
     ///
     /// Returns [`TopicMeasurementError::InvalidModelInput`] unless `topic_count`
-    /// is at least two, seeds are nonempty, the iteration budget is at least
-    /// two, and tolerance is finite and positive.
+    /// is at least two, seeds are nonempty, nonzero, and unique, the iteration
+    /// budget is at least two, and tolerance is finite and positive.
     pub fn new(
         topic_count: usize,
         seeds: Vec<u64>,
@@ -383,6 +383,8 @@ impl ReferenceTopicModelConfig {
     fn validate(&self) -> Result<(), TopicMeasurementError> {
         if self.topic_count < 2
             || self.seeds.is_empty()
+            || self.seeds.contains(&0)
+            || self.seeds.iter().copied().collect::<BTreeSet<_>>().len() != self.seeds.len()
             || self.maximum_iterations < 2
             || !self.tolerance.is_finite()
             || self.tolerance <= 0.0
