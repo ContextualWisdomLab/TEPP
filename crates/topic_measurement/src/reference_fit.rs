@@ -10,9 +10,11 @@
 //! This is fit-local integrity, not Evidence authentication. It does not prove
 //! the external source snapshot, vocabulary lineage, or availability clock.
 
+use uuid::Uuid;
+
 use crate::{
-    ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, TopicMeasurementError,
-    fit_reference_topic_model,
+    JointCoordinatePrecision, ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig,
+    TopicMeasurementError, fit_reference_topic_model,
 };
 
 /// Owner-issued nominal aggregate for one admitted CPU reference fit.
@@ -62,5 +64,26 @@ impl ReferenceTopicFit {
     #[must_use]
     pub const fn model(&self) -> &ReferenceTopicModel {
         &self.model
+    }
+
+    /// Build the joint generalized-Gauss-Newton precision for this exact fit.
+    ///
+    /// The retained input, configuration, and numerical model are consumed as
+    /// one owner-issued aggregate, preventing a caller from rebinding a model
+    /// from one fit to dimension-compatible input/configuration from another.
+    /// `topic_ids` remain provisional caller-supplied coordinates until the
+    /// Evidence-owned vocabulary provenance and released topic-basis contract
+    /// are settled; this method does not promote them to semantic authority.
+    ///
+    /// # Errors
+    ///
+    /// Propagates invalid dimension, identity, non-finite, symmetry, or
+    /// positive-definiteness failures from the joint-precision owner.
+    pub fn build_joint_coordinate_precision(
+        &self,
+        topic_ids: Vec<Uuid>,
+    ) -> Result<JointCoordinatePrecision, TopicMeasurementError> {
+        self.input
+            .build_joint_coordinate_precision(&self.model, &self.config, topic_ids)
     }
 }
