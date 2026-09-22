@@ -67,7 +67,7 @@ fn generated_manifest_owns_digest_bound_topic_truth() {
 
 #[test]
 fn membership_truth_is_weighted_and_cross_classified() {
-    let config = SimulationConfig::new(2027, 4, 1, 3, 0, 0, 0, 0, 0, 0, 0, 0)
+    let config = SimulationConfig::new(2027, 4, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0)
         .expect("simulation config");
     let manifest = generate(config).expect("known-membership corpus");
 
