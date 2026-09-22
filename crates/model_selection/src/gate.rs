@@ -6,16 +6,18 @@ use crate::{ModelCandidate, ModelSelectionError};
 ///
 /// RMSE and bias are conditional on successful replications. The total,
 /// successful, and failed counts remain explicit so failed fits cannot disappear
-/// from the scientific denominator. Monte Carlo standard errors use the usual
-/// sample-variance estimator across successful replications; RMSE uncertainty
-/// applies the delta method to the mean squared error and is exactly zero when
-/// every successful replication recovers the truth.
+/// from the scientific denominator. Monte Carlo standard errors quantify finite-
+/// replication uncertainty for the failure proportion and for conditional recovery
+/// measures. Bias uses the usual sample-variance estimator across successful
+/// replications; RMSE uncertainty applies the delta method to the mean squared
+/// error and is exactly zero when every successful replication recovers the truth.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SelectedKRecoverySummary {
     truth_k: u32,
     replication_count: usize,
     success_count: usize,
     failure_count: usize,
+    failure_rate_monte_carlo_standard_error: f64,
     bias: f64,
     root_mean_square_error: f64,
     bias_monte_carlo_standard_error: f64,
@@ -51,6 +53,17 @@ impl SelectedKRecoverySummary {
     #[must_use]
     pub fn failure_rate(self) -> f64 {
         self.failure_count as f64 / self.replication_count as f64
+    }
+
+    /// Return the Monte Carlo standard error of the empirical failure rate.
+    ///
+    /// This uses every attempted replication as the Bernoulli denominator:
+    /// `sqrt(p_hat * (1 - p_hat) / R)`, where `R` is the attempted replication
+    /// count. It is simulation uncertainty for the observed failure proportion,
+    /// not a confidence interval or uncertainty conditional on successful fits.
+    #[must_use]
+    pub const fn failure_rate_monte_carlo_standard_error(self) -> f64 {
+        self.failure_rate_monte_carlo_standard_error
     }
 
     /// Return mean selected-`K` error conditional on successful replications.
@@ -131,9 +144,10 @@ pub fn select_candidate_k(candidates: &[ModelCandidate]) -> Result<u32, ModelSel
 /// fitting/selection attempt. Bias and RMSE are therefore conditional on
 /// success while [`SelectedKRecoverySummary::failure_count`] and
 /// [`SelectedKRecoverySummary::failure_rate`] preserve the unconditional
-/// failure denominator required for scientific acceptance. At least two
+/// failure denominator required for scientific acceptance. The failure-rate
+/// Monte Carlo standard error uses all attempted replications. At least two
 /// successful replications are required because a one-run result cannot carry
-/// an empirical Monte Carlo standard error.
+/// an empirical Monte Carlo standard error for conditional recovery.
 ///
 /// This function does not itself establish temporal leakage safety: callers
 /// must obtain each replication from the canonical rolling-origin owner path.
@@ -174,6 +188,10 @@ pub fn selected_k_recovery_summary(
 
     let success_count = residuals.len();
     let replication_count = selected.len();
+    let replication_count_f64 = replication_count as f64;
+    let failure_rate = failure_count as f64 / replication_count_f64;
+    let failure_rate_monte_carlo_standard_error =
+        (failure_rate * (1.0 - failure_rate) / replication_count_f64).sqrt();
     let n = success_count as f64;
     let bias = residuals.iter().sum::<f64>() / n;
     let mean_squared_error = residuals.iter().map(|value| value * value).sum::<f64>() / n;
@@ -202,6 +220,7 @@ pub fn selected_k_recovery_summary(
         replication_count,
         success_count,
         failure_count,
+        failure_rate_monte_carlo_standard_error,
         bias,
         root_mean_square_error,
         bias_monte_carlo_standard_error,
