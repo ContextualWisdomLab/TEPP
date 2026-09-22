@@ -43,7 +43,8 @@ impl FittedCandidateKConfig {
     /// `K` is supplied, [`ModelSelectionError::NonPositiveCandidateK`] when any
     /// candidate is less than two, or
     /// [`ModelSelectionError::InvalidDiagnostic`] when candidates are
-    /// duplicated or the seed/iteration/tolerance contract fails.
+    /// duplicated, the seed manifest is empty/zero/duplicated, or the
+    /// iteration/tolerance contract fails.
     pub fn new(
         candidate_topic_counts: Vec<u32>,
         seeds: Vec<u64>,
@@ -95,7 +96,7 @@ impl FittedCandidateKConfig {
         &self.candidate_topic_counts
     }
 
-    /// Return the estimator initialization seeds.
+    /// Return the estimator initialization seeds in caller order.
     #[must_use]
     pub fn seeds(&self) -> &[u64] {
         &self.seeds
@@ -127,6 +128,8 @@ impl FittedCandidateKConfig {
             }
         }
         if self.seeds.is_empty()
+            || self.seeds.contains(&0)
+            || self.seeds.iter().copied().collect::<BTreeSet<_>>().len() != self.seeds.len()
             || self.maximum_iterations < 2
             || !self.tolerance.is_finite()
             || self.tolerance <= 0.0
