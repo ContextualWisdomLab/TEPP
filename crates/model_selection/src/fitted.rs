@@ -114,6 +114,46 @@ impl FittedCandidateKConfig {
         self.tolerance
     }
 
+    /// Build the exact reference-estimator configuration for one declared candidate.
+    ///
+    /// This crate-owned conversion is the single numerical-design boundary used
+    /// both when fitting candidates and when scientific recovery verifies retained
+    /// fit configuration. Keeping seeds, convergence controls, and hyperparameters
+    /// here prevents those paths from drifting independently.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ModelSelectionError::PredictiveCandidateGridMismatch`] when
+    /// `candidate_k` is not part of the declared grid, or
+    /// [`ModelSelectionError::InvalidDiagnostic`] when the reference owner rejects
+    /// the resulting configuration.
+    pub(crate) fn reference_topic_model_config(
+        &self,
+        candidate_k: u32,
+    ) -> Result<ReferenceTopicModelConfig, ModelSelectionError> {
+        if !self.candidate_topic_counts.contains(&candidate_k) {
+            return Err(ModelSelectionError::PredictiveCandidateGridMismatch);
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        let topic_count = candidate_k as usize;
+        ReferenceTopicModelConfig::new(
+            topic_count,
+            self.seeds.clone(),
+            self.maximum_iterations,
+            self.tolerance,
+        )
+        .and_then(|value| {
+            value.with_hyperparameters(
+                self.prior_variance,
+                self.relation_strength,
+                self.ridge,
+                self.topic_smoothing,
+                self.step_size,
+            )
+        })
+        .map_err(|_| ModelSelectionError::InvalidDiagnostic)
+    }
+
     fn validate(&self) -> Result<(), ModelSelectionError> {
         if self.candidate_topic_counts.is_empty() {
             return Err(ModelSelectionError::EmptyCandidateSet);
@@ -212,24 +252,7 @@ pub fn select_fitted_candidate_k(
     refuse_nonstatistical_method(method_name)?;
     let mut candidates = Vec::new();
     for &candidate_k in config.candidate_topic_counts() {
-        #[allow(clippy::cast_possible_truncation)]
-        let topic_count = candidate_k as usize;
-        let fit_config = ReferenceTopicModelConfig::new(
-            topic_count,
-            config.seeds().to_vec(),
-            config.maximum_iterations(),
-            config.tolerance(),
-        )
-        .and_then(|value| {
-            value.with_hyperparameters(
-                config.prior_variance,
-                config.relation_strength,
-                config.ridge,
-                config.topic_smoothing,
-                config.step_size,
-            )
-        })
-        .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+        let fit_config = config.reference_topic_model_config(candidate_k)?;
         if let Ok(fit) = ReferenceTopicFit::fit(input, &fit_config) {
             candidates.push(statistical_candidate_from_fit(&fit)?);
         }
@@ -329,6 +352,17 @@ mod tests {
         assert_eq!(config.seeds(), &[7, 11]);
         assert_eq!(config.maximum_iterations(), 20);
         assert!((config.tolerance() - 1e-5).abs() < f64::EPSILON);
+        assert_eq!(
+            config
+                .reference_topic_model_config(2)
+                .expect("declared reference config"),
+            ReferenceTopicModelConfig::new(2, vec![7, 11], 20, 1e-5)
+                .expect("reference config")
+        );
+        assert_eq!(
+            config.reference_topic_model_config(4),
+            Err(ModelSelectionError::PredictiveCandidateGridMismatch)
+        );
         refuse_nonstatistical_method("trsl_tm_reference").expect("allowed");
         refuse_nonstatistical_method("logistic_normal").expect("allowed");
         for method in [
