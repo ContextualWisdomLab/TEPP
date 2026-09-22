@@ -68,7 +68,9 @@ fn reference_fixture() -> (ReferenceTopicInput, ReferenceTopicModelConfig) {
     }
 
     let mut relations = RelationGraph::new();
-    for (source, target, source_day, target_day) in [(0, 1, 1, 2), (1, 2, 2, 3), (2, 3, 3, 4)] {
+    for (source, target, source_day, target_day) in
+        [(0, 1, 1, 2), (1, 2, 2, 3), (2, 3, 3, 4)]
+    {
         relations
             .insert(relation(ids[source], ids[target], source_day, target_day))
             .expect("insert relation");
