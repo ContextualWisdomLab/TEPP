@@ -119,14 +119,16 @@ fn owner_issued_basis_identity_is_deterministic() {
 }
 
 #[test]
-fn bound_fit_coordinates_pair_alr_location_with_diagonal_variance() {
+fn bound_fit_coordinates_pair_alr_location_variance_and_topic_basis() {
     let (input, config) = fitted_input_and_config();
     let fit = ReferenceTopicFit::fit(&input, &config).expect("owner-issued fit");
+    let basis = FittedTopicBasisIdentity::from_bound_fit(&fit).expect("basis identity");
     let summary =
         FittedDocumentCoordinateSummary::from_bound_fit(&fit).expect("coordinate summary");
 
     assert_eq!(summary.version(), "tepp.fitted_document_coordinate_summary.v1");
     assert_eq!(summary.topic_count(), 2);
+    assert_eq!(summary.topic_basis_identity(), &basis);
     assert_eq!(summary.rows().len(), input.document_count());
     for (document_index, (row, document_id)) in summary
         .rows()
@@ -139,6 +141,14 @@ fn bound_fit_coordinates_pair_alr_location_with_diagonal_variance() {
         let coordinate = &row.coordinates()[0];
         assert_eq!(coordinate.numerator_topic_index(), 0);
         assert_eq!(coordinate.reference_topic_index(), 1);
+        assert_eq!(
+            basis.topics()[coordinate.numerator_topic_index()].topic_index(),
+            coordinate.numerator_topic_index()
+        );
+        assert_eq!(
+            basis.topics()[coordinate.reference_topic_index()].topic_index(),
+            coordinate.reference_topic_index()
+        );
         let expected_location =
             additive_log_ratio(&fit.model().document_topic_proportions[document_index])
                 .expect("ALR location")[0];
