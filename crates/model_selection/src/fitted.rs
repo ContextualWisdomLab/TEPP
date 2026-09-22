@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use topic_measurement::{
-    ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, fit_reference_topic_model,
+    ReferenceTopicFit, ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig,
     refuse_lexical_inferential_weight,
 };
 
@@ -147,35 +147,27 @@ impl FittedCandidateKConfig {
     }
 }
 
-/// Build a statistically supported candidate from one actual fitted model.
+/// Build a statistically supported candidate from one owner-issued reference fit.
 ///
 /// The first diagnostic is Schwarz's (1978) large-sample maximizer
-/// `ℓ − (p ln N)/2` from the fitted `θ` and `β`. Complexity is the free
-/// parameter count `p`. A failed or non-finite diagnostic is returned as a
-/// typed error; it is never replaced with a fabricated likelihood. The
-/// candidate label must equal the fitted topic dimension, so diagnostics from
-/// one fit cannot be attributed to a different `K`.
+/// `ℓ − (p ln N)/2` from the retained fitted `θ` and `β`. Complexity is the
+/// free parameter count `p`. Input and model are read from the same
+/// [`ReferenceTopicFit`], so a dimension-compatible model from another fit
+/// cannot be rebound to different corpus/design coordinates at this public
+/// statistical-authority boundary. Candidate `K` is derived from the fit.
 ///
 /// # Errors
 ///
-/// Returns [`ModelSelectionError::NonPositiveCandidateK`] when `candidate_k`
-/// is less than two, or [`ModelSelectionError::InvalidDiagnostic`] when the
-/// candidate label does not match the fitted topic dimension or the fitted
-/// dimensions, likelihood, or parameter count are unusable.
+/// Returns [`ModelSelectionError::InvalidDiagnostic`] when the fitted
+/// dimensions, likelihood, candidate dimension, or parameter count are unusable.
 pub fn statistical_candidate_from_fit(
-    input: &ReferenceTopicInput,
-    candidate_k: u32,
-    model: &ReferenceTopicModel,
+    fit: &ReferenceTopicFit,
 ) -> Result<ModelCandidate, ModelSelectionError> {
-    if candidate_k < 2 {
-        return Err(ModelSelectionError::NonPositiveCandidateK);
-    }
+    let input = fit.input();
+    let model = fit.model();
     let parameters = free_parameter_count(model)?;
-    let fitted_k = u32::try_from(model.topic_term_probabilities.len())
+    let candidate_k = u32::try_from(model.topic_term_probabilities.len())
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
-    if candidate_k != fitted_k {
-        return Err(ModelSelectionError::InvalidDiagnostic);
-    }
     let log_likelihood = input
         .in_sample_log_likelihood(model)
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
@@ -193,12 +185,13 @@ pub fn statistical_candidate_from_fit(
 
 /// Fit each candidate `K` and select the admissible statistical topic count.
 ///
-/// Each candidate is fitted with [`fit_reference_topic_model`]. A typed
-/// `DidNotConverge`, `NonFiniteEstimate`, or `InvalidModelInput` is a failed
-/// candidate, not a fabricated diagnostic. LLM-vote-only values may be
-/// supplied as recommenders; they cannot win without a successful statistical
-/// fit. TF-IDF, BM25, stopword-deletion, and LLM labels are refused as
-/// inferential coordinates.
+/// Each candidate is fitted with [`ReferenceTopicFit::fit`], retaining the
+/// exact admitted input and deterministic configuration beside the model before
+/// scoring. A typed `DidNotConverge`, `NonFiniteEstimate`, or
+/// `InvalidModelInput` is a failed candidate, not a fabricated diagnostic.
+/// LLM-vote-only values may be supplied as recommenders; they cannot win
+/// without a successful statistical fit. TF-IDF, BM25, stopword-deletion, and
+/// LLM labels are refused as inferential coordinates.
 ///
 /// This wiring does not claim GPU execution, full Bayesian sampling, or topic
 /// birth/split/merge.
@@ -234,8 +227,8 @@ pub fn select_fitted_candidate_k(
             )
         })
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
-        if let Ok(model) = fit_reference_topic_model(input, &fit_config) {
-            candidates.push(statistical_candidate_from_fit(input, candidate_k, &model)?);
+        if let Ok(fit) = ReferenceTopicFit::fit(input, &fit_config) {
+            candidates.push(statistical_candidate_from_fit(&fit)?);
         }
     }
     for &vote in llm_votes {
@@ -344,9 +337,9 @@ mod tests {
             "stopworddeletion",
             "llm",
             "llmlabel",
-            "llm-labels",
+            "llmlabels",
             "llm_vote",
-            "llm_vote_only",
+            "llmvoteonly",
         ] {
             assert_eq!(
                 refuse_nonstatistical_method(method),
