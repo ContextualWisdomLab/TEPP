@@ -48,13 +48,16 @@ fn expanding_history_retains_unrelated_history_and_audits_evaluation_connected_e
         &cutoffs[1],
     );
 
-    let mut evaluation_snapshot = training_snapshot.clone();
-    insert(
-        &mut evaluation_snapshot,
-        current_evaluation,
-        25,
-        &cutoffs[2],
-    );
+    let mut evaluation_snapshot = CorpusSnapshot::new();
+    for (document_id, day) in [
+        (unrelated_old, 1),
+        (prior_evaluation_now_historical, 15),
+        (linked_old, 5),
+        (linked_old_transitive, 6),
+        (current_evaluation, 25),
+    ] {
+        insert(&mut evaluation_snapshot, document_id, day, &cutoffs[2]);
+    }
 
     let links = [
         LeakageLink {
