@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-24
 **Decision status:** Accepted
-**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring, frozen training-prevalence projection, and fixed-training rolling-origin predictive selection are active-PR; method effects and GPU remain accepted-target.
+**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring, frozen training-prevalence projection, fixed-training rolling-origin predictive selection, and deterministic known-topic recovery truth are active-PR; method effects in the estimator and GPU remain accepted-target.
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
 ## Context
@@ -157,6 +157,8 @@ Backend changes require a versioned model contract, migration notes, reproducibi
 ## Verification
 
 Required evidence includes known-truth topic/covariate/covariance recovery, bias/RMSE/interval coverage, held-out predictive evidence, seed/bootstrap stability, relation-aware split integrity, language alignment/invariance, method-effect recovery, known-K/acceptable-set behavior, posterior calibration, and downstream coordinate compatibility. Held-out evidence additionally requires a frozen training prevalence basis so the same evaluation observation has the same projected design row regardless of which other evaluation-horizon observations share its batch. Rolling-origin K evidence additionally requires contiguous owner-admitted windows, identical unique candidate sets across origins, exact training/evaluation identity binding, deliberate future-availability leakage refusal, realistic repeated true-K recovery that preserves temporal/relational and multilevel/multiple-membership composition, and Monte Carlo uncertainty over both successful recovery metrics and failure rate. CPU/GPU implementations additionally require parity under ADR 0001/0006.
+
+The active-PR `tepp_simulation` recovery owner supplies the prerequisite deterministic truth rather than hand-authored estimator fixtures: a versioned integer configuration declares true `K`, vocabulary/document size, topic separation, temporal prevalence drift, residual logistic-normal scale, weighted multiple-membership strength, and true-transition strength. A separate topic seed domain generates positive normalized topic-term probabilities, the declared prevalence intercept/slope/covariance state, document ALR coordinates/topic mixtures, method/membership/relation contributions, and fixed-length term counts. Role-specific membership groups recur across events and their weights sum to 10,000 basis points so generated recovery studies contain actual shared cross-classification rather than atomized document-only groups. The configuration and every generated topic-truth row are digest-bound to the `TruthManifest`. This is simulation truth only: it does not mint production Evidence, Membership, relation-activation, source/event-time, or release authority, and it is not by itself #680 scientific acceptance.
 
 ## Rollback and supersession
 
