@@ -61,10 +61,10 @@ fn canonical_nonempty_document_set(
 /// The window is derived through [`rolling_origin_windows`] from the supplied
 /// ordered cutoff sequence; callers cannot substitute an independently defined
 /// train/test pair. The training and evaluation snapshots must be bound to the
-/// selected window's exact knowledge cutoffs. Evaluation identities must exist
-/// at the test cutoff but not in the training snapshot, so this scientific path
-/// measures genuinely later-available evidence instead of relabeling an
-/// already-available row as temporal holdout.
+/// selected window's exact knowledge cutoffs. Every evaluation identity must
+/// carry a retained availability time strictly after the training cutoff and no
+/// later than the evaluation snapshot's already-validated cutoff. Snapshot
+/// absence is therefore never treated as proof that a row was unavailable.
 ///
 /// Governed revisions, translations, copied variants, shared episodes, and
 /// canonically equivalent records are checked with the existing connected-group
@@ -73,14 +73,14 @@ fn canonical_nonempty_document_set(
 /// # Errors
 ///
 /// Returns [`CorpusSplitError::InvalidSplitConfiguration`] for a missing window,
-/// empty partition, overlap, or evaluation identity already available in the
-/// training snapshot; [`CorpusSplitError::DuplicateDocumentIdentity`] for a
-/// duplicate identity inside either partition;
-/// [`CorpusSplitError::KnowledgeCutoffMismatch`] when either snapshot is bound to
-/// a different horizon; [`CorpusSplitError::UnavailableAtCutoff`] when a listed
-/// identity is absent from its required snapshot; or
-/// [`CorpusSplitError::RelationLeakage`] when a governed connected group crosses
-/// train/evaluation.
+/// empty partition, overlap, or evaluation identity whose retained availability
+/// time is not later than the training cutoff;
+/// [`CorpusSplitError::DuplicateDocumentIdentity`] for a duplicate identity
+/// inside either partition; [`CorpusSplitError::KnowledgeCutoffMismatch`] when
+/// either snapshot is bound to a different horizon;
+/// [`CorpusSplitError::UnavailableAtCutoff`] when a listed identity is absent
+/// from its required snapshot; or [`CorpusSplitError::RelationLeakage`] when a
+/// governed connected group crosses train/evaluation.
 pub fn admit_rolling_origin_partition(
     ordered_cutoffs: &[KnowledgeCutoff],
     window_index: usize,
@@ -108,17 +108,16 @@ pub fn admit_rolling_origin_partition(
     if training
         .iter()
         .any(|document_id| !training_snapshot.contains(*document_id))
-        || evaluation
-            .iter()
-            .any(|document_id| !evaluation_snapshot.contains(*document_id))
     {
         return Err(CorpusSplitError::UnavailableAtCutoff);
     }
-    if evaluation
-        .iter()
-        .any(|document_id| training_snapshot.contains(*document_id))
-    {
-        return Err(CorpusSplitError::InvalidSplitConfiguration);
+    for document_id in &evaluation {
+        let available_time = evaluation_snapshot
+            .available_time(*document_id)
+            .ok_or(CorpusSplitError::UnavailableAtCutoff)?;
+        if available_time.instant() <= window.train_cutoff.instant() {
+            return Err(CorpusSplitError::InvalidSplitConfiguration);
+        }
     }
 
     let universe: Vec<_> = training.iter().chain(&evaluation).copied().collect();
