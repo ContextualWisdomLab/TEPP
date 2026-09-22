@@ -11,7 +11,9 @@ use temporal_core::{
     AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
     TemporalPrecision,
 };
-use topic_measurement::{PrevalenceFeature, ReferenceTopicInput, SparseMatrix, TopicMeasurementError};
+use topic_measurement::{
+    PrevalenceFeature, ReferenceTopicTrainingInput, SparseMatrix, TopicMeasurementError,
+};
 use uuid::Uuid;
 
 fn event_time(day: u8) -> EventTime {
@@ -55,7 +57,9 @@ fn membership(
     .expect("membership")
 }
 
-fn training_input(covariates: Option<&SparseMatrix>) -> (ReferenceTopicInput, MembershipNetwork) {
+fn training_input(
+    covariates: Option<&SparseMatrix>,
+) -> (ReferenceTopicTrainingInput, MembershipNetwork) {
     let document_ids = vec![Uuid::from_u128(1), Uuid::from_u128(2)];
     let event_times = vec![event_time(1), event_time(3)];
     let available = AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("available");
@@ -94,7 +98,7 @@ fn training_input(covariates: Option<&SparseMatrix>) -> (ReferenceTopicInput, Me
     relations
         .insert(relation(document_ids[0], document_ids[1], 1, 3))
         .expect("training relation");
-    let input = ReferenceTopicInput::new(
+    let input = ReferenceTopicTrainingInput::new(
         &snapshot,
         document_ids,
         &counts,
@@ -109,11 +113,9 @@ fn training_input(covariates: Option<&SparseMatrix>) -> (ReferenceTopicInput, Me
 
 #[test]
 fn held_out_rows_use_only_the_frozen_training_time_transform() {
-    let (input, memberships) = training_input(None);
-    let basis = input
-        .prevalence_design_basis()
-        .expect("owner-issued training basis");
-    assert_eq!(basis.features(), input.features());
+    let (training, memberships) = training_input(None);
+    let basis = training.prevalence_design_basis();
+    assert_eq!(basis.features(), training.input().features());
     assert_eq!(basis.event_time_origin(), &event_time(1));
     assert!(basis.event_time_scale_seconds() > 0.0);
 
@@ -149,10 +151,8 @@ fn projection_fails_closed_on_coordinates_absent_from_training_basis() {
         vec![1.0, 2.0],
     )
     .expect("training covariates");
-    let (input, memberships) = training_input(Some(&training_covariates));
-    let basis = input
-        .prevalence_design_basis()
-        .expect("owner-issued training basis");
+    let (training, memberships) = training_input(Some(&training_covariates));
+    let basis = training.prevalence_design_basis();
     assert!(basis.features().contains(&PrevalenceFeature::Covariate(0)));
 
     let wider_covariates = SparseMatrix::from_csr(
