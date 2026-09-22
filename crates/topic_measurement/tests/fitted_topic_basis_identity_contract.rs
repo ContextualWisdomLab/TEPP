@@ -211,10 +211,31 @@ fn fitted_document_coordinates_pair_alr_location_with_diagonal_variance() {
 fn malformed_document_coordinate_state_fails_closed() {
     let (input, model) = fitted_input_and_model();
 
+    let mut one_topic = model.clone();
+    one_topic.topic_term_probabilities.truncate(1);
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &one_topic),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
     let mut missing_document = model.clone();
     missing_document.document_topic_proportions.pop();
     assert_eq!(
         FittedDocumentCoordinateSummary::from_fit(&input, &missing_document),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
+    let mut missing_variance_document = model.clone();
+    missing_variance_document.document_coordinate_variances.pop();
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &missing_variance_document),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
+    let mut malformed_topic_width = model.clone();
+    malformed_topic_width.document_topic_proportions[0].pop();
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &malformed_topic_width),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
