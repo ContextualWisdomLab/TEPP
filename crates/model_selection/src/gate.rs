@@ -6,8 +6,9 @@ use crate::{ModelCandidate, ModelSelectionError};
 ///
 /// LLM-only candidates are ignored as recommenders and never become the
 /// numerical optimum. Among non-dominated statistical candidates the gate
-/// prefers higher held-out log-likelihood, then smaller `K`; complexity is
-/// applied while constructing the Pareto front.
+/// prefers higher Schwarz model-selection score, then smaller `K`; complexity
+/// is applied while constructing the Pareto front. This gate does not claim a
+/// held-out predictive likelihood unless one is separately measured upstream.
 ///
 /// # Errors
 ///
@@ -36,12 +37,12 @@ pub fn select_candidate_k(candidates: &[ModelCandidate]) -> Result<u32, ModelSel
         .filter(|candidate| !statistical.iter().any(|other| other.dominates(*candidate)))
         .collect();
     front.sort_by(|left, right| {
-        let ll_ord = right
-            .held_out_log_likelihood()
-            .partial_cmp(&left.held_out_log_likelihood())
+        let score_order = right
+            .schwarz_score()
+            .partial_cmp(&left.schwarz_score())
             .unwrap_or(std::cmp::Ordering::Equal);
-        if ll_ord != std::cmp::Ordering::Equal {
-            return ll_ord;
+        if score_order != std::cmp::Ordering::Equal {
+            return score_order;
         }
         left.candidate_k().cmp(&right.candidate_k())
     });
@@ -91,9 +92,9 @@ mod tests {
             Err(ModelSelectionError::EmptyCandidateSet)
         );
         assert_eq!(select_candidate_k(&[a, b]).expect("tie"), 2);
-        let higher_likelihood = ModelCandidate::statistical(8, -20.0, 9.0).expect("likelihood");
+        let higher_score = ModelCandidate::statistical(8, -20.0, 9.0).expect("score");
         assert_eq!(
-            select_candidate_k(&[a, higher_likelihood]).expect("likelihood tie-break"),
+            select_candidate_k(&[a, higher_score]).expect("score tie-break"),
             8
         );
 
