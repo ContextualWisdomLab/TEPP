@@ -10,6 +10,17 @@ use uuid::Uuid;
 
 use crate::ModelSelectionError;
 
+fn candidate_k_from_topic_count(topic_count: usize) -> Result<u32, ModelSelectionError> {
+    if topic_count < 2 {
+        return Err(ModelSelectionError::NonPositiveCandidateK);
+    }
+    u32::try_from(topic_count).map_err(|_| ModelSelectionError::InvalidDiagnostic)
+}
+
+fn predictive_candidate_is_better(best: (u32, f64), candidate: (u32, f64)) -> bool {
+    candidate.1 > best.1 || (candidate.1 == best.1 && candidate.0 < best.0)
+}
+
 /// Score one admitted rolling-origin evaluation partition under a fixed training fit.
 ///
 /// The training fit's exact document identity set must match the admitted
@@ -101,27 +112,40 @@ pub fn select_rolling_origin_predictive_candidate_k(
     evaluation_covariates: Option<&SparseMatrix>,
     memberships: &MembershipNetwork,
 ) -> Result<u32, ModelSelectionError> {
-    if candidate_training_fits.is_empty() {
-        return Err(ModelSelectionError::EmptyCandidateSet);
-    }
-
-    let mut seen_candidate_k = BTreeSet::new();
-    let mut best: Option<(u32, f64)> = None;
-    for training_fit in candidate_training_fits {
-        let topic_count = training_fit
+    let mut candidates = candidate_training_fits.iter();
+    let first_fit = candidates
+        .next()
+        .ok_or(ModelSelectionError::EmptyCandidateSet)?;
+    let first_k = candidate_k_from_topic_count(
+        first_fit
             .reference_fit()
             .model()
             .topic_term_probabilities
-            .len();
-        let candidate_k =
-            u32::try_from(topic_count).map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
-        if candidate_k < 2 {
-            return Err(ModelSelectionError::InvalidDiagnostic);
-        }
+            .len(),
+    )?;
+    let first_score = rolling_origin_prevalence_mean_predictive_log_likelihood(
+        partition,
+        first_fit,
+        evaluation_document_ids,
+        evaluation_document_term,
+        evaluation_event_times,
+        evaluation_covariates,
+        memberships,
+    )?;
+    let mut seen_candidate_k = BTreeSet::from([first_k]);
+    let mut best = (first_k, first_score);
+
+    for training_fit in candidates {
+        let candidate_k = candidate_k_from_topic_count(
+            training_fit
+                .reference_fit()
+                .model()
+                .topic_term_probabilities
+                .len(),
+        )?;
         if !seen_candidate_k.insert(candidate_k) {
             return Err(ModelSelectionError::DuplicateCandidateK);
         }
-
         let score = rolling_origin_prevalence_mean_predictive_log_likelihood(
             partition,
             training_fit,
@@ -131,17 +155,39 @@ pub fn select_rolling_origin_predictive_candidate_k(
             evaluation_covariates,
             memberships,
         )?;
-        match best {
-            None => best = Some((candidate_k, score)),
-            Some((best_k, best_score))
-                if score > best_score || (score == best_score && candidate_k < best_k) =>
-            {
-                best = Some((candidate_k, score));
-            }
-            Some(_) => {}
+        let candidate = (candidate_k, score);
+        if predictive_candidate_is_better(best, candidate) {
+            best = candidate;
         }
     }
 
-    best.map(|(candidate_k, _)| candidate_k)
-        .ok_or(ModelSelectionError::EmptyCandidateSet)
+    Ok(best.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{candidate_k_from_topic_count, predictive_candidate_is_better};
+    use crate::ModelSelectionError;
+
+    #[test]
+    fn topic_count_conversion_is_fail_closed() {
+        assert_eq!(
+            candidate_k_from_topic_count(1),
+            Err(ModelSelectionError::NonPositiveCandidateK)
+        );
+        assert_eq!(candidate_k_from_topic_count(2), Ok(2));
+        #[cfg(target_pointer_width = "64")]
+        assert_eq!(
+            candidate_k_from_topic_count(u32::MAX as usize + 1),
+            Err(ModelSelectionError::InvalidDiagnostic)
+        );
+    }
+
+    #[test]
+    fn predictive_candidate_ordering_covers_score_and_tie_rules() {
+        assert!(predictive_candidate_is_better((2, -20.0), (3, -10.0)));
+        assert!(!predictive_candidate_is_better((2, -10.0), (3, -20.0)));
+        assert!(predictive_candidate_is_better((3, -10.0), (2, -10.0)));
+        assert!(!predictive_candidate_is_better((2, -10.0), (3, -10.0)));
+    }
 }
