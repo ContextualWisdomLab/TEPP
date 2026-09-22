@@ -14,10 +14,13 @@ mod latent_event;
 mod missingness;
 mod relation_process;
 mod rng;
+mod topic_process;
 mod truth_manifest;
 
 /// Bounded parameters for a reproducible truth simulation.
 pub use configuration::SimulationConfig;
+/// Deterministic parameters for the known-topic data-generating process.
+pub use configuration::TopicDgpConfig;
 /// Method-effect labels for generated documents.
 pub use document_process::DocumentMethodEffect;
 /// Synthetic non-wrapping calendar bound in hours.
@@ -50,6 +53,12 @@ pub use relation_process::SimulatedRelationKind;
 pub use relation_process::TrueRelation;
 /// Deterministic generator.
 pub use rng::SeededRng;
+/// Known latent topic state and generated counts for one document.
+pub use topic_process::DocumentTopicTruth;
+/// Seed-domain separator for known-topic generation.
+pub use topic_process::TOPIC_DGP_SEED_DOMAIN;
+/// Digest-bound known-topic content/prevalence truth.
+pub use topic_process::TopicTruthManifest;
 /// Digest-bound known-truth corpus.
 pub use truth_manifest::TruthManifest;
 /// Digest helper for configuration fingerprints.
@@ -172,6 +181,8 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
     }
 
     let observed_relations = apply_relation_noise(&mut rng, config, &true_relations, &documents);
+    let topic_truth =
+        topic_process::generate_topic_truth(config, &events, &documents, &true_relations);
     Ok(TruthManifest::new(
         config.seed(),
         config_digest,
@@ -179,10 +190,12 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
         documents,
         true_relations,
         observed_relations,
+        topic_truth,
     ))
 }
 
 fn config_fingerprint(config: SimulationConfig) -> Vec<u8> {
+    let topic = config.topic_dgp();
     let mut bytes = Vec::new();
     for value in [
         config.seed(),
@@ -197,6 +210,14 @@ fn config_fingerprint(config: SimulationConfig) -> Vec<u8> {
         u64::from(config.revision_rate_bps()),
         u64::from(config.translation_rate_bps()),
         u64::from(config.template_copy_rate_bps()),
+        u64::from(topic.true_topic_count()),
+        u64::from(topic.vocabulary_size()),
+        u64::from(topic.document_length()),
+        u64::from(topic.topic_separation_bps()),
+        u64::from(topic.temporal_drift_bps()),
+        u64::from(topic.latent_standard_deviation_bps()),
+        u64::from(topic.membership_effect_bps()),
+        u64::from(topic.relation_effect_bps()),
     ] {
         bytes.extend(value.to_le_bytes());
     }
