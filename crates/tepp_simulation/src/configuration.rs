@@ -1,6 +1,7 @@
 //! Simulation scenario configuration.
 
 use crate::SimulationError;
+use crate::document_process::MEMBERSHIP_ROLE_COUNT;
 
 /// Deterministic parameters for the known-topic data-generating process.
 ///
@@ -176,7 +177,7 @@ impl SimulationConfig {
     /// # Errors
     ///
     /// Returns [`SimulationError::InvalidConfiguration`] when counts are zero,
-    /// membership targets exceed the six owned role labels, or any rate exceeds
+    /// membership targets exceed the owned role vocabulary, or any rate exceeds
     /// `10_000` basis points.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -250,7 +251,8 @@ impl SimulationConfig {
     /// # Errors
     ///
     /// Returns [`SimulationError::InvalidConfiguration`] for empty counts,
-    /// membership targets outside `1..=6`, or rates outside `0..=10_000`.
+    /// membership targets outside the owned role vocabulary, or rates outside
+    /// `0..=10_000`.
     pub fn validate(self) -> Result<(), SimulationError> {
         if self.event_count == 0 {
             return Err(SimulationError::InvalidConfiguration);
@@ -258,7 +260,7 @@ impl SimulationConfig {
         if self.documents_per_event == 0 {
             return Err(SimulationError::InvalidConfiguration);
         }
-        if self.membership_targets == 0 || self.membership_targets > 6 {
+        if self.membership_targets == 0 || self.membership_targets > MEMBERSHIP_ROLE_COUNT {
             return Err(SimulationError::InvalidConfiguration);
         }
         for rate in [
@@ -294,7 +296,7 @@ impl SimulationConfig {
         self.documents_per_event
     }
 
-    /// Distinct membership targets attached to each document (`1..=6`).
+    /// Distinct membership targets attached to each document.
     #[must_use]
     pub const fn membership_targets(self) -> u32 {
         self.membership_targets
