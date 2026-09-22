@@ -166,8 +166,8 @@ fn malformed_or_ambiguous_fitted_topic_rows_fail_closed() {
 #[test]
 fn fitted_document_coordinates_pair_alr_location_with_diagonal_variance() {
     let (input, model) = fitted_input_and_model();
-    let summary =
-        FittedDocumentCoordinateSummary::from_fit(&input, &model).expect("coordinate summary");
+    let summary = FittedDocumentCoordinateSummary::from_unbound_pair(&input, &model)
+        .expect("coordinate summary");
 
     assert_eq!(summary.version(), "tepp.fitted_document_coordinate_summary.v1");
     assert_eq!(summary.topic_count(), 2);
@@ -195,8 +195,8 @@ fn fitted_document_coordinates_pair_alr_location_with_diagonal_variance() {
 
     let mut shifted = model.clone();
     shifted.document_topic_proportions[0] = vec![0.8, 0.2];
-    let shifted_summary =
-        FittedDocumentCoordinateSummary::from_fit(&input, &shifted).expect("shifted summary");
+    let shifted_summary = FittedDocumentCoordinateSummary::from_unbound_pair(&input, &shifted)
+        .expect("shifted summary");
     assert_ne!(
         summary.rows()[0].coordinates()[0].location().to_bits(),
         shifted_summary.rows()[0].coordinates()[0].location().to_bits(),
@@ -215,63 +215,63 @@ fn malformed_document_coordinate_state_fails_closed() {
     let mut one_topic = model.clone();
     one_topic.topic_term_probabilities.truncate(1);
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &one_topic),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &one_topic),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
     let mut malformed_basis = model.clone();
     malformed_basis.topic_term_probabilities[0].pop();
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &malformed_basis),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &malformed_basis),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
     let mut missing_document = model.clone();
     missing_document.document_topic_proportions.pop();
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &missing_document),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &missing_document),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
     let mut missing_variance_document = model.clone();
     missing_variance_document.document_coordinate_variances.pop();
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &missing_variance_document),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &missing_variance_document),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
     let mut malformed_topic_width = model.clone();
     malformed_topic_width.document_topic_proportions[0].pop();
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &malformed_topic_width),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &malformed_topic_width),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
     let mut malformed_variance_width = model.clone();
     malformed_variance_width.document_coordinate_variances[0].clear();
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &malformed_variance_width),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &malformed_variance_width),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
     let mut non_finite_variance = model.clone();
     non_finite_variance.document_coordinate_variances[0][0] = f64::NAN;
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &non_finite_variance),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &non_finite_variance),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
     let mut non_positive_variance = model.clone();
     non_positive_variance.document_coordinate_variances[0][0] = 0.0;
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &non_positive_variance),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &non_positive_variance),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 
     let mut invalid_location = model;
     invalid_location.document_topic_proportions[0] = vec![1.0, 0.0];
     assert_eq!(
-        FittedDocumentCoordinateSummary::from_fit(&input, &invalid_location),
+        FittedDocumentCoordinateSummary::from_unbound_pair(&input, &invalid_location),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 }
