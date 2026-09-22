@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use corpus_split::{
-    CorpusDocument, CorpusSnapshot, LeakageLink, LeakageLinkKind,
+    CorpusDocument, CorpusSnapshot, CorpusSplitError, LeakageLink, LeakageLinkKind,
     admit_expanding_rolling_origin_partition,
 };
 use temporal_core::{AvailableTime, KnowledgeCutoff};
@@ -93,5 +93,41 @@ fn expanding_history_retains_unrelated_history_and_audits_evaluation_connected_e
     assert_eq!(
         admitted.leakage_excluded_training_document_ids(),
         &BTreeSet::from([linked_old, linked_old_transitive])
+    );
+}
+
+#[test]
+fn expanding_history_fails_closed_when_evaluation_group_consumes_all_history() {
+    let cutoffs = [cutoff(10), cutoff(20), cutoff(30)];
+    let historical = Uuid::from_u128(10);
+    let current_evaluation = Uuid::from_u128(11);
+
+    let mut training_snapshot = CorpusSnapshot::new();
+    insert(&mut training_snapshot, historical, 5, &cutoffs[1]);
+    let mut evaluation_snapshot = CorpusSnapshot::new();
+    insert(&mut evaluation_snapshot, historical, 5, &cutoffs[2]);
+    insert(
+        &mut evaluation_snapshot,
+        current_evaluation,
+        25,
+        &cutoffs[2],
+    );
+
+    let links = [LeakageLink {
+        left: historical,
+        right: current_evaluation,
+        kind: LeakageLinkKind::CopiedVariant,
+    }];
+
+    assert_eq!(
+        admit_expanding_rolling_origin_partition(
+            &cutoffs,
+            1,
+            &training_snapshot,
+            &evaluation_snapshot,
+            &[current_evaluation],
+            &links,
+        ),
+        Err(CorpusSplitError::InvalidSplitConfiguration)
     );
 }
