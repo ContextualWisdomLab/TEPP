@@ -526,6 +526,12 @@ impl ReferenceTopicModel {
 impl ReferenceTopicInput {
     /// Build the identified joint ALR precision at a converged MAP fit.
     ///
+    /// Owner-internal callers use this arithmetic primitive after the public
+    /// [`crate::ReferenceTopicFit`] aggregate has bound input, configuration,
+    /// and fitted model. Keeping the detached form crate-private prevents
+    /// downstream consumers from manufacturing owner-looking precision by
+    /// recombining dimension-compatible state from different fits.
+    ///
     /// The document likelihood block is the exact conditional multinomial
     /// information from the generalized-EM coordinate update, the Gaussian
     /// prevalence prior contributes its precision, and the nonlinear network
@@ -537,7 +543,7 @@ impl ReferenceTopicInput {
     ///
     /// Returns a typed invalid-input or non-finite error when dimensions,
     /// identities, numerical values, symmetry, or positive-definiteness fail.
-    pub fn build_joint_coordinate_precision(
+    pub(crate) fn build_joint_coordinate_precision(
         &self,
         model: &ReferenceTopicModel,
         config: &ReferenceTopicModelConfig,
