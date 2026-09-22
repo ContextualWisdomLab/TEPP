@@ -14,6 +14,7 @@ mod candidate;
 mod error;
 mod fitted;
 mod gate;
+mod recovery_grid;
 mod rolling_origin_predictive;
 
 /// One candidate `K` with statistical or LLM-only support.
@@ -34,6 +35,10 @@ pub use gate::select_candidate_k;
 pub use gate::selected_k_recovery_summary;
 /// RMSE of selected `K` replications against known truth.
 pub use gate::selected_k_root_mean_square_error;
+/// Rolling-origin recovery payload that retains the fitted candidate dimensions.
+pub use recovery_grid::RollingOriginRecoveryEvaluation;
+/// Select candidate `K` only when every recovery window covers the declared grid.
+pub use recovery_grid::select_declared_rolling_origin_recovery_candidate_k;
 /// Borrowed payload for one admitted rolling-origin predictive evaluation window.
 pub use rolling_origin_predictive::RollingOriginPredictiveEvaluation;
 /// Score one admitted rolling-origin evaluation partition under a fixed training fit.
