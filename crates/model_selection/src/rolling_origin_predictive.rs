@@ -178,28 +178,6 @@ fn predictive_candidate_scores(
     Ok(scores)
 }
 
-fn validate_rolling_origin_training_history(
-    evaluations: &[RollingOriginPredictiveEvaluation<'_>],
-) -> Result<(), ModelSelectionError> {
-    for pair in evaluations.windows(2) {
-        let previous = pair[0].partition;
-        let next = pair[1].partition;
-        if previous.window().test_cutoff != next.window().train_cutoff {
-            return Err(ModelSelectionError::RollingOriginWindowMismatch);
-        }
-        if !previous
-            .training_document_ids()
-            .is_subset(next.training_document_ids())
-            || !previous
-                .evaluation_document_ids()
-                .is_subset(next.training_document_ids())
-        {
-            return Err(ModelSelectionError::RollingOriginTrainingHistoryMismatch);
-        }
-    }
-    Ok(())
-}
-
 /// Select candidate `K` from one admitted rolling-origin predictive partition.
 ///
 /// Every candidate is an owner-issued [`ReferenceTopicTrainingFit`]. Its topic
@@ -245,14 +223,17 @@ pub fn select_rolling_origin_predictive_candidate_k(
 /// Select candidate `K` from predictive evidence accumulated across windows.
 ///
 /// Adjacent partitions must form one contiguous chronological sequence: each
-/// next training cutoff equals the previous evaluation cutoff. Their numerical
-/// training histories must also be cumulative: every preceding training and
-/// evaluation identity must be retained in the next training identity set.
-/// Additional newly historical rows are allowed. Every window must expose the
-/// same unique fitted candidate-K set. Each `(window, K)` score is obtained
-/// through the same partition-bound fixed-training scorer used by the one-window
-/// gate, then finite log likelihoods are summed by `K`. The largest aggregate
-/// wins with smaller `K` on an exact tie.
+/// next training cutoff equals the previous evaluation cutoff. Every window must
+/// expose the same unique fitted candidate-K set. Each `(window, K)` score is
+/// obtained through the same partition-bound fixed-training scorer used by the
+/// one-window gate, then finite log likelihoods are summed by `K`. The largest
+/// aggregate wins with smaller `K` on an exact tie.
+///
+/// Training-set design remains owned by the admitted partitions. This aggregator
+/// does not silently convert every rolling-origin design into an expanding
+/// history; leakage-safe expanding history for #680 is a `corpus_split` owner
+/// policy so governed connected groups may be excluded without being mistaken
+/// for arbitrary numerical omission.
 ///
 /// This is score aggregation across admitted rolling-origin windows, not a vote
 /// over per-window winners, not the in-sample Schwarz criterion, and not STM
@@ -263,11 +244,8 @@ pub fn select_rolling_origin_predictive_candidate_k(
 ///
 /// Returns [`ModelSelectionError::EmptyCandidateSet`] for no windows or a window
 /// without fitted candidates; [`ModelSelectionError::RollingOriginWindowMismatch`]
-/// for a noncontiguous window sequence;
-/// [`ModelSelectionError::RollingOriginTrainingHistoryMismatch`] when a later
-/// training set drops an identity already present in the preceding training or
-/// evaluation partition; [`ModelSelectionError::DuplicateCandidateK`] for
-/// repeated fitted dimensions within a window;
+/// for a noncontiguous window sequence; [`ModelSelectionError::DuplicateCandidateK`]
+/// for repeated fitted dimensions within a window;
 /// [`ModelSelectionError::PredictiveCandidateSetMismatch`] when candidate-K sets
 /// differ across windows; or [`ModelSelectionError::InvalidDiagnostic`] when
 /// finite per-window scores overflow during cross-window aggregation. Partition
@@ -278,7 +256,12 @@ pub fn select_rolling_origin_predictive_candidate_k_across_windows(
     let first = *evaluations
         .first()
         .ok_or(ModelSelectionError::EmptyCandidateSet)?;
-    validate_rolling_origin_training_history(evaluations)?;
+
+    for pair in evaluations.windows(2) {
+        if pair[0].partition.window().test_cutoff != pair[1].partition.window().train_cutoff {
+            return Err(ModelSelectionError::RollingOriginWindowMismatch);
+        }
+    }
 
     let first_scores = predictive_candidate_scores(first)?;
     let expected_candidate_k: BTreeSet<_> = first_scores
