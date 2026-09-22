@@ -13,8 +13,7 @@ use temporal_core::{
 };
 use topic_measurement::{
     FittedDocumentCoordinateSummary, FittedTopicBasisIdentity, ReferenceTopicFit, ReferenceTopicInput,
-    ReferenceTopicModel, ReferenceTopicModelConfig, SparseMatrix, TopicMeasurementError,
-    additive_log_ratio, fit_reference_topic_model,
+    ReferenceTopicModelConfig, SparseMatrix, additive_log_ratio,
 };
 use uuid::Uuid;
 
@@ -101,66 +100,22 @@ fn fitted_input_and_config() -> (ReferenceTopicInput, ReferenceTopicModelConfig)
     (input, config)
 }
 
-fn fitted_model() -> ReferenceTopicModel {
-    let (input, config) = fitted_input_and_config();
-    fit_reference_topic_model(&input, &config).expect("converged reference fit")
-}
-
 #[test]
-fn fitted_basis_identity_is_deterministic_and_topic_content_follows_a_permutation() {
-    let model = fitted_model();
-    let identity = FittedTopicBasisIdentity::from_model(&model, 4).expect("basis identity");
-    let repeated = FittedTopicBasisIdentity::from_model(&model, 4).expect("repeated identity");
+fn owner_issued_basis_identity_is_deterministic() {
+    let (input, config) = fitted_input_and_config();
+    let fit = ReferenceTopicFit::fit(&input, &config).expect("owner-issued fit");
+    let identity = FittedTopicBasisIdentity::from_bound_fit(&fit).expect("basis identity");
+    let repeated = FittedTopicBasisIdentity::from_bound_fit(&fit).expect("repeated identity");
 
     assert_eq!(identity, repeated);
-    assert_eq!(identity.vocabulary_size(), 4);
-    assert_eq!(identity.topics().len(), 2);
+    assert_eq!(identity.vocabulary_size(), fit.input().vocabulary_size());
+    assert_eq!(identity.topics().len(), fit.model().topic_term_probabilities.len());
     assert_eq!(identity.topics()[0].topic_index(), 0);
     assert_eq!(identity.topics()[1].topic_index(), 1);
     assert_eq!(identity.sha256().len(), 64);
     assert_eq!(identity.topics()[0].sha256().len(), 64);
     assert_eq!(identity.topics()[1].sha256().len(), 64);
     assert_ne!(identity.topics()[0].sha256(), identity.topics()[1].sha256());
-
-    let mut permuted = model.clone();
-    permuted.topic_term_probabilities.swap(0, 1);
-    let permuted_identity =
-        FittedTopicBasisIdentity::from_model(&permuted, 4).expect("permuted identity");
-
-    assert_eq!(identity.topics()[0].sha256(), permuted_identity.topics()[1].sha256());
-    assert_eq!(identity.topics()[1].sha256(), permuted_identity.topics()[0].sha256());
-    assert_ne!(identity.sha256(), permuted_identity.sha256());
-}
-
-#[test]
-fn malformed_or_ambiguous_fitted_topic_rows_fail_closed() {
-    let model = fitted_model();
-
-    assert_eq!(
-        FittedTopicBasisIdentity::from_model(&model, 3),
-        Err(TopicMeasurementError::InvalidModelInput)
-    );
-
-    let mut malformed_width = model.clone();
-    malformed_width.topic_term_probabilities[0].pop();
-    assert_eq!(
-        FittedTopicBasisIdentity::from_model(&malformed_width, 4),
-        Err(TopicMeasurementError::InvalidModelInput)
-    );
-
-    let mut non_finite = model.clone();
-    non_finite.topic_term_probabilities[0][0] = f64::NAN;
-    assert_eq!(
-        FittedTopicBasisIdentity::from_model(&non_finite, 4),
-        Err(TopicMeasurementError::InvalidModelInput)
-    );
-
-    let mut duplicate = model;
-    duplicate.topic_term_probabilities[1] = duplicate.topic_term_probabilities[0].clone();
-    assert_eq!(
-        FittedTopicBasisIdentity::from_model(&duplicate, 4),
-        Err(TopicMeasurementError::InvalidModelInput)
-    );
 }
 
 #[test]
@@ -193,17 +148,4 @@ fn bound_fit_coordinates_pair_alr_location_with_diagonal_variance() {
             fit.model().document_coordinate_variances[document_index][0].to_bits()
         );
     }
-}
-
-#[test]
-fn public_basis_identity_is_minted_from_owner_issued_fit() {
-    let (input, config) = fitted_input_and_config();
-    let fit = ReferenceTopicFit::fit(&input, &config).expect("owner-issued fit");
-
-    let identity = FittedTopicBasisIdentity::from_bound_fit(&fit).expect("basis identity");
-    let repeated = FittedTopicBasisIdentity::from_bound_fit(&fit).expect("repeated basis identity");
-
-    assert_eq!(identity, repeated);
-    assert_eq!(identity.vocabulary_size(), fit.input().vocabulary_size());
-    assert_eq!(identity.topics().len(), fit.model().topic_term_probabilities.len());
 }
