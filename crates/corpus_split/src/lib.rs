@@ -12,6 +12,7 @@ mod document;
 mod error;
 mod inferential_weight;
 mod rolling_origin;
+mod rolling_origin_partition;
 mod snapshot;
 mod unicode_identity;
 mod weights;
@@ -50,6 +51,10 @@ pub use inferential_weight::refuse_inferential_retrieval_weight;
 pub use rolling_origin::RollingOriginWindow;
 /// Build ordered rolling-origin windows.
 pub use rolling_origin::rolling_origin_windows;
+/// Leakage-checked newly available rolling-origin train/evaluation partition.
+pub use rolling_origin_partition::RollingOriginPartition;
+/// Admit one rolling-origin partition through canonical cutoff and leakage owners.
+pub use rolling_origin_partition::admit_rolling_origin_partition;
 /// Cutoff-filtered corpus snapshot.
 pub use snapshot::CorpusSnapshot;
 /// NFC identity of a UTF-8 document body.
