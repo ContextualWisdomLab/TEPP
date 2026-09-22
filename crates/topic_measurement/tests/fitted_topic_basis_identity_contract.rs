@@ -1,4 +1,4 @@
-//! Fit-owned topic-basis identity contract for release-coordinate consumers.
+//! Fit-owned topic-basis and document-coordinate contracts for release consumers.
 
 use corpus_split::{CorpusDocument, CorpusSnapshot};
 use membership_core::{
@@ -12,8 +12,9 @@ use temporal_core::{
     TemporalPrecision,
 };
 use topic_measurement::{
-    FittedTopicBasisIdentity, ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig,
-    SparseMatrix, TopicMeasurementError, fit_reference_topic_model,
+    FittedDocumentCoordinateSummary, FittedTopicBasisIdentity, ReferenceTopicInput,
+    ReferenceTopicModel, ReferenceTopicModelConfig, SparseMatrix, TopicMeasurementError,
+    additive_log_ratio, fit_reference_topic_model,
 };
 use uuid::Uuid;
 
@@ -43,7 +44,7 @@ fn relation(source: Uuid, target: Uuid, source_day: u8, target_day: u8) -> Relat
     .expect("forward relation")
 }
 
-fn fitted_model() -> ReferenceTopicModel {
+fn fitted_input_and_model() -> (ReferenceTopicInput, ReferenceTopicModel) {
     let ids: Vec<_> = (1_u128..=4).map(Uuid::from_u128).collect();
     let times: Vec<_> = (1_u8..=4).map(event_time).collect();
     let available = AvailableTime::parse_rfc3339("2026-07-01T00:00:00Z").expect("available");
@@ -97,7 +98,12 @@ fn fitted_model() -> ReferenceTopicModel {
     let config = ReferenceTopicModelConfig::new(2, vec![7, 11], 2_000, 0.001)
         .and_then(|config| config.with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2))
         .expect("reference config");
-    fit_reference_topic_model(&input, &config).expect("converged reference fit")
+    let model = fit_reference_topic_model(&input, &config).expect("converged reference fit");
+    (input, model)
+}
+
+fn fitted_model() -> ReferenceTopicModel {
+    fitted_input_and_model().1
 }
 
 #[test]
@@ -153,6 +159,90 @@ fn malformed_or_ambiguous_fitted_topic_rows_fail_closed() {
     duplicate.topic_term_probabilities[1] = duplicate.topic_term_probabilities[0].clone();
     assert_eq!(
         FittedTopicBasisIdentity::from_model(&duplicate, 4),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+}
+
+#[test]
+fn fitted_document_coordinates_pair_alr_location_with_diagonal_variance() {
+    let (input, model) = fitted_input_and_model();
+    let summary =
+        FittedDocumentCoordinateSummary::from_fit(&input, &model).expect("coordinate summary");
+
+    assert_eq!(summary.topic_count(), 2);
+    assert_eq!(summary.rows().len(), input.document_count());
+    for (document_index, (row, document_id)) in summary
+        .rows()
+        .iter()
+        .zip(input.document_ids())
+        .enumerate()
+    {
+        assert_eq!(row.document_id(), *document_id);
+        assert_eq!(row.coordinates().len(), 1);
+        let coordinate = &row.coordinates()[0];
+        assert_eq!(coordinate.numerator_topic_index(), 0);
+        assert_eq!(coordinate.reference_topic_index(), 1);
+        let expected_location =
+            additive_log_ratio(&model.document_topic_proportions[document_index])
+                .expect("ALR location")[0];
+        assert_eq!(coordinate.location().to_bits(), expected_location.to_bits());
+        assert_eq!(
+            coordinate.variance().to_bits(),
+            model.document_coordinate_variances[document_index][0].to_bits()
+        );
+    }
+
+    let mut shifted = model.clone();
+    shifted.document_topic_proportions[0] = vec![0.8, 0.2];
+    let shifted_summary =
+        FittedDocumentCoordinateSummary::from_fit(&input, &shifted).expect("shifted summary");
+    assert_ne!(
+        summary.rows()[0].coordinates()[0].location().to_bits(),
+        shifted_summary.rows()[0].coordinates()[0].location().to_bits(),
+        "equal diagonal variance must not erase a changed fitted ALR location"
+    );
+    assert_eq!(
+        summary.rows()[0].coordinates()[0].variance().to_bits(),
+        shifted_summary.rows()[0].coordinates()[0].variance().to_bits()
+    );
+}
+
+#[test]
+fn malformed_document_coordinate_state_fails_closed() {
+    let (input, model) = fitted_input_and_model();
+
+    let mut missing_document = model.clone();
+    missing_document.document_topic_proportions.pop();
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &missing_document),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
+    let mut malformed_variance_width = model.clone();
+    malformed_variance_width.document_coordinate_variances[0].clear();
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &malformed_variance_width),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
+    let mut non_finite_variance = model.clone();
+    non_finite_variance.document_coordinate_variances[0][0] = f64::NAN;
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &non_finite_variance),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
+    let mut non_positive_variance = model.clone();
+    non_positive_variance.document_coordinate_variances[0][0] = 0.0;
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &non_positive_variance),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+
+    let mut invalid_location = model;
+    invalid_location.document_topic_proportions[0] = vec![1.0, 0.0];
+    assert_eq!(
+        FittedDocumentCoordinateSummary::from_fit(&input, &invalid_location),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 }
