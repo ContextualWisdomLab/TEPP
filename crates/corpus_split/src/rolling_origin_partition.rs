@@ -88,10 +88,13 @@ fn canonical_nonempty_document_set(
 /// The window is derived through [`rolling_origin_windows`] from the supplied
 /// ordered cutoff sequence; callers cannot substitute an independently defined
 /// train/test pair. The training and evaluation snapshots must be bound to the
-/// selected window's exact knowledge cutoffs. Every evaluation identity must
-/// carry a retained availability time strictly after the training cutoff and no
-/// later than the evaluation snapshot's already-validated cutoff. Snapshot
-/// absence is therefore never treated as proof that a row was unavailable.
+/// selected window's exact knowledge cutoffs. Every evaluation identity must be
+/// absent from the prior training snapshot, not merely omitted from the caller's
+/// training-ID slice, and must carry a retained availability time strictly after
+/// the training cutoff and no later than the evaluation snapshot's already-
+/// validated cutoff. Prior-snapshot presence is local proof that an identity is
+/// not newly available; it is not external source-provenance authentication.
+/// Snapshot absence alone is never treated as proof that a row was unavailable.
 ///
 /// Governed revisions, translations, copied variants, shared episodes, and
 /// canonically equivalent records are checked with the existing connected-group
@@ -100,8 +103,9 @@ fn canonical_nonempty_document_set(
 /// # Errors
 ///
 /// Returns [`CorpusSplitError::InvalidSplitConfiguration`] for a missing window,
-/// empty partition, overlap, or evaluation identity whose retained availability
-/// time is not later than the training cutoff;
+/// empty partition, overlap, an evaluation identity already present in the prior
+/// training snapshot, or an evaluation identity whose retained availability time
+/// is not later than the training cutoff;
 /// [`CorpusSplitError::DuplicateDocumentIdentity`] for a duplicate identity
 /// inside either partition; [`CorpusSplitError::KnowledgeCutoffMismatch`] when
 /// either snapshot is bound to a different horizon;
@@ -130,6 +134,12 @@ pub fn admit_rolling_origin_partition(
     let training = canonical_nonempty_document_set(training_document_ids)?;
     let evaluation = canonical_nonempty_document_set(evaluation_document_ids)?;
     if !training.is_disjoint(&evaluation) {
+        return Err(CorpusSplitError::InvalidSplitConfiguration);
+    }
+    if evaluation
+        .iter()
+        .any(|document_id| training_snapshot.contains(*document_id))
+    {
         return Err(CorpusSplitError::InvalidSplitConfiguration);
     }
     if training
