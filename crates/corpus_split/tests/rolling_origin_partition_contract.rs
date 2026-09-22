@@ -20,12 +20,13 @@ fn document(id: u128, available_day: u8) -> CorpusDocument {
     CorpusDocument::new(Uuid::from_u128(id), available(available_day))
 }
 
-fn snapshots() -> (CorpusSnapshot, CorpusSnapshot, [Uuid; 4]) {
+fn snapshots() -> (CorpusSnapshot, CorpusSnapshot, [Uuid; 5]) {
     let ids = [
         Uuid::from_u128(1),
         Uuid::from_u128(2),
         Uuid::from_u128(3),
         Uuid::from_u128(4),
+        Uuid::from_u128(5),
     ];
     let mut train = CorpusSnapshot::new();
     for id in [1_u128, 2] {
@@ -34,7 +35,14 @@ fn snapshots() -> (CorpusSnapshot, CorpusSnapshot, [Uuid; 4]) {
             .expect("train document");
     }
     let mut evaluation = CorpusSnapshot::new();
-    for (id, day) in [(1_u128, 1_u8), (2, 1), (3, 15), (4, 15)] {
+    for (id, day) in [
+        (1_u128, 1_u8),
+        (2, 1),
+        (3, 15),
+        (4, 15),
+        // Deliberately omitted from the train snapshot despite already being available.
+        (5, 1),
+    ] {
         evaluation
             .insert_if_eligible(document(id, day), &cutoff(20))
             .expect("evaluation snapshot document");
@@ -93,6 +101,19 @@ fn rolling_origin_partition_rejects_temporal_and_connected_group_leakage() {
             &evaluation,
             &[ids[0]],
             &[ids[1], ids[2]],
+            &[],
+        ),
+        Err(CorpusSplitError::InvalidSplitConfiguration)
+    );
+    // Absence from the train snapshot is not proof of future availability.
+    assert_eq!(
+        admit_rolling_origin_partition(
+            &cutoffs,
+            0,
+            &train,
+            &evaluation,
+            &[ids[0], ids[1]],
+            &[ids[4]],
             &[],
         ),
         Err(CorpusSplitError::InvalidSplitConfiguration)
