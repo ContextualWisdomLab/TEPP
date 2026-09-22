@@ -59,18 +59,10 @@ fn artifact_json(uncertainty: Value) -> String {
 
 #[test]
 fn v2_accepts_coordinate_bound_diagonal_laplace_quantities() {
-    let artifact = TopicLineageArtifact::from_json(&artifact_json(canonical_uncertainty()))
+    let payload = artifact_json(canonical_uncertainty());
+    let artifact = TopicLineageArtifact::from_json(&payload)
         .expect("coordinate-bound diagonal uncertainty");
-    assert_eq!(artifact.diagonal_laplace_uncertainty.len(), 2);
-    assert_eq!(
-        artifact.diagonal_laplace_uncertainty[0].document_id,
-        "00000000-0000-0000-0000-000000000001"
-    );
-    assert_eq!(
-        artifact.diagonal_laplace_uncertainty[0].coordinates[0]
-            .reference_topic_index,
-        1
-    );
+    assert_eq!(artifact.to_json().expect("canonical artifact"), payload);
 }
 
 #[test]
