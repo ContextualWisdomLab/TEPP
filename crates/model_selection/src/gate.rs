@@ -197,14 +197,6 @@ pub fn selected_k_recovery_summary(
         mse_monte_carlo_standard_error / (2.0 * root_mean_square_error)
     };
 
-    if !bias.is_finite()
-        || !root_mean_square_error.is_finite()
-        || !bias_monte_carlo_standard_error.is_finite()
-        || !rmse_monte_carlo_standard_error.is_finite()
-    {
-        return Err(ModelSelectionError::InvalidDiagnostic);
-    }
-
     Ok(SelectedKRecoverySummary {
         truth_k,
         replication_count,
