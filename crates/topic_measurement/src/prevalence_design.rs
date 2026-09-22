@@ -117,7 +117,12 @@ impl PrevalenceDesignBasis {
     ) -> Result<Vec<Vec<f64>>, TopicMeasurementError> {
         if document_ids.is_empty()
             || document_ids.len() != event_times.len()
-            || document_ids.iter().copied().collect::<BTreeSet<_>>().len() != document_ids.len()
+            || document_ids
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .len()
+                != document_ids.len()
         {
             return Err(TopicMeasurementError::InvalidModelInput);
         }
