@@ -1,11 +1,13 @@
 //! Scientific-recovery binding for a predeclared candidate-`K` design.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use corpus_split::RollingOriginPartition;
 use membership_core::MembershipNetwork;
 use temporal_core::EventTime;
-use topic_measurement::{ReferenceTopicTrainingFit, SparseMatrix};
+use topic_measurement::{
+    ReferenceTopicModelConfig, ReferenceTopicTrainingFit, SparseMatrix,
+};
 use uuid::Uuid;
 
 use crate::{
@@ -24,8 +26,9 @@ fn unique_candidate_topic_counts(
     Ok(topic_counts)
 }
 
-/// One rolling-origin evaluation whose fitted candidate dimensions are retained
-/// for comparison against the predeclared recovery design.
+/// One rolling-origin evaluation whose fitted candidate dimensions and exact
+/// numerical configurations are retained for comparison against the predeclared
+/// recovery design.
 ///
 /// This is a scientific-acceptance composition value. It does not mint split,
 /// source, Membership, relation, or fitted-model authority; those values remain
@@ -33,11 +36,13 @@ fn unique_candidate_topic_counts(
 pub struct RollingOriginRecoveryEvaluation<'a> {
     predictive: RollingOriginPredictiveEvaluation<'a>,
     candidate_topic_counts: BTreeSet<usize>,
+    candidate_configurations: BTreeMap<usize, ReferenceTopicModelConfig>,
     candidate_fit_count: usize,
 }
 
 impl<'a> RollingOriginRecoveryEvaluation<'a> {
-    /// Group one predictive window while retaining its fitted candidate dimensions.
+    /// Group one predictive window while retaining fitted dimensions and the
+    /// exact owner-issued configuration attached to each training fit.
     ///
     /// # Errors
     ///
@@ -61,6 +66,18 @@ impl<'a> RollingOriginRecoveryEvaluation<'a> {
             }),
             candidate_training_fits.len(),
         )?;
+        let candidate_configurations = candidate_training_fits
+            .iter()
+            .map(|fit| {
+                (
+                    fit.reference_fit()
+                        .model()
+                        .topic_term_probabilities
+                        .len(),
+                    fit.reference_fit().config().clone(),
+                )
+            })
+            .collect();
 
         Ok(Self {
             predictive: RollingOriginPredictiveEvaluation::new(
@@ -73,19 +90,23 @@ impl<'a> RollingOriginRecoveryEvaluation<'a> {
                 memberships,
             ),
             candidate_topic_counts,
+            candidate_configurations,
             candidate_fit_count: candidate_training_fits.len(),
         })
     }
 }
 
 /// Select candidate `K` only when every rolling-origin window covers the
-/// predeclared scientific candidate grid exactly.
+/// predeclared scientific candidate grid and numerical design exactly.
 ///
 /// The declared grid comes from [`FittedCandidateKConfig`], not from successful
 /// fits. Therefore a candidate that fails fitting and disappears from every
-/// window cannot silently shrink the recovery design. Such a replication fails
-/// closed and can be recorded as `None` by the caller before aggregation with
-/// `selected_k_recovery_summary`.
+/// window cannot silently shrink the recovery design. Each surviving fit must
+/// also retain the exact candidate-specific [`ReferenceTopicModelConfig`] derived
+/// from the same declared recovery design, including deterministic seeds,
+/// convergence controls, and hyperparameters. A dimension-compatible fit from a
+/// different optimizer configuration is a failed scientific replication, not an
+/// interchangeable candidate.
 ///
 /// This stricter path is for scientific recovery/validation. The generic
 /// multi-window predictive selector retains its operational survivor semantics.
@@ -94,9 +115,11 @@ impl<'a> RollingOriginRecoveryEvaluation<'a> {
 ///
 /// Returns [`ModelSelectionError::EmptyCandidateSet`] when there are no windows,
 /// [`ModelSelectionError::PredictiveCandidateGridMismatch`] when any window's
-/// fitted candidate dimensions differ from the declared grid, or propagates the
-/// generic rolling-origin predictive selector's cutoff, identity, candidate, and
-/// numerical failures.
+/// fitted candidate dimensions differ from the declared grid,
+/// [`ModelSelectionError::PredictiveCandidateConfigurationMismatch`] when a
+/// fitted candidate was produced under a different numerical configuration, or
+/// propagates the generic rolling-origin predictive selector's cutoff, identity,
+/// candidate, and numerical failures.
 pub fn select_declared_rolling_origin_recovery_candidate_k(
     config: &FittedCandidateKConfig,
     evaluations: &[RollingOriginRecoveryEvaluation<'_>],
@@ -116,6 +139,14 @@ pub fn select_declared_rolling_origin_recovery_candidate_k(
             || evaluation.candidate_topic_counts != declared
         {
             return Err(ModelSelectionError::PredictiveCandidateGridMismatch);
+        }
+        for &candidate_k in config.candidate_topic_counts() {
+            #[allow(clippy::cast_possible_truncation)]
+            let topic_count = candidate_k as usize;
+            let expected = config.reference_topic_model_config(candidate_k)?;
+            if evaluation.candidate_configurations.get(&topic_count) != Some(&expected) {
+                return Err(ModelSelectionError::PredictiveCandidateConfigurationMismatch);
+            }
         }
     }
 
