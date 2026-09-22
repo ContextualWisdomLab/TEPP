@@ -11,7 +11,7 @@ use std::collections::BTreeSet;
 
 use sha2::{Digest, Sha256};
 
-use crate::{ReferenceTopicModel, TopicMeasurementError};
+use crate::{error::TopicMeasurementError, reference::ReferenceTopicModel};
 
 /// Version of the fit-local topic-basis identity contract.
 pub const FITTED_TOPIC_BASIS_IDENTITY_VERSION: &str = "tepp.fitted_topic_basis_identity.v1";
@@ -102,7 +102,8 @@ impl FittedTopicBasisIdentity {
             for probability in row {
                 hasher.update(probability.to_bits().to_be_bytes());
             }
-            let sha256 = lowercase_hex(hasher.finalize().as_slice());
+            let digest = hasher.finalize();
+            let sha256 = lowercase_hex(&digest);
             if !seen.insert(sha256.clone()) {
                 return Err(TopicMeasurementError::InvalidModelInput);
             }
@@ -123,10 +124,11 @@ impl FittedTopicBasisIdentity {
             basis_hasher.update(topic_index.to_be_bytes());
             basis_hasher.update(topic.sha256.as_bytes());
         }
+        let basis_digest = basis_hasher.finalize();
 
         Ok(Self {
             vocabulary_size,
-            sha256: lowercase_hex(basis_hasher.finalize().as_slice()),
+            sha256: lowercase_hex(&basis_digest),
             topics,
         })
     }
@@ -160,6 +162,7 @@ fn lowercase_hex(bytes: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let mut encoded = String::with_capacity(bytes.len() * 2);
     for byte in bytes {
+        let byte = *byte;
         encoded.push(char::from(HEX[usize::from(byte >> 4)]));
         encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
