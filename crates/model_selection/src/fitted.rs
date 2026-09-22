@@ -152,25 +152,36 @@ impl FittedCandidateKConfig {
 /// The first diagnostic is Schwarz's (1978) large-sample maximizer
 /// `ℓ − (p ln N)/2` from the fitted `θ` and `β`. Complexity is the free
 /// parameter count `p`. A failed or non-finite diagnostic is returned as a
-/// typed error; it is never replaced with a fabricated likelihood.
+/// typed error; it is never replaced with a fabricated likelihood. The
+/// candidate label must equal the fitted topic dimension, so diagnostics from
+/// one fit cannot be attributed to a different `K`.
 ///
 /// # Errors
 ///
 /// Returns [`ModelSelectionError::NonPositiveCandidateK`] when `candidate_k`
 /// is less than two, or [`ModelSelectionError::InvalidDiagnostic`] when the
-/// fitted dimensions, likelihood, or parameter count are unusable.
+/// candidate label does not match the fitted topic dimension or the fitted
+/// dimensions, likelihood, or parameter count are unusable.
 pub fn statistical_candidate_from_fit(
     input: &ReferenceTopicInput,
     candidate_k: u32,
     model: &ReferenceTopicModel,
 ) -> Result<ModelCandidate, ModelSelectionError> {
+    if candidate_k < 2 {
+        return Err(ModelSelectionError::NonPositiveCandidateK);
+    }
+    let parameters = free_parameter_count(model)?;
+    let fitted_k = u32::try_from(model.topic_term_probabilities.len())
+        .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+    if candidate_k != fitted_k {
+        return Err(ModelSelectionError::InvalidDiagnostic);
+    }
     let log_likelihood = input
         .in_sample_log_likelihood(model)
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
     let tokens = input
         .token_count()
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
-    let parameters = free_parameter_count(model)?;
     let log_tokens = tokens.ln();
     if log_tokens < 0.0 {
         return Err(ModelSelectionError::InvalidDiagnostic);
