@@ -1,6 +1,4 @@
-use model_selection::{
-    ModelSelectionError, selected_k_recovery_summary,
-};
+use model_selection::{ModelSelectionError, selected_k_recovery_summary};
 
 #[test]
 fn recovery_summary_preserves_failure_denominator_and_monte_carlo_uncertainty() {
@@ -19,7 +17,29 @@ fn recovery_summary_preserves_failure_denominator_and_monte_carlo_uncertainty() 
 }
 
 #[test]
+fn perfect_recovery_has_zero_monte_carlo_error_but_keeps_failures() {
+    let summary = selected_k_recovery_summary(&[Some(4), Some(4), None, Some(4)], 4)
+        .expect("perfect conditional recovery");
+
+    assert_eq!(summary.replication_count(), 4);
+    assert_eq!(summary.success_count(), 3);
+    assert_eq!(summary.failure_count(), 1);
+    assert!(summary.bias().abs() < f64::EPSILON);
+    assert!(summary.root_mean_square_error().abs() < f64::EPSILON);
+    assert!(summary.bias_monte_carlo_standard_error().abs() < f64::EPSILON);
+    assert!(summary.rmse_monte_carlo_standard_error().abs() < f64::EPSILON);
+}
+
+#[test]
 fn recovery_summary_fails_closed_without_replication_support() {
+    assert_eq!(
+        selected_k_recovery_summary(&[], 4),
+        Err(ModelSelectionError::EmptyCandidateSet)
+    );
+    assert_eq!(
+        selected_k_recovery_summary(&[None, None], 4),
+        Err(ModelSelectionError::InsufficientRecoveryReplications)
+    );
     assert_eq!(
         selected_k_recovery_summary(&[Some(4), None], 4),
         Err(ModelSelectionError::InsufficientRecoveryReplications)
