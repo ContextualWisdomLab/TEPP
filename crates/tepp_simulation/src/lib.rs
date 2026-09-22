@@ -66,6 +66,8 @@ pub use truth_manifest::digest_bytes;
 
 use uuid::Uuid;
 
+const MEMBERSHIP_GROUP_SEED_DOMAIN: u64 = 0x4d45_4d42_4552_4752;
+
 /// Generate a deterministic truth corpus from a validated configuration.
 ///
 /// # Errors
@@ -107,6 +109,7 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
                 &mut rng,
                 config,
                 event_id,
+                ordinal,
                 event_time,
                 document_time,
                 available_time,
@@ -129,6 +132,7 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
                 &mut documents,
                 &mut true_relations,
                 event_id,
+                ordinal,
                 event_time,
                 event_hour_index,
                 report_delay,
@@ -144,6 +148,7 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
                 &mut documents,
                 &mut true_relations,
                 event_id,
+                ordinal,
                 event_time,
                 event_hour_index,
                 report_delay,
@@ -159,6 +164,7 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
                 &mut documents,
                 &mut true_relations,
                 event_id,
+                ordinal,
                 event_time,
                 event_hour_index,
                 report_delay,
@@ -233,11 +239,32 @@ fn next_id(rng: &mut SeededRng) -> Uuid {
     Uuid::from_bytes(bytes)
 }
 
+fn membership_group_id(seed: u64, event_ordinal: u32, membership_index: u32) -> Uuid {
+    let classification = match membership_index % 4 {
+        0 => event_ordinal % 2,
+        1 => (event_ordinal / 2) % 2,
+        2 => 0,
+        _ => event_ordinal % 3,
+    };
+    let lane = u64::from(membership_index) << 32;
+    let mut rng = SeededRng::new(
+        seed ^ MEMBERSHIP_GROUP_SEED_DOMAIN ^ lane ^ u64::from(classification),
+    );
+    next_id(&mut rng)
+}
+
+fn membership_weight_bps(membership_index: u32, membership_targets: u32) -> u32 {
+    let base = 10_000 / membership_targets;
+    let remainder = 10_000 % membership_targets;
+    base + u32::from(membership_index < remainder)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_document(
     rng: &mut SeededRng,
     config: SimulationConfig,
     event_id: Uuid,
+    event_ordinal: u32,
     event_time: temporal_core::EventTime,
     document_time: temporal_core::DocumentTime,
     available_time: temporal_core::AvailableTime,
@@ -247,9 +274,9 @@ fn build_document(
     let mut memberships = Vec::with_capacity(config.membership_targets() as usize);
     for index in 0..config.membership_targets() {
         memberships.push(SimulatedMembership::new(
-            next_id(rng),
+            membership_group_id(config.seed(), event_ordinal, index),
             membership_role_at(index as usize),
-            10_000 / config.membership_targets().max(1),
+            membership_weight_bps(index, config.membership_targets()),
         ));
     }
     let is_missing = rng.bernoulli_bps(config.missingness_rate_bps());
@@ -273,6 +300,7 @@ fn push_variant_if_drawn(
     documents: &mut Vec<SimulatedDocument>,
     true_relations: &mut Vec<TrueRelation>,
     event_id: Uuid,
+    event_ordinal: u32,
     event_time: temporal_core::EventTime,
     event_hour_index: u32,
     report_delay: u32,
@@ -294,6 +322,7 @@ fn push_variant_if_drawn(
         rng,
         config,
         event_id,
+        event_ordinal,
         event_time,
         document_time,
         available_time,
@@ -368,7 +397,7 @@ fn can_inject_false_positive(
 mod tests {
     use super::{
         SYNTHETIC_YEAR_HOURS, SimulationConfig, SimulationError, can_inject_false_positive,
-        generate, sample_delay_hours,
+        generate, membership_group_id, membership_weight_bps, sample_delay_hours,
     };
 
     #[test]
@@ -410,6 +439,16 @@ mod tests {
         assert_eq!(
             SimulationConfig::new(1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
             Err(SimulationError::InvalidConfiguration)
+        );
+    }
+
+    #[test]
+    fn membership_groups_recur_and_weights_sum_exactly() {
+        assert_eq!(membership_group_id(7, 0, 2), membership_group_id(7, 3, 2));
+        assert_ne!(membership_group_id(7, 0, 0), membership_group_id(7, 1, 0));
+        assert_eq!(
+            (0..3).map(|index| membership_weight_bps(index, 3)).sum::<u32>(),
+            10_000
         );
     }
 
