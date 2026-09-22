@@ -72,16 +72,19 @@ The full bounded MAP objective is
 Production inference uses deterministic generalized EM: normalized latent
 term-topic responsibilities, smoothed multinomial `β` updates, bounded
 gradient updates for `η` and structural coefficients, and a diagonal Laplace
-curvature approximation for document-coordinate uncertainty. For the ADR 0024
-producer prerequisite, the CPU path also constructs a bounded document-major
-joint generalized-Gauss-Newton Laplace precision from the conditional
-multinomial information, Gaussian prior, and admitted relation-residual
-Jacobians; this matrix is not a covariance or posterior draw set. Multiple seeded
-initializations retain the best finite converged objective. A non-finite
-intermediate, invalid sparse matrix, missing cutoff-safe document, reverse
-transition, or exhausted iteration budget returns a typed failure; it never
-emits a partial topic artifact. Recovery gates remain caller-owned promotion
-criteria over completed validation evidence.
+curvature approximation for document-coordinate uncertainty. The retained
+diagonal variance is the reciprocal of the matching generalized-Gauss-Newton
+precision diagonal, including the exact softmax-Jacobian relation curvature;
+it is not `diag(P^{-1})` and does not represent marginal variance from the full
+joint posterior. For the ADR 0024 producer prerequisite, the CPU path also
+constructs a bounded document-major joint generalized-Gauss-Newton Laplace
+precision from the conditional multinomial information, Gaussian prior, and
+admitted relation-residual Jacobians; this matrix is not a covariance or
+posterior draw set. Multiple seeded initializations retain the best finite
+converged objective. A non-finite intermediate, invalid sparse matrix, missing
+cutoff-safe document, reverse transition, or exhausted iteration budget returns
+a typed failure; it never emits a partial topic artifact. Recovery gates remain
+caller-owned promotion criteria over completed validation evidence.
 
 ## Non-goals
 
