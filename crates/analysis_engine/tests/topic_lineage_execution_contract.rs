@@ -97,17 +97,21 @@ fn request() -> AnalysisRunRequest {
     }
 }
 
-#[test]
-fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
-    let (snapshot, ids, times, memberships, relations) = fixture();
-    let counts = SparseMatrix::from_csr(
+fn fitted_counts(values: Vec<f64>) -> SparseMatrix {
+    SparseMatrix::from_csr(
         4,
         4,
         vec![0, 2, 4, 6, 8],
         vec![0, 1, 0, 1, 2, 3, 2, 3],
-        vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0],
+        values,
     )
-    .expect("counts");
+    .expect("counts")
+}
+
+#[test]
+fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let counts = fitted_counts(vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0]);
     let input = ReferenceTopicInput::new(
         &snapshot,
         ids,
@@ -141,6 +145,28 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     assert_eq!(execution.artifact.method_configuration_json, CONFIG_JSON);
     assert_eq!(execution.artifact.estimator_backend, "cpu_f64_reference");
     assert_eq!(execution.artifact.posterior_approximation, "diagonal_laplace");
+    assert_eq!(execution.artifact.diagonal_laplace_uncertainty.len(), 4);
+    assert_eq!(
+        execution
+            .artifact
+            .diagonal_laplace_uncertainty
+            .iter()
+            .map(|row| row.document_id.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+            "00000000-0000-0000-0000-000000000003",
+            "00000000-0000-0000-0000-000000000004",
+        ]
+    );
+    for row in &execution.artifact.diagonal_laplace_uncertainty {
+        assert_eq!(row.coordinates.len(), 1);
+        assert_eq!(row.coordinates[0].numerator_topic_index, 0);
+        assert_eq!(row.coordinates[0].reference_topic_index, 1);
+        assert!(row.coordinates[0].variance.is_finite());
+        assert!(row.coordinates[0].variance > 0.0);
+    }
     assert_eq!(execution.artifact.connected_post_count, 4);
     assert_eq!(execution.artifact.lineage_count, 2);
     assert_eq!(execution.artifact.sequence_edges.len(), 2);
@@ -157,6 +183,72 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         Some(TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION)
     );
     assert!(execution.artifact.to_json().is_ok());
+}
+
+#[test]
+fn fit_b_uncertainty_cannot_rebind_to_fit_a_terminal_digest() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let counts_a = fitted_counts(vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0]);
+    let counts_b = fitted_counts(vec![120.0, 5.0, 110.0, 10.0, 5.0, 120.0, 10.0, 110.0]);
+    let input_a = ReferenceTopicInput::new(
+        &snapshot,
+        ids.clone(),
+        &counts_a,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("input a");
+    let input_b = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &counts_b,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("input b");
+    let request = request();
+    let accepted =
+        AnalysisRunAccepted::new("run-topic-lineage", "accepted", &request.idempotency_key)
+            .expect("accepted");
+    let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
+    let execution_a = execute_topic_lineage_run(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input_a,
+        CONFIG_JSON,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("execution a");
+    let execution_b = execute_topic_lineage_run(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input_b,
+        CONFIG_JSON,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("execution b");
+
+    assert_ne!(
+        execution_a.artifact.diagonal_laplace_uncertainty,
+        execution_b.artifact.diagonal_laplace_uncertainty,
+        "the fixture must exercise distinct fit-owned uncertainty quantities"
+    );
+    let mut rebound = execution_a.artifact.clone();
+    rebound.diagonal_laplace_uncertainty = execution_b.artifact.diagonal_laplace_uncertainty;
+    let rebound_digest = rebound.sha256().expect("rebound artifact stays structurally valid");
+    assert_ne!(
+        execution_a.terminal_result.result_sha256.as_deref(),
+        Some(rebound_digest.as_str()),
+        "fit-B uncertainty must not preserve fit-A terminal-result identity"
+    );
 }
 
 #[test]
