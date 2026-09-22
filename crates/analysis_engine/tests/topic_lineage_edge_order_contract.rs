@@ -1,7 +1,9 @@
 //! Contract tests for canonical topic-lineage sequence-edge ordering.
 
 use analysis_engine::{
-    TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION, TopicLineageArtifact, TopicLineageArtifactEdge,
+    TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION, TopicLineageArtifact,
+    TopicLineageArtifactDocumentUncertainty, TopicLineageArtifactEdge,
+    TopicLineageArtifactUncertaintyCoordinate,
 };
 
 const CONFIG_JSON: &str = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[7,11],\"maximum_iterations\":2000,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.5,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
@@ -16,6 +18,17 @@ fn edge(predecessor: &str, successor: &str, topic_index: u64) -> TopicLineageArt
     }
 }
 
+fn uncertainty(document_id: &str, variance: f64) -> TopicLineageArtifactDocumentUncertainty {
+    TopicLineageArtifactDocumentUncertainty {
+        document_id: document_id.into(),
+        coordinates: vec![TopicLineageArtifactUncertaintyCoordinate {
+            numerator_topic_index: 0,
+            reference_topic_index: 1,
+            variance,
+        }],
+    }
+}
+
 fn artifact(sequence_edges: Vec<TopicLineageArtifactEdge>) -> TopicLineageArtifact {
     TopicLineageArtifact {
         schema_version: TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION.into(),
@@ -27,6 +40,12 @@ fn artifact(sequence_edges: Vec<TopicLineageArtifactEdge>) -> TopicLineageArtifa
         method_configuration_sha256: CONFIG_SHA256.into(),
         estimator_backend: "cpu_f64_reference".into(),
         posterior_approximation: "diagonal_laplace".into(),
+        diagonal_laplace_uncertainty: vec![
+            uncertainty("11111111-1111-4111-8111-111111111111", 0.125),
+            uncertainty("22222222-2222-4222-8222-222222222222", 0.25),
+            uncertainty("33333333-3333-4333-8333-333333333333", 0.375),
+            uncertainty("44444444-4444-4444-8444-444444444444", 0.5),
+        ],
         selected_seed: 7,
         iterations: 4,
         objective: -1.0,
