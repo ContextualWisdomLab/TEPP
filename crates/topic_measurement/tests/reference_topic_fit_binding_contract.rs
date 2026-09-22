@@ -72,7 +72,9 @@ fn admitted_input(id_offset: u128) -> (ReferenceTopicInput, ReferenceTopicModelC
     }
 
     let mut relations = RelationGraph::new();
-    for (source, target, source_day, target_day) in [(0, 1, 1, 2), (1, 2, 2, 3), (2, 3, 3, 4)] {
+    for (source, target, source_day, target_day) in
+        [(0, 1, 1, 2), (1, 2, 2, 3), (2, 3, 3, 4)]
+    {
         relations
             .insert(relation(ids[source], ids[target], source_day, target_day))
             .expect("insert relation");
@@ -120,9 +122,12 @@ fn owner_issued_fit_keeps_model_input_and_config_in_one_nominal_aggregate() {
     let summary_b = FittedDocumentCoordinateSummary::from_bound_fit(&fit_b).expect("summary B");
     let summary_a_ids: Vec<_> = summary_a.rows().iter().map(|row| row.document_id()).collect();
     let summary_b_ids: Vec<_> = summary_b.rows().iter().map(|row| row.document_id()).collect();
-    assert_eq!(summary_a_ids, input_a.document_ids());
-    assert_eq!(summary_b_ids, input_b.document_ids());
+    assert_eq!(summary_a_ids.as_slice(), input_a.document_ids());
+    assert_eq!(summary_b_ids.as_slice(), input_b.document_ids());
     assert_ne!(summary_a_ids, summary_b_ids);
 
-    assert_eq!(fit_a.model().posterior_approximation(), fit_b.model().posterior_approximation());
+    assert_eq!(
+        fit_a.model().posterior_approximation(),
+        fit_b.model().posterior_approximation()
+    );
 }
