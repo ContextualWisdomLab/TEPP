@@ -200,45 +200,48 @@ pub fn selected_k_recovery_summary(
     let failure_rate_monte_carlo_standard_error =
         (failure_rate * (1.0 - failure_rate) / replication_count_f64).sqrt();
 
-    let (bias, root_mean_square_error, bias_monte_carlo_standard_error, rmse_monte_carlo_standard_error) =
-        if residuals.is_empty() {
-            (None, None, None, None)
-        } else {
-            let n = success_count as f64;
-            let bias = residuals.iter().sum::<f64>() / n;
-            let mean_squared_error = residuals.iter().map(|value| value * value).sum::<f64>() / n;
-            let root_mean_square_error = mean_squared_error.sqrt();
+    let (
+        bias,
+        root_mean_square_error,
+        bias_monte_carlo_standard_error,
+        rmse_monte_carlo_standard_error,
+    ) = if residuals.is_empty() {
+        (None, None, None, None)
+    } else {
+        let n = success_count as f64;
+        let bias = residuals.iter().sum::<f64>() / n;
+        let mean_squared_error = residuals.iter().map(|value| value * value).sum::<f64>() / n;
+        let root_mean_square_error = mean_squared_error.sqrt();
 
-            if success_count < 2 {
-                (Some(bias), Some(root_mean_square_error), None, None)
+        if success_count < 2 {
+            (Some(bias), Some(root_mean_square_error), None, None)
+        } else {
+            let sample_denominator = (success_count - 1) as f64;
+            let residual_sample_variance = residuals
+                .iter()
+                .map(|value| (value - bias).powi(2))
+                .sum::<f64>()
+                / sample_denominator;
+            let bias_monte_carlo_standard_error = (residual_sample_variance / n).sqrt();
+            let squared_error_sample_variance = residuals
+                .iter()
+                .map(|value| ((value * value) - mean_squared_error).powi(2))
+                .sum::<f64>()
+                / sample_denominator;
+            let mse_monte_carlo_standard_error = (squared_error_sample_variance / n).sqrt();
+            let rmse_monte_carlo_standard_error = if root_mean_square_error == 0.0 {
+                0.0
             } else {
-                let sample_denominator = (success_count - 1) as f64;
-                let residual_sample_variance = residuals
-                    .iter()
-                    .map(|value| (value - bias).powi(2))
-                    .sum::<f64>()
-                    / sample_denominator;
-                let bias_monte_carlo_standard_error = (residual_sample_variance / n).sqrt();
-                let squared_error_sample_variance = residuals
-                    .iter()
-                    .map(|value| ((value * value) - mean_squared_error).powi(2))
-                    .sum::<f64>()
-                    / sample_denominator;
-                let mse_monte_carlo_standard_error =
-                    (squared_error_sample_variance / n).sqrt();
-                let rmse_monte_carlo_standard_error = if root_mean_square_error == 0.0 {
-                    0.0
-                } else {
-                    mse_monte_carlo_standard_error / (2.0 * root_mean_square_error)
-                };
-                (
-                    Some(bias),
-                    Some(root_mean_square_error),
-                    Some(bias_monte_carlo_standard_error),
-                    Some(rmse_monte_carlo_standard_error),
-                )
-            }
-        };
+                mse_monte_carlo_standard_error / (2.0 * root_mean_square_error)
+            };
+            (
+                Some(bias),
+                Some(root_mean_square_error),
+                Some(bias_monte_carlo_standard_error),
+                Some(rmse_monte_carlo_standard_error),
+            )
+        }
+    };
 
     Ok(SelectedKRecoverySummary {
         truth_k,
