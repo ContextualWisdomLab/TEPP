@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-24
 **Decision status:** Accepted
-**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring and frozen training-prevalence projection are active-PR; method effects and GPU remain accepted-target.
+**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring, frozen training-prevalence projection, and fixed-training rolling-origin predictive selection are active-PR; method effects and GPU remain accepted-target.
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
 ## Context
@@ -63,6 +63,23 @@ validity/availability clocks. A future `EventTime` is therefore not rejected
 solely because it is later than the training cutoff; leakage safety depends on
 the separate Evidence/availability authority and on keeping the training
 preprocessing state fixed (Roberts et al., 2019).
+
+Active-PR rolling-origin predictive evaluation keeps that frozen training state
+and the admitted split authority together. A predictive evaluation row is
+scored only when its exact training fit identities equal the partition training
+set and its duplicate-free evaluation identities equal the partition evaluation
+set. Candidate `K` is derived from the owner-issued fitted topic dimension, not
+from a detached caller label. Within one admitted window, the highest finite
+fixed-training prevalence-mean predictive log likelihood is the predictive
+candidate criterion, with deterministic smaller-`K` exact-tie handling.
+Across multiple origins, windows must be contiguous (`test_cutoff_i =
+train_cutoff_{i+1}`), every origin must expose the same unique fitted candidate
+set, and finite predictive log likelihoods are summed by `K` before the same
+deterministic comparison. Per-window winner voting, mixing the in-sample
+Schwarz score into this predictive aggregate, or calling this quantity STM
+document-completion likelihood is not allowed. This active-PR gate is a
+prerequisite for realistic known-`K` rolling-origin recovery; it is not itself
+that recovery evidence.
 
 For explicit observed predecessor/successor relations only, the reference
 objective adds the harmonic network penalty
@@ -139,7 +156,7 @@ Backend changes require a versioned model contract, migration notes, reproducibi
 
 ## Verification
 
-Required evidence includes known-truth topic/covariate/covariance recovery, bias/RMSE/interval coverage, held-out predictive evidence, seed/bootstrap stability, relation-aware split integrity, language alignment/invariance, method-effect recovery, known-K/acceptable-set behavior, posterior calibration, and downstream coordinate compatibility. Held-out evidence additionally requires a frozen training prevalence basis so the same evaluation observation has the same projected design row regardless of which other evaluation-horizon observations share its batch. CPU/GPU implementations additionally require parity under ADR 0001/0006.
+Required evidence includes known-truth topic/covariate/covariance recovery, bias/RMSE/interval coverage, held-out predictive evidence, seed/bootstrap stability, relation-aware split integrity, language alignment/invariance, method-effect recovery, known-K/acceptable-set behavior, posterior calibration, and downstream coordinate compatibility. Held-out evidence additionally requires a frozen training prevalence basis so the same evaluation observation has the same projected design row regardless of which other evaluation-horizon observations share its batch. Rolling-origin K evidence additionally requires contiguous owner-admitted windows, identical unique candidate sets across origins, exact training/evaluation identity binding, deliberate future-availability leakage refusal, realistic repeated true-K recovery that preserves temporal/relational and multilevel/multiple-membership composition, and Monte Carlo uncertainty over both successful recovery metrics and failure rate. CPU/GPU implementations additionally require parity under ADR 0001/0006.
 
 ## Rollback and supersession
 
