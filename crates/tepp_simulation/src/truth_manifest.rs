@@ -4,12 +4,13 @@ use crate::SimulationError;
 use crate::document_process::SimulatedDocument;
 use crate::latent_event::LatentEvent;
 use crate::relation_process::{ObservedRelation, TrueRelation};
+use crate::topic_process::TopicTruthManifest;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use temporal_core::KnowledgeCutoff;
 
 /// Immutable known-truth corpus bound to an explicit seed and content digest.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct TruthManifest {
     seed: u64,
     config_digest: String,
@@ -18,11 +19,13 @@ pub struct TruthManifest {
     documents: Vec<SimulatedDocument>,
     true_relations: Vec<TrueRelation>,
     observed_relations: Vec<ObservedRelation>,
+    topic_truth: TopicTruthManifest,
 }
 
 impl TruthManifest {
     /// Construct a truth manifest and compute its content digest.
     #[must_use]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         seed: u64,
         config_digest: String,
@@ -30,6 +33,7 @@ impl TruthManifest {
         documents: Vec<SimulatedDocument>,
         true_relations: Vec<TrueRelation>,
         observed_relations: Vec<ObservedRelation>,
+        topic_truth: TopicTruthManifest,
     ) -> Self {
         let mut manifest = Self {
             seed,
@@ -39,6 +43,7 @@ impl TruthManifest {
             documents,
             true_relations,
             observed_relations,
+            topic_truth,
         };
         manifest.content_digest = manifest.compute_content_digest();
         manifest
@@ -56,7 +61,7 @@ impl TruthManifest {
         &self.config_digest
     }
 
-    /// Digest of the generated truth rows.
+    /// Digest of the generated truth rows, including all known-topic state.
     #[must_use]
     pub fn content_digest(&self) -> &str {
         &self.content_digest
@@ -84,6 +89,12 @@ impl TruthManifest {
     #[must_use]
     pub fn observed_relations(&self) -> &[ObservedRelation] {
         &self.observed_relations
+    }
+
+    /// Known topic/content/prevalence state and generated term observations.
+    #[must_use]
+    pub const fn topic_truth(&self) -> &TopicTruthManifest {
+        &self.topic_truth
     }
 
     /// Number of latent events.
@@ -115,7 +126,8 @@ impl TruthManifest {
     /// # Errors
     ///
     /// Returns [`SimulationError::ManifestInvariantViolation`] when temporal
-    /// order, membership multiplicity, parent linkage, or digest integrity fails.
+    /// order, membership multiplicity, parent linkage, topic-state alignment,
+    /// or digest integrity fails.
     pub fn verify_invariants(&self) -> Result<(), SimulationError> {
         if self.content_digest != self.compute_content_digest() {
             return Err(SimulationError::ManifestInvariantViolation);
@@ -164,7 +176,7 @@ impl TruthManifest {
                 return Err(SimulationError::ManifestInvariantViolation);
             }
         }
-        Ok(())
+        self.topic_truth.verify_against_documents(&self.documents)
     }
 
     #[cfg(test)]
@@ -215,7 +227,53 @@ impl TruthManifest {
             hasher.update(relation.target_id().as_bytes());
             hasher.update([u8::from(relation.is_true_positive())]);
         }
+        self.hash_topic_truth(&mut hasher);
         hex_encode(&hasher.finalize())
+    }
+
+    fn hash_topic_truth(&self, hasher: &mut Sha256) {
+        let truth = &self.topic_truth;
+        hasher.update(truth.seed_domain().to_le_bytes());
+        hasher.update(truth.true_k().to_le_bytes());
+        hasher.update(truth.vocabulary_size().to_le_bytes());
+        hasher.update(truth.document_length().to_le_bytes());
+        for topic in truth.topic_term_probabilities() {
+            for probability in topic {
+                hasher.update(probability.to_bits().to_le_bytes());
+            }
+        }
+        for value in truth.prevalence_intercepts() {
+            hasher.update(value.to_bits().to_le_bytes());
+        }
+        for value in truth.prevalence_time_slopes() {
+            hasher.update(value.to_bits().to_le_bytes());
+        }
+        for row in truth.prevalence_covariance() {
+            for value in row {
+                hasher.update(value.to_bits().to_le_bytes());
+            }
+        }
+        for state in truth.document_states() {
+            hasher.update(state.document_id().as_bytes());
+            for value in state.logistic_normal_coordinates() {
+                hasher.update(value.to_bits().to_le_bytes());
+            }
+            for value in state.topic_mixture() {
+                hasher.update(value.to_bits().to_le_bytes());
+            }
+            for value in state.membership_contribution() {
+                hasher.update(value.to_bits().to_le_bytes());
+            }
+            for value in state.relation_contribution() {
+                hasher.update(value.to_bits().to_le_bytes());
+            }
+            for value in state.method_contribution() {
+                hasher.update(value.to_bits().to_le_bytes());
+            }
+            for count in state.term_counts() {
+                hasher.update(count.to_le_bytes());
+            }
+        }
     }
 }
 
@@ -241,9 +299,11 @@ pub fn digest_bytes(bytes: &[u8]) -> String {
 mod tests {
     use super::{TruthManifest, digest_bytes};
     use crate::SimulationError;
+    use crate::configuration::SimulationConfig;
     use crate::document_process::{DocumentMethodEffect, SimulatedDocument, SimulatedMembership};
     use crate::latent_event::{LatentEvent, LatentEventState};
     use crate::relation_process::{ObservedRelation, SimulatedRelationKind, TrueRelation};
+    use crate::topic_process::generate_topic_truth;
     use temporal_core::{AvailableTime, DocumentTime, EventTime};
     use uuid::Uuid;
 
@@ -275,6 +335,27 @@ mod tests {
         .expect("doc")
     }
 
+    fn manifest(
+        seed: u64,
+        config_digest: String,
+        events: Vec<LatentEvent>,
+        documents: Vec<SimulatedDocument>,
+        true_relations: Vec<TrueRelation>,
+        observed_relations: Vec<ObservedRelation>,
+    ) -> TruthManifest {
+        let config = SimulationConfig::ci_default(seed);
+        let topic_truth = generate_topic_truth(config, &events, &documents, &true_relations);
+        TruthManifest::new(
+            seed,
+            config_digest,
+            events,
+            documents,
+            true_relations,
+            observed_relations,
+            topic_truth,
+        )
+    }
+
     fn sample_manifest() -> TruthManifest {
         let event_time = EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("e");
         let events = vec![
@@ -300,7 +381,7 @@ mod tests {
             Uuid::from_u128(2),
             true,
         )];
-        TruthManifest::new(
+        manifest(
             7,
             digest_bytes(b"cfg"),
             events,
@@ -323,6 +404,7 @@ mod tests {
         assert_eq!(manifest.documents().len(), 1);
         assert_eq!(manifest.true_relations().len(), 1);
         assert_eq!(manifest.observed_relations().len(), 1);
+        assert_eq!(manifest.topic_truth().true_k(), 3);
         assert_eq!(digest_bytes(b"a").len(), 64);
     }
 
@@ -336,7 +418,7 @@ mod tests {
             Err(SimulationError::ManifestInvariantViolation)
         );
 
-        let empty_events = TruthManifest::new(
+        let empty_events = manifest(
             1,
             "c".into(),
             Vec::new(),
@@ -349,7 +431,7 @@ mod tests {
             Err(SimulationError::ManifestInvariantViolation)
         );
 
-        let empty_docs = TruthManifest::new(
+        let empty_docs = manifest(
             1,
             "c".into(),
             sample_manifest().events().to_vec(),
@@ -362,7 +444,7 @@ mod tests {
             Err(SimulationError::ManifestInvariantViolation)
         );
 
-        let bad_ordinal = TruthManifest::new(
+        let bad_ordinal = manifest(
             1,
             "c".into(),
             vec![
@@ -378,7 +460,7 @@ mod tests {
             Err(SimulationError::ManifestInvariantViolation)
         );
 
-        let bad_time_order = TruthManifest::new(
+        let bad_time_order = manifest(
             1,
             "c".into(),
             vec![
@@ -400,7 +482,7 @@ mod tests {
             vec![SimulatedMembership::new(Uuid::from_u128(9), "author", 1)],
             None,
         );
-        let duplicate_docs = TruthManifest::new(
+        let duplicate_docs = manifest(
             1,
             "c".into(),
             vec![event(1, "2026-01-01T00:00:00Z", 0)],
@@ -413,7 +495,7 @@ mod tests {
             Err(SimulationError::ManifestInvariantViolation)
         );
 
-        let unknown_event = TruthManifest::new(
+        let unknown_event = manifest(
             1,
             "c".into(),
             vec![event(1, "2026-01-01T00:00:00Z", 0)],
@@ -431,7 +513,7 @@ mod tests {
             Err(SimulationError::ManifestInvariantViolation)
         );
 
-        let empty_memberships = TruthManifest::new(
+        let empty_memberships = manifest(
             1,
             "c".into(),
             vec![event(1, "2026-01-01T00:00:00Z", 0)],
@@ -444,7 +526,7 @@ mod tests {
             Err(SimulationError::ManifestInvariantViolation)
         );
 
-        let duplicate_roles = TruthManifest::new(
+        let duplicate_roles = manifest(
             1,
             "c".into(),
             vec![event(1, "2026-01-01T00:00:00Z", 0)],
@@ -465,7 +547,7 @@ mod tests {
             Err(SimulationError::ManifestInvariantViolation)
         );
 
-        let orphan_parent = TruthManifest::new(
+        let orphan_parent = manifest(
             1,
             "c".into(),
             vec![event(1, "2026-01-01T00:00:00Z", 0)],
