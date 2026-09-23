@@ -8,6 +8,7 @@
 //! noise, and emit a digest-bound truth manifest for scientific recovery tests.
 
 mod configuration;
+mod coverage_calibration;
 mod document_process;
 mod error;
 mod latent_event;
@@ -21,6 +22,8 @@ mod truth_manifest;
 pub use configuration::SimulationConfig;
 /// Deterministic parameters for the known-topic data-generating process.
 pub use configuration::TopicDgpConfig;
+/// Owner-issued prospective interval-calibration simulation scenario.
+pub use coverage_calibration::CoverageCalibrationSimulationDesign;
 /// Method-effect labels for generated documents.
 pub use document_process::DocumentMethodEffect;
 /// Synthetic non-wrapping calendar bound in hours.
