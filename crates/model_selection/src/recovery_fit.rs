@@ -13,7 +13,9 @@ use topic_measurement::{
 
 use crate::{FittedCandidateKConfig, ModelSelectionError};
 
-fn recovery_fit_result<T>(result: Result<T, TopicMeasurementError>) -> Result<T, ModelSelectionError> {
+fn recovery_fit_result<T>(
+    result: Result<T, TopicMeasurementError>,
+) -> Result<T, ModelSelectionError> {
     result.map_err(|_| ModelSelectionError::RecoveryCandidateFitFailed)
 }
 
@@ -43,7 +45,10 @@ pub fn fit_declared_recovery_candidates(
     let mut fits = Vec::with_capacity(config.candidate_topic_counts().len());
     for &candidate_k in config.candidate_topic_counts() {
         let fit_config = config.reference_topic_model_config(candidate_k)?;
-        let fit = recovery_fit_result(ReferenceTopicTrainingFit::fit(training_input, &fit_config))?;
+        let fit = recovery_fit_result(ReferenceTopicTrainingFit::fit(
+            training_input,
+            &fit_config,
+        ))?;
         fits.push(fit);
     }
     Ok(fits)
