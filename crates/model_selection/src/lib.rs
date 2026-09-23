@@ -18,6 +18,7 @@ mod recovery_fit;
 mod recovery_grid;
 mod recovery_outcome;
 mod rolling_origin_predictive;
+mod rolling_origin_state;
 
 /// One candidate `K` with statistical or LLM-only support.
 pub use candidate::ModelCandidate;
@@ -57,3 +58,5 @@ pub use rolling_origin_predictive::rolling_origin_prevalence_mean_predictive_log
 pub use rolling_origin_predictive::select_rolling_origin_predictive_candidate_k;
 /// Select candidate `K` from predictive evidence accumulated across canonical windows.
 pub use rolling_origin_predictive::select_rolling_origin_predictive_candidate_k_across_windows;
+/// Infer held-out document states only for the exact admitted rolling-origin identities.
+pub use rolling_origin_state::rolling_origin_held_out_document_topic_proportions;
