@@ -104,7 +104,7 @@ fn six_term_training_input() -> ReferenceTopicTrainingInput {
 #[test]
 fn candidate_exceeding_training_vocabulary_is_structural_invalidity() {
     let training = six_term_training_input();
-    let declared = FittedCandidateKConfig::new(vec![2, 7], vec![7, 11, 19], 2_000, 0.001)
+    let declared = FittedCandidateKConfig::new(vec![7, 2], vec![7, 11, 19], 2_000, 0.001)
         .expect("syntactically valid declared grid");
 
     let error = fit_declared_recovery_candidates(&training, &declared)
