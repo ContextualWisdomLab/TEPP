@@ -4,6 +4,8 @@ use crate::{SimulationConfig, SimulationError};
 
 const COVERAGE_CALIBRATION_FIRST_SEED: u64 = 0x4341_4c49_4252_0000;
 const COVERAGE_CALIBRATION_REPLICATION_COUNT: usize = 10_000;
+const COVERAGE_CALIBRATION_FINGERPRINT_DOMAIN: &[u8] =
+    b"tepp.coverage-calibration-scenario-fingerprint.v1\0";
 
 /// Owner-issued DGP scenario for the first prospective rolling-origin coverage study.
 ///
@@ -81,5 +83,37 @@ impl CoverageCalibrationSimulationDesign {
             3_000,
             3_000,
         )
+    }
+
+    /// Digest the complete declared scenario into one immutable SHA-256 fingerprint.
+    ///
+    /// The digest covers a domain separator, the versioned scenario identity,
+    /// the declared attempt count, and the canonical configuration fingerprint
+    /// of every replication in ordinal order. Configuration bytes are produced
+    /// by the same crate-owned fingerprint used to bind generated truth manifests,
+    /// so persisted acceptance evidence cannot silently switch to a second config
+    /// serialization.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimulationError::InvalidConfiguration`] if any owner-issued
+    /// replication configuration cannot be reconstructed.
+    pub fn scenario_fingerprint(self) -> Result<String, SimulationError> {
+        let mut bytes = Vec::with_capacity(
+            COVERAGE_CALIBRATION_FINGERPRINT_DOMAIN.len()
+                + self.scenario_id().len()
+                + 1
+                + 8
+                + (COVERAGE_CALIBRATION_REPLICATION_COUNT * 160),
+        );
+        bytes.extend_from_slice(COVERAGE_CALIBRATION_FINGERPRINT_DOMAIN);
+        bytes.extend_from_slice(self.scenario_id().as_bytes());
+        bytes.push(0);
+        bytes.extend_from_slice(&10_000_u64.to_le_bytes());
+        for replication_index in 0..COVERAGE_CALIBRATION_REPLICATION_COUNT {
+            let config = self.config_for_replication(replication_index)?;
+            bytes.extend_from_slice(&crate::config_fingerprint(config));
+        }
+        Ok(crate::digest_bytes(&bytes))
     }
 }
