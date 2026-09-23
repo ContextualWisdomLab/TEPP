@@ -141,6 +141,7 @@ fn fit_bound_marginal_retains_owner_topic_basis_identity() {
     let expected_basis =
         FittedTopicBasisIdentity::from_bound_fit(&fit).expect("fit-owned topic basis");
     let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
+    let alternate_topic_ids = vec![Uuid::from_u128(901), Uuid::from_u128(902)];
     let document_id = fit.input().document_ids()[0];
 
     let marginal = FitBoundDocumentMarginalCovariance::from_bound_fit(
@@ -149,6 +150,12 @@ fn fit_bound_marginal_retains_owner_topic_basis_identity() {
         document_id,
     )
     .expect("fit-bound marginal covariance with basis identity");
+    let relabeled = FitBoundDocumentMarginalCovariance::from_bound_fit(
+        &fit,
+        alternate_topic_ids.clone(),
+        document_id,
+    )
+    .expect("same fit under provisional topic UUID relabeling");
 
     assert_eq!(marginal.document_id(), document_id);
     assert_eq!(marginal.event_time(), event_time(1));
@@ -156,10 +163,15 @@ fn fit_bound_marginal_retains_owner_topic_basis_identity() {
     assert_eq!(marginal.topic_basis_identity(), &expected_basis);
     assert_eq!(marginal.values().len(), 1);
     assert_eq!(marginal.values()[0].len(), 1);
+
+    assert_eq!(relabeled.topic_ids(), alternate_topic_ids);
+    assert_ne!(relabeled.topic_ids(), marginal.topic_ids());
+    assert_eq!(relabeled.topic_basis_identity(), marginal.topic_basis_identity());
+    assert_eq!(relabeled.values(), marginal.values());
 }
 
 #[test]
-fn missing_document_identity_fails_closed() {
+fn invalid_provisional_topic_or_document_identity_fails_closed() {
     let fit = fit();
     let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
     let precision = fit
@@ -171,7 +183,19 @@ fn missing_document_identity_fails_closed() {
         Err(TopicMeasurementError::InvalidModelInput)
     );
     assert_eq!(
-        FitBoundDocumentMarginalCovariance::from_bound_fit(&fit, topic_ids, Uuid::from_u128(999)),
+        FitBoundDocumentMarginalCovariance::from_bound_fit(
+            &fit,
+            topic_ids,
+            Uuid::from_u128(999),
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    assert_eq!(
+        FitBoundDocumentMarginalCovariance::from_bound_fit(
+            &fit,
+            vec![Uuid::from_u128(201), Uuid::from_u128(201)],
+            fit.input().document_ids()[0],
+        ),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 }
