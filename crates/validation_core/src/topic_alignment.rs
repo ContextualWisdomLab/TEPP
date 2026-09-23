@@ -136,9 +136,9 @@ pub fn realign_additive_log_ratio(
 /// `Σ_z = A Σ_x Aᵀ` so recovery intervals are evaluated in the same truth-topic
 /// reference basis as their locations. The input must be an exact `(K - 1) ×
 /// (K - 1)` finite symmetric positive-semidefinite covariance matrix. Symmetry
-/// and semidefinite checks use scale-relative binary64 tolerances only to absorb
-/// floating-point roundoff; materially asymmetric or indefinite matrices fail
-/// closed.
+/// and semidefinite checks use local scale-relative binary64 tolerances only to
+/// absorb floating-point roundoff; materially asymmetric or indefinite matrices
+/// fail closed.
 ///
 /// This is validation-coordinate arithmetic. It does not mutate estimator state,
 /// calibrate posterior intervals by itself, authenticate source/vocabulary
@@ -176,12 +176,12 @@ pub fn realign_additive_log_ratio_covariance(
             let mut value = 0.0_f64;
             for fitted_row in 0..coordinate_count {
                 let left_weight = transform[row][fitted_row];
-                if left_weight == 0.0 {
+                if left_weight.abs() <= f64::EPSILON {
                     continue;
                 }
                 for fitted_column in 0..coordinate_count {
                     let right_weight = transform[column][fitted_column];
-                    if right_weight == 0.0 {
+                    if right_weight.abs() <= f64::EPSILON {
                         continue;
                     }
                     value += left_weight
@@ -230,52 +230,50 @@ fn validate_covariance_matrix(
     covariance: &[Vec<f64>],
     coordinate_count: usize,
 ) -> Result<(), ValidationError> {
-    if coordinate_count == 0
-        || covariance.len() != coordinate_count
+    if covariance.len() != coordinate_count
         || covariance.iter().any(|row| row.len() != coordinate_count)
         || covariance.iter().flatten().any(|value| !value.is_finite())
     {
         return Err(ValidationError::InvalidInput);
     }
 
-    let scale = covariance
-        .iter()
-        .flatten()
-        .map(|value| value.abs())
-        .fold(1.0_f64, f64::max);
-    let symmetry_tolerance = COVARIANCE_SYMMETRY_RELATIVE_TOLERANCE * scale;
     for row in 0..coordinate_count {
+        if covariance[row][row] < 0.0 {
+            return Err(ValidationError::InvalidInput);
+        }
         for column in 0..row {
+            let scale = covariance[row][column]
+                .abs()
+                .max(covariance[column][row].abs())
+                .max(f64::EPSILON);
+            let symmetry_tolerance = COVARIANCE_SYMMETRY_RELATIVE_TOLERANCE * scale;
             if (covariance[row][column] - covariance[column][row]).abs() > symmetry_tolerance {
                 return Err(ValidationError::InvalidInput);
             }
         }
     }
 
-    let psd_tolerance = COVARIANCE_PSD_RELATIVE_TOLERANCE * scale;
-    if !is_positive_semidefinite(covariance, psd_tolerance) {
+    if !is_positive_semidefinite(covariance) {
         return Err(ValidationError::InvalidInput);
     }
     Ok(())
 }
 
-fn is_positive_semidefinite(covariance: &[Vec<f64>], tolerance: f64) -> bool {
+fn is_positive_semidefinite(covariance: &[Vec<f64>]) -> bool {
     let coordinate_count = covariance.len();
     let mut lower = vec![vec![0.0_f64; coordinate_count]; coordinate_count];
 
     for row in 0..coordinate_count {
         for column in 0..=row {
-            let mut correction = 0.0_f64;
-            for previous in 0..column {
-                correction += lower[row][previous] * lower[column][previous];
-                if !correction.is_finite() {
-                    return false;
-                }
-            }
+            let correction = (0..column)
+                .map(|previous| lower[row][previous] * lower[column][previous])
+                .sum::<f64>();
             let residual = covariance[row][column] - correction;
-            if !residual.is_finite() {
-                return false;
-            }
+            let local_scale = covariance[row][column]
+                .abs()
+                .max(correction.abs())
+                .max(f64::EPSILON);
+            let tolerance = COVARIANCE_PSD_RELATIVE_TOLERANCE * local_scale;
 
             if row == column {
                 if residual < -tolerance {
