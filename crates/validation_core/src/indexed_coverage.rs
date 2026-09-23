@@ -1,11 +1,15 @@
 //! Exact replication-identity binding for sharded coverage-calibration evidence.
 
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 
 use crate::{
     MonteCarloRecoveryMetricSummary, ValidationError,
     summarize_windowed_coverage_recovery_replications,
 };
+
+const INDEXED_COVERAGE_FINGERPRINT_DOMAIN: &[u8] =
+    b"tepp.validation.coverage-calibration-outcomes.v1\0";
 
 /// One declared coverage-calibration replication and its numerical outcome.
 ///
@@ -73,6 +77,62 @@ pub fn canonical_indexed_coverage_outcomes(
 ) -> Result<Vec<CoverageCalibrationReplicationOutcome>, ValidationError> {
     ordered_outcomes(attempted_replication_count, outcomes)
         .map(|ordered| ordered.into_iter().cloned().collect())
+}
+
+/// SHA-256 fingerprint of the exact canonical indexed coverage outcome ledger.
+///
+/// The digest is domain-separated and independent of shard/completion input
+/// order. It binds the declared attempt count and, for every replication in
+/// canonical identity order, the zero-based identity, success/failure state,
+/// successful window count, and exact IEEE-754 binary64 coverage bits. The
+/// canonical ledger remains the recovery/audit representation; this digest is a
+/// compact immutable provenance binding for evidence artifacts and cross-system
+/// verification.
+///
+/// This function validates the exact replication identity set but deliberately
+/// does not replace scientific coverage validation. Evidence construction must
+/// still pass the indexed aggregation owner before persisting this fingerprint.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when the declared identity set is
+/// malformed or a platform count cannot be represented in the canonical `u64`
+/// wire geometry.
+pub fn canonical_indexed_coverage_outcomes_sha256(
+    attempted_replication_count: usize,
+    outcomes: &[CoverageCalibrationReplicationOutcome],
+) -> Result<String, ValidationError> {
+    let ordered = ordered_outcomes(attempted_replication_count, outcomes)?;
+    let attempted = u64::try_from(attempted_replication_count)
+        .map_err(|_| ValidationError::InvalidInput)?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(INDEXED_COVERAGE_FINGERPRINT_DOMAIN);
+    hasher.update(attempted.to_le_bytes());
+
+    for outcome in ordered {
+        let replication_index = u64::try_from(outcome.replication_index)
+            .map_err(|_| ValidationError::InvalidInput)?;
+        hasher.update(replication_index.to_le_bytes());
+        match &outcome.window_coverages {
+            Some(window_coverages) => {
+                hasher.update([1_u8]);
+                let window_count = u64::try_from(window_coverages.len())
+                    .map_err(|_| ValidationError::InvalidInput)?;
+                hasher.update(window_count.to_le_bytes());
+                for coverage in window_coverages {
+                    hasher.update(coverage.to_bits().to_le_bytes());
+                }
+            }
+            None => {
+                hasher.update([0_u8]);
+                hasher.update(0_u64.to_le_bytes());
+            }
+        }
+    }
+
+    let digest = hasher.finalize();
+    Ok(format!("{digest:x}"))
 }
 
 /// Aggregate coverage only from an exact permutation of declared replication identities.
