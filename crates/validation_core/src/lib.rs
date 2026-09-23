@@ -79,3 +79,5 @@ pub use temporal_order::temporal_order_accuracy;
 pub use topic_alignment::{TopicAlignment, align_topic_probability_rows};
 /// Re-express fitted additive-log-ratio coordinates in the aligned truth basis.
 pub use topic_alignment::realign_additive_log_ratio;
+/// Propagate fitted additive-log-ratio covariance into the aligned truth basis.
+pub use topic_alignment::realign_additive_log_ratio_covariance;
