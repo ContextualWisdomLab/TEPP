@@ -28,8 +28,12 @@ mod topic_alignment;
 
 /// Standard error of mean signed bias.
 pub use bias::bias_standard_error;
+/// Mean absolute parameter-wise bias across repeated recovery observations.
+pub use bias::mean_absolute_parameter_bias;
 /// Mean signed bias.
 pub use bias::mean_bias;
+/// Mean signed bias for every parameter across repeated recovery observations.
+pub use bias::parameter_mean_biases;
 /// Four ADR 0014 claim authorities.
 pub use claim::ClaimAuthority;
 /// One evidence item offered for promotion.
