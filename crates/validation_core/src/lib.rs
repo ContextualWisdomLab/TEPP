@@ -25,6 +25,7 @@ mod report;
 mod rmse;
 mod temporal_order;
 mod topic_alignment;
+mod topic_state_alignment;
 
 /// Standard error of mean signed bias.
 pub use bias::bias_standard_error;
@@ -96,3 +97,7 @@ pub use topic_alignment::{TopicAlignment, align_topic_probability_rows};
 pub use topic_alignment::realign_additive_log_ratio;
 /// Propagate fitted additive-log-ratio covariance into the aligned truth basis.
 pub use topic_alignment::realign_additive_log_ratio_covariance;
+/// Re-express fitted document topic-state rows in known-truth topic order.
+pub use topic_state_alignment::realign_topic_probability_rows;
+/// Re-express one fitted document topic-state vector in known-truth topic order.
+pub use topic_state_alignment::realign_topic_probability_vector;
