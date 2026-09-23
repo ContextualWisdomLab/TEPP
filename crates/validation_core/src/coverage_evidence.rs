@@ -29,7 +29,10 @@ pub struct CoverageCalibrationEvidenceRecord {
     failure_rate: f64,
     failure_rate_standard_error: f64,
     coverage_mean: Option<f64>,
+    coverage_standard_deviation: Option<f64>,
     coverage_monte_carlo_standard_error: Option<f64>,
+    coverage_percentile_lower: Option<f64>,
+    coverage_percentile_upper: Option<f64>,
     coverage_within_practical_band: bool,
     monte_carlo_precision_sufficient: bool,
     supports_calibration_claim: bool,
@@ -71,6 +74,7 @@ impl CoverageCalibrationEvidenceRecord {
         }
         parse_commit_head(source_head)?;
         let assessment = assess_coverage_calibration(design, summary)?;
+        let successful_metric_summary = summary.successful_metric_summary();
 
         Ok(Self {
             schema_version: COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION,
@@ -84,8 +88,14 @@ impl CoverageCalibrationEvidenceRecord {
             failure_rate: assessment.failure_rate(),
             failure_rate_standard_error: summary.failure_rate_standard_error(),
             coverage_mean: assessment.coverage_mean(),
+            coverage_standard_deviation: successful_metric_summary
+                .map(|metric| metric.standard_deviation),
             coverage_monte_carlo_standard_error: assessment
                 .coverage_monte_carlo_standard_error(),
+            coverage_percentile_lower: successful_metric_summary
+                .map(|metric| metric.percentile_lower),
+            coverage_percentile_upper: successful_metric_summary
+                .map(|metric| metric.percentile_upper),
             coverage_within_practical_band: assessment.coverage_within_practical_band(),
             monte_carlo_precision_sufficient: assessment.monte_carlo_precision_sufficient(),
             supports_calibration_claim: assessment.supports_calibration_claim(),
@@ -158,10 +168,28 @@ impl CoverageCalibrationEvidenceRecord {
         self.coverage_mean
     }
 
+    /// Between-DGP sample standard deviation of conditional coverage when estimable.
+    #[must_use]
+    pub const fn coverage_standard_deviation(&self) -> Option<f64> {
+        self.coverage_standard_deviation
+    }
+
     /// Between-DGP Monte Carlo standard error of conditional coverage when estimable.
     #[must_use]
     pub const fn coverage_monte_carlo_standard_error(&self) -> Option<f64> {
         self.coverage_monte_carlo_standard_error
+    }
+
+    /// Lower empirical percentile of successful DGP-level coverage when estimable.
+    #[must_use]
+    pub const fn coverage_percentile_lower(&self) -> Option<f64> {
+        self.coverage_percentile_lower
+    }
+
+    /// Upper empirical percentile of successful DGP-level coverage when estimable.
+    #[must_use]
+    pub const fn coverage_percentile_upper(&self) -> Option<f64> {
+        self.coverage_percentile_upper
     }
 
     /// Whether conditional mean coverage lies in the prospective practical band.
