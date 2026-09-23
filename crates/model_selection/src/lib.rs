@@ -14,6 +14,7 @@ mod candidate;
 mod error;
 mod fitted;
 mod gate;
+mod recovery_fit;
 mod recovery_grid;
 mod rolling_origin_predictive;
 
@@ -35,6 +36,8 @@ pub use gate::select_candidate_k;
 pub use gate::selected_k_recovery_summary;
 /// RMSE of selected `K` replications against known truth.
 pub use gate::selected_k_root_mean_square_error;
+/// Fit every K in the predeclared scientific recovery design.
+pub use recovery_fit::fit_declared_recovery_candidates;
 /// Rolling-origin recovery payload that retains the fitted candidate dimensions.
 pub use recovery_grid::RollingOriginRecoveryEvaluation;
 /// Select candidate `K` only when every recovery window covers the declared grid.
