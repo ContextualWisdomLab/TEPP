@@ -1,22 +1,18 @@
 //! Exact replication-identity binding for sharded coverage-calibration evidence.
 
-use sha2::{Digest, Sha256};
+use serde::Serialize;
 
 use crate::{
     MonteCarloRecoveryMetricSummary, ValidationError,
     summarize_windowed_coverage_recovery_replications,
 };
 
-const INDEXED_COVERAGE_OUTCOME_FINGERPRINT_DOMAIN: &[u8] =
-    b"tepp.validation.indexed-coverage-outcomes.v1\0";
-const HEX: &[u8; 16] = b"0123456789abcdef";
-
 /// One declared coverage-calibration replication and its numerical outcome.
 ///
 /// A missing coverage vector represents only an owner-admitted numerical
 /// failure. Structural experiment invalidity must abort before constructing an
 /// outcome so it cannot be hidden inside the attempted scientific denominator.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CoverageCalibrationReplicationOutcome {
     replication_index: usize,
     window_coverages: Option<Vec<f64>>,
@@ -54,53 +50,29 @@ impl CoverageCalibrationReplicationOutcome {
     }
 }
 
-/// Compute a deterministic SHA-256 fingerprint of the exact indexed outcome ledger.
+/// Canonicalize an exact declared coverage outcome ledger in replication order.
 ///
-/// The digest is independent of shard/completion input order because outcomes are
-/// first validated as an exact permutation of `0..attempted_replication_count`
-/// and then hashed in declared replication order. The canonical byte stream is
-/// domain-separated and includes the attempted count, each zero-based identity,
-/// success/failure state, successful window count, and every coverage value's
-/// exact IEEE-754 binary64 bits. This function binds provenance only; scientific
-/// validation of window coverage values remains with the aggregation owner.
+/// The returned vector preserves every declared success/failure identity and all
+/// successful rolling-origin coverage values. Because the identity set must be an
+/// exact permutation of `0..attempted_replication_count`, callers may persist this
+/// representation directly without losing which prospectively declared DGPs
+/// failed. Input shard/completion order is deliberately irrelevant.
+///
+/// This function validates identity geometry only. Scientific validation of
+/// successful coverage values remains with the aggregation owner, which must be
+/// called before persisted evidence is accepted.
 ///
 /// # Errors
 ///
 /// Returns [`ValidationError::InvalidInput`] when no replications were declared,
-/// the outcome count differs from the declaration, the identity set is not an
-/// exact permutation, or a platform-sized count cannot be represented as `u64`.
-pub fn indexed_coverage_outcome_fingerprint(
+/// the outcome count differs from the declaration, or the identity set is not an
+/// exact permutation.
+pub fn canonical_indexed_coverage_outcomes(
     attempted_replication_count: usize,
     outcomes: &[CoverageCalibrationReplicationOutcome],
-) -> Result<String, ValidationError> {
-    let ordered = ordered_outcomes(attempted_replication_count, outcomes)?;
-    let attempted = u64::try_from(attempted_replication_count)
-        .map_err(|_| ValidationError::InvalidInput)?;
-
-    let mut hasher = Sha256::new();
-    hasher.update(INDEXED_COVERAGE_OUTCOME_FINGERPRINT_DOMAIN);
-    hasher.update(attempted.to_be_bytes());
-
-    for outcome in ordered {
-        let replication_index = u64::try_from(outcome.replication_index)
-            .map_err(|_| ValidationError::InvalidInput)?;
-        hasher.update(replication_index.to_be_bytes());
-        match &outcome.window_coverages {
-            Some(window_coverages) => {
-                hasher.update([1]);
-                let window_count = u64::try_from(window_coverages.len())
-                    .map_err(|_| ValidationError::InvalidInput)?;
-                hasher.update(window_count.to_be_bytes());
-                for coverage in window_coverages {
-                    hasher.update(coverage.to_bits().to_be_bytes());
-                }
-            }
-            None => hasher.update([0]),
-        }
-    }
-
-    let digest = hasher.finalize();
-    Ok(lower_hex(&digest))
+) -> Result<Vec<CoverageCalibrationReplicationOutcome>, ValidationError> {
+    ordered_outcomes(attempted_replication_count, outcomes)
+        .map(|ordered| ordered.into_iter().cloned().collect())
 }
 
 /// Aggregate coverage only from an exact permutation of declared replication identities.
@@ -159,13 +131,4 @@ fn ordered_outcomes<'a>(
         return Err(ValidationError::InvalidInput);
     }
     Ok(ordered)
-}
-
-fn lower_hex(bytes: &[u8]) -> String {
-    let mut encoded = String::with_capacity(bytes.len() * 2);
-    for &byte in bytes {
-        encoded.push(char::from(HEX[usize::from(byte >> 4)]));
-        encoded.push(char::from(HEX[usize::from(byte & 0x0f)]));
-    }
-    encoded
 }
