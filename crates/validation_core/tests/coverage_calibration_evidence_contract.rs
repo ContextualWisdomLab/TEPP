@@ -54,8 +54,10 @@ fn calibration_evidence_binds_design_scenario_source_and_failure_uncertainty() {
     assert!(json.contains("\"attempted_replication_count\":10000"));
     assert!(json.contains("\"successful_replication_count\":9998"));
     assert!(json.contains("\"failure_count\":2"));
+    assert!(json.contains("\"failure_rate_standard_error\":"));
     assert!(json.contains(SCENARIO_FINGERPRINT));
     assert!(json.contains(SOURCE_HEAD));
+    assert_eq!(record.to_json().expect("repeat json"), json);
 }
 
 #[test]
@@ -65,6 +67,7 @@ fn calibration_evidence_fails_closed_on_identity_digest_head_or_design_drift() {
 
     for (scenario_id, fingerprint, source_head) in [
         ("", SCENARIO_FINGERPRINT, SOURCE_HEAD),
+        ("tepp.\u{1}scenario", SCENARIO_FINGERPRINT, SOURCE_HEAD),
         (SCENARIO_ID, "abc", SOURCE_HEAD),
         (
             SCENARIO_ID,
