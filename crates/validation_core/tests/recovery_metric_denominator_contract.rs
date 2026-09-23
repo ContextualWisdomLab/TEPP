@@ -88,7 +88,14 @@ fn recovery_metric_summary_handles_all_success() {
     assert_eq!(summary.failure_count(), 0);
     assert_eq!(summary.failure_rate(), 0.0);
     assert_eq!(summary.failure_rate_standard_error(), 0.0);
-    assert_eq!(summary.successful_metric_mean(), Some(0.3));
+    assert!(
+        (summary
+            .successful_metric_mean()
+            .expect("successful metric mean")
+            - 0.3)
+            .abs()
+            < 1.0e-12
+    );
     assert_eq!(
         summary
             .successful_metric_summary()
