@@ -107,13 +107,11 @@ fn candidate_exceeding_training_vocabulary_is_structural_invalidity() {
     let declared = FittedCandidateKConfig::new(vec![2, 7], vec![7, 11, 19], 2_000, 0.001)
         .expect("syntactically valid declared grid");
 
-    let result = fit_declared_recovery_candidates(&training, &declared);
+    let error = fit_declared_recovery_candidates(&training, &declared)
+        .expect_err("K beyond training vocabulary must invalidate recovery design");
+    assert_eq!(error, ModelSelectionError::RecoveryCandidateInputInvalid);
     assert!(matches!(
-        result,
-        Err(ModelSelectionError::RecoveryCandidateInputInvalid)
-    ));
-    assert!(matches!(
-        admit_recovery_replication_result(result),
+        admit_recovery_replication_result::<()>(Err(error)),
         Err(ModelSelectionError::RecoveryCandidateInputInvalid)
     ));
 }
