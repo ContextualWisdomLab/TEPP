@@ -5,12 +5,14 @@
 //! fitted content, prevalence, or document-state coordinates are compared with a
 //! known generating basis. This module uses squared Hellinger distance between
 //! topic-term probability rows and solves the global square assignment problem.
-//! It also expresses fitted additive-log-ratio coordinates in the aligned truth
-//! reference basis without mutating the fitted model.
+//! It also expresses fitted additive-log-ratio coordinates and covariance in the
+//! aligned truth reference basis without mutating the fitted model.
 
 use crate::ValidationError;
 
 const PROBABILITY_SUM_TOLERANCE: f64 = 1.0e-10;
+const COVARIANCE_SYMMETRY_RELATIVE_TOLERANCE: f64 = 1.0e-10;
+const COVARIANCE_PSD_RELATIVE_TOLERANCE: f64 = 1.0e-12;
 
 /// One deterministic one-to-one mapping from known-truth topics to fitted topics.
 #[derive(Clone, Debug, PartialEq)]
@@ -127,6 +129,78 @@ pub fn realign_additive_log_ratio(
     Ok(realigned)
 }
 
+/// Express fitted ALR covariance in the topic alignment's truth reference basis.
+///
+/// [`realign_additive_log_ratio`] applies a linear coordinate change `z = A x`.
+/// This function applies the corresponding covariance propagation
+/// `Σ_z = A Σ_x Aᵀ` so recovery intervals are evaluated in the same truth-topic
+/// reference basis as their locations. The input must be an exact `(K - 1) ×
+/// (K - 1)` finite symmetric positive-semidefinite covariance matrix. Symmetry
+/// and semidefinite checks use scale-relative binary64 tolerances only to absorb
+/// floating-point roundoff; materially asymmetric or indefinite matrices fail
+/// closed.
+///
+/// This is validation-coordinate arithmetic. It does not mutate estimator state,
+/// calibrate posterior intervals by itself, authenticate source/vocabulary
+/// provenance, or establish semantic/release topic identity.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] for invalid covariance geometry,
+/// non-finite/asymmetric/indefinite input, or a non-finite transformed matrix.
+pub fn realign_additive_log_ratio_covariance(
+    alignment: &TopicAlignment,
+    fitted_covariance: &[Vec<f64>],
+) -> Result<Vec<Vec<f64>>, ValidationError> {
+    let coordinate_count = alignment.truth_to_fitted.len() - 1;
+    validate_covariance_matrix(fitted_covariance, coordinate_count)?;
+
+    let truth_reference_fitted_index = alignment.truth_to_fitted[coordinate_count];
+    let mut transform = vec![vec![0.0; coordinate_count]; coordinate_count];
+    for (truth_index, fitted_index) in alignment.truth_to_fitted[..coordinate_count]
+        .iter()
+        .copied()
+        .enumerate()
+    {
+        if fitted_index < coordinate_count {
+            transform[truth_index][fitted_index] = 1.0;
+        }
+        if truth_reference_fitted_index < coordinate_count {
+            transform[truth_index][truth_reference_fitted_index] -= 1.0;
+        }
+    }
+
+    let mut transformed = vec![vec![0.0; coordinate_count]; coordinate_count];
+    for row in 0..coordinate_count {
+        for column in row..coordinate_count {
+            let mut value = 0.0_f64;
+            for fitted_row in 0..coordinate_count {
+                let left_weight = transform[row][fitted_row];
+                if left_weight == 0.0 {
+                    continue;
+                }
+                for fitted_column in 0..coordinate_count {
+                    let right_weight = transform[column][fitted_column];
+                    if right_weight == 0.0 {
+                        continue;
+                    }
+                    value += left_weight
+                        * fitted_covariance[fitted_row][fitted_column]
+                        * right_weight;
+                    if !value.is_finite() {
+                        return Err(ValidationError::InvalidInput);
+                    }
+                }
+            }
+            transformed[row][column] = value;
+            transformed[column][row] = value;
+        }
+    }
+
+    validate_covariance_matrix(&transformed, coordinate_count)?;
+    Ok(transformed)
+}
+
 fn validate_probability_basis(rows: &[Vec<f64>]) -> Result<usize, ValidationError> {
     if rows.len() < 2 {
         return Err(ValidationError::InvalidInput);
@@ -150,6 +224,79 @@ fn validate_probability_basis(rows: &[Vec<f64>]) -> Result<usize, ValidationErro
         }
     }
     Ok(vocabulary_size)
+}
+
+fn validate_covariance_matrix(
+    covariance: &[Vec<f64>],
+    coordinate_count: usize,
+) -> Result<(), ValidationError> {
+    if coordinate_count == 0
+        || covariance.len() != coordinate_count
+        || covariance.iter().any(|row| row.len() != coordinate_count)
+        || covariance.iter().flatten().any(|value| !value.is_finite())
+    {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    let scale = covariance
+        .iter()
+        .flatten()
+        .map(|value| value.abs())
+        .fold(1.0_f64, f64::max);
+    let symmetry_tolerance = COVARIANCE_SYMMETRY_RELATIVE_TOLERANCE * scale;
+    for row in 0..coordinate_count {
+        for column in 0..row {
+            if (covariance[row][column] - covariance[column][row]).abs() > symmetry_tolerance {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+    }
+
+    let psd_tolerance = COVARIANCE_PSD_RELATIVE_TOLERANCE * scale;
+    if !is_positive_semidefinite(covariance, psd_tolerance) {
+        return Err(ValidationError::InvalidInput);
+    }
+    Ok(())
+}
+
+fn is_positive_semidefinite(covariance: &[Vec<f64>], tolerance: f64) -> bool {
+    let coordinate_count = covariance.len();
+    let mut lower = vec![vec![0.0_f64; coordinate_count]; coordinate_count];
+
+    for row in 0..coordinate_count {
+        for column in 0..=row {
+            let mut correction = 0.0_f64;
+            for previous in 0..column {
+                correction += lower[row][previous] * lower[column][previous];
+                if !correction.is_finite() {
+                    return false;
+                }
+            }
+            let residual = covariance[row][column] - correction;
+            if !residual.is_finite() {
+                return false;
+            }
+
+            if row == column {
+                if residual < -tolerance {
+                    return false;
+                }
+                lower[row][column] = if residual <= tolerance {
+                    0.0
+                } else {
+                    residual.sqrt()
+                };
+            } else if lower[column][column] > 0.0 {
+                lower[row][column] = residual / lower[column][column];
+                if !lower[row][column].is_finite() {
+                    return false;
+                }
+            } else if residual.abs() > tolerance {
+                return false;
+            }
+        }
+    }
+    true
 }
 
 fn squared_hellinger(left: &[f64], right: &[f64]) -> f64 {
