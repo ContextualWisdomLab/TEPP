@@ -16,6 +16,7 @@ fn windowed_coverage_recovery_keeps_attempted_dgp_denominator() {
     assert_eq!(summary.successful_replication_count(), 2);
     assert_eq!(summary.failure_count(), 2);
     assert!((summary.failure_rate() - 0.5).abs() < 1.0e-12);
+    assert!((summary.failure_rate_standard_error() - 0.25).abs() < 1.0e-12);
     assert!((summary.successful_metric_mean().expect("coverage mean") - 0.9).abs() < 1.0e-12);
     assert_eq!(
         summary
@@ -87,4 +88,13 @@ fn windowed_coverage_recovery_rejects_structurally_invalid_success_payloads() {
             Err(ValidationError::InvalidInput)
         );
     }
+    assert_eq!(
+        summarize_windowed_coverage_recovery_replications(
+            2,
+            &[vec![0.9]],
+            0.9,
+            0.1,
+        ),
+        Err(ValidationError::InvalidConfiguration)
+    );
 }
