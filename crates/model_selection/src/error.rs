@@ -52,7 +52,7 @@ impl fmt::Display for ModelSelectionError {
             Self::LexicalWeightForbidden => "lexical inferential weights are forbidden",
             Self::NoSuccessfulFit => "no fitted candidate produced a finite diagnostic",
             Self::RecoveryCandidateFitFailed => {
-                "a declared scientific-recovery candidate failed numerically while fitting"
+                "a declared scientific-recovery candidate failed to fit"
             }
             Self::RecoveryCandidateInputInvalid => {
                 "a declared scientific-recovery candidate is structurally incompatible with the training input"
@@ -116,7 +116,7 @@ mod tests {
             ),
             (
                 ModelSelectionError::RecoveryCandidateFitFailed,
-                "a declared scientific-recovery candidate failed numerically while fitting",
+                "a declared scientific-recovery candidate failed to fit",
             ),
             (
                 ModelSelectionError::RecoveryCandidateInputInvalid,
