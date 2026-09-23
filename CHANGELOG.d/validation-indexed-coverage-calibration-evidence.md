@@ -1,0 +1,6 @@
+## Scientific validation
+
+- Add `CoverageCalibrationReplicationOutcome` and `summarize_indexed_windowed_coverage_recovery_replications(...)` so sharded/resumed interval-calibration evidence is accepted only when replication identities form an exact permutation of the prospectively declared `0..N` schedule. Duplicate, missing, and out-of-range identities fail closed.
+- Canonicalize successful coverage aggregation by replication identity before binary64 Monte Carlo accumulation, while delegating window validation, within-DGP collapse, failure-rate arithmetic, MCSE, and percentile calculation to the existing coverage/recovery owners.
+- Route `CoverageCalibrationEvidenceRecord` through the indexed outcome owner rather than accepting a detached aggregate summary, and persist the percentile probabilities beside their empirical bounds. This prevents a correct-looking attempted count from masking duplicated/omitted DGPs and makes percentile evidence self-describing.
+- Structural experiment invalidity remains outside the attempted failure denominator; indexed `numerical_failure` outcomes are reserved for owner-admitted numerical failure. This change does not execute the 10,000-DGP study or define an acceptable numerical-failure rate.
