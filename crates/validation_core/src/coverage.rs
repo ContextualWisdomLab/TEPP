@@ -1,6 +1,7 @@
 //! Interval coverage for recovered confidence/credible intervals.
 
 use crate::ValidationError;
+use crate::monte_carlo::{MonteCarloSummary, summarize_replications};
 
 /// Empirical coverage of closed intervals `[lower, upper]` for truth values.
 ///
@@ -34,6 +35,52 @@ pub fn interval_coverage(
         }
     }
     Ok(covered as f64 / truth.len() as f64)
+}
+
+/// Collapse rolling-origin coverage within each DGP replication before Monte Carlo inference.
+///
+/// Each outer element is one independently generated DGP replication. Each inner
+/// vector contains already-computed coverage proportions for the declared
+/// rolling-origin windows within that replication. Windows are weighted equally
+/// inside a DGP replication; the resulting per-DGP means are the only samples
+/// passed to the Monte Carlo summary owner.
+///
+/// This contract prevents repeated document, coordinate, or expanding-window
+/// intervals from inflating the Monte Carlo replication count. It does not assert
+/// independence within a DGP replication and does not construct binomial/Wilson
+/// intervals from the flattened interval count.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when fewer than two independent DGP
+/// replications are supplied, any replication has no declared windows, or any
+/// window coverage is non-finite or outside `[0, 1]`. Percentile configuration
+/// errors are propagated from [`summarize_replications`].
+pub fn summarize_windowed_coverage_replications(
+    replication_window_coverages: &[Vec<f64>],
+    lower_percentile: f64,
+    upper_percentile: f64,
+) -> Result<MonteCarloSummary, ValidationError> {
+    if replication_window_coverages.len() < 2
+        || replication_window_coverages.iter().any(|windows| {
+            windows.is_empty()
+                || windows
+                    .iter()
+                    .any(|coverage| !coverage.is_finite() || !(0.0..=1.0).contains(coverage))
+        })
+    {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    let per_replication_coverage: Vec<f64> = replication_window_coverages
+        .iter()
+        .map(|windows| windows.iter().sum::<f64>() / windows.len() as f64)
+        .collect();
+    summarize_replications(
+        &per_replication_coverage,
+        lower_percentile,
+        upper_percentile,
+    )
 }
 
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
@@ -173,5 +220,35 @@ mod tests {
         assert!((summary.mean - 0.5).abs() < 1.0e-12);
         assert!((summary.percentile_lower - 0.25).abs() < 1.0e-12);
         assert!((summary.percentile_upper - 0.75).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn windowed_coverage_rejects_nonindependent_or_invalid_replication_geometry() {
+        assert_eq!(
+            summarize_windowed_coverage_replications(&[vec![0.95]], 0.025, 0.975),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            summarize_windowed_coverage_replications(&[vec![0.9], vec![]], 0.025, 0.975),
+            Err(ValidationError::InvalidInput)
+        );
+        for invalid in [f64::NAN, -0.1, 1.1] {
+            assert_eq!(
+                summarize_windowed_coverage_replications(
+                    &[vec![0.9], vec![invalid]],
+                    0.025,
+                    0.975,
+                ),
+                Err(ValidationError::InvalidInput)
+            );
+        }
+        assert_eq!(
+            summarize_windowed_coverage_replications(
+                &[vec![0.9], vec![0.8]],
+                0.9,
+                0.1,
+            ),
+            Err(ValidationError::InvalidConfiguration)
+        );
     }
 }
