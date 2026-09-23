@@ -105,7 +105,7 @@ fn fit() -> ReferenceTopicFit {
     )
     .expect("reference input");
     let config = ReferenceTopicModelConfig::new(2, vec![7, 11], 2_000, 0.001)
-        .and_then(|config| config.with_hyperparameters(1.0, 8.0, 0.01, 0.05, 0.2))
+        .and_then(|config| config.with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2))
         .expect("reference config");
     ReferenceTopicFit::fit(&input, &config).expect("converged reference fit")
 }
