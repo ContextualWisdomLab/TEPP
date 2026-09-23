@@ -11,6 +11,7 @@
 //! contracts and preserves their artifact meaning.
 
 mod case_deletion_refit;
+mod coverage_calibration_execution;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -41,6 +42,10 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Indexed scientific coverage-calibration execution error.
+pub use coverage_calibration_execution::CoverageCalibrationExecutionError;
+/// Execute one prospectively declared coverage-calibration replication.
+pub use coverage_calibration_execution::execute_coverage_calibration_replication;
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
