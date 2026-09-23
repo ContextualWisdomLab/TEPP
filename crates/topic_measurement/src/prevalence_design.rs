@@ -7,10 +7,11 @@
 //! from evaluation-horizon rows.
 
 use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use corpus_split::CorpusSnapshot;
 use membership_core::{MemberId, MembershipNetwork};
-use relation_graph::RelationGraph;
+use relation_graph::{RelationEvidenceStatus, RelationGraph};
 use temporal_core::EventTime;
 use uuid::Uuid;
 
@@ -181,6 +182,36 @@ impl PrevalenceDesignBasis {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct TrainingNumericalState {
+    document_ids: Vec<Uuid>,
+    term_rows: Vec<Vec<(usize, f64)>>,
+    vocabulary_size: usize,
+    event_times: Vec<EventTime>,
+    design: Vec<Vec<f64>>,
+    features: Vec<PrevalenceFeature>,
+    transition_pairs: BTreeSet<(Uuid, Uuid)>,
+}
+
+fn admitted_transition_pairs(
+    document_ids: &[Uuid],
+    relations: &RelationGraph,
+) -> BTreeSet<(Uuid, Uuid)> {
+    let document_ids: BTreeSet<_> = document_ids.iter().copied().collect();
+    relations
+        .edges()
+        .filter(|edge| {
+            edge.is_transition_edge() && edge.evidence_status() == RelationEvidenceStatus::Observed
+        })
+        .filter_map(|edge| {
+            let source = edge.source().as_uuid();
+            let target = edge.target().as_uuid();
+            (document_ids.contains(&source) && document_ids.contains(&target))
+                .then_some((source, target))
+        })
+        .collect()
+}
+
 /// Training admission that binds a reference input to its frozen prevalence basis.
 ///
 /// Both values are minted atomically from the same raw training observations. A
@@ -190,6 +221,7 @@ impl PrevalenceDesignBasis {
 pub struct ReferenceTopicTrainingInput {
     input: ReferenceTopicInput,
     prevalence_design_basis: PrevalenceDesignBasis,
+    numerical_state: Arc<TrainingNumericalState>,
 }
 
 impl ReferenceTopicTrainingInput {
@@ -225,15 +257,25 @@ impl ReferenceTopicTrainingInput {
         )?;
         let prevalence_design_basis =
             PrevalenceDesignBasis::from_training(event_times, input.features())?;
-        prevalence_design_basis.project(
+        let design = prevalence_design_basis.project(
             &retained_document_ids,
             event_times,
             covariates,
             memberships,
         )?;
+        let numerical_state = Arc::new(TrainingNumericalState {
+            document_ids: retained_document_ids.clone(),
+            term_rows: document_term.row_entries(),
+            vocabulary_size: document_term.columns(),
+            event_times: event_times.to_vec(),
+            design,
+            features: input.features().to_vec(),
+            transition_pairs: admitted_transition_pairs(&retained_document_ids, relations),
+        });
         Ok(Self {
             input,
             prevalence_design_basis,
+            numerical_state,
         })
     }
 
@@ -247,6 +289,18 @@ impl ReferenceTopicTrainingInput {
     #[must_use]
     pub const fn prevalence_design_basis(&self) -> &PrevalenceDesignBasis {
         &self.prevalence_design_basis
+    }
+
+    /// Whether another admitted training value has the same numerical estimator state.
+    ///
+    /// Equality covers ordered document identities, canonical term rows and vocabulary,
+    /// exact event times, the frozen prevalence design/feature basis, and admitted
+    /// observed transition pairs. It is deliberately narrower than source provenance:
+    /// matching numerical state does not authenticate Evidence, Membership ownership,
+    /// relation activation, or availability receipts.
+    #[must_use]
+    pub fn shares_numerical_training_state(&self, other: &Self) -> bool {
+        self.numerical_state == other.numerical_state
     }
 }
 
