@@ -23,6 +23,7 @@ mod monte_carlo;
 mod report;
 mod rmse;
 mod temporal_order;
+mod topic_alignment;
 
 /// Standard error of mean signed bias.
 pub use bias::bias_standard_error;
@@ -74,3 +75,5 @@ pub use rmse::rmse_standard_error;
 pub use rmse::root_mean_square_error;
 /// Pairwise temporal-order accuracy.
 pub use temporal_order::temporal_order_accuracy;
+/// Deterministic fitted-topic to known-truth probability-basis alignment.
+pub use topic_alignment::{TopicAlignment, align_topic_probability_rows};
