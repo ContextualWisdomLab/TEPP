@@ -77,3 +77,5 @@ pub use rmse::root_mean_square_error;
 pub use temporal_order::temporal_order_accuracy;
 /// Deterministic fitted-topic to known-truth probability-basis alignment.
 pub use topic_alignment::{TopicAlignment, align_topic_probability_rows};
+/// Re-express fitted additive-log-ratio coordinates in the aligned truth basis.
+pub use topic_alignment::realign_additive_log_ratio;
