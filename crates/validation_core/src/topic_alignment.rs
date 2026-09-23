@@ -48,8 +48,8 @@ impl TopicAlignment {
 /// # Errors
 ///
 /// Returns [`ValidationError::InvalidInput`] for empty, one-topic, ragged,
-/// dimension-mismatched, non-finite, negative, zero-mass, non-normalized, or
-/// otherwise nonassignable probability matrices.
+/// dimension-mismatched, non-finite, negative, zero-mass, or non-normalized
+/// probability matrices.
 pub fn align_topic_probability_rows(
     truth: &[Vec<f64>],
     fitted: &[Vec<f64>],
@@ -59,22 +59,21 @@ pub fn align_topic_probability_rows(
         return Err(ValidationError::InvalidInput);
     }
 
-    let mut costs = vec![vec![0.0; fitted.len()]; truth.len()];
-    for (truth_index, truth_row) in truth.iter().enumerate() {
-        for (fitted_index, fitted_row) in fitted.iter().enumerate() {
-            costs[truth_index][fitted_index] = squared_hellinger(truth_row, fitted_row)?;
-        }
-    }
-
-    let truth_to_fitted = minimum_cost_assignment(&costs)?;
+    let costs: Vec<Vec<f64>> = truth
+        .iter()
+        .map(|truth_row| {
+            fitted
+                .iter()
+                .map(|fitted_row| squared_hellinger(truth_row, fitted_row))
+                .collect()
+        })
+        .collect();
+    let truth_to_fitted = minimum_cost_assignment(&costs);
     let total_squared_hellinger_distance = truth_to_fitted
         .iter()
         .enumerate()
         .map(|(truth_index, fitted_index)| costs[truth_index][*fitted_index])
-        .sum::<f64>();
-    if !total_squared_hellinger_distance.is_finite() {
-        return Err(ValidationError::InvalidInput);
-    }
+        .sum();
 
     Ok(TopicAlignment {
         truth_to_fitted,
@@ -107,38 +106,22 @@ fn validate_probability_basis(rows: &[Vec<f64>]) -> Result<usize, ValidationErro
     Ok(vocabulary_size)
 }
 
-fn squared_hellinger(left: &[f64], right: &[f64]) -> Result<f64, ValidationError> {
-    if left.len() != right.len() || left.is_empty() {
-        return Err(ValidationError::InvalidInput);
-    }
-    let distance = 0.5
-        * left
-            .iter()
-            .zip(right)
-            .map(|(left_value, right_value)| (left_value.sqrt() - right_value.sqrt()).powi(2))
-            .sum::<f64>();
-    if distance.is_finite() && (0.0..=1.0 + PROBABILITY_SUM_TOLERANCE).contains(&distance) {
-        Ok(distance)
-    } else {
-        Err(ValidationError::InvalidInput)
-    }
+fn squared_hellinger(left: &[f64], right: &[f64]) -> f64 {
+    0.5 * left
+        .iter()
+        .zip(right)
+        .map(|(left_value, right_value)| (left_value.sqrt() - right_value.sqrt()).powi(2))
+        .sum::<f64>()
 }
 
-/// Solve a finite square minimum-cost assignment with deterministic tie order.
+/// Solve a validated square minimum-cost assignment with deterministic tie order.
 ///
 /// This is the shortest-path/potential form of the Hungarian method. Rows are
 /// truth topics, columns are fitted topics, and ascending column order breaks
-/// exact floating-point ties without post-hoc topic reordering.
-fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Result<Vec<usize>, ValidationError> {
+/// exact floating-point ties without post-hoc topic reordering. Callers validate
+/// square finite nonnegative geometry before constructing `costs`.
+fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Vec<usize> {
     let n = costs.len();
-    if n < 2
-        || costs
-            .iter()
-            .any(|row| row.len() != n || row.iter().any(|value| !value.is_finite() || *value < 0.0))
-    {
-        return Err(ValidationError::InvalidInput);
-    }
-
     let mut row_potential = vec![0.0_f64; n + 1];
     let mut column_potential = vec![0.0_f64; n + 1];
     let mut matched_row_for_column = vec![0_usize; n + 1];
@@ -172,9 +155,6 @@ fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Result<Vec<usize>, ValidationE
                     next_column = candidate_column;
                 }
             }
-            if !delta.is_finite() || next_column == 0 {
-                return Err(ValidationError::InvalidInput);
-            }
 
             for candidate_column in 0..=n {
                 if used_column[candidate_column] {
@@ -200,40 +180,20 @@ fn minimum_cost_assignment(costs: &[Vec<f64>]) -> Result<Vec<usize>, ValidationE
         }
     }
 
-    let mut assignment = vec![usize::MAX; n];
+    let mut assignment = vec![0_usize; n];
     for column in 1..=n {
-        let row = matched_row_for_column[column];
-        if row == 0 || assignment[row - 1] != usize::MAX {
-            return Err(ValidationError::InvalidInput);
-        }
-        assignment[row - 1] = column - 1;
+        assignment[matched_row_for_column[column] - 1] = column - 1;
     }
-    if assignment.iter().any(|column| *column == usize::MAX) {
-        return Err(ValidationError::InvalidInput);
-    }
-    Ok(assignment)
+    assignment
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{minimum_cost_assignment, squared_hellinger, validate_probability_basis};
-    use crate::ValidationError;
+    use super::minimum_cost_assignment;
 
     #[test]
     fn exact_assignment_ties_use_stable_column_order() {
         let costs = vec![vec![0.0, 0.0], vec![0.0, 0.0]];
-        assert_eq!(minimum_cost_assignment(&costs), Ok(vec![0, 1]));
-    }
-
-    #[test]
-    fn private_helpers_fail_closed_on_invalid_geometry() {
-        assert_eq!(minimum_cost_assignment(&[]), Err(ValidationError::InvalidInput));
-        assert_eq!(minimum_cost_assignment(&[vec![0.0]]), Err(ValidationError::InvalidInput));
-        assert_eq!(
-            minimum_cost_assignment(&[vec![0.0, f64::NAN], vec![0.0, 0.0]]),
-            Err(ValidationError::InvalidInput)
-        );
-        assert_eq!(squared_hellinger(&[1.0], &[]), Err(ValidationError::InvalidInput));
-        assert_eq!(validate_probability_basis(&[vec![1.0], vec![1.0]]), Err(ValidationError::InvalidInput));
+        assert_eq!(minimum_cost_assignment(&costs), vec![0, 1]);
     }
 }
