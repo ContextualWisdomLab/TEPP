@@ -9,10 +9,10 @@
 
 use std::fmt;
 
-use tepp_simulation::CoverageCalibrationSimulationDesign;
+use tepp_simulation::{CoverageCalibrationSimulationDesign, SimulationError};
 use validation_core::{
     CoverageCalibrationDesign, CoverageCalibrationEvidenceRecord,
-    CoverageCalibrationReplicationOutcome,
+    CoverageCalibrationReplicationOutcome, ValidationError,
 };
 
 use crate::{CoverageCalibrationExecutionError, execute_coverage_calibration_replication};
@@ -38,10 +38,15 @@ pub enum CoverageCalibrationStudyError {
 impl fmt::Display for CoverageCalibrationStudyError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidShardRange => formatter.write_str("invalid coverage calibration shard range"),
-            Self::InvalidDesignBinding => formatter.write_str("coverage calibration design/scenario attempt counts differ"),
+            Self::InvalidShardRange => {
+                formatter.write_str("invalid coverage calibration shard range")
+            }
+            Self::InvalidDesignBinding => formatter
+                .write_str("coverage calibration design/scenario attempt counts differ"),
             Self::Execution(error) => error.fmt(formatter),
-            Self::InvalidScenarioBinding => formatter.write_str("invalid coverage calibration scenario binding"),
+            Self::InvalidScenarioBinding => {
+                formatter.write_str("invalid coverage calibration scenario binding")
+            }
             Self::InvalidEvidence => formatter.write_str("invalid coverage calibration evidence"),
         }
     }
@@ -77,8 +82,10 @@ pub fn execute_coverage_calibration_shard(
 
     (start_replication_index..end_replication_index_exclusive)
         .map(|replication_index| {
-            execute_coverage_calibration_replication(design, replication_index)
-                .map_err(CoverageCalibrationStudyError::Execution)
+            map_execution_result(execute_coverage_calibration_replication(
+                design,
+                replication_index,
+            ))
         })
         .collect()
 }
@@ -111,14 +118,13 @@ pub fn assemble_coverage_calibration_evidence_v1(
 ) -> Result<CoverageCalibrationEvidenceRecord, CoverageCalibrationStudyError> {
     let validation_design = CoverageCalibrationDesign::tepp_nominal_95_v1();
     let simulation_design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
-    if validation_design.attempted_dgp_count() != simulation_design.attempted_replication_count() {
-        return Err(CoverageCalibrationStudyError::InvalidDesignBinding);
-    }
-    let scenario_fingerprint = simulation_design
-        .scenario_fingerprint()
-        .map_err(|_| CoverageCalibrationStudyError::InvalidScenarioBinding)?;
+    require_matching_attempt_counts(
+        validation_design.attempted_dgp_count(),
+        simulation_design.attempted_replication_count(),
+    )?;
+    let scenario_fingerprint = map_scenario_fingerprint(simulation_design.scenario_fingerprint())?;
 
-    CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
+    map_evidence_result(CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
         &validation_design,
         outcomes,
         LOWER_COVERAGE_PERCENTILE,
@@ -126,6 +132,106 @@ pub fn assemble_coverage_calibration_evidence_v1(
         simulation_design.scenario_id(),
         &scenario_fingerprint,
         source_head,
-    )
-    .map_err(|_| CoverageCalibrationStudyError::InvalidEvidence)
+    ))
+}
+
+fn require_matching_attempt_counts(
+    validation_attempt_count: usize,
+    simulation_attempt_count: usize,
+) -> Result<(), CoverageCalibrationStudyError> {
+    if validation_attempt_count != simulation_attempt_count {
+        return Err(CoverageCalibrationStudyError::InvalidDesignBinding);
+    }
+    Ok(())
+}
+
+fn map_execution_result(
+    result: Result<CoverageCalibrationReplicationOutcome, CoverageCalibrationExecutionError>,
+) -> Result<CoverageCalibrationReplicationOutcome, CoverageCalibrationStudyError> {
+    result.map_err(CoverageCalibrationStudyError::Execution)
+}
+
+fn map_scenario_fingerprint(
+    result: Result<String, SimulationError>,
+) -> Result<String, CoverageCalibrationStudyError> {
+    result.map_err(|_| CoverageCalibrationStudyError::InvalidScenarioBinding)
+}
+
+fn map_evidence_result(
+    result: Result<CoverageCalibrationEvidenceRecord, ValidationError>,
+) -> Result<CoverageCalibrationEvidenceRecord, CoverageCalibrationStudyError> {
+    result.map_err(|_| CoverageCalibrationStudyError::InvalidEvidence)
+}
+
+#[cfg(test)]
+mod tests {
+    use tepp_simulation::SimulationError;
+    use validation_core::{CoverageCalibrationReplicationOutcome, ValidationError};
+
+    use super::{
+        CoverageCalibrationStudyError, map_evidence_result, map_execution_result,
+        map_scenario_fingerprint, require_matching_attempt_counts,
+    };
+    use crate::CoverageCalibrationExecutionError;
+
+    #[test]
+    fn owner_binding_and_error_mappers_fail_closed() {
+        assert_eq!(require_matching_attempt_counts(10, 10), Ok(()));
+        assert_eq!(
+            require_matching_attempt_counts(10, 9),
+            Err(CoverageCalibrationStudyError::InvalidDesignBinding)
+        );
+        assert_eq!(
+            map_scenario_fingerprint(Err(SimulationError::InvalidConfiguration)),
+            Err(CoverageCalibrationStudyError::InvalidScenarioBinding)
+        );
+        assert_eq!(
+            map_execution_result(Err(CoverageCalibrationExecutionError::InvalidSimulationScenario)),
+            Err(CoverageCalibrationStudyError::Execution(
+                CoverageCalibrationExecutionError::InvalidSimulationScenario
+            ))
+        );
+        assert_eq!(
+            map_evidence_result(Err(ValidationError::InvalidInput)),
+            Err(CoverageCalibrationStudyError::InvalidEvidence)
+        );
+
+        let successful = CoverageCalibrationReplicationOutcome::successful(0, vec![0.95]);
+        assert_eq!(map_execution_result(Ok(successful.clone())), Ok(successful));
+        assert_eq!(
+            map_scenario_fingerprint(Ok("fingerprint".to_owned())),
+            Ok("fingerprint".to_owned())
+        );
+    }
+
+    #[test]
+    fn public_error_messages_are_stable() {
+        let messages = [
+            (
+                CoverageCalibrationStudyError::InvalidShardRange,
+                "invalid coverage calibration shard range",
+            ),
+            (
+                CoverageCalibrationStudyError::InvalidDesignBinding,
+                "coverage calibration design/scenario attempt counts differ",
+            ),
+            (
+                CoverageCalibrationStudyError::Execution(
+                    CoverageCalibrationExecutionError::InvalidSimulationScenario,
+                ),
+                "invalid coverage calibration simulation scenario",
+            ),
+            (
+                CoverageCalibrationStudyError::InvalidScenarioBinding,
+                "invalid coverage calibration scenario binding",
+            ),
+            (
+                CoverageCalibrationStudyError::InvalidEvidence,
+                "invalid coverage calibration evidence",
+            ),
+        ];
+        for (error, message) in messages {
+            assert_eq!(error.to_string(), message);
+        }
+    }
 }
