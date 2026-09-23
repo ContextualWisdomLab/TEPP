@@ -1,6 +1,9 @@
 use std::collections::BTreeSet;
 
-use tepp_simulation::{CoverageCalibrationSimulationDesign, SimulationError, TopicDgpConfig};
+use tepp_simulation::{
+    CoverageCalibrationDgpFamily, CoverageCalibrationSimulationDesign, SimulationError,
+    TopicDgpConfig,
+};
 
 #[test]
 fn coverage_calibration_v1_owns_exact_seed_schedule_and_realistic_dgp() {
@@ -44,6 +47,40 @@ fn coverage_calibration_v1_owns_exact_seed_schedule_and_realistic_dgp() {
     assert_eq!(config.translation_rate_bps(), 3_000);
     assert_eq!(config.template_copy_rate_bps(), 3_000);
     assert_eq!(config.topic_dgp(), TopicDgpConfig::ci_default());
+}
+
+#[test]
+fn coverage_calibration_v1_separates_dgp_family_from_acceptance_seed_schedule() {
+    let family = CoverageCalibrationDgpFamily::rolling_origin_v1();
+    let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+    let first_seed = design.seed_for_replication(0).expect("first seed");
+
+    assert_eq!(
+        family
+            .config_for_seed(first_seed)
+            .expect("family configuration"),
+        design
+            .config_for_replication(0)
+            .expect("declared replication configuration")
+    );
+
+    let ci_seed = 101;
+    let ci_config = family
+        .config_for_seed(ci_seed)
+        .expect("same DGP family under a non-acceptance CI seed");
+    assert_eq!(ci_config.seed(), ci_seed);
+    assert_eq!(ci_config.event_count(), 9);
+    assert_eq!(ci_config.documents_per_event(), 2);
+    assert_eq!(ci_config.membership_targets(), 3);
+    assert_eq!(ci_config.max_report_delay_hours(), 12);
+    assert_eq!(ci_config.max_availability_delay_hours(), 6);
+    assert_eq!(ci_config.missingness_rate_bps(), 0);
+    assert_eq!(ci_config.relation_false_negative_bps(), 0);
+    assert_eq!(ci_config.relation_false_positive_bps(), 500);
+    assert_eq!(ci_config.revision_rate_bps(), 3_000);
+    assert_eq!(ci_config.translation_rate_bps(), 3_000);
+    assert_eq!(ci_config.template_copy_rate_bps(), 3_000);
+    assert_eq!(ci_config.topic_dgp(), TopicDgpConfig::ci_default());
 }
 
 #[test]
