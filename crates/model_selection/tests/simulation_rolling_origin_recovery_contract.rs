@@ -29,7 +29,7 @@ use topic_measurement::{ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, 
 use uuid::Uuid;
 use validation_core::{
     align_topic_probability_rows, mean_absolute_parameter_bias, root_mean_square_error,
-    summarize_replications,
+    summarize_recovery_metric_replications,
 };
 
 const REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
@@ -533,11 +533,43 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
             .all(|value| value.is_finite())
     );
 
-    let topic_rmse_monte_carlo = summarize_replications(&topic_term_rmse, 0.025, 0.975)
-        .expect("topic-term RMSE Monte Carlo summary");
-    let topic_bias_monte_carlo =
-        summarize_replications(&topic_term_mean_absolute_bias, 0.025, 0.975)
-            .expect("topic-term bias Monte Carlo summary");
+    let topic_rmse_recovery = summarize_recovery_metric_replications(
+        summary.replication_count(),
+        &topic_term_rmse,
+        0.025,
+        0.975,
+    )
+    .expect("topic-term RMSE recovery summary");
+    let topic_bias_recovery = summarize_recovery_metric_replications(
+        summary.replication_count(),
+        &topic_term_mean_absolute_bias,
+        0.025,
+        0.975,
+    )
+    .expect("topic-term bias recovery summary");
+
+    for metric in [topic_rmse_recovery, topic_bias_recovery] {
+        assert_eq!(
+            metric.attempted_replication_count(),
+            summary.replication_count()
+        );
+        assert_eq!(metric.successful_replication_count(), summary.success_count());
+        assert_eq!(metric.failure_count(), summary.failure_count());
+        assert!((metric.failure_rate() - summary.failure_rate()).abs() < 1.0e-12);
+        assert!(
+            (metric.failure_rate_standard_error()
+                - summary.failure_rate_monte_carlo_standard_error())
+            .abs()
+                < 1.0e-12
+        );
+    }
+
+    let topic_rmse_monte_carlo = topic_rmse_recovery
+        .successful_metric_summary()
+        .expect("successful topic-term RMSE summary");
+    let topic_bias_monte_carlo = topic_bias_recovery
+        .successful_metric_summary()
+        .expect("successful topic-term bias summary");
     assert_eq!(
         topic_rmse_monte_carlo.replication_count,
         summary.success_count()
