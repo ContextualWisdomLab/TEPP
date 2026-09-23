@@ -151,6 +151,7 @@ fn fit_bound_marginal_retains_owner_topic_basis_identity() {
     .expect("fit-bound marginal covariance with basis identity");
 
     assert_eq!(marginal.document_id(), document_id);
+    assert_eq!(marginal.event_time(), event_time(1));
     assert_eq!(marginal.topic_ids(), topic_ids);
     assert_eq!(marginal.topic_basis_identity(), &expected_basis);
     assert_eq!(marginal.values().len(), 1);
@@ -160,12 +161,17 @@ fn fit_bound_marginal_retains_owner_topic_basis_identity() {
 #[test]
 fn missing_document_identity_fails_closed() {
     let fit = fit();
+    let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
     let precision = fit
-        .build_joint_coordinate_precision(vec![Uuid::from_u128(201), Uuid::from_u128(202)])
+        .build_joint_coordinate_precision(topic_ids.clone())
         .expect("fit-owned joint precision");
 
     assert_eq!(
         precision.document_marginal_covariance(Uuid::from_u128(999)),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    assert_eq!(
+        FitBoundDocumentMarginalCovariance::from_bound_fit(&fit, topic_ids, Uuid::from_u128(999)),
         Err(TopicMeasurementError::InvalidModelInput)
     );
 }
