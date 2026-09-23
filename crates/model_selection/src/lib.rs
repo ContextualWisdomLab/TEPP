@@ -47,6 +47,8 @@ pub use recovery_grid::select_declared_rolling_origin_recovery_candidate_k;
 pub use recovery_grid::select_declared_rolling_origin_recovery_candidate_k_for_cutoffs;
 /// Preserve numerical recovery failures without swallowing structural invalidity.
 pub use recovery_outcome::admit_recovery_replication_result;
+/// Summarize typed recovery results only after owner failure classification.
+pub use recovery_outcome::selected_k_recovery_summary_from_results;
 /// Borrowed payload for one admitted rolling-origin predictive evaluation window.
 pub use rolling_origin_predictive::RollingOriginPredictiveEvaluation;
 /// Score one admitted rolling-origin evaluation partition under a fixed training fit.
