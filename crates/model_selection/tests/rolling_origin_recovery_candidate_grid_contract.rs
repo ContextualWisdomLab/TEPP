@@ -7,6 +7,7 @@ use membership_core::{
 use model_selection::{
     FittedCandidateKConfig, ModelSelectionError, RollingOriginRecoveryEvaluation,
     select_declared_rolling_origin_recovery_candidate_k,
+    select_declared_rolling_origin_recovery_candidate_k_for_cutoffs,
 };
 use relation_graph::{
     RelationEdge, RelationEndpointId, RelationEvidenceStatus, RelationGraph, RelationKind,
@@ -182,6 +183,25 @@ fn recovery_rejects_a_shared_survivor_set_that_omits_declared_k() {
     )
     .expect("complete grid selection");
     assert!(matches!(selected, 2 | 3));
+
+    assert_eq!(
+        select_declared_rolling_origin_recovery_candidate_k_for_cutoffs(
+            &complete_grid,
+            &cutoffs,
+            std::slice::from_ref(&evaluation),
+        )
+        .expect("complete declared horizon"),
+        selected
+    );
+    let extended_cutoffs = [cutoff(10), cutoff(20), cutoff(30)];
+    assert_eq!(
+        select_declared_rolling_origin_recovery_candidate_k_for_cutoffs(
+            &complete_grid,
+            &extended_cutoffs,
+            std::slice::from_ref(&evaluation),
+        ),
+        Err(ModelSelectionError::RecoveryWindowSetMismatch)
+    );
 
     let declared_grid =
         FittedCandidateKConfig::new(vec![2, 3, 4], vec![7, 11, 19], 2_000, 0.001)
