@@ -1,36 +1,42 @@
 use validation_core::{
-    CoverageCalibrationDesign, CoverageCalibrationEvidenceRecord, ValidationError,
-    summarize_windowed_coverage_recovery_replications,
+    CoverageCalibrationDesign, CoverageCalibrationEvidenceRecord,
+    CoverageCalibrationReplicationOutcome, ValidationError,
 };
 
 const SOURCE_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 const SCENARIO_ID: &str = "tepp.simulation.rolling_origin_coverage.v1";
 const SCENARIO_FINGERPRINT: &str =
     "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
+const LOWER_PERCENTILE: f64 = 0.025;
+const UPPER_PERCENTILE: f64 = 0.975;
 
-fn summary(attempted: usize, successful: usize) -> validation_core::MonteCarloRecoveryMetricSummary {
-    let successful_coverages = vec![vec![0.95]; successful];
-    summarize_windowed_coverage_recovery_replications(
-        attempted,
-        &successful_coverages,
-        0.025,
-        0.975,
-    )
-    .expect("denominator-preserving coverage summary")
+fn outcomes(successful: usize) -> Vec<CoverageCalibrationReplicationOutcome> {
+    (0..10_000)
+        .map(|replication_index| {
+            if replication_index < successful {
+                CoverageCalibrationReplicationOutcome::successful(replication_index, vec![0.95])
+            } else {
+                CoverageCalibrationReplicationOutcome::numerical_failure(replication_index)
+            }
+        })
+        .collect()
 }
 
-#[test]
-fn calibration_evidence_binds_design_scenario_source_and_failure_uncertainty() {
-    let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
-    let summary = summary(10_000, 9_998);
-    let record = CoverageCalibrationEvidenceRecord::from_summary(
-        &design,
-        &summary,
+fn evidence(successful: usize) -> Result<CoverageCalibrationEvidenceRecord, ValidationError> {
+    CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
+        &CoverageCalibrationDesign::tepp_nominal_95_v1(),
+        &outcomes(successful),
+        LOWER_PERCENTILE,
+        UPPER_PERCENTILE,
         SCENARIO_ID,
         SCENARIO_FINGERPRINT,
         SOURCE_HEAD,
     )
-    .expect("calibration evidence");
+}
+
+#[test]
+fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty() {
+    let record = evidence(9_998).expect("calibration evidence");
 
     assert_eq!(record.schema_version(), 1);
     assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
@@ -46,6 +52,8 @@ fn calibration_evidence_binds_design_scenario_source_and_failure_uncertainty() {
     assert_eq!(record.coverage_mean(), Some(0.95));
     assert_eq!(record.coverage_standard_deviation(), Some(0.0));
     assert_eq!(record.coverage_monte_carlo_standard_error(), Some(0.0));
+    assert_eq!(record.coverage_percentile_lower_probability(), LOWER_PERCENTILE);
+    assert_eq!(record.coverage_percentile_upper_probability(), UPPER_PERCENTILE);
     assert_eq!(record.coverage_percentile_lower(), Some(0.95));
     assert_eq!(record.coverage_percentile_upper(), Some(0.95));
     assert!(record.coverage_within_practical_band());
@@ -58,6 +66,8 @@ fn calibration_evidence_binds_design_scenario_source_and_failure_uncertainty() {
     assert!(json.contains("\"successful_replication_count\":9998"));
     assert!(json.contains("\"failure_count\":2"));
     assert!(json.contains("\"failure_rate_standard_error\":"));
+    assert!(json.contains("\"coverage_percentile_lower_probability\":0.025"));
+    assert!(json.contains("\"coverage_percentile_upper_probability\":0.975"));
     assert!(json.contains("\"coverage_percentile_lower\":0.95"));
     assert!(json.contains("\"coverage_percentile_upper\":0.95"));
     assert!(json.contains(SCENARIO_FINGERPRINT));
@@ -67,16 +77,7 @@ fn calibration_evidence_binds_design_scenario_source_and_failure_uncertainty() {
 
 #[test]
 fn singleton_success_keeps_point_evidence_without_fabricating_dispersion() {
-    let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
-    let singleton = summary(10_000, 1);
-    let record = CoverageCalibrationEvidenceRecord::from_summary(
-        &design,
-        &singleton,
-        SCENARIO_ID,
-        SCENARIO_FINGERPRINT,
-        SOURCE_HEAD,
-    )
-    .expect("singleton evidence remains reportable");
+    let record = evidence(1).expect("singleton evidence remains reportable");
 
     assert_eq!(record.coverage_mean(), Some(0.95));
     assert_eq!(record.coverage_standard_deviation(), None);
@@ -88,9 +89,9 @@ fn singleton_success_keeps_point_evidence_without_fabricating_dispersion() {
 }
 
 #[test]
-fn calibration_evidence_fails_closed_on_identity_digest_head_or_design_drift() {
+fn calibration_evidence_fails_closed_on_identity_digest_head_or_percentile_drift() {
     let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
-    let valid_summary = summary(10_000, 2);
+    let valid_outcomes = outcomes(2);
 
     for (scenario_id, fingerprint, source_head) in [
         ("", SCENARIO_FINGERPRINT, SOURCE_HEAD),
@@ -109,9 +110,11 @@ fn calibration_evidence_fails_closed_on_identity_digest_head_or_design_drift() {
         (SCENARIO_ID, SCENARIO_FINGERPRINT, "not-a-git-head"),
     ] {
         assert_eq!(
-            CoverageCalibrationEvidenceRecord::from_summary(
+            CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
                 &design,
-                &valid_summary,
+                &valid_outcomes,
+                LOWER_PERCENTILE,
+                UPPER_PERCENTILE,
                 scenario_id,
                 fingerprint,
                 source_head,
@@ -120,15 +123,16 @@ fn calibration_evidence_fails_closed_on_identity_digest_head_or_design_drift() {
         );
     }
 
-    let wrong_attempt_count = summary(9_999, 2);
     assert_eq!(
-        CoverageCalibrationEvidenceRecord::from_summary(
+        CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
             &design,
-            &wrong_attempt_count,
+            &valid_outcomes,
+            0.9,
+            0.1,
             SCENARIO_ID,
             SCENARIO_FINGERPRINT,
             SOURCE_HEAD,
         ),
-        Err(ValidationError::InvalidInput)
+        Err(ValidationError::InvalidConfiguration)
     );
 }
