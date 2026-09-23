@@ -41,8 +41,10 @@ pub use gate::selected_k_root_mean_square_error;
 pub use recovery_fit::fit_declared_recovery_candidates;
 /// Rolling-origin recovery payload that retains the fitted candidate dimensions.
 pub use recovery_grid::RollingOriginRecoveryEvaluation;
-/// Select candidate `K` only when every recovery window covers the declared grid.
+/// Select candidate `K` only when every supplied recovery window covers the declared grid.
 pub use recovery_grid::select_declared_rolling_origin_recovery_candidate_k;
+/// Select candidate `K` only when recovery covers the full owner-derived cutoff horizon.
+pub use recovery_grid::select_declared_rolling_origin_recovery_candidate_k_for_cutoffs;
 /// Preserve numerical recovery failures without swallowing structural invalidity.
 pub use recovery_outcome::admit_recovery_replication_result;
 /// Borrowed payload for one admitted rolling-origin predictive evaluation window.
