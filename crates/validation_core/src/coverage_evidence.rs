@@ -3,26 +3,28 @@
 use crate::{
     CoverageCalibrationDesign, CoverageCalibrationReplicationOutcome, ValidationError,
     assess_coverage_calibration, canonical_indexed_coverage_outcomes,
-    canonical_indexed_coverage_outcomes_sha256, parse_commit_head,
-    summarize_indexed_windowed_coverage_recovery_replications,
+    canonical_indexed_coverage_outcomes_sha256, coverage_calibration_design_sha256,
+    parse_commit_head, summarize_indexed_windowed_coverage_recovery_replications,
 };
 use serde::Serialize;
 
-const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 3;
+const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 4;
 
 /// Immutable evidence record for one prospective coverage-calibration experiment.
 ///
 /// The record keeps validation criterion identity separate from simulation
-/// scenario identity while binding both to an exact source commit. It persists
-/// the complete canonical declared replication ledger, its compact SHA-256
-/// provenance binding, the unconditional failure denominator, and Monte Carlo
-/// uncertainty alongside conditional interval-calibration metrics. A positive
+/// scenario identity while binding the exact prospective criterion, scenario,
+/// indexed outcomes, and source commit. It persists the complete canonical
+/// declared replication ledger, compact SHA-256 provenance bindings, the
+/// unconditional failure denominator, and Monte Carlo uncertainty alongside
+/// conditional interval-calibration metrics. A positive
 /// [`Self::supports_calibration_claim`] value is intentionally narrower than
 /// estimator robustness, scientific promotion, or release authority.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CoverageCalibrationEvidenceRecord {
     schema_version: u32,
     validation_design_id: String,
+    validation_design_fingerprint: String,
     simulation_scenario_id: String,
     simulation_scenario_fingerprint: String,
     replication_outcomes: Vec<CoverageCalibrationReplicationOutcome>,
@@ -51,7 +53,11 @@ impl CoverageCalibrationEvidenceRecord {
     /// `simulation_scenario_id` and `simulation_scenario_fingerprint` are opaque
     /// values supplied by the simulation owner. This crate validates only their
     /// persistence-safe shape rather than importing simulation-domain source.
-    /// `source_head` must be an exact lowercase forty-hex Git commit identity.
+    /// The validation design is fingerprinted from its owner-issued identity,
+    /// attempted count, nominal coverage, practical band, and Monte Carlo precision
+    /// target so a stable design name cannot hide criterion drift. `source_head`
+    /// must be an exact lowercase forty-hex Git commit identity.
+    ///
     /// The indexed aggregation boundary requires an exact permutation of the
     /// prospective design's replication identities before any summary can be
     /// serialized. The same validated outcomes are persisted in canonical identity
@@ -65,7 +71,8 @@ impl CoverageCalibrationEvidenceRecord {
     ///
     /// Returns [`ValidationError::InvalidInput`] for an empty/control-bearing
     /// scenario identity, non-canonical SHA-256 scenario fingerprint or Git head,
-    /// malformed coverage outcome, or replication identity drift. Returns
+    /// malformed coverage outcome, replication identity drift, or a design whose
+    /// canonical wire geometry cannot be represented. Returns
     /// [`ValidationError::InvalidConfiguration`] for invalid percentile bounds.
     #[allow(clippy::too_many_arguments)]
     pub fn from_indexed_outcomes(
@@ -88,6 +95,7 @@ impl CoverageCalibrationEvidenceRecord {
             return Err(ValidationError::InvalidInput);
         }
         parse_commit_head(source_head)?;
+        let validation_design_fingerprint = coverage_calibration_design_sha256(design)?;
         let summary = summarize_indexed_windowed_coverage_recovery_replications(
             design.attempted_dgp_count(),
             outcomes,
@@ -106,6 +114,7 @@ impl CoverageCalibrationEvidenceRecord {
         Ok(Self {
             schema_version: COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION,
             validation_design_id: design.design_id().to_owned(),
+            validation_design_fingerprint,
             simulation_scenario_id: simulation_scenario_id.to_owned(),
             simulation_scenario_fingerprint: simulation_scenario_fingerprint.to_owned(),
             replication_outcomes,
@@ -143,6 +152,12 @@ impl CoverageCalibrationEvidenceRecord {
     #[must_use]
     pub fn validation_design_id(&self) -> &str {
         &self.validation_design_id
+    }
+
+    /// Canonical SHA-256 fingerprint of the prospective validation criterion.
+    #[must_use]
+    pub fn validation_design_fingerprint(&self) -> &str {
+        &self.validation_design_fingerprint
     }
 
     /// Simulation-owner scenario identity.
