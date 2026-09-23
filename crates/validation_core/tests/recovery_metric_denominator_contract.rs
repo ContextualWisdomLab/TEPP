@@ -1,6 +1,4 @@
-use validation_core::{
-    ValidationError, summarize_recovery_metric_replications,
-};
+use validation_core::{ValidationError, summarize_recovery_metric_replications};
 
 #[test]
 fn recovery_metric_summary_preserves_attempted_failure_denominator() {
