@@ -12,9 +12,7 @@ use temporal_core::{
     AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
     TemporalPrecision,
 };
-use topic_measurement::{
-    ReferenceTopicModelConfig, ReferenceTopicTrainingInput, SparseMatrix,
-};
+use topic_measurement::{ReferenceTopicModelConfig, ReferenceTopicTrainingInput, SparseMatrix};
 use uuid::Uuid;
 
 fn event_time(day: u8) -> EventTime {
@@ -70,13 +68,13 @@ fn training_input() -> ReferenceTopicTrainingInput {
     }
 
     let mut relations = RelationGraph::new();
-    for index in 0..document_ids.len() - 1 {
+    for (index, source_day) in (1_u8..=5).enumerate() {
         relations
             .insert(transition(
                 document_ids[index],
                 document_ids[index + 1],
-                index as u8 + 1,
-                index as u8 + 2,
+                source_day,
+                source_day + 1,
             ))
             .expect("insert transition");
     }
@@ -114,8 +112,22 @@ fn public_recovery_fit_owner_materializes_every_declared_candidate_in_order() {
         .expect("complete declared recovery fit grid");
 
     assert_eq!(fits.len(), 2);
-    assert_eq!(fits[0].reference_fit().model().topic_term_probabilities.len(), 2);
-    assert_eq!(fits[1].reference_fit().model().topic_term_probabilities.len(), 3);
+    assert_eq!(
+        fits[0]
+            .reference_fit()
+            .model()
+            .topic_term_probabilities
+            .len(),
+        2
+    );
+    assert_eq!(
+        fits[1]
+            .reference_fit()
+            .model()
+            .topic_term_probabilities
+            .len(),
+        3
+    );
     for (fit, candidate_k) in fits.iter().zip(declared.candidate_topic_counts()) {
         let expected = ReferenceTopicModelConfig::new(
             *candidate_k as usize,
@@ -125,6 +137,9 @@ fn public_recovery_fit_owner_materializes_every_declared_candidate_in_order() {
         )
         .expect("default owner reference config");
         assert_eq!(fit.reference_fit().config(), &expected);
-        assert!(fit.training_input().shares_numerical_training_state(&training));
+        assert!(
+            fit.training_input()
+                .shares_numerical_training_state(&training)
+        );
     }
 }
