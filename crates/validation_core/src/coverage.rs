@@ -73,7 +73,9 @@ pub fn wilson_coverage_interval(
 
 #[cfg(test)]
 mod tests {
-    use super::{interval_coverage, wilson_coverage_interval};
+    use super::{
+        interval_coverage, summarize_windowed_coverage_replications, wilson_coverage_interval,
+    };
     use crate::ValidationError;
 
     #[test]
@@ -156,5 +158,20 @@ mod tests {
             wilson_coverage_interval(&truth, &lower, &upper, 1e200),
             Err(ValidationError::InvalidConfiguration)
         );
+    }
+
+    #[test]
+    fn windowed_coverage_collapses_within_dgp_before_monte_carlo() {
+        let summary = summarize_windowed_coverage_replications(
+            &[vec![1.0, 0.5], vec![0.5, 0.0]],
+            0.025,
+            0.975,
+        )
+        .expect("DGP-clustered coverage summary");
+
+        assert_eq!(summary.replication_count, 2);
+        assert!((summary.mean - 0.5).abs() < 1.0e-12);
+        assert!((summary.percentile_lower - 0.25).abs() < 1.0e-12);
+        assert!((summary.percentile_upper - 0.75).abs() < 1.0e-12);
     }
 }
