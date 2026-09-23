@@ -60,6 +60,7 @@ pub struct MonteCarloRecoveryMetricSummary {
     failure_count: usize,
     failure_rate: f64,
     failure_rate_standard_error: f64,
+    successful_metric_mean: Option<f64>,
     successful_metric_summary: Option<MonteCarloSummary>,
 }
 
@@ -94,7 +95,22 @@ impl MonteCarloRecoveryMetricSummary {
         self.failure_rate_standard_error
     }
 
-    /// Conditional scalar summary for successful replications, if any succeeded.
+    /// Conditional arithmetic mean for successful scalar recovery values.
+    ///
+    /// The point estimate is retained even when exactly one replication succeeds.
+    /// In that case [`Self::successful_metric_summary`] remains `None` because
+    /// between-replication dispersion and Monte Carlo standard error are not
+    /// estimable from a singleton successful sample.
+    #[must_use]
+    pub const fn successful_metric_mean(self) -> Option<f64> {
+        self.successful_metric_mean
+    }
+
+    /// Conditional scalar Monte Carlo summary when at least two attempts succeeded.
+    ///
+    /// A single successful replication retains its point estimate through
+    /// [`Self::successful_metric_mean`] but does not manufacture zero sample
+    /// dispersion or zero Monte Carlo standard error.
     #[must_use]
     pub const fn successful_metric_summary(self) -> Option<MonteCarloSummary> {
         self.successful_metric_summary
@@ -111,10 +127,13 @@ impl MonteCarloRecoveryMetricSummary {
 /// by the owning workflow before calling this function; it must not be encoded as
 /// an attempted failure here.
 ///
-/// The successful values are summarized with [`summarize_replications`]. When all
-/// attempts fail, the successful metric summary is `None` rather than a fabricated
-/// numeric value. Failure-rate Monte Carlo uncertainty uses the Bernoulli standard
-/// error `sqrt(p(1-p)/n)` over the unconditional attempted denominator.
+/// The conditional arithmetic mean is retained whenever at least one attempt
+/// succeeds. The full [`MonteCarloSummary`] is emitted only from two or more
+/// successful replications because sample dispersion and Monte Carlo standard
+/// error are not estimable from one successful value. When all attempts fail,
+/// neither a point estimate nor a scalar summary is fabricated. Failure-rate
+/// Monte Carlo uncertainty uses the Bernoulli standard error
+/// `sqrt(p(1-p)/n)` over the unconditional attempted denominator.
 ///
 /// # Errors
 ///
@@ -147,7 +166,13 @@ pub fn summarize_recovery_metric_replications(
     let failure_rate = failure_count as f64 / attempted;
     let failure_rate_standard_error =
         require_finite((failure_rate * (1.0 - failure_rate) / attempted).sqrt())?;
-    let successful_metric_summary = if successful_samples.is_empty() {
+    let successful_metric_mean = if successful_samples.is_empty() {
+        None
+    } else {
+        let (mean, _, _) = welford_moments(successful_samples)?;
+        Some(require_finite(mean)?)
+    };
+    let successful_metric_summary = if successful_samples.len() < 2 {
         None
     } else {
         Some(summarize_replications(
@@ -163,6 +188,7 @@ pub fn summarize_recovery_metric_replications(
         failure_count,
         failure_rate,
         failure_rate_standard_error,
+        successful_metric_mean,
         successful_metric_summary,
     })
 }
