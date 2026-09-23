@@ -96,8 +96,9 @@ impl CoverageCalibrationSimulationDesign {
     ///
     /// # Errors
     ///
-    /// Returns [`SimulationError::InvalidConfiguration`] if any owner-issued
-    /// replication configuration cannot be reconstructed.
+    /// Returns [`SimulationError::InvalidConfiguration`] if the declared attempt
+    /// count cannot be represented as `u64` or any owner-issued replication
+    /// configuration cannot be reconstructed.
     pub fn scenario_fingerprint(self) -> Result<String, SimulationError> {
         let mut bytes = Vec::with_capacity(
             COVERAGE_CALIBRATION_FINGERPRINT_DOMAIN.len()
@@ -109,7 +110,9 @@ impl CoverageCalibrationSimulationDesign {
         bytes.extend_from_slice(COVERAGE_CALIBRATION_FINGERPRINT_DOMAIN);
         bytes.extend_from_slice(self.scenario_id().as_bytes());
         bytes.push(0);
-        bytes.extend_from_slice(&10_000_u64.to_le_bytes());
+        let attempted_replication_count = u64::try_from(self.attempted_replication_count())
+            .map_err(|_| SimulationError::InvalidConfiguration)?;
+        bytes.extend_from_slice(&attempted_replication_count.to_le_bytes());
         for replication_index in 0..COVERAGE_CALIBRATION_REPLICATION_COUNT {
             let config = self.config_for_replication(replication_index)?;
             bytes.extend_from_slice(&crate::config_fingerprint(config));
