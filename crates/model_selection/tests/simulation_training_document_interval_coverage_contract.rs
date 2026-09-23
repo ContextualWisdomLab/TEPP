@@ -245,13 +245,33 @@ fn truth_k_window_coverage(
         .expect("fit-bound document coordinates");
     let truth_by_document = truth_topic_state_by_document(manifest);
     let topic_ids: Vec<_> = (0..coordinate_summary.topic_count())
-        .map(|index| Uuid::from_u128(10_000 + index as u128))
+        .map(|index| {
+            Uuid::from_u128(
+                10_000 + u128::try_from(index).expect("bounded topic index fits u128"),
+            )
+        })
         .collect();
+    let document_ids: Vec<_> = coordinate_summary
+        .rows()
+        .iter()
+        .map(|row| row.document_id())
+        .collect();
+    let marginals = FitBoundDocumentMarginalCovariance::from_bound_fit_many(
+        reference_fit,
+        topic_ids,
+        &document_ids,
+    )
+    .expect("one-factorization full-joint document covariance batch");
 
     let mut truth = Vec::new();
     let mut lower = Vec::new();
     let mut upper = Vec::new();
-    for row in coordinate_summary.rows() {
+    for (row, marginal) in coordinate_summary.rows().iter().zip(&marginals) {
+        assert_eq!(
+            marginal.document_id(),
+            row.document_id(),
+            "batch covariance order must remain bound to fitted document order"
+        );
         let fitted_location: Vec<_> = row
             .coordinates()
             .iter()
@@ -259,12 +279,6 @@ fn truth_k_window_coverage(
             .collect();
         let aligned_location = realign_additive_log_ratio(&alignment, &fitted_location)
             .expect("truth-basis fitted ALR location");
-        let marginal = FitBoundDocumentMarginalCovariance::from_bound_fit(
-            reference_fit,
-            topic_ids.clone(),
-            row.document_id(),
-        )
-        .expect("full-joint fit-bound document covariance");
         assert_eq!(
             marginal.topic_basis_identity(),
             coordinate_summary.topic_basis_identity(),
