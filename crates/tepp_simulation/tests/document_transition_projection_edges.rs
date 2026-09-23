@@ -34,10 +34,18 @@ fn projection_fails_closed_when_either_transition_endpoint_has_no_owned_document
         missing_source.document_transition_pairs(),
         Err(SimulationError::ManifestInvariantViolation)
     );
+    assert_eq!(
+        missing_source.observed_document_transition_pairs(),
+        Err(SimulationError::ManifestInvariantViolation)
+    );
 
     let missing_target = without_event_documents(&generated, generated.events()[2].event_id());
     assert_eq!(
         missing_target.document_transition_pairs(),
+        Err(SimulationError::ManifestInvariantViolation)
+    );
+    assert_eq!(
+        missing_target.observed_document_transition_pairs(),
         Err(SimulationError::ManifestInvariantViolation)
     );
 }
