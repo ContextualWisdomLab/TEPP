@@ -35,15 +35,7 @@ fn outcomes_with_failures(failure_indices: &[usize]) -> Vec<CoverageCalibrationR
 }
 
 fn evidence(successful: usize) -> Result<CoverageCalibrationEvidenceRecord, ValidationError> {
-    CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
-        &CoverageCalibrationDesign::tepp_nominal_95_v1(),
-        &outcomes(successful),
-        LOWER_PERCENTILE,
-        UPPER_PERCENTILE,
-        SCENARIO_ID,
-        SCENARIO_FINGERPRINT,
-        SOURCE_HEAD,
-    )
+    evidence_from_outcomes(&outcomes(successful))
 }
 
 fn evidence_from_outcomes(
@@ -64,10 +56,17 @@ fn evidence_from_outcomes(
 fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty() {
     let record = evidence(9_998).expect("calibration evidence");
 
-    assert_eq!(record.schema_version(), 1);
+    assert_eq!(record.schema_version(), 2);
     assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
     assert_eq!(record.simulation_scenario_id(), SCENARIO_ID);
     assert_eq!(record.simulation_scenario_fingerprint(), SCENARIO_FINGERPRINT);
+    assert_eq!(record.replication_outcome_fingerprint().len(), 64);
+    assert!(
+        record
+            .replication_outcome_fingerprint()
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
     assert_eq!(record.source_head(), SOURCE_HEAD);
     assert_eq!(record.attempted_replication_count(), 10_000);
     assert_eq!(record.successful_replication_count(), 9_998);
@@ -87,7 +86,8 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(record.supports_calibration_claim());
 
     let json = record.to_json().expect("deterministic evidence json");
-    assert!(json.contains("\"schema_version\":1"));
+    assert!(json.contains("\"schema_version\":2"));
+    assert!(json.contains("\"replication_outcome_fingerprint\":"));
     assert!(json.contains("\"attempted_replication_count\":10000"));
     assert!(json.contains("\"successful_replication_count\":9998"));
     assert!(json.contains("\"failure_count\":2"));
@@ -97,6 +97,7 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(json.contains("\"coverage_percentile_lower\":0.95"));
     assert!(json.contains("\"coverage_percentile_upper\":0.95"));
     assert!(json.contains(SCENARIO_FINGERPRINT));
+    assert!(json.contains(record.replication_outcome_fingerprint()));
     assert!(json.contains(SOURCE_HEAD));
     assert_eq!(record.to_json().expect("repeat json"), json);
 }
@@ -117,9 +118,32 @@ fn persisted_evidence_distinguishes_exact_indexed_failure_identity_pattern() {
     assert_eq!(early_failures.coverage_mean(), Some(0.95));
     assert_eq!(late_failures.coverage_mean(), Some(0.95));
     assert_ne!(
+        early_failures.replication_outcome_fingerprint(),
+        late_failures.replication_outcome_fingerprint()
+    );
+    assert_ne!(
         early_failures.to_json().expect("early json"),
         late_failures.to_json().expect("late json"),
         "persisted evidence must retain which declared DGP identities failed"
+    );
+}
+
+#[test]
+fn indexed_outcome_fingerprint_is_independent_of_shard_completion_order() {
+    let ordered = outcomes_with_failures(&[7, 83]);
+    let mut reversed = ordered.clone();
+    reversed.reverse();
+
+    let ordered_record = evidence_from_outcomes(&ordered).expect("ordered evidence");
+    let reversed_record = evidence_from_outcomes(&reversed).expect("reversed evidence");
+
+    assert_eq!(
+        ordered_record.replication_outcome_fingerprint(),
+        reversed_record.replication_outcome_fingerprint()
+    );
+    assert_eq!(
+        ordered_record.to_json().expect("ordered json"),
+        reversed_record.to_json().expect("reversed json")
     );
 }
 
