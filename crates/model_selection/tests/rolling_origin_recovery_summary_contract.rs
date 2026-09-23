@@ -1,4 +1,6 @@
-use model_selection::{ModelSelectionError, selected_k_recovery_summary};
+use model_selection::{
+    ModelSelectionError, selected_k_recovery_summary, selected_k_recovery_summary_from_results,
+};
 
 #[test]
 fn recovery_summary_preserves_failure_denominator_and_monte_carlo_uncertainty() {
@@ -85,4 +87,53 @@ fn recovery_summary_preserves_failure_evidence_with_limited_success_support() {
         selected_k_recovery_summary(&[Some(4), Some(4)], 1),
         Err(ModelSelectionError::NonPositiveCandidateK)
     );
+}
+
+#[test]
+fn typed_recovery_results_cannot_hide_structural_invalidity_in_the_failure_denominator() {
+    let summary = selected_k_recovery_summary_from_results(
+        [
+            Ok(4),
+            Err(ModelSelectionError::RecoveryCandidateFitFailed),
+            Ok(5),
+            Err(ModelSelectionError::InvalidDiagnostic),
+        ],
+        4,
+    )
+    .expect("numerical failures remain reportable");
+    assert_eq!(summary.replication_count(), 4);
+    assert_eq!(summary.success_count(), 2);
+    assert_eq!(summary.failure_count(), 2);
+    assert_eq!(summary.failure_rate(), 0.5);
+
+    for structural in [
+        ModelSelectionError::RecoveryCandidateInputInvalid,
+        ModelSelectionError::PredictiveEvaluationInputInvalid,
+        ModelSelectionError::RecoveryWindowSetMismatch,
+    ] {
+        assert_eq!(
+            selected_k_recovery_summary_from_results([Ok(4), Err(structural), Ok(4)], 4),
+            Err(structural)
+        );
+    }
+}
+
+#[test]
+fn typed_recovery_summary_preserves_catastrophic_numerical_failure_evidence() {
+    let summary = selected_k_recovery_summary_from_results(
+        [
+            Err(ModelSelectionError::RecoveryCandidateFitFailed),
+            Err(ModelSelectionError::NoSuccessfulFit),
+            Err(ModelSelectionError::InvalidDiagnostic),
+        ],
+        4,
+    )
+    .expect("all numerical failures remain in the denominator");
+
+    assert_eq!(summary.replication_count(), 3);
+    assert_eq!(summary.success_count(), 0);
+    assert_eq!(summary.failure_count(), 3);
+    assert_eq!(summary.failure_rate(), 1.0);
+    assert_eq!(summary.bias(), None);
+    assert_eq!(summary.root_mean_square_error(), None);
 }
