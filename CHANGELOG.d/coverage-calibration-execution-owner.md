@@ -1,0 +1,6 @@
+# Scientific coverage calibration execution
+
+- Opened #733 after tracing the prospective 10,000-DGP calibration path through #725-#732 and finding that the executable rolling-origin coverage composition still lives only in a `model_selection` integration test.
+- Moved the realistic rolling-origin coverage DGP shape behind `CoverageCalibrationSimulationDesign::regression_config_for_seed` so CI-scale regression seeds use the same owner-defined event count, delays, Membership width, relation noise, method-effect rates, and known-topic DGP as the prospective scenario without consuming its reserved acceptance seed schedule.
+- `CoverageCalibrationSimulationDesign::config_for_replication` now delegates to that same private DGP constructor while retaining sole authority for the prospectively declared replication ordinal -> seed mapping. The existing scenario fingerprint therefore remains bound to the same canonical configuration bytes.
+- Updated the simulator-backed interval-coverage integration to consume the simulation owner instead of reconstructing twelve `SimulationConfig` arguments locally. This is the first #733 repair slice; the cross-context acceptance executor and actual 10,000-DGP schema-v4 evidence run remain open and are not claimed by this change.
