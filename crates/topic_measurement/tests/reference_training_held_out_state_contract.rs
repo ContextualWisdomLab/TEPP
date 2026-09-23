@@ -115,6 +115,7 @@ fn training_fit() -> (ReferenceTopicTrainingFit, MembershipNetwork, Uuid, Uuid) 
 #[test]
 fn held_out_state_uses_counts_without_batch_context_or_global_refit() {
     let (fit, memberships, focal, companion) = training_fit();
+    let original_model = fit.reference_fit().model().clone();
     let focal_counts =
         SparseMatrix::from_csr(1, 4, vec![0, 2], vec![0, 1], vec![95.0, 5.0]).expect("focal");
     let batch_counts = SparseMatrix::from_csr(
@@ -157,6 +158,7 @@ fn held_out_state_uses_counts_without_batch_context_or_global_refit() {
         )
         .expect("contrasting held-out state");
 
+    assert_eq!(fit.reference_fit().model(), &original_model);
     assert_eq!(single.len(), 1);
     assert_eq!(batched.len(), 2);
     assert_eq!(single[0].len(), 2);
