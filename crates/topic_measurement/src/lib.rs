@@ -14,6 +14,7 @@ mod coordinates;
 mod document_coordinate;
 mod error;
 mod lexical;
+mod marginal_covariance;
 mod posterior_draw;
 mod prevalence_design;
 mod reference;
@@ -43,6 +44,8 @@ pub use document_coordinate::FittedDocumentCoordinateSummary;
 pub use error::TopicMeasurementError;
 /// Refuse lexical retrieval weights as inferential coordinates.
 pub use lexical::refuse_lexical_inferential_weight;
+/// One fit-bound document marginal covariance in retained ALR topic order.
+pub use marginal_covariance::DocumentMarginalCovariance;
 /// Stable counter-based draw algorithm identity.
 pub use posterior_draw::JOINT_POSTERIOR_DRAW_ALGORITHM_VERSION;
 /// Versioned deterministic joint Gaussian plausible-value draw set.
