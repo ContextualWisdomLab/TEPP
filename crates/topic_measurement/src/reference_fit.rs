@@ -245,4 +245,186 @@ impl ReferenceTopicTrainingFit {
         }
         Ok(scores)
     }
+
+    /// Infer evaluation-document topic states while keeping the training fit frozen.
+    ///
+    /// Evaluation EventTime, covariates, and Membership are projected through the
+    /// exact frozen [`PrevalenceDesignBasis`] retained by this fit. Each evaluation
+    /// ALR coordinate starts at that projected prevalence mean and is then optimized
+    /// independently against only its own observed term counts and the fitted
+    /// Gaussian prevalence prior. Topic-term probabilities, prevalence coefficients,
+    /// training document coordinates, relation parameters, and all other global
+    /// training state remain unchanged.
+    ///
+    /// This is a deterministic local MAP-style coordinate recovery primitive for
+    /// scientific held-out state validation. It is deliberately separate from
+    /// [`Self::prevalence_mean_predictive_log_likelihoods`]: the latter evaluates
+    /// counts at the prevalence mean, whereas this method lets the held-out counts
+    /// update only their own local latent coordinate. No held-out relation graph is
+    /// admitted here, so adding another evaluation row cannot change the focal row.
+    /// It is not posterior sampling and does not by itself establish calibrated
+    /// interval coverage or rolling-origin source admission.
+    ///
+    /// Returned simplex rows follow `document_ids` exactly.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] for incompatible row,
+    /// vocabulary, count, or frozen-design geometry. Returns
+    /// [`TopicMeasurementError::NonFiniteEstimate`] for non-finite numerical state
+    /// and [`TopicMeasurementError::DidNotConverge`] when the retained deterministic
+    /// iteration budget is exhausted. ALR conversion errors propagate unchanged.
+    pub fn infer_held_out_document_topic_proportions(
+        &self,
+        document_ids: &[Uuid],
+        document_term: &SparseMatrix,
+        event_times: &[EventTime],
+        covariates: Option<&SparseMatrix>,
+        memberships: &MembershipNetwork,
+    ) -> Result<Vec<Vec<f64>>, TopicMeasurementError> {
+        let model = self.reference_fit.model();
+        let config = self.reference_fit.config();
+        let topic_count = model.topic_term_probabilities.len();
+        let coordinate_count = topic_count
+            .checked_sub(1)
+            .filter(|count| *count > 0)
+            .ok_or(TopicMeasurementError::InvalidModelInput)?;
+        let vocabulary_size = model
+            .topic_term_probabilities
+            .first()
+            .map(Vec::len)
+            .filter(|size| *size > 0)
+            .ok_or(TopicMeasurementError::InvalidModelInput)?;
+        if document_ids.is_empty()
+            || document_term.rows() != document_ids.len()
+            || document_term.columns() != vocabulary_size
+            || event_times.len() != document_ids.len()
+            || model
+                .topic_term_probabilities
+                .iter()
+                .any(|row| row.len() != vocabulary_size || row.iter().any(|value| !value.is_finite() || *value <= 0.0))
+            || model.prevalence_coefficients.is_empty()
+            || model
+                .prevalence_coefficients
+                .iter()
+                .any(|row| row.len() != coordinate_count || row.iter().any(|value| !value.is_finite()))
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+
+        let design = self
+            .prevalence_design_basis()
+            .project(document_ids, event_times, covariates, memberships)?;
+        if design.len() != document_ids.len()
+            || design
+                .iter()
+                .any(|row| row.len() != model.prevalence_coefficients.len() || row.iter().any(|value| !value.is_finite()))
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+
+        let term_rows = document_term.row_entries();
+        let mut recovered = Vec::with_capacity(document_ids.len());
+        for (row_index, terms) in term_rows.iter().enumerate() {
+            let row_total = terms.iter().map(|(_, count)| count).sum::<f64>();
+            if terms.is_empty()
+                || terms
+                    .iter()
+                    .any(|(term, count)| *term >= vocabulary_size || !count.is_finite() || *count < 0.0)
+                || !row_total.is_finite()
+                || row_total <= 0.0
+            {
+                return Err(TopicMeasurementError::InvalidModelInput);
+            }
+
+            let mut mean = vec![0.0; coordinate_count];
+            for (feature, value) in design[row_index].iter().copied().enumerate() {
+                for (coordinate, coefficient) in model.prevalence_coefficients[feature]
+                    .iter()
+                    .copied()
+                    .enumerate()
+                {
+                    mean[coordinate] += value * coefficient;
+                }
+            }
+            if mean.iter().any(|value| !value.is_finite()) {
+                return Err(TopicMeasurementError::NonFiniteEstimate);
+            }
+
+            recovered.push(infer_local_document_state(
+                terms,
+                &model.topic_term_probabilities,
+                &mean,
+                row_total,
+                config,
+            )?);
+        }
+        Ok(recovered)
+    }
+}
+
+fn infer_local_document_state(
+    terms: &[(usize, f64)],
+    topic_term_probabilities: &[Vec<f64>],
+    mean: &[f64],
+    token_count: f64,
+    config: &ReferenceTopicModelConfig,
+) -> Result<Vec<f64>, TopicMeasurementError> {
+    let topic_count = topic_term_probabilities.len();
+    let coordinate_count = topic_count - 1;
+    let mut eta = mean.to_vec();
+    let mut previous_objective = None;
+
+    for iteration in 1..=config.maximum_iterations() {
+        let theta = from_additive_log_ratio(&eta)?;
+        let mut expected_topic_counts = vec![0.0; topic_count];
+        let mut log_likelihood = 0.0_f64;
+        for &(term, count) in terms {
+            let probability = (0..topic_count)
+                .map(|topic| theta[topic] * topic_term_probabilities[topic][term])
+                .sum::<f64>();
+            if !probability.is_finite() || probability <= 0.0 {
+                return Err(TopicMeasurementError::NonFiniteEstimate);
+            }
+            let log_probability = probability.ln();
+            if !log_probability.is_finite() {
+                return Err(TopicMeasurementError::NonFiniteEstimate);
+            }
+            log_likelihood += count * log_probability;
+            for topic in 0..topic_count {
+                expected_topic_counts[topic] +=
+                    count * theta[topic] * topic_term_probabilities[topic][term] / probability;
+            }
+        }
+        let prior = eta
+            .iter()
+            .zip(mean)
+            .map(|(value, center)| (value - center).powi(2))
+            .sum::<f64>()
+            / (2.0 * config.prior_variance());
+        let objective = log_likelihood - prior;
+        if !objective.is_finite() {
+            return Err(TopicMeasurementError::NonFiniteEstimate);
+        }
+        if iteration > 3
+            && previous_objective.is_some_and(|previous: f64| {
+                (objective - previous).abs() / (1.0 + previous.abs()) <= config.tolerance()
+            })
+        {
+            return Ok(theta);
+        }
+        previous_objective = Some(objective);
+
+        let scale = config.step_size() / (1.0 + token_count);
+        for coordinate in 0..coordinate_count {
+            let gradient = expected_topic_counts[coordinate]
+                - token_count * theta[coordinate]
+                - (eta[coordinate] - mean[coordinate]) / config.prior_variance();
+            eta[coordinate] += scale * gradient;
+            if !eta[coordinate].is_finite() {
+                return Err(TopicMeasurementError::NonFiniteEstimate);
+            }
+        }
+    }
+    Err(TopicMeasurementError::DidNotConverge)
 }
