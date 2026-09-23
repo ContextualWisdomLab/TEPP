@@ -130,7 +130,7 @@ fn public_recovery_fit_owner_materializes_every_declared_candidate_in_order() {
     );
     for (fit, candidate_k) in fits.iter().zip(declared.candidate_topic_counts()) {
         let expected = ReferenceTopicModelConfig::new(
-            *candidate_k as usize,
+            usize::try_from(*candidate_k).expect("candidate K fits usize"),
             declared.seeds().to_vec(),
             declared.maximum_iterations(),
             declared.tolerance(),
