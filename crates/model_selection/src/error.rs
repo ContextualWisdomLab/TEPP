@@ -18,8 +18,10 @@ pub enum ModelSelectionError {
     LexicalWeightForbidden,
     /// Every fitted candidate failed to converge or produced a typed numeric failure.
     NoSuccessfulFit,
-    /// One declared scientific-recovery candidate failed to fit.
+    /// One declared scientific-recovery candidate failed numerically while fitting.
     RecoveryCandidateFitFailed,
+    /// One declared scientific-recovery candidate is structurally incompatible with the training input.
+    RecoveryCandidateInputInvalid,
     /// Fewer than two successful recovery replications remain after failures.
     InsufficientRecoveryReplications,
     /// A rolling-origin numerical input did not match the admitted split identities.
@@ -50,7 +52,10 @@ impl fmt::Display for ModelSelectionError {
             Self::LexicalWeightForbidden => "lexical inferential weights are forbidden",
             Self::NoSuccessfulFit => "no fitted candidate produced a finite diagnostic",
             Self::RecoveryCandidateFitFailed => {
-                "a declared scientific-recovery candidate failed to fit"
+                "a declared scientific-recovery candidate failed numerically while fitting"
+            }
+            Self::RecoveryCandidateInputInvalid => {
+                "a declared scientific-recovery candidate is structurally incompatible with the training input"
             }
             Self::InsufficientRecoveryReplications => {
                 "at least two successful recovery replications are required"
@@ -111,7 +116,11 @@ mod tests {
             ),
             (
                 ModelSelectionError::RecoveryCandidateFitFailed,
-                "a declared scientific-recovery candidate failed to fit",
+                "a declared scientific-recovery candidate failed numerically while fitting",
+            ),
+            (
+                ModelSelectionError::RecoveryCandidateInputInvalid,
+                "a declared scientific-recovery candidate is structurally incompatible with the training input",
             ),
             (
                 ModelSelectionError::InsufficientRecoveryReplications,
