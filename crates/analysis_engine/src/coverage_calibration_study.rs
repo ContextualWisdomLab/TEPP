@@ -3,28 +3,39 @@
 //! Per-replication scientific composition lives in
 //! [`crate::execute_coverage_calibration_replication`]. This module adds the
 //! application boundary needed to execute declared ordinal ranges without
-//! caller-authored seeds and to assemble the complete indexed outcome ledger
-//! into schema-owned validation evidence without caller-authored scenario
-//! identity or fingerprint values.
+//! caller-authored seeds, persist shard provenance without losing source/scenario
+//! identity, and assemble the complete indexed outcome ledger into schema-owned
+//! validation evidence.
 
 use std::fmt;
 
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use tepp_simulation::{CoverageCalibrationSimulationDesign, SimulationError};
 use validation_core::{
     CoverageCalibrationDesign, CoverageCalibrationEvidenceRecord,
-    CoverageCalibrationReplicationOutcome, ValidationError,
+    CoverageCalibrationReplicationOutcome, ValidationError, parse_commit_head,
 };
 
 use crate::{CoverageCalibrationExecutionError, execute_coverage_calibration_replication};
 
 const LOWER_COVERAGE_PERCENTILE: f64 = 0.025;
 const UPPER_COVERAGE_PERCENTILE: f64 = 0.975;
+const COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION: u32 = 1;
+const COVERAGE_CALIBRATION_SHARD_FINGERPRINT_DOMAIN: &[u8] =
+    b"tepp.analysis.coverage-calibration-shard.v1\0";
 
 /// Fail-closed error from prospective coverage-study execution or evidence assembly.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CoverageCalibrationStudyError {
     /// The requested half-open shard range was empty or outside the declared scenario.
     InvalidShardRange,
+    /// The exact source commit identity was not canonical lowercase forty-hex.
+    InvalidSourceIdentity,
+    /// A persisted shard record disagreed with the declared source/scenario/range binding.
+    InvalidShardProvenance,
+    /// The supplied shard set did not exactly cover the declared replication schedule.
+    IncompleteShardSet,
     /// The versioned simulation and validation owners disagree on the declared attempt count.
     InvalidDesignBinding,
     /// A structurally invalid replication aborted scientific execution.
@@ -41,6 +52,15 @@ impl fmt::Display for CoverageCalibrationStudyError {
             Self::InvalidShardRange => {
                 formatter.write_str("invalid coverage calibration shard range")
             }
+            Self::InvalidSourceIdentity => {
+                formatter.write_str("invalid coverage calibration source identity")
+            }
+            Self::InvalidShardProvenance => {
+                formatter.write_str("invalid coverage calibration shard provenance")
+            }
+            Self::IncompleteShardSet => {
+                formatter.write_str("incomplete coverage calibration shard set")
+            }
             Self::InvalidDesignBinding => formatter
                 .write_str("coverage calibration design/scenario attempt counts differ"),
             Self::Execution(error) => error.fmt(formatter),
@@ -54,14 +74,125 @@ impl fmt::Display for CoverageCalibrationStudyError {
 
 impl std::error::Error for CoverageCalibrationStudyError {}
 
+/// Immutable application-level provenance record for one executed calibration shard.
+///
+/// The record binds a half-open ordinal range to the simulation-owner scenario,
+/// the exact source commit supplied by the execution environment, and the indexed
+/// outcomes actually produced for that range. Its digest is an immutable transfer
+/// binding, not authentication of external storage, runners, or the Git build.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+pub struct CoverageCalibrationShardRecord {
+    schema_version: u32,
+    start_replication_index: usize,
+    end_replication_index_exclusive: usize,
+    simulation_scenario_id: String,
+    simulation_scenario_fingerprint: String,
+    source_head: String,
+    outcomes: Vec<CoverageCalibrationReplicationOutcome>,
+}
+
+impl CoverageCalibrationShardRecord {
+    /// Version of the persisted shard-record wire contract.
+    #[must_use]
+    pub const fn schema_version(&self) -> u32 {
+        self.schema_version
+    }
+
+    /// First zero-based replication ordinal represented by this shard.
+    #[must_use]
+    pub const fn start_replication_index(&self) -> usize {
+        self.start_replication_index
+    }
+
+    /// Exclusive upper replication ordinal represented by this shard.
+    #[must_use]
+    pub const fn end_replication_index_exclusive(&self) -> usize {
+        self.end_replication_index_exclusive
+    }
+
+    /// Simulation-owner scenario identity bound to this shard.
+    #[must_use]
+    pub fn simulation_scenario_id(&self) -> &str {
+        &self.simulation_scenario_id
+    }
+
+    /// Simulation-owner scenario fingerprint bound to this shard.
+    #[must_use]
+    pub fn simulation_scenario_fingerprint(&self) -> &str {
+        &self.simulation_scenario_fingerprint
+    }
+
+    /// Exact lowercase source commit declared by the execution environment.
+    #[must_use]
+    pub fn source_head(&self) -> &str {
+        &self.source_head
+    }
+
+    /// Indexed outcomes in the shard's declared ordinal order.
+    #[must_use]
+    pub fn outcomes(&self) -> &[CoverageCalibrationReplicationOutcome] {
+        &self.outcomes
+    }
+
+    /// Serialize the deterministic shard record to struct-order JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoverageCalibrationStudyError::InvalidEvidence`] if serialization
+    /// unexpectedly fails.
+    pub fn to_json(&self) -> Result<String, CoverageCalibrationStudyError> {
+        serde_json::to_string(self).map_err(|_| CoverageCalibrationStudyError::InvalidEvidence)
+    }
+
+    /// Return a domain-separated SHA-256 binding over exact shard provenance/outcomes.
+    ///
+    /// Coverage values enter as exact IEEE-754 binary64 bits. The digest therefore
+    /// remains independent of JSON float formatting while changing for any source,
+    /// scenario, range, success/failure identity, or coverage-bit change.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoverageCalibrationStudyError::InvalidShardProvenance`] if a
+    /// platform-sized count cannot be represented in the canonical `u64` geometry.
+    pub fn sha256(&self) -> Result<String, CoverageCalibrationStudyError> {
+        let mut hasher = Sha256::new();
+        hasher.update(COVERAGE_CALIBRATION_SHARD_FINGERPRINT_DOMAIN);
+        hasher.update(self.schema_version.to_le_bytes());
+        update_len_prefixed(&mut hasher, self.simulation_scenario_id.as_bytes())?;
+        update_len_prefixed(
+            &mut hasher,
+            self.simulation_scenario_fingerprint.as_bytes(),
+        )?;
+        update_len_prefixed(&mut hasher, self.source_head.as_bytes())?;
+        hasher.update(to_u64(self.start_replication_index)?.to_le_bytes());
+        hasher.update(to_u64(self.end_replication_index_exclusive)?.to_le_bytes());
+        hasher.update(to_u64(self.outcomes.len())?.to_le_bytes());
+        for outcome in &self.outcomes {
+            hasher.update(to_u64(outcome.replication_index())?.to_le_bytes());
+            match outcome.window_coverages() {
+                Some(window_coverages) => {
+                    hasher.update([1_u8]);
+                    hasher.update(to_u64(window_coverages.len())?.to_le_bytes());
+                    for coverage in window_coverages {
+                        hasher.update(coverage.to_bits().to_le_bytes());
+                    }
+                }
+                None => {
+                    hasher.update([0_u8]);
+                    hasher.update(0_u64.to_le_bytes());
+                }
+            }
+        }
+        Ok(format!("{:x}", hasher.finalize()))
+    }
+}
+
 /// Execute one half-open range of prospectively declared DGP replication ordinals.
 ///
 /// The caller chooses only a bounded ordinal range. Seed and DGP configuration
 /// remain owned by [`CoverageCalibrationSimulationDesign`], and every element is
 /// produced by the same indexed executor used for unsharded scientific
-/// execution. Returned outcomes therefore retain declared replication identity
-/// and may be concatenated in any completion order before canonical evidence
-/// assembly.
+/// execution. Returned outcomes retain declared replication identity.
 ///
 /// # Errors
 ///
@@ -90,49 +221,165 @@ pub fn execute_coverage_calibration_shard(
         .collect()
 }
 
-/// Assemble the complete v1 prospective coverage study into canonical evidence.
+/// Execute and bind one shard to exact scenario/source provenance for persistence or resume.
 ///
-/// This boundary fixes the validation/scenario owner pair and the previously
-/// established 2.5%/97.5% empirical reporting probabilities. The simulation
-/// scenario identity and fingerprint are derived directly from the simulation
-/// owner rather than accepted as caller strings. `outcomes` may arrive in shard
-/// completion order; `validation_core` requires an exact permutation of every
-/// declared ordinal and canonicalizes it before persistence.
-///
-/// `source_head` is the exact lowercase forty-hex Git commit that produced the
-/// supplied outcomes. This function records that identity but does not claim to
-/// authenticate the surrounding build or storage system.
+/// Scenario identity and fingerprint are derived directly from the simulation
+/// owner. The caller supplies an exact source commit because that identity belongs
+/// to the execution environment rather than the simulation domain. It is validated
+/// before any expensive scientific replication executes.
 ///
 /// # Errors
 ///
-/// Returns [`CoverageCalibrationStudyError::InvalidDesignBinding`] if the two
-/// versioned owners drift in attempted-DGP count,
-/// [`CoverageCalibrationStudyError::InvalidScenarioBinding`] if the simulation
-/// fingerprint cannot be reconstructed, or
-/// [`CoverageCalibrationStudyError::InvalidEvidence`] when outcome identities,
-/// coverage values, source identity, or evidence serialization inputs violate
-/// the validation owner contract.
-pub fn assemble_coverage_calibration_evidence_v1(
-    outcomes: &[CoverageCalibrationReplicationOutcome],
+/// Returns [`CoverageCalibrationStudyError::InvalidSourceIdentity`] for a
+/// non-canonical source commit, [`CoverageCalibrationStudyError::InvalidShardRange`]
+/// for an invalid range, [`CoverageCalibrationStudyError::InvalidScenarioBinding`]
+/// when owner scenario fingerprinting fails, or the structural execution error
+/// produced by a declared replication.
+pub fn execute_coverage_calibration_shard_record(
+    design: CoverageCalibrationSimulationDesign,
+    start_replication_index: usize,
+    end_replication_index_exclusive: usize,
     source_head: &str,
+) -> Result<CoverageCalibrationShardRecord, CoverageCalibrationStudyError> {
+    require_canonical_source_head(source_head)?;
+    let scenario_fingerprint = map_scenario_fingerprint(design.scenario_fingerprint())?;
+    let outcomes = execute_coverage_calibration_shard(
+        design,
+        start_replication_index,
+        end_replication_index_exclusive,
+    )?;
+    validate_outcome_range(
+        start_replication_index,
+        end_replication_index_exclusive,
+        &outcomes,
+    )?;
+
+    Ok(CoverageCalibrationShardRecord {
+        schema_version: COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION,
+        start_replication_index,
+        end_replication_index_exclusive,
+        simulation_scenario_id: design.scenario_id().to_owned(),
+        simulation_scenario_fingerprint: scenario_fingerprint,
+        source_head: source_head.to_owned(),
+        outcomes,
+    })
+}
+
+/// Assemble the complete v1 prospective coverage study from provenance-bound shards.
+///
+/// Shards may arrive in any completion order, but together they must exactly tile
+/// `0..attempted_dgp_count` without gaps or overlap. Every shard must bind the same
+/// canonical source commit and the current v1 simulation-owner scenario identity
+/// and fingerprint. Only after those application-level provenance checks pass are
+/// outcomes flattened into `validation_core`, which remains authoritative for the
+/// exact full permutation, denominator, coverage, Monte Carlo uncertainty,
+/// percentiles, and schema-v4 evidence arithmetic.
+///
+/// # Errors
+///
+/// Returns [`CoverageCalibrationStudyError::IncompleteShardSet`] for an empty,
+/// gapped, overlapping, or partial shard set,
+/// [`CoverageCalibrationStudyError::InvalidShardProvenance`] for mixed or stale
+/// scenario/source/range bindings,
+/// [`CoverageCalibrationStudyError::InvalidDesignBinding`] if simulation and
+/// validation owners drift in attempted-DGP count, or the existing scenario and
+/// evidence errors when their owners reject reconstruction.
+pub fn assemble_coverage_calibration_evidence_v1(
+    shards: &[CoverageCalibrationShardRecord],
 ) -> Result<CoverageCalibrationEvidenceRecord, CoverageCalibrationStudyError> {
     let validation_design = CoverageCalibrationDesign::tepp_nominal_95_v1();
     let simulation_design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+    let attempted_replication_count = validation_design.attempted_dgp_count();
     require_matching_attempt_counts(
-        validation_design.attempted_dgp_count(),
+        attempted_replication_count,
         simulation_design.attempted_replication_count(),
     )?;
     let scenario_fingerprint = map_scenario_fingerprint(simulation_design.scenario_fingerprint())?;
+    let (source_head, outcomes) = validate_and_flatten_shards(
+        shards,
+        attempted_replication_count,
+        simulation_design.scenario_id(),
+        &scenario_fingerprint,
+    )?;
 
     map_evidence_result(CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
         &validation_design,
-        outcomes,
+        &outcomes,
         LOWER_COVERAGE_PERCENTILE,
         UPPER_COVERAGE_PERCENTILE,
         simulation_design.scenario_id(),
         &scenario_fingerprint,
-        source_head,
+        &source_head,
     ))
+}
+
+fn validate_and_flatten_shards(
+    shards: &[CoverageCalibrationShardRecord],
+    attempted_replication_count: usize,
+    expected_scenario_id: &str,
+    expected_scenario_fingerprint: &str,
+) -> Result<(String, Vec<CoverageCalibrationReplicationOutcome>), CoverageCalibrationStudyError> {
+    if shards.is_empty() {
+        return Err(CoverageCalibrationStudyError::IncompleteShardSet);
+    }
+
+    let mut ordered: Vec<_> = shards.iter().collect();
+    ordered.sort_unstable_by_key(|shard| shard.start_replication_index);
+    let source_head = ordered[0].source_head.clone();
+    require_canonical_source_head(&source_head)
+        .map_err(|_| CoverageCalibrationStudyError::InvalidShardProvenance)?;
+
+    let mut next_replication_index = 0_usize;
+    let mut outcomes = Vec::with_capacity(attempted_replication_count);
+    for shard in ordered {
+        if shard.schema_version != COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION
+            || shard.simulation_scenario_id != expected_scenario_id
+            || shard.simulation_scenario_fingerprint != expected_scenario_fingerprint
+            || shard.source_head != source_head
+        {
+            return Err(CoverageCalibrationStudyError::InvalidShardProvenance);
+        }
+        if shard.start_replication_index != next_replication_index
+            || shard.start_replication_index >= shard.end_replication_index_exclusive
+            || shard.end_replication_index_exclusive > attempted_replication_count
+        {
+            return Err(CoverageCalibrationStudyError::IncompleteShardSet);
+        }
+        validate_outcome_range(
+            shard.start_replication_index,
+            shard.end_replication_index_exclusive,
+            &shard.outcomes,
+        )?;
+        outcomes.extend(shard.outcomes.iter().cloned());
+        next_replication_index = shard.end_replication_index_exclusive;
+    }
+
+    if next_replication_index != attempted_replication_count {
+        return Err(CoverageCalibrationStudyError::IncompleteShardSet);
+    }
+    Ok((source_head, outcomes))
+}
+
+fn validate_outcome_range(
+    start_replication_index: usize,
+    end_replication_index_exclusive: usize,
+    outcomes: &[CoverageCalibrationReplicationOutcome],
+) -> Result<(), CoverageCalibrationStudyError> {
+    let expected_len = end_replication_index_exclusive
+        .checked_sub(start_replication_index)
+        .ok_or(CoverageCalibrationStudyError::InvalidShardProvenance)?;
+    if outcomes.len() != expected_len {
+        return Err(CoverageCalibrationStudyError::InvalidShardProvenance);
+    }
+    for (offset, outcome) in outcomes.iter().enumerate() {
+        let expected_index = start_replication_index
+            .checked_add(offset)
+            .ok_or(CoverageCalibrationStudyError::InvalidShardProvenance)?;
+        if outcome.replication_index() != expected_index {
+            return Err(CoverageCalibrationStudyError::InvalidShardProvenance);
+        }
+    }
+    Ok(())
 }
 
 fn require_matching_attempt_counts(
@@ -143,6 +390,30 @@ fn require_matching_attempt_counts(
         return Err(CoverageCalibrationStudyError::InvalidDesignBinding);
     }
     Ok(())
+}
+
+fn require_canonical_source_head(source_head: &str) -> Result<(), CoverageCalibrationStudyError> {
+    let lowercase_hex = source_head.len() == 40
+        && source_head
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+    if !lowercase_hex || parse_commit_head(source_head).is_err() {
+        return Err(CoverageCalibrationStudyError::InvalidSourceIdentity);
+    }
+    Ok(())
+}
+
+fn update_len_prefixed(
+    hasher: &mut Sha256,
+    bytes: &[u8],
+) -> Result<(), CoverageCalibrationStudyError> {
+    hasher.update(to_u64(bytes.len())?.to_le_bytes());
+    hasher.update(bytes);
+    Ok(())
+}
+
+fn to_u64(value: usize) -> Result<u64, CoverageCalibrationStudyError> {
+    u64::try_from(value).map_err(|_| CoverageCalibrationStudyError::InvalidShardProvenance)
 }
 
 fn map_execution_result(
@@ -165,14 +436,46 @@ fn map_evidence_result(
 
 #[cfg(test)]
 mod tests {
-    use tepp_simulation::SimulationError;
+    use tepp_simulation::{CoverageCalibrationSimulationDesign, SimulationError};
     use validation_core::{CoverageCalibrationReplicationOutcome, ValidationError};
 
     use super::{
-        CoverageCalibrationStudyError, map_evidence_result, map_execution_result,
-        map_scenario_fingerprint, require_matching_attempt_counts,
+        COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION, CoverageCalibrationShardRecord,
+        CoverageCalibrationStudyError, assemble_coverage_calibration_evidence_v1,
+        map_evidence_result, map_execution_result, map_scenario_fingerprint,
+        require_matching_attempt_counts, validate_and_flatten_shards,
     };
     use crate::CoverageCalibrationExecutionError;
+
+    const SOURCE_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+    const OTHER_SOURCE_HEAD: &str = "1123456789abcdef0123456789abcdef01234567";
+
+    fn synthetic_shard(
+        start: usize,
+        end: usize,
+        source_head: &str,
+    ) -> CoverageCalibrationShardRecord {
+        let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+        let fingerprint = design
+            .scenario_fingerprint()
+            .expect("versioned scenario fingerprint");
+        CoverageCalibrationShardRecord {
+            schema_version: COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION,
+            start_replication_index: start,
+            end_replication_index_exclusive: end,
+            simulation_scenario_id: design.scenario_id().to_owned(),
+            simulation_scenario_fingerprint: fingerprint,
+            source_head: source_head.to_owned(),
+            outcomes: (start..end)
+                .map(|replication_index| {
+                    CoverageCalibrationReplicationOutcome::successful(
+                        replication_index,
+                        vec![0.95, 0.95, 0.95, 0.95, 0.95],
+                    )
+                })
+                .collect(),
+        }
+    }
 
     #[test]
     fn owner_binding_and_error_mappers_fail_closed() {
@@ -205,11 +508,82 @@ mod tests {
     }
 
     #[test]
+    fn shard_assembly_is_completion_order_independent_and_binds_one_source() {
+        let second = synthetic_shard(5_000, 10_000, SOURCE_HEAD);
+        let first = synthetic_shard(0, 5_000, SOURCE_HEAD);
+        let evidence = assemble_coverage_calibration_evidence_v1(&[second, first])
+            .expect("complete provenance-bound shard set");
+
+        assert_eq!(evidence.source_head(), SOURCE_HEAD);
+        assert_eq!(evidence.attempted_replication_count(), 10_000);
+        assert_eq!(evidence.successful_replication_count(), 10_000);
+        assert!(evidence.supports_calibration_claim());
+    }
+
+    #[test]
+    fn shard_assembly_rejects_mixed_source_and_non_tiling_ranges() {
+        let first = synthetic_shard(0, 5_000, SOURCE_HEAD);
+        let mixed_source = synthetic_shard(5_000, 10_000, OTHER_SOURCE_HEAD);
+        assert_eq!(
+            assemble_coverage_calibration_evidence_v1(&[first.clone(), mixed_source]),
+            Err(CoverageCalibrationStudyError::InvalidShardProvenance)
+        );
+
+        let gap = synthetic_shard(5_001, 10_000, SOURCE_HEAD);
+        assert_eq!(
+            assemble_coverage_calibration_evidence_v1(&[first.clone(), gap]),
+            Err(CoverageCalibrationStudyError::IncompleteShardSet)
+        );
+
+        let overlap = synthetic_shard(4_999, 10_000, SOURCE_HEAD);
+        assert_eq!(
+            assemble_coverage_calibration_evidence_v1(&[first, overlap]),
+            Err(CoverageCalibrationStudyError::IncompleteShardSet)
+        );
+    }
+
+    #[test]
+    fn shard_validation_rejects_outcome_identity_drift() {
+        let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+        let fingerprint = design
+            .scenario_fingerprint()
+            .expect("versioned scenario fingerprint");
+        let malformed = CoverageCalibrationShardRecord {
+            schema_version: COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION,
+            start_replication_index: 0,
+            end_replication_index_exclusive: 1,
+            simulation_scenario_id: design.scenario_id().to_owned(),
+            simulation_scenario_fingerprint: fingerprint.clone(),
+            source_head: SOURCE_HEAD.to_owned(),
+            outcomes: vec![CoverageCalibrationReplicationOutcome::successful(
+                1,
+                vec![0.95],
+            )],
+        };
+        assert_eq!(
+            validate_and_flatten_shards(&[malformed], 1, design.scenario_id(), &fingerprint),
+            Err(CoverageCalibrationStudyError::InvalidShardProvenance)
+        );
+    }
+
+    #[test]
     fn public_error_messages_are_stable() {
         let messages = [
             (
                 CoverageCalibrationStudyError::InvalidShardRange,
                 "invalid coverage calibration shard range",
+            ),
+            (
+                CoverageCalibrationStudyError::InvalidSourceIdentity,
+                "invalid coverage calibration source identity",
+            ),
+            (
+                CoverageCalibrationStudyError::InvalidShardProvenance,
+                "invalid coverage calibration shard provenance",
+            ),
+            (
+                CoverageCalibrationStudyError::IncompleteShardSet,
+                "incomplete coverage calibration shard set",
             ),
             (
                 CoverageCalibrationStudyError::InvalidDesignBinding,
