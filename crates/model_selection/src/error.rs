@@ -34,6 +34,8 @@ pub enum ModelSelectionError {
     PredictiveCandidateGridMismatch,
     /// A recovery fit used a numerical configuration other than the declared design.
     PredictiveCandidateConfigurationMismatch,
+    /// Recovery candidates in one window were fitted from different training states.
+    PredictiveCandidateTrainingStateMismatch,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -60,6 +62,9 @@ impl fmt::Display for ModelSelectionError {
             }
             Self::PredictiveCandidateConfigurationMismatch => {
                 "rolling-origin predictive fit configuration does not match the declared recovery design"
+            }
+            Self::PredictiveCandidateTrainingStateMismatch => {
+                "rolling-origin recovery candidates do not share one numerical training state"
             }
         };
         formatter.write_str(message)
@@ -130,6 +135,10 @@ mod tests {
             (
                 ModelSelectionError::PredictiveCandidateConfigurationMismatch,
                 "rolling-origin predictive fit configuration does not match the declared recovery design",
+            ),
+            (
+                ModelSelectionError::PredictiveCandidateTrainingStateMismatch,
+                "rolling-origin recovery candidates do not share one numerical training state",
             ),
         ] {
             assert_eq!(error.to_string(), message);
