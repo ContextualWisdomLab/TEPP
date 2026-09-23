@@ -2,6 +2,9 @@ use validation_core::{
     CoverageCalibrationReplicationOutcome, canonical_indexed_coverage_outcomes_sha256,
 };
 
+const FIXTURE_SHA256: &str =
+    "2f1b68c10f2e861405d39b50ecf0b9f1fff79650911e97afc6ed28d71e3bea04";
+
 fn outcomes() -> Vec<CoverageCalibrationReplicationOutcome> {
     vec![
         CoverageCalibrationReplicationOutcome::successful(0, vec![0.95, 0.91]),
@@ -21,6 +24,7 @@ fn indexed_coverage_fingerprint_is_canonical_and_bit_exact() {
     let reversed_digest = canonical_indexed_coverage_outcomes_sha256(3, &reversed)
         .expect("completion order must not affect digest");
 
+    assert_eq!(ordered_digest, FIXTURE_SHA256);
     assert_eq!(ordered_digest, reversed_digest);
     assert_eq!(ordered_digest.len(), 64);
     assert!(
