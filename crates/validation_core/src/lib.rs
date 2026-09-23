@@ -82,6 +82,8 @@ pub use graph_metrics::edge_recall;
 pub use indexed_coverage::CoverageCalibrationReplicationOutcome;
 /// Canonicalize an exact indexed coverage outcome ledger in declared identity order.
 pub use indexed_coverage::canonical_indexed_coverage_outcomes;
+/// Fingerprint the canonical indexed coverage outcome ledger with SHA-256.
+pub use indexed_coverage::canonical_indexed_coverage_outcomes_sha256;
 /// Aggregate coverage only from the exact declared replication identity set.
 pub use indexed_coverage::summarize_indexed_windowed_coverage_recovery_replications;
 /// Closed marginal normal interval bounds in location-coordinate order.
