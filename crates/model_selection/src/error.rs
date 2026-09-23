@@ -18,6 +18,8 @@ pub enum ModelSelectionError {
     LexicalWeightForbidden,
     /// Every fitted candidate failed to converge or produced a typed numeric failure.
     NoSuccessfulFit,
+    /// One declared scientific-recovery candidate failed to fit.
+    RecoveryCandidateFitFailed,
     /// Fewer than two successful recovery replications remain after failures.
     InsufficientRecoveryReplications,
     /// A rolling-origin numerical input did not match the admitted split identities.
@@ -47,6 +49,9 @@ impl fmt::Display for ModelSelectionError {
             Self::LlmVoteIsNotStatisticalAuthority => "llm vote is not statistical authority",
             Self::LexicalWeightForbidden => "lexical inferential weights are forbidden",
             Self::NoSuccessfulFit => "no fitted candidate produced a finite diagnostic",
+            Self::RecoveryCandidateFitFailed => {
+                "a declared scientific-recovery candidate failed to fit"
+            }
             Self::InsufficientRecoveryReplications => {
                 "at least two successful recovery replications are required"
             }
@@ -103,6 +108,10 @@ mod tests {
             (
                 ModelSelectionError::NoSuccessfulFit,
                 "no fitted candidate produced a finite diagnostic",
+            ),
+            (
+                ModelSelectionError::RecoveryCandidateFitFailed,
+                "a declared scientific-recovery candidate failed to fit",
             ),
             (
                 ModelSelectionError::InsufficientRecoveryReplications,
