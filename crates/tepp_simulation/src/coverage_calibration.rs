@@ -7,39 +7,6 @@ const COVERAGE_CALIBRATION_REPLICATION_COUNT: usize = 10_000;
 const COVERAGE_CALIBRATION_FINGERPRINT_DOMAIN: &[u8] =
     b"tepp.coverage-calibration-scenario-fingerprint.v1\0";
 
-/// Owner-issued data-generating-process family used by rolling-origin coverage studies.
-///
-/// This value owns every simulation parameter except the RNG seed. It exists so
-/// small regression fixtures and the prospective acceptance schedule exercise one
-/// DGP definition without copying event counts, delays, relation noise, method
-/// effects, or topic-truth settings into consumers. It does **not** identify an
-/// acceptance replication: scientific acceptance must obtain its seed and config
-/// through [`CoverageCalibrationSimulationDesign::config_for_replication`].
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct CoverageCalibrationDgpFamily;
-
-impl CoverageCalibrationDgpFamily {
-    /// Construct TEPP's first rolling-origin coverage DGP family.
-    #[must_use]
-    pub const fn rolling_origin_v1() -> Self {
-        Self
-    }
-
-    /// Construct the family configuration under an explicitly supplied seed.
-    ///
-    /// This method is intended for bounded regression/composition tests that must
-    /// stay on the same DGP shape while remaining disjoint from the prospective
-    /// acceptance seed schedule. It does not mint scenario or replication identity.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`SimulationError::InvalidConfiguration`] if the owned DGP family
-    /// becomes invalid under a future incompatible change.
-    pub fn config_for_seed(self, seed: u64) -> Result<SimulationConfig, SimulationError> {
-        SimulationConfig::new(seed, 9, 2, 3, 12, 6, 0, 0, 500, 3_000, 3_000, 3_000)
-    }
-}
-
 /// Owner-issued DGP scenario for the first prospective rolling-origin coverage study.
 ///
 /// This type fixes the data-generating process and seed schedule independently
@@ -85,12 +52,31 @@ impl CoverageCalibrationSimulationDesign {
             .ok_or(SimulationError::InvalidConfiguration)
     }
 
+    /// Construct the owned DGP shape under a non-acceptance regression seed.
+    ///
+    /// This keeps small CI composition tests on the exact temporal, Membership,
+    /// relation-noise, method-effect, and topic-truth configuration used by the
+    /// prospective scenario without consuming its reserved acceptance seed
+    /// schedule. The returned value has no acceptance replication identity;
+    /// scientific acceptance must call [`Self::config_for_replication`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimulationError::InvalidConfiguration`] if the owned DGP shape
+    /// becomes invalid under a future incompatible change.
+    pub fn regression_config_for_seed(
+        self,
+        seed: u64,
+    ) -> Result<SimulationConfig, SimulationError> {
+        rolling_origin_v1_config(seed)
+    }
+
     /// Construct the exact DGP configuration for one declared replication.
     ///
-    /// The scenario binds the exact acceptance seed schedule to the shared
-    /// [`CoverageCalibrationDgpFamily::rolling_origin_v1`] configuration. Callers
-    /// performing scientific acceptance must use this method rather than supplying
-    /// a seed or reconstructing the family parameters themselves.
+    /// The scenario binds the exact acceptance seed schedule to the same owned
+    /// DGP shape used by [`Self::regression_config_for_seed`]. Callers performing
+    /// scientific acceptance must use this method rather than supplying a seed or
+    /// reconstructing the configuration parameters themselves.
     ///
     /// # Errors
     ///
@@ -101,8 +87,7 @@ impl CoverageCalibrationSimulationDesign {
         self,
         replication_index: usize,
     ) -> Result<SimulationConfig, SimulationError> {
-        CoverageCalibrationDgpFamily::rolling_origin_v1()
-            .config_for_seed(self.seed_for_replication(replication_index)?)
+        rolling_origin_v1_config(self.seed_for_replication(replication_index)?)
     }
 
     /// Digest the complete declared scenario into one immutable SHA-256 fingerprint.
@@ -139,4 +124,8 @@ impl CoverageCalibrationSimulationDesign {
         }
         Ok(crate::digest_bytes(&bytes))
     }
+}
+
+fn rolling_origin_v1_config(seed: u64) -> Result<SimulationConfig, SimulationError> {
+    SimulationConfig::new(seed, 9, 2, 3, 12, 6, 0, 0, 500, 3_000, 3_000, 3_000)
 }
