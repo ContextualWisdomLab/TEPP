@@ -1,0 +1,3 @@
+### Changed
+
+- Scientific rolling-origin recovery can now bind selected-K evaluation to the complete owner-derived `KnowledgeCutoff` horizon. `select_declared_rolling_origin_recovery_candidate_k_for_cutoffs(...)` derives the canonical window sequence through `corpus_split::rolling_origin_windows` and rejects omitted, reordered, or substituted windows with `RecoveryWindowSetMismatch`, preventing a leading or trailing numerical fit failure from being hidden by selecting on a truncated prefix or suffix. The lower-level slice-only selector remains available and generic predictive survivor semantics are unchanged.
