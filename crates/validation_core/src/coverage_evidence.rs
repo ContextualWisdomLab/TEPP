@@ -1,8 +1,9 @@
 //! Machine-readable evidence for prospective coverage-calibration studies.
 
 use crate::{
-    CoverageCalibrationDesign, MonteCarloRecoveryMetricSummary, ValidationError,
+    CoverageCalibrationDesign, CoverageCalibrationReplicationOutcome, ValidationError,
     assess_coverage_calibration, parse_commit_head,
+    summarize_indexed_windowed_coverage_recovery_replications,
 };
 use serde::Serialize;
 
@@ -12,8 +13,8 @@ const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 1;
 ///
 /// The record keeps validation criterion identity separate from simulation
 /// scenario identity while binding both to an exact source commit. It preserves
-/// the unconditional attempted/success/failure denominator and failure-rate
-/// Monte Carlo uncertainty alongside conditional interval-calibration metrics.
+/// the exact declared replication identity set, unconditional failure denominator,
+/// and Monte Carlo uncertainty alongside conditional interval-calibration metrics.
 /// A positive [`Self::supports_calibration_claim`] value is intentionally narrower
 /// than estimator robustness, scientific promotion, or release authority.
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -31,6 +32,8 @@ pub struct CoverageCalibrationEvidenceRecord {
     coverage_mean: Option<f64>,
     coverage_standard_deviation: Option<f64>,
     coverage_monte_carlo_standard_error: Option<f64>,
+    coverage_percentile_lower_probability: f64,
+    coverage_percentile_upper_probability: f64,
     coverage_percentile_lower: Option<f64>,
     coverage_percentile_upper: Option<f64>,
     coverage_within_practical_band: bool,
@@ -39,25 +42,29 @@ pub struct CoverageCalibrationEvidenceRecord {
 }
 
 impl CoverageCalibrationEvidenceRecord {
-    /// Construct a persisted evidence record from owner validation design and summary.
+    /// Construct persisted evidence from the exact declared replication identity set.
     ///
     /// `simulation_scenario_id` and `simulation_scenario_fingerprint` are opaque
     /// values supplied by the simulation owner. This crate validates only their
     /// persistence-safe shape rather than importing simulation-domain source.
     /// `source_head` must be an exact lowercase forty-hex Git commit identity.
-    /// The denominator is rechecked through [`assess_coverage_calibration`], so
-    /// a summary from a shortened or extended experiment cannot be serialized
-    /// under the prospective design identity.
+    /// The indexed aggregation boundary requires an exact permutation of the
+    /// prospective design's replication identities before any summary can be
+    /// serialized, preventing duplicate/omitted shard results from preserving a
+    /// superficially correct attempt count.
     ///
     /// # Errors
     ///
     /// Returns [`ValidationError::InvalidInput`] for an empty/control-bearing
-    /// scenario identity, a non-canonical SHA-256 scenario fingerprint, a
-    /// non-canonical Git head, or a summary whose attempt count differs from the
-    /// prospective design.
-    pub fn from_summary(
+    /// scenario identity, non-canonical SHA-256 scenario fingerprint or Git head,
+    /// malformed coverage outcome, or replication identity drift. Returns
+    /// [`ValidationError::InvalidConfiguration`] for invalid percentile bounds.
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_indexed_outcomes(
         design: &CoverageCalibrationDesign,
-        summary: &MonteCarloRecoveryMetricSummary,
+        outcomes: &[CoverageCalibrationReplicationOutcome],
+        lower_percentile: f64,
+        upper_percentile: f64,
         simulation_scenario_id: &str,
         simulation_scenario_fingerprint: &str,
         source_head: &str,
@@ -73,7 +80,13 @@ impl CoverageCalibrationEvidenceRecord {
             return Err(ValidationError::InvalidInput);
         }
         parse_commit_head(source_head)?;
-        let assessment = assess_coverage_calibration(design, summary)?;
+        let summary = summarize_indexed_windowed_coverage_recovery_replications(
+            design.attempted_dgp_count(),
+            outcomes,
+            lower_percentile,
+            upper_percentile,
+        )?;
+        let assessment = assess_coverage_calibration(design, &summary)?;
         let successful_metric_summary = summary.successful_metric_summary();
 
         Ok(Self {
@@ -92,6 +105,8 @@ impl CoverageCalibrationEvidenceRecord {
                 .map(|metric| metric.standard_deviation),
             coverage_monte_carlo_standard_error: assessment
                 .coverage_monte_carlo_standard_error(),
+            coverage_percentile_lower_probability: lower_percentile,
+            coverage_percentile_upper_probability: upper_percentile,
             coverage_percentile_lower: successful_metric_summary
                 .map(|metric| metric.percentile_lower),
             coverage_percentile_upper: successful_metric_summary
@@ -178,6 +193,18 @@ impl CoverageCalibrationEvidenceRecord {
     #[must_use]
     pub const fn coverage_monte_carlo_standard_error(&self) -> Option<f64> {
         self.coverage_monte_carlo_standard_error
+    }
+
+    /// Probability defining the lower empirical percentile bound.
+    #[must_use]
+    pub const fn coverage_percentile_lower_probability(&self) -> f64 {
+        self.coverage_percentile_lower_probability
+    }
+
+    /// Probability defining the upper empirical percentile bound.
+    #[must_use]
+    pub const fn coverage_percentile_upper_probability(&self) -> f64 {
+        self.coverage_percentile_upper_probability
     }
 
     /// Lower empirical percentile of successful DGP-level coverage when estimable.
