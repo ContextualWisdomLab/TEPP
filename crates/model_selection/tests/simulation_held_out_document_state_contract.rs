@@ -2,23 +2,29 @@
 //!
 //! This contract is deliberately narrower than the full #680 repeated recovery
 //! experiment. It proves that the #719 local-state owner can consume realistic
-//! simulator rows after a temporal cutoff, preserve the training fit, align the
-//! recovered simplex into the simulator truth topic basis, and produce finite
-//! recovery diagnostics over the exact evaluation document identities.
+//! simulator rows after a temporal cutoff, that #720 binds those rows to the
+//! exact admitted rolling-origin identities, and that the recovered simplex can
+//! be compared with simulator truth without mutating the training fit.
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use corpus_split::{CorpusDocument, CorpusSnapshot};
+use corpus_split::{
+    CorpusDocument, CorpusSnapshot, LeakageLink, LeakageLinkKind,
+    admit_expanding_rolling_origin_partition,
+};
 use membership_core::{
     GroupId, MemberId, MembershipAssignment, MembershipNetwork, MembershipRole, MembershipWeight,
 };
+use model_selection::{ModelSelectionError, rolling_origin_held_out_document_topic_proportions};
 use relation_graph::{
     RelationEdge, RelationEndpointId, RelationEvidenceStatus, RelationGraph, RelationKind,
 };
 use temporal_core::{
     EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval, TemporalPrecision,
 };
-use tepp_simulation::{SimulatedDocument, SimulationConfig, TruthManifest, generate};
+use tepp_simulation::{
+    DocumentMethodEffect, SimulatedDocument, SimulationConfig, TruthManifest, generate,
+};
 use topic_measurement::{
     ReferenceTopicModelConfig, ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, SparseMatrix,
 };
@@ -46,6 +52,21 @@ fn cutoff_after_event(manifest: &TruthManifest, event_id: Uuid) -> KnowledgeCuto
         .max_by_key(|available_time| available_time.instant())
         .expect("generated event owns documents");
     KnowledgeCutoff::parse_rfc3339(&latest.to_rfc3339()).expect("availability cutoff")
+}
+
+fn snapshot_at(manifest: &TruthManifest, cutoff: &KnowledgeCutoff) -> CorpusSnapshot {
+    let mut snapshot = CorpusSnapshot::new();
+    for document in manifest.documents() {
+        if document.available_time().instant() <= cutoff.instant() {
+            snapshot
+                .insert_if_eligible(
+                    CorpusDocument::new(document.document_id(), document.available_time()),
+                    cutoff,
+                )
+                .expect("cutoff-eligible simulated document");
+        }
+    }
+    snapshot
 }
 
 fn event_time_by_document(manifest: &TruthManifest) -> BTreeMap<Uuid, EventTime> {
@@ -87,6 +108,40 @@ fn membership_network(manifest: &TruthManifest) -> MembershipNetwork {
         }
     }
     network
+}
+
+fn leakage_links(manifest: &TruthManifest) -> Vec<LeakageLink> {
+    let mut links = Vec::new();
+    let mut documents_by_event: BTreeMap<Uuid, Vec<Uuid>> = BTreeMap::new();
+    for document in manifest.documents() {
+        documents_by_event
+            .entry(document.event_id())
+            .or_default()
+            .push(document.document_id());
+        if let Some(parent) = document.parent_document_id() {
+            let kind = match document.method_effect() {
+                DocumentMethodEffect::Revision => LeakageLinkKind::Revision,
+                DocumentMethodEffect::Translation => LeakageLinkKind::Translation,
+                _ => LeakageLinkKind::CopiedVariant,
+            };
+            links.push(LeakageLink {
+                left: parent,
+                right: document.document_id(),
+                kind,
+            });
+        }
+    }
+    for document_ids in documents_by_event.values_mut() {
+        document_ids.sort_unstable();
+        for pair in document_ids.windows(2) {
+            links.push(LeakageLink {
+                left: pair[0],
+                right: pair[1],
+                kind: LeakageLinkKind::SameEpisode,
+            });
+        }
+    }
+    links
 }
 
 fn point_interval(time: EventTime) -> TemporalInterval<EventTime> {
@@ -164,7 +219,7 @@ fn count_matrix(
 }
 
 #[test]
-fn simulated_future_rows_recover_local_states_without_refitting_the_training_model() {
+fn simulated_future_rows_recover_local_states_without_refitting_or_identity_rebinding() {
     let manifest = generate(simulation_config()).expect("known-truth simulation");
     manifest
         .verify_invariants()
@@ -172,44 +227,40 @@ fn simulated_future_rows_recover_local_states_without_refitting_the_training_mod
 
     let training_cutoff = cutoff_after_event(&manifest, manifest.events()[3].event_id());
     let evaluation_cutoff = cutoff_after_event(&manifest, manifest.events()[4].event_id());
-    let training_document_ids: Vec<_> = manifest
-        .documents()
-        .iter()
-        .filter(|document| document.available_time().instant() <= training_cutoff.instant())
-        .map(SimulatedDocument::document_id)
+    let cutoffs = vec![training_cutoff.clone(), evaluation_cutoff.clone()];
+    let training_snapshot = snapshot_at(&manifest, &training_cutoff);
+    let evaluation_snapshot = snapshot_at(&manifest, &evaluation_cutoff);
+    let training_snapshot_ids: BTreeSet<_> = training_snapshot.document_ids().collect();
+    let evaluation_document_ids: Vec<_> = evaluation_snapshot
+        .document_ids()
+        .filter(|document_id| !training_snapshot_ids.contains(document_id))
         .collect();
-    let evaluation_document_ids: Vec<_> = manifest
-        .documents()
-        .iter()
-        .filter(|document| {
-            document.available_time().instant() > training_cutoff.instant()
-                && document.available_time().instant() <= evaluation_cutoff.instant()
-        })
-        .map(SimulatedDocument::document_id)
-        .collect();
-    assert!(!training_document_ids.is_empty());
     assert!(!evaluation_document_ids.is_empty());
-    let training_identity_set: BTreeSet<_> = training_document_ids.iter().copied().collect();
+
+    let expanding = admit_expanding_rolling_origin_partition(
+        &cutoffs,
+        0,
+        &training_snapshot,
+        &evaluation_snapshot,
+        &evaluation_document_ids,
+        &leakage_links(&manifest),
+    )
+    .expect("owner-admitted leakage-safe held-out partition");
+    let partition = expanding.partition().clone();
+    let training_document_ids: Vec<_> =
+        partition.training_document_ids().iter().copied().collect();
+    let admitted_evaluation_ids: Vec<_> =
+        partition.evaluation_document_ids().iter().copied().collect();
+    assert_eq!(
+        admitted_evaluation_ids.iter().copied().collect::<BTreeSet<_>>(),
+        evaluation_document_ids.iter().copied().collect::<BTreeSet<_>>()
+    );
     assert!(
-        evaluation_document_ids
+        admitted_evaluation_ids
             .iter()
-            .all(|document_id| !training_identity_set.contains(document_id)),
+            .all(|document_id| !partition.training_document_ids().contains(document_id)),
         "held-out identities must not enter the training state"
     );
-
-    let mut training_snapshot = CorpusSnapshot::new();
-    for document in manifest
-        .documents()
-        .iter()
-        .filter(|document| training_identity_set.contains(&document.document_id()))
-    {
-        training_snapshot
-            .insert_if_eligible(
-                CorpusDocument::new(document.document_id(), document.available_time()),
-                &training_cutoff,
-            )
-            .expect("training document is available at the frozen cutoff");
-    }
 
     let memberships = membership_network(&manifest);
     let relations = relation_graph(&manifest);
@@ -248,25 +299,41 @@ fn simulated_future_rows_recover_local_states_without_refitting_the_training_mod
     let frozen_model = fit.reference_fit().model().clone();
 
     let evaluation_document_term = count_matrix(
-        &evaluation_document_ids,
+        &admitted_evaluation_ids,
         vocabulary_size,
         &counts_by_document,
     );
-    let evaluation_event_times: Vec<_> = evaluation_document_ids
+    let evaluation_event_times: Vec<_> = admitted_evaluation_ids
         .iter()
         .map(|document_id| event_times[document_id])
         .collect();
-    let recovered = fit
-        .infer_held_out_document_topic_proportions(
-            &evaluation_document_ids,
+    let recovered = rolling_origin_held_out_document_topic_proportions(
+        &partition,
+        &fit,
+        &admitted_evaluation_ids,
+        &evaluation_document_term,
+        &evaluation_event_times,
+        None,
+        &memberships,
+    )
+    .expect("partition-bound frozen-fit held-out state recovery");
+    assert_eq!(fit.reference_fit().model(), &frozen_model);
+    assert_eq!(recovered.len(), admitted_evaluation_ids.len());
+
+    let mut rebound_ids = admitted_evaluation_ids.clone();
+    rebound_ids[0] = training_document_ids[0];
+    assert_eq!(
+        rolling_origin_held_out_document_topic_proportions(
+            &partition,
+            &fit,
+            &rebound_ids,
             &evaluation_document_term,
             &evaluation_event_times,
             None,
             &memberships,
-        )
-        .expect("frozen-fit held-out local-state recovery");
-    assert_eq!(fit.reference_fit().model(), &frozen_model);
-    assert_eq!(recovered.len(), evaluation_document_ids.len());
+        ),
+        Err(ModelSelectionError::PartitionInputMismatch)
+    );
 
     let alignment = align_topic_probability_rows(
         manifest.topic_truth().topic_term_probabilities(),
@@ -283,8 +350,8 @@ fn simulated_future_rows_recover_local_states_without_refitting_the_training_mod
         .collect();
     let mut truth_flat = Vec::new();
     let mut recovered_flat = Vec::new();
-    for (document_id, recovered_state) in evaluation_document_ids.iter().zip(&aligned) {
-        let truth_state = truth_state_by_document
+    for (document_id, recovered_state) in admitted_evaluation_ids.iter().zip(&aligned) {
+        let truth_state = *truth_state_by_document
             .get(document_id)
             .expect("evaluation identity retains simulator truth");
         assert_eq!(truth_state.len(), recovered_state.len());
