@@ -226,7 +226,7 @@ fn validate_probability_basis(rows: &[Vec<f64>]) -> Result<usize, ValidationErro
     Ok(vocabulary_size)
 }
 
-fn validate_covariance_matrix(
+pub(crate) fn validate_covariance_matrix(
     covariance: &[Vec<f64>],
     coordinate_count: usize,
 ) -> Result<(), ValidationError> {
