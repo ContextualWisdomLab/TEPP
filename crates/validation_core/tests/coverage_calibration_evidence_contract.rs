@@ -56,8 +56,15 @@ fn evidence_from_outcomes(
 fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty() {
     let record = evidence(9_998).expect("calibration evidence");
 
-    assert_eq!(record.schema_version(), 3);
+    assert_eq!(record.schema_version(), 4);
     assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
+    assert_eq!(record.validation_design_fingerprint().len(), 64);
+    assert!(
+        record
+            .validation_design_fingerprint()
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
     assert_eq!(record.simulation_scenario_id(), SCENARIO_ID);
     assert_eq!(record.simulation_scenario_fingerprint(), SCENARIO_FINGERPRINT);
     assert_eq!(record.replication_outcomes().len(), 10_000);
@@ -91,7 +98,9 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(record.supports_calibration_claim());
 
     let json = record.to_json().expect("deterministic evidence json");
-    assert!(json.contains("\"schema_version\":3"));
+    assert!(json.contains("\"schema_version\":4"));
+    assert!(json.contains("\"validation_design_fingerprint\":"));
+    assert!(json.contains(record.validation_design_fingerprint()));
     assert!(json.contains("\"replication_outcomes\":["));
     assert!(json.contains("\"replication_index\":9999,\"window_coverages\":null"));
     assert!(json.contains("\"replication_outcomes_sha256\":"));
