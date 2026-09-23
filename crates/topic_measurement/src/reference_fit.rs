@@ -287,8 +287,7 @@ impl ReferenceTopicTrainingFit {
         let topic_count = model.topic_term_probabilities.len();
         let coordinate_count = topic_count - 1;
         let vocabulary_size = model.topic_term_probabilities[0].len();
-        if document_ids.is_empty()
-            || document_term.rows() != document_ids.len()
+        if document_term.rows() != document_ids.len()
             || document_term.columns() != vocabulary_size
             || event_times.len() != document_ids.len()
         {
@@ -303,9 +302,7 @@ impl ReferenceTopicTrainingFit {
         for (row_index, terms) in term_rows.iter().enumerate() {
             let row_total = terms.iter().map(|(_, count)| count).sum::<f64>();
             if terms.is_empty()
-                || terms
-                    .iter()
-                    .any(|(_, count)| !count.is_finite() || *count < 0.0)
+                || terms.iter().any(|(_, count)| *count < 0.0)
                 || !row_total.is_finite()
                 || row_total <= 0.0
             {
@@ -428,11 +425,11 @@ mod tests {
     #[test]
     fn projected_mean_rejects_invalid_geometry_and_overflow() {
         assert_eq!(
-            projected_prevalence_mean(&[1.0], &[], 1),
+            projected_prevalence_mean(&[1.0, 2.0], &[vec![0.0]], 1),
             Err(TopicMeasurementError::InvalidModelInput)
         );
         assert_eq!(
-            projected_prevalence_mean(&[1.0, 2.0], &[vec![0.0]], 1),
+            projected_prevalence_mean(&[], &[], 1),
             Err(TopicMeasurementError::InvalidModelInput)
         );
         assert_eq!(
@@ -501,7 +498,7 @@ mod tests {
                 &[vec![0.9, 0.1], vec![0.1, 0.9]],
                 &mean,
                 1.0,
-                &config(2, 1.0e-12),
+                &config(4, f64::MIN_POSITIVE),
             ),
             Err(TopicMeasurementError::DidNotConverge)
         );
