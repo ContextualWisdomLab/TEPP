@@ -47,6 +47,25 @@ fn coverage_calibration_v1_owns_exact_seed_schedule_and_realistic_dgp() {
 }
 
 #[test]
+fn coverage_calibration_v1_fingerprint_binds_the_complete_declared_scenario() {
+    let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+    let fingerprint = design
+        .scenario_fingerprint()
+        .expect("declared scenario fingerprint");
+
+    assert_eq!(fingerprint.len(), 64);
+    assert!(
+        fingerprint
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
+    assert_eq!(
+        fingerprint,
+        "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a"
+    );
+}
+
+#[test]
 fn coverage_calibration_v1_config_rejects_out_of_range_replication() {
     let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
     assert_eq!(
