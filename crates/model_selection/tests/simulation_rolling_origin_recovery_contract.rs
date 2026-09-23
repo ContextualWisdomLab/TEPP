@@ -27,7 +27,9 @@ use tepp_simulation::{
 };
 use topic_measurement::{ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, SparseMatrix};
 use uuid::Uuid;
-use validation_core::{align_topic_probability_rows, mean_bias, root_mean_square_error};
+use validation_core::{
+    align_topic_probability_rows, mean_absolute_parameter_bias, root_mean_square_error,
+};
 
 const REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
 const FIRST_TRAINING_EVENT_INDEX: usize = 3;
@@ -39,13 +41,13 @@ struct WindowFixture {
     evaluation_document_term: SparseMatrix,
     evaluation_event_times: Vec<EventTime>,
     topic_term_rmse: f64,
-    topic_term_bias: f64,
+    aligned_topic_term_probabilities: Vec<f64>,
 }
 
 struct RecoveryReplication {
     selected_k: u32,
     mean_topic_term_rmse: f64,
-    mean_topic_term_bias: f64,
+    mean_absolute_topic_term_bias: f64,
 }
 
 fn simulation_config(seed: u64) -> SimulationConfig {
@@ -244,7 +246,7 @@ fn count_matrix(
 fn topic_term_recovery(
     manifest: &TruthManifest,
     fits: &[ReferenceTopicTrainingFit],
-) -> (f64, f64) {
+) -> (f64, Vec<f64>) {
     let truth = manifest.topic_truth().topic_term_probabilities();
     let truth_k = usize::try_from(manifest.topic_truth().true_topic_count())
         .expect("true topic count fits usize");
@@ -262,10 +264,8 @@ fn topic_term_recovery(
         .iter()
         .flat_map(|fitted_index| fitted.topic_term_probabilities[*fitted_index].iter().copied())
         .collect();
-    (
-        root_mean_square_error(&truth_flat, &recovered_flat).expect("topic-term RMSE"),
-        mean_bias(&truth_flat, &recovered_flat).expect("topic-term bias"),
-    )
+    let rmse = root_mean_square_error(&truth_flat, &recovered_flat).expect("topic-term RMSE");
+    (rmse, recovered_flat)
 }
 
 fn mean(values: &[f64]) -> f64 {
@@ -417,7 +417,8 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
         )
         .expect("owner-admitted numerical training state");
         let fits = fit_declared_recovery_candidates(&training_input, &config)?;
-        let (topic_term_rmse, topic_term_bias) = topic_term_recovery(&manifest, &fits);
+        let (topic_term_rmse, aligned_topic_term_probabilities) =
+            topic_term_recovery(&manifest, &fits);
 
         let evaluation_document_term =
             count_matrix(&evaluation_document_ids, vocabulary_size, &counts_by_document);
@@ -432,7 +433,7 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
             evaluation_document_term,
             evaluation_event_times,
             topic_term_rmse,
-            topic_term_bias,
+            aligned_topic_term_probabilities,
         });
     }
 
@@ -457,11 +458,24 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
         &evaluations?,
     )?;
     let topic_term_rmse: Vec<_> = fixtures.iter().map(|fixture| fixture.topic_term_rmse).collect();
-    let topic_term_bias: Vec<_> = fixtures.iter().map(|fixture| fixture.topic_term_bias).collect();
+    let truth_flat: Vec<_> = manifest
+        .topic_truth()
+        .topic_term_probabilities()
+        .iter()
+        .flatten()
+        .copied()
+        .collect();
+    let recovered_topic_rows: Vec<_> = fixtures
+        .iter()
+        .map(|fixture| fixture.aligned_topic_term_probabilities.clone())
+        .collect();
+    let mean_absolute_topic_term_bias =
+        mean_absolute_parameter_bias(&truth_flat, &recovered_topic_rows)
+            .expect("aligned parameter-wise topic-term bias");
     Ok(RecoveryReplication {
         selected_k,
         mean_topic_term_rmse: mean(&topic_term_rmse),
-        mean_topic_term_bias: mean(&topic_term_bias),
+        mean_absolute_topic_term_bias,
     })
 }
 
@@ -474,13 +488,13 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         .collect();
     let mut selected_results = Vec::with_capacity(outcomes.len());
     let mut topic_term_rmse = Vec::new();
-    let mut topic_term_bias = Vec::new();
+    let mut topic_term_mean_absolute_bias = Vec::new();
     for outcome in outcomes {
         match outcome {
             Ok(replication) => {
                 selected_results.push(Ok(replication.selected_k));
                 topic_term_rmse.push(replication.mean_topic_term_rmse);
-                topic_term_bias.push(replication.mean_topic_term_bias);
+                topic_term_mean_absolute_bias.push(replication.mean_absolute_topic_term_bias);
             }
             Err(error) => selected_results.push(Err(error)),
         }
@@ -507,11 +521,18 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         "CI-scale scientific recovery must retain enough successful replications to estimate Monte Carlo uncertainty"
     );
     assert_eq!(topic_term_rmse.len(), summary.success_count());
-    assert_eq!(topic_term_bias.len(), summary.success_count());
+    assert_eq!(
+        topic_term_mean_absolute_bias.len(),
+        summary.success_count()
+    );
     assert!(topic_term_rmse.iter().all(|value| value.is_finite()));
-    assert!(topic_term_bias.iter().all(|value| value.is_finite()));
+    assert!(
+        topic_term_mean_absolute_bias
+            .iter()
+            .all(|value| value.is_finite())
+    );
     assert!(mean(&topic_term_rmse) <= 1.0);
-    assert!(mean(&topic_term_bias).abs() <= 1.0);
+    assert!(mean(&topic_term_mean_absolute_bias) <= 1.0);
     assert!(summary.bias().is_some());
     assert!(summary.root_mean_square_error().is_some());
     assert!(summary.bias_monte_carlo_standard_error().is_some());
