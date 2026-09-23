@@ -50,9 +50,6 @@ impl FitBoundDocumentMarginalCovariance {
         let topic_basis_identity = FittedTopicBasisIdentity::from_bound_fit(fit)?;
         let precision = fit.build_joint_coordinate_precision(topic_ids)?;
         let marginal = precision.document_marginal_covariance(document_id)?;
-        if marginal.topic_ids().len() != topic_basis_identity.topics().len() {
-            return Err(TopicMeasurementError::InvalidModelInput);
-        }
         Ok(Self {
             marginal,
             topic_basis_identity,
