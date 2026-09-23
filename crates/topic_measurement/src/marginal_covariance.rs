@@ -1,10 +1,12 @@
 //! Fit-bound document marginal covariance from the joint ALR precision.
 //!
 //! The reference estimator already retains a bounded dense generalized-Gauss-
-//! Newton precision for scientific validation. This module exposes one document's
-//! marginal covariance block from the inverse of that full relation-coupled
-//! precision. It does not treat reciprocal precision diagonals or an isolated
-//! document block inverse as a marginal posterior covariance.
+//! Newton precision for scientific validation. This module exposes one or more
+//! document marginal covariance blocks from the inverse of that full relation-
+//! coupled precision. It does not treat reciprocal precision diagonals or an
+//! isolated document block inverse as a marginal posterior covariance.
+
+use std::collections::BTreeSet;
 
 use temporal_core::EventTime;
 use uuid::Uuid;
@@ -51,29 +53,100 @@ impl DocumentMarginalCovariance {
 impl JointCoordinatePrecision {
     /// Solve one document's marginal covariance block from the full precision.
     ///
-    /// The method factors the retained joint precision once and solves one unit
-    /// right-hand side for each ALR coordinate of the requested document. Only
-    /// the requested rows of `P^-1` are retained; a dense inverse is never
-    /// materialized. With joint dimension `N <= 4096` and document coordinate
-    /// count `C = K-1`, the bounded dense reference path costs `O(N^3)` for the
-    /// Cholesky factorization plus `O(C N^2)` for triangular solves and `O(N^2)`
-    /// memory. This is a validation primitive, not a calibrated posterior claim.
+    /// The scalar API delegates to [`Self::document_marginal_covariances`] so
+    /// single- and multi-document scientific paths share identical selected-
+    /// inverse arithmetic and validation semantics.
     ///
-    /// The returned coordinates remain bound to this precision's document,
-    /// event-time, and topic order. Evidence provenance, release topic identity,
+    /// # Errors
+    ///
+    /// Propagates retained-geometry, missing-document, factorization, solve,
+    /// symmetry, and positive-definiteness failures from the batch owner.
+    pub fn document_marginal_covariance(
+        &self,
+        document_id: Uuid,
+    ) -> Result<DocumentMarginalCovariance, TopicMeasurementError> {
+        self.document_marginal_covariances(&[document_id])?
+            .into_iter()
+            .next()
+            .ok_or(TopicMeasurementError::InvalidModelInput)
+    }
+
+    /// Solve requested document marginal covariance blocks with one factorization.
+    ///
+    /// The retained joint precision is validated and Cholesky-factorized once.
+    /// For every requested document, one unit right-hand side is solved for each
+    /// ALR coordinate and only that document's `(K-1) × (K-1)` block of `P^-1`
+    /// is retained. Requested order is preserved exactly; duplicate, empty, or
+    /// absent document requests fail closed rather than silently changing the
+    /// scientific denominator.
+    ///
+    /// With joint dimension `N <= 4096`, coordinate count `C = K-1`, and `R`
+    /// requested documents, the bounded dense reference path costs `O(N^3)` for
+    /// one Cholesky factorization plus `O(R C N^2)` for triangular solves and
+    /// `O(N^2)` memory. This is a validation primitive, not a calibrated
+    /// posterior or accelerated/sparse covariance claim.
+    ///
+    /// Returned coordinates remain bound to each fitted document, retained
+    /// EventTime, and topic order. Evidence provenance, release topic identity,
     /// empirical coverage, and backend parity remain separate owner
     /// responsibilities.
     ///
     /// # Errors
     ///
-    /// Returns [`TopicMeasurementError::InvalidModelInput`] when the requested
-    /// document is absent or retained matrix geometry is inconsistent. Returns
-    /// [`TopicMeasurementError::NonFiniteEstimate`] when factorization, linear
-    /// solves, symmetry reconciliation, or positive-definiteness fails.
-    pub fn document_marginal_covariance(
+    /// Returns [`TopicMeasurementError::InvalidModelInput`] when the request is
+    /// empty/duplicated, a requested document is absent, or retained matrix
+    /// geometry is inconsistent. Returns [`TopicMeasurementError::NonFiniteEstimate`]
+    /// when factorization, linear solves, symmetry reconciliation, or positive-
+    /// definiteness fails.
+    pub fn document_marginal_covariances(
         &self,
-        document_id: Uuid,
-    ) -> Result<DocumentMarginalCovariance, TopicMeasurementError> {
+        requested_document_ids: &[Uuid],
+    ) -> Result<Vec<DocumentMarginalCovariance>, TopicMeasurementError> {
+        if requested_document_ids.is_empty()
+            || requested_document_ids.iter().copied().collect::<BTreeSet<_>>().len()
+                != requested_document_ids.len()
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
+        let (coordinate_count, dimension) = self.validated_geometry()?;
+        let document_indices: Vec<_> = requested_document_ids
+            .iter()
+            .map(|document_id| {
+                self.document_ids
+                    .iter()
+                    .position(|candidate| candidate == document_id)
+                    .ok_or(TopicMeasurementError::InvalidModelInput)
+            })
+            .collect::<Result<_, _>>()?;
+        let lower = cholesky(&self.values)?;
+
+        requested_document_ids
+            .iter()
+            .copied()
+            .zip(document_indices)
+            .map(|(document_id, document_index)| {
+                let start = document_index * coordinate_count;
+                let mut covariance = vec![vec![0.0; coordinate_count]; coordinate_count];
+                for local_column in 0..coordinate_count {
+                    let mut right_hand_side = vec![0.0; dimension];
+                    right_hand_side[start + local_column] = 1.0;
+                    let solution = solve_cholesky(&lower, &right_hand_side)?;
+                    for local_row in 0..coordinate_count {
+                        covariance[local_row][local_column] = solution[start + local_row];
+                    }
+                }
+                reconcile_roundoff_and_validate(&mut covariance)?;
+                Ok(DocumentMarginalCovariance {
+                    document_id,
+                    event_time: self.event_times[document_index],
+                    topic_ids: self.topic_ids.clone(),
+                    values: covariance,
+                })
+            })
+            .collect()
+    }
+
+    fn validated_geometry(&self) -> Result<(usize, usize), TopicMeasurementError> {
         let coordinate_count = self
             .topic_ids
             .len()
@@ -93,31 +166,7 @@ impl JointCoordinatePrecision {
         {
             return Err(TopicMeasurementError::InvalidModelInput);
         }
-        let document_index = self
-            .document_ids
-            .iter()
-            .position(|candidate| *candidate == document_id)
-            .ok_or(TopicMeasurementError::InvalidModelInput)?;
-
-        let lower = cholesky(&self.values)?;
-        let start = document_index * coordinate_count;
-        let mut covariance = vec![vec![0.0; coordinate_count]; coordinate_count];
-        for local_column in 0..coordinate_count {
-            let mut right_hand_side = vec![0.0; dimension];
-            right_hand_side[start + local_column] = 1.0;
-            let solution = solve_cholesky(&lower, &right_hand_side)?;
-            for local_row in 0..coordinate_count {
-                covariance[local_row][local_column] = solution[start + local_row];
-            }
-        }
-        reconcile_roundoff_and_validate(&mut covariance)?;
-
-        Ok(DocumentMarginalCovariance {
-            document_id,
-            event_time: self.event_times[document_index],
-            topic_ids: self.topic_ids.clone(),
-            values: covariance,
-        })
+        Ok((coordinate_count, dimension))
     }
 }
 
