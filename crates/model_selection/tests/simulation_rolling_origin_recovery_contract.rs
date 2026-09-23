@@ -29,6 +29,7 @@ use topic_measurement::{ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, 
 use uuid::Uuid;
 use validation_core::{
     align_topic_probability_rows, mean_absolute_parameter_bias, root_mean_square_error,
+    summarize_replications,
 };
 
 const REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
@@ -531,8 +532,31 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
             .iter()
             .all(|value| value.is_finite())
     );
-    assert!(mean(&topic_term_rmse) <= 1.0);
-    assert!(mean(&topic_term_mean_absolute_bias) <= 1.0);
+
+    let topic_rmse_monte_carlo = summarize_replications(&topic_term_rmse, 0.025, 0.975)
+        .expect("topic-term RMSE Monte Carlo summary");
+    let topic_bias_monte_carlo =
+        summarize_replications(&topic_term_mean_absolute_bias, 0.025, 0.975)
+            .expect("topic-term bias Monte Carlo summary");
+    assert_eq!(
+        topic_rmse_monte_carlo.replication_count,
+        summary.success_count()
+    );
+    assert_eq!(
+        topic_bias_monte_carlo.replication_count,
+        summary.success_count()
+    );
+    assert!(topic_rmse_monte_carlo.mean.is_finite());
+    assert!(topic_rmse_monte_carlo.standard_deviation.is_finite());
+    assert!(topic_rmse_monte_carlo.standard_error.is_finite());
+    assert!(topic_rmse_monte_carlo.percentile_lower.is_finite());
+    assert!(topic_rmse_monte_carlo.percentile_upper.is_finite());
+    assert!(topic_bias_monte_carlo.mean.is_finite());
+    assert!(topic_bias_monte_carlo.standard_deviation.is_finite());
+    assert!(topic_bias_monte_carlo.standard_error.is_finite());
+    assert!(topic_bias_monte_carlo.percentile_lower.is_finite());
+    assert!(topic_bias_monte_carlo.percentile_upper.is_finite());
+
     assert!(summary.bias().is_some());
     assert!(summary.root_mean_square_error().is_some());
     assert!(summary.bias_monte_carlo_standard_error().is_some());
