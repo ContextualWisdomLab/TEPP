@@ -16,6 +16,7 @@ mod fitted;
 mod gate;
 mod recovery_fit;
 mod recovery_grid;
+mod recovery_outcome;
 mod rolling_origin_predictive;
 
 /// One candidate `K` with statistical or LLM-only support.
@@ -42,6 +43,8 @@ pub use recovery_fit::fit_declared_recovery_candidates;
 pub use recovery_grid::RollingOriginRecoveryEvaluation;
 /// Select candidate `K` only when every recovery window covers the declared grid.
 pub use recovery_grid::select_declared_rolling_origin_recovery_candidate_k;
+/// Preserve numerical recovery failures without swallowing structural invalidity.
+pub use recovery_outcome::admit_recovery_replication_result;
 /// Borrowed payload for one admitted rolling-origin predictive evaluation window.
 pub use rolling_origin_predictive::RollingOriginPredictiveEvaluation;
 /// Score one admitted rolling-origin evaluation partition under a fixed training fit.
