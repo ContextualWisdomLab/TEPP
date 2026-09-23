@@ -133,6 +133,203 @@ pub fn summarize_windowed_coverage_recovery_replications(
     )
 }
 
+/// Prospective interval-calibration design for one versioned scientific acceptance run.
+///
+/// This value records the design before the expensive DGP experiment is run. It
+/// intentionally separates a practical psychometric coverage band from Monte
+/// Carlo precision and from numerical-failure reporting. The design does not
+/// define an acceptable failure-rate threshold and therefore cannot by itself
+/// promote a full scientific or release claim.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CoverageCalibrationDesign {
+    design_id: &'static str,
+    attempted_dgp_count: usize,
+    nominal_coverage: f64,
+    practical_lower_coverage: f64,
+    practical_upper_coverage: f64,
+    maximum_monte_carlo_standard_error: f64,
+}
+
+impl CoverageCalibrationDesign {
+    /// TEPP's prospectively declared nominal-95% coverage design, version 1.
+    ///
+    /// The practical `[0.91, 0.98]` band follows the Muthén and Muthén (2002)
+    /// psychometric simulation convention. Ten thousand independent DGP
+    /// attempts are predeclared so a complete successful sample of bounded
+    /// `[0,1]` DGP-level coverage values has worst-case Monte Carlo standard
+    /// error at most `0.005`. The actual owner-reported standard error remains
+    /// authoritative when numerical failures reduce the successful sample.
+    #[must_use]
+    pub const fn tepp_nominal_95_v1() -> Self {
+        Self {
+            design_id: "tepp.coverage.nominal95.v1",
+            attempted_dgp_count: 10_000,
+            nominal_coverage: 0.95,
+            practical_lower_coverage: 0.91,
+            practical_upper_coverage: 0.98,
+            maximum_monte_carlo_standard_error: 0.005,
+        }
+    }
+
+    /// Stable versioned identity for the prospective design.
+    #[must_use]
+    pub const fn design_id(self) -> &'static str {
+        self.design_id
+    }
+
+    /// Number of independent DGP replications declared before execution.
+    #[must_use]
+    pub const fn attempted_dgp_count(self) -> usize {
+        self.attempted_dgp_count
+    }
+
+    /// Nominal interval coverage targeted by the estimator.
+    #[must_use]
+    pub const fn nominal_coverage(self) -> f64 {
+        self.nominal_coverage
+    }
+
+    /// Lower practical coverage bound declared before execution.
+    #[must_use]
+    pub const fn practical_lower_coverage(self) -> f64 {
+        self.practical_lower_coverage
+    }
+
+    /// Upper practical coverage bound declared before execution.
+    #[must_use]
+    pub const fn practical_upper_coverage(self) -> f64 {
+        self.practical_upper_coverage
+    }
+
+    /// Maximum accepted Monte Carlo standard error of the successful DGP coverage mean.
+    #[must_use]
+    pub const fn maximum_monte_carlo_standard_error(self) -> f64 {
+        self.maximum_monte_carlo_standard_error
+    }
+}
+
+/// Assessment of one denominator-preserving coverage summary against a prospective design.
+///
+/// A passing conditional calibration assessment is not a convergence, robustness,
+/// scientific-promotion, or release decision. Numerical failures remain visible
+/// through the attempted/success/failure fields and require their own owner policy.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CoverageCalibrationAssessment {
+    attempted_replication_count: usize,
+    successful_replication_count: usize,
+    failure_count: usize,
+    failure_rate: f64,
+    coverage_mean: Option<f64>,
+    coverage_monte_carlo_standard_error: Option<f64>,
+    coverage_within_practical_band: bool,
+    monte_carlo_precision_sufficient: bool,
+}
+
+impl CoverageCalibrationAssessment {
+    /// Unconditional attempted DGP count.
+    #[must_use]
+    pub const fn attempted_replication_count(self) -> usize {
+        self.attempted_replication_count
+    }
+
+    /// DGP count with numerically available coverage.
+    #[must_use]
+    pub const fn successful_replication_count(self) -> usize {
+        self.successful_replication_count
+    }
+
+    /// Owner-admitted numerical failures among attempted DGP replications.
+    #[must_use]
+    pub const fn failure_count(self) -> usize {
+        self.failure_count
+    }
+
+    /// Unconditional numerical failure rate.
+    #[must_use]
+    pub const fn failure_rate(self) -> f64 {
+        self.failure_rate
+    }
+
+    /// Conditional mean DGP-level coverage, when at least one replication succeeded.
+    #[must_use]
+    pub const fn coverage_mean(self) -> Option<f64> {
+        self.coverage_mean
+    }
+
+    /// Between-DGP Monte Carlo standard error, available only with at least two successes.
+    #[must_use]
+    pub const fn coverage_monte_carlo_standard_error(self) -> Option<f64> {
+        self.coverage_monte_carlo_standard_error
+    }
+
+    /// Whether the conditional coverage mean lies inside the prospective practical band.
+    #[must_use]
+    pub const fn coverage_within_practical_band(self) -> bool {
+        self.coverage_within_practical_band
+    }
+
+    /// Whether between-DGP coverage uncertainty meets the prospective precision target.
+    #[must_use]
+    pub const fn monte_carlo_precision_sufficient(self) -> bool {
+        self.monte_carlo_precision_sufficient
+    }
+
+    /// Whether this summary supports the **conditional coverage-calibration** claim.
+    ///
+    /// This deliberately does not judge the numerical failure rate. A caller must
+    /// not treat `true` as estimator robustness, full scientific promotion, or
+    /// release authority.
+    #[must_use]
+    pub const fn supports_calibration_claim(self) -> bool {
+        self.coverage_within_practical_band && self.monte_carlo_precision_sufficient
+    }
+}
+
+/// Assess denominator-preserving coverage evidence against one prospective design.
+///
+/// The attempted DGP count must match the design exactly, preventing a caller
+/// from shrinking or extending the experiment after seeing outcomes while still
+/// claiming the same design identity. Coverage and its Monte Carlo standard
+/// error are read only from the owner summary; this function does not recompute
+/// window/document/coordinate arithmetic or remove failed attempts.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when the summary's attempted DGP
+/// count differs from the prospective design. Structural experiment invalidity
+/// must already have failed closed before a recovery summary is minted.
+pub fn assess_coverage_calibration(
+    design: &CoverageCalibrationDesign,
+    summary: &MonteCarloRecoveryMetricSummary,
+) -> Result<CoverageCalibrationAssessment, ValidationError> {
+    if summary.attempted_replication_count() != design.attempted_dgp_count {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    let coverage_mean = summary.successful_metric_mean();
+    let coverage_monte_carlo_standard_error = summary
+        .successful_metric_summary()
+        .map(|metric| metric.standard_error);
+    let coverage_within_practical_band = coverage_mean.is_some_and(|mean| {
+        (design.practical_lower_coverage..=design.practical_upper_coverage).contains(&mean)
+    });
+    let monte_carlo_precision_sufficient = coverage_monte_carlo_standard_error
+        .is_some_and(|standard_error| {
+            standard_error <= design.maximum_monte_carlo_standard_error
+        });
+
+    Ok(CoverageCalibrationAssessment {
+        attempted_replication_count: summary.attempted_replication_count(),
+        successful_replication_count: summary.successful_replication_count(),
+        failure_count: summary.failure_count(),
+        failure_rate: summary.failure_rate(),
+        coverage_mean,
+        coverage_monte_carlo_standard_error,
+        coverage_within_practical_band,
+        monte_carlo_precision_sufficient,
+    })
+}
+
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
 ///
 /// Returns `(lower, upper)` for the empirical coverage rate at the stated
