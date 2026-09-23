@@ -15,6 +15,7 @@
 mod bias;
 mod claim;
 mod coverage;
+mod coverage_evidence;
 mod error;
 mod graph_metrics;
 mod input;
@@ -66,6 +67,8 @@ pub use coverage::summarize_windowed_coverage_replications;
 pub use coverage::summarize_windowed_coverage_recovery_replications;
 /// Wilson bounds for coverage proportions.
 pub use coverage::wilson_coverage_interval;
+/// Immutable machine-readable evidence for one prospective calibration experiment.
+pub use coverage_evidence::CoverageCalibrationEvidenceRecord;
 /// Fail-closed validation errors.
 pub use error::ValidationError;
 /// Undirected edge identity.
