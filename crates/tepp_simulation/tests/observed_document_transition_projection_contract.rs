@@ -1,6 +1,10 @@
 //! Recovery fitting must consume the noisy observed transition channel, not latent truth.
 
-use tepp_simulation::{DocumentMethodEffect, SimulatedRelationKind, SimulationConfig, generate};
+use tepp_simulation::{
+    DocumentMethodEffect, ObservedRelation, SimulatedRelationKind, SimulationConfig, TruthManifest,
+    generate,
+};
+use uuid::Uuid;
 
 #[test]
 fn observed_transition_projection_respects_false_negatives_and_ignores_reference_noise() {
@@ -65,4 +69,44 @@ fn observed_transition_projection_respects_false_negatives_and_ignores_reference
         source.method_effect() == DocumentMethodEffect::Original
             && target.method_effect() == DocumentMethodEffect::Original
     }));
+}
+
+#[test]
+fn observed_transition_projection_does_not_use_truth_marker_as_an_oracle_filter() {
+    let generated = generate(
+        SimulationConfig::new(2043, 3, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0)
+            .expect("simulation config"),
+    )
+    .expect("generated truth");
+    let transition = generated
+        .true_relations()
+        .iter()
+        .find(|relation| relation.kind().is_transition())
+        .expect("true transition");
+    let false_marked_observation = ObservedRelation::new(
+        Uuid::from_u128(0x699),
+        SimulatedRelationKind::TransitionsTo,
+        transition.source_id(),
+        transition.target_id(),
+        false,
+    );
+    let observed_only = TruthManifest::new(
+        generated.seed(),
+        generated.config_digest().to_owned(),
+        generated.events().to_vec(),
+        generated.documents().to_vec(),
+        generated.true_relations().to_vec(),
+        vec![false_marked_observation],
+        generated.topic_truth().clone(),
+    );
+
+    let projected = observed_only
+        .observed_document_transition_pairs()
+        .expect("observed transition projection");
+    let latent = observed_only
+        .document_transition_pairs()
+        .expect("latent truth projection");
+
+    assert_eq!(projected.len(), 1);
+    assert!(latent.contains(&projected[0]));
 }
