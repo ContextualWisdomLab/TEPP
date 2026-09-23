@@ -5,7 +5,8 @@
 //! fitted content, prevalence, or document-state coordinates are compared with a
 //! known generating basis. This module uses squared Hellinger distance between
 //! topic-term probability rows and solves the global square assignment problem.
-//! It does not rename, reorder, or mutate fitted model state.
+//! It also expresses fitted additive-log-ratio coordinates in the aligned truth
+//! reference basis without mutating the fitted model.
 
 use crate::ValidationError;
 
@@ -79,6 +80,51 @@ pub fn align_topic_probability_rows(
         truth_to_fitted,
         total_squared_hellinger_distance,
     })
+}
+
+/// Express fitted ALR coordinates in the topic alignment's truth reference basis.
+///
+/// A `K`-topic additive-log-ratio vector stores `K - 1` fitted log-ratio scores
+/// relative to fitted topic `K - 1`, whose implicit score is zero. Topic
+/// alignment can move the truth reference topic to a different fitted index, so
+/// merely permuting the stored coordinates is not valid. This transform first
+/// restores that implicit zero score and then emits, for each truth topic
+/// `t < K - 1`, `s_f(m(t)) - s_f(m(K - 1))`, where `m` is the truth-to-fitted
+/// alignment.
+///
+/// The same linear contrast may be applied row-wise to fitted prevalence
+/// coefficients expressed in that ALR basis. This function does not transform a
+/// covariance matrix, mutate model state, or create semantic/release topic
+/// identity.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when the fitted coordinate width is
+/// not exactly `K - 1`, an input coordinate is non-finite, or the required
+/// reference subtraction overflows to a non-finite result.
+pub fn realign_additive_log_ratio(
+    alignment: &TopicAlignment,
+    fitted_coordinates: &[f64],
+) -> Result<Vec<f64>, ValidationError> {
+    let topic_count = alignment.truth_to_fitted.len();
+    if fitted_coordinates.len().checked_add(1) != Some(topic_count)
+        || fitted_coordinates.iter().any(|value| !value.is_finite())
+    {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    let mut fitted_scores = fitted_coordinates.to_vec();
+    fitted_scores.push(0.0);
+    let truth_reference_fitted_index = alignment.truth_to_fitted[topic_count - 1];
+    let reference_score = fitted_scores[truth_reference_fitted_index];
+    let realigned: Vec<f64> = alignment.truth_to_fitted[..topic_count - 1]
+        .iter()
+        .map(|fitted_index| fitted_scores[*fitted_index] - reference_score)
+        .collect();
+    if realigned.iter().any(|value| !value.is_finite()) {
+        return Err(ValidationError::InvalidInput);
+    }
+    Ok(realigned)
 }
 
 fn validate_probability_basis(rows: &[Vec<f64>]) -> Result<usize, ValidationError> {
