@@ -13,6 +13,7 @@
 mod coordinates;
 mod document_coordinate;
 mod error;
+mod fit_bound_marginal_covariance;
 mod lexical;
 mod marginal_covariance;
 mod posterior_draw;
@@ -42,6 +43,8 @@ pub use document_coordinate::FittedDocumentCoordinateRow;
 pub use document_coordinate::FittedDocumentCoordinateSummary;
 /// Fail-closed topic-coordinate errors.
 pub use error::TopicMeasurementError;
+/// One document marginal covariance bound to the fitted topic-term basis.
+pub use fit_bound_marginal_covariance::FitBoundDocumentMarginalCovariance;
 /// Refuse lexical retrieval weights as inferential coordinates.
 pub use lexical::refuse_lexical_inferential_weight;
 /// One fit-bound document marginal covariance in retained ALR topic order.
