@@ -112,8 +112,8 @@ fn candidate_exceeding_training_vocabulary_is_structural_invalidity() {
         result,
         Err(ModelSelectionError::RecoveryCandidateInputInvalid)
     ));
-    assert_eq!(
+    assert!(matches!(
         admit_recovery_replication_result(result),
         Err(ModelSelectionError::RecoveryCandidateInputInvalid)
-    );
+    ));
 }
