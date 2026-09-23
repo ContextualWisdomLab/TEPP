@@ -32,9 +32,8 @@ fn covariance_factorization_refuses_non_finite_residuals() {
 #[test]
 fn covariance_factorization_refuses_non_finite_off_diagonal_factor() {
     let alignment = four_topic_alignment();
-    let minimum_positive = f64::from_bits(1);
     let covariance = vec![
-        vec![minimum_positive, f64::MAX, 0.0],
+        vec![1.0e-27, f64::MAX, 0.0],
         vec![f64::MAX, f64::MAX, 0.0],
         vec![0.0, 0.0, 1.0],
     ];
