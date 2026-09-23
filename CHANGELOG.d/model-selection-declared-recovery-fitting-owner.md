@@ -1,0 +1,1 @@
+`model_selection` now owns complete-grid scientific recovery fitting through `fit_declared_recovery_candidates`, which derives every candidate estimator configuration from `FittedCandidateKConfig` and fails the replication when any declared candidate fit fails instead of returning a survivor subset.
