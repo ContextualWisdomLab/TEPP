@@ -229,7 +229,7 @@ fn membership_network(
             .ok_or(CoverageCalibrationExecutionError::MissingObservedEventTime)?;
         for membership in document.memberships() {
             let role = MembershipRole::from_wire_name(membership.role_label())
-                .ok_or(CoverageCalibrationExecutionError::InvalidMembershipProjection)?;
+                .map_err(|_| CoverageCalibrationExecutionError::InvalidMembershipProjection)?;
             let weight = MembershipWeight::new(f64::from(membership.weight_bps()) / 10_000.0)
                 .map_err(|_| CoverageCalibrationExecutionError::InvalidMembershipProjection)?;
             let assignment = MembershipAssignment::new(
