@@ -29,9 +29,11 @@ fn generated_topic_truth_exposes_the_exact_physical_time_basis() {
     assert!(center_seconds > 0.0);
     assert!((center_seconds - scale_seconds).abs() < 1.0e-12);
 
-    let denominator = (manifest.events().len() - 1) as f64;
-    for (index, event) in manifest.events().iter().enumerate() {
-        let expected = 2.0 * index as f64 / denominator - 1.0;
+    let denominator = f64::from(
+        u32::try_from(manifest.events().len() - 1).expect("bounded simulated event count"),
+    );
+    for event in manifest.events() {
+        let expected = 2.0 * f64::from(event.ordinal()) / denominator - 1.0;
         let actual = manifest
             .prevalence_time_coordinate_at(event.event_time())
             .expect("event coordinate");
@@ -87,6 +89,31 @@ fn malformed_or_non_affine_event_geometry_fails_closed() {
     ];
     assert_eq!(
         with_events(&generated, irregular).prevalence_time_basis(),
+        Err(SimulationError::ManifestInvariantViolation)
+    );
+
+    let non_increasing = vec![
+        LatentEvent::new(
+            generated.events()[0].event_id(),
+            EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("t0"),
+            0,
+            generated.events()[0].state(),
+        ),
+        LatentEvent::new(
+            generated.events()[1].event_id(),
+            EventTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("t1"),
+            1,
+            generated.events()[1].state(),
+        ),
+        LatentEvent::new(
+            generated.events()[2].event_id(),
+            EventTime::parse_rfc3339("2026-01-03T00:00:00Z").expect("t2"),
+            2,
+            generated.events()[2].state(),
+        ),
+    ];
+    assert_eq!(
+        with_events(&generated, non_increasing).prevalence_time_basis(),
         Err(SimulationError::ManifestInvariantViolation)
     );
 }
