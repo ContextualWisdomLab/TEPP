@@ -17,11 +17,12 @@ use temporal_core::{
     EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval, TemporalPrecision,
 };
 use tepp_simulation::{
-    DocumentMethodEffect, SimulatedDocument, SimulationConfig, TruthManifest, generate,
+    CoverageCalibrationSimulationDesign, DocumentMethodEffect, SimulatedDocument, TruthManifest,
+    generate,
 };
 use topic_measurement::{
-    FitBoundDocumentMarginalCovariance, FittedDocumentCoordinateSummary, ReferenceTopicTrainingInput,
-    SparseMatrix, additive_log_ratio,
+    FitBoundDocumentMarginalCovariance, FittedDocumentCoordinateSummary,
+    ReferenceTopicTrainingInput, SparseMatrix, additive_log_ratio,
 };
 use uuid::Uuid;
 use validation_core::{
@@ -33,13 +34,6 @@ use validation_core::{
 const REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
 const FIRST_TRAINING_EVENT_INDEX: usize = 3;
 const NORMAL_95_PERCENT_CRITICAL_VALUE: f64 = 1.959_963_984_540_054;
-
-fn simulation_config(seed: u64) -> SimulationConfig {
-    SimulationConfig::new(
-        seed, 9, 2, 3, 12, 6, 0, 0, 500, 3_000, 3_000, 3_000,
-    )
-    .expect("realistic recovery simulation config")
-}
 
 fn cutoff_after_event(manifest: &TruthManifest, event_id: Uuid) -> KnowledgeCutoff {
     let latest = manifest
@@ -308,7 +302,13 @@ fn truth_k_window_coverage(
 
 #[allow(clippy::too_many_lines)]
 fn replication_window_coverages(seed: u64) -> Vec<f64> {
-    let manifest = generate(simulation_config(seed)).expect("known-truth simulation");
+    let simulation_design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+    let manifest = generate(
+        simulation_design
+            .regression_config_for_seed(seed)
+            .expect("owner-issued rolling-origin coverage DGP shape"),
+    )
+    .expect("known-truth simulation");
     manifest
         .verify_invariants()
         .expect("truth manifest invariants");
