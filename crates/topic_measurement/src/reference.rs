@@ -390,6 +390,30 @@ impl ReferenceTopicModelConfig {
         Ok(self)
     }
 
+    /// Return the maximum deterministic iteration budget for fit-local inference.
+    #[must_use]
+    pub(crate) const fn maximum_iterations(&self) -> usize {
+        self.maximum_iterations
+    }
+
+    /// Return the convergence tolerance retained by this fitted configuration.
+    #[must_use]
+    pub(crate) const fn tolerance(&self) -> f64 {
+        self.tolerance
+    }
+
+    /// Return the Gaussian prevalence-prior variance retained by this fit.
+    #[must_use]
+    pub(crate) const fn prior_variance(&self) -> f64 {
+        self.prior_variance
+    }
+
+    /// Return the deterministic ALR update step retained by this fit.
+    #[must_use]
+    pub(crate) const fn step_size(&self) -> f64 {
+        self.step_size
+    }
+
     fn validate(&self) -> Result<(), TopicMeasurementError> {
         if self.topic_count < 2
             || self.seeds.is_empty()
