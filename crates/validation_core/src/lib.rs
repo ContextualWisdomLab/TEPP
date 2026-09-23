@@ -66,10 +66,14 @@ pub use graph_metrics::edge_recall;
 pub use matching::absolute_residuals;
 /// Tolerance match counts.
 pub use matching::match_count;
+/// Monte Carlo recovery metric summary with an unconditional failure denominator.
+pub use monte_carlo::MonteCarloRecoveryMetricSummary;
 /// Monte Carlo replication summary.
 pub use monte_carlo::MonteCarloSummary;
 /// SE-aware acceptance gate.
 pub use monte_carlo::accept_within_standard_errors;
+/// Aggregate scalar recovery while retaining attempted and failed replications.
+pub use monte_carlo::summarize_recovery_metric_replications;
 /// Aggregate Monte Carlo replications.
 pub use monte_carlo::summarize_replications;
 /// One affine EventTime coordinate for prevalence coefficient comparison.
