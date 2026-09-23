@@ -54,6 +54,8 @@ pub use claim::promote_claim;
 pub use claim::promote_scientific_recovery;
 /// Empirical interval coverage.
 pub use coverage::interval_coverage;
+/// Collapse rolling-origin coverage within DGP replications before Monte Carlo inference.
+pub use coverage::summarize_windowed_coverage_replications;
 /// Wilson bounds for coverage proportions.
 pub use coverage::wilson_coverage_interval;
 /// Fail-closed validation errors.
