@@ -44,7 +44,10 @@ fn calibration_evidence_binds_design_scenario_source_and_failure_uncertainty() {
     assert!(record.failure_rate_standard_error().is_finite());
     assert!(record.failure_rate_standard_error() > 0.0);
     assert_eq!(record.coverage_mean(), Some(0.95));
+    assert_eq!(record.coverage_standard_deviation(), Some(0.0));
     assert_eq!(record.coverage_monte_carlo_standard_error(), Some(0.0));
+    assert_eq!(record.coverage_percentile_lower(), Some(0.95));
+    assert_eq!(record.coverage_percentile_upper(), Some(0.95));
     assert!(record.coverage_within_practical_band());
     assert!(record.monte_carlo_precision_sufficient());
     assert!(record.supports_calibration_claim());
@@ -55,9 +58,33 @@ fn calibration_evidence_binds_design_scenario_source_and_failure_uncertainty() {
     assert!(json.contains("\"successful_replication_count\":9998"));
     assert!(json.contains("\"failure_count\":2"));
     assert!(json.contains("\"failure_rate_standard_error\":"));
+    assert!(json.contains("\"coverage_percentile_lower\":0.95"));
+    assert!(json.contains("\"coverage_percentile_upper\":0.95"));
     assert!(json.contains(SCENARIO_FINGERPRINT));
     assert!(json.contains(SOURCE_HEAD));
     assert_eq!(record.to_json().expect("repeat json"), json);
+}
+
+#[test]
+fn singleton_success_keeps_point_evidence_without_fabricating_dispersion() {
+    let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    let singleton = summary(10_000, 1);
+    let record = CoverageCalibrationEvidenceRecord::from_summary(
+        &design,
+        &singleton,
+        SCENARIO_ID,
+        SCENARIO_FINGERPRINT,
+        SOURCE_HEAD,
+    )
+    .expect("singleton evidence remains reportable");
+
+    assert_eq!(record.coverage_mean(), Some(0.95));
+    assert_eq!(record.coverage_standard_deviation(), None);
+    assert_eq!(record.coverage_monte_carlo_standard_error(), None);
+    assert_eq!(record.coverage_percentile_lower(), None);
+    assert_eq!(record.coverage_percentile_upper(), None);
+    assert!(!record.monte_carlo_precision_sufficient());
+    assert!(!record.supports_calibration_claim());
 }
 
 #[test]
