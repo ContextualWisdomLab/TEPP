@@ -42,7 +42,7 @@ This is a deterministic Gaussian/Laplace validation primitive. A positive-defini
 
 Tierney and Kadane (1986) describe Laplace approximations for posterior moments, variances, and marginal densities from local likelihood geometry. Rue, Martino, and Chopin (2009) treat latent Gaussian models in precision form and emphasize computation of posterior marginals and subvector marginals from the joint Gaussian structure. TEPP uses the same linear-algebra distinction while keeping a narrower claim: the returned matrix is the marginal covariance of TEPP's retained local Gaussian approximation, not proof that the approximation is empirically calibrated.
 
-For #680, coverage must be estimated over independent known-truth DGP replications. Expanding rolling-origin windows repeatedly estimate earlier documents, and coordinates within a joint fit are dependent. Those repeated intervals therefore must not be flattened into an IID Bernoulli sample or fed to Wilson bounds as though each document-coordinate-window observation were independent. The scientific harness must first compute window-level coverage, collapse window metrics within each DGP replication, and then quantify between-replication Monte Carlo uncertainty.
+For #680, coverage must be estimated over independent known-truth DGP replications. Expanding rolling-origin windows repeatedly estimate earlier documents, and coordinates within a joint fit are dependent. Those repeated intervals therefore must not be flattened into an IID Bernoulli sample or fed to Wilson bounds as though each document-coordinate-window observation were independent. The scientific harness must first compute window-level coverage, collapse window metrics within each DGP replication, and then quantify between-replication Monte Carlo uncertainty. Morris, White, and Crowther (2019) likewise frame simulation studies as empirical experiments with known truth and recommend reporting Monte Carlo standard errors for finite-replication performance estimates; TEPP keeps that uncertainty at the independent DGP-replication level rather than treating dependent rolling-window observations as extra replications.
 
 ## Claim boundary
 
@@ -50,7 +50,9 @@ The #704 solve, #705 basis binding, #703 truth-basis transform, and #721 interva
 
 ## References
 
-Rue, H., Martino, G., & Chopin, N. (2009). Approximate Bayesian inference for latent Gaussian models by using integrated nested Laplace approximations. *Journal of the Royal Statistical Society: Series B (Statistical Methodology), 71*(2), 319–392. https://doi.org/10.1111/j.1467-9868.2008.00700.x
+Morris, T. P., White, I. R., & Crowther, M. J. (2019). Using simulation studies to evaluate statistical methods. *Statistics in Medicine, 38*(11), 2074–2102. https://doi.org/10.1002/sim.8086
+
+Rue, H., Martino, S., & Chopin, N. (2009). Approximate Bayesian inference for latent Gaussian models by using integrated nested Laplace approximations. *Journal of the Royal Statistical Society: Series B (Statistical Methodology), 71*(2), 319–392. https://doi.org/10.1111/j.1467-9868.2008.00700.x
 
 Tierney, L., & Kadane, J. B. (1986). Accurate approximations for posterior moments and marginal densities. *Journal of the American Statistical Association, 81*(393), 82–86. https://doi.org/10.1080/01621459.1986.10478240
 
