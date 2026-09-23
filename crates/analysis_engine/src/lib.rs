@@ -47,12 +47,12 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use coverage_calibration_execution::CoverageCalibrationExecutionError;
 /// Execute one prospectively declared coverage-calibration replication.
 pub use coverage_calibration_execution::execute_coverage_calibration_replication;
-/// Fail-closed error from prospective coverage-study execution or evidence assembly.
-pub use coverage_calibration_study::CoverageCalibrationStudyError;
-/// Assemble the complete version-one prospective coverage study into canonical evidence.
-pub use coverage_calibration_study::assemble_coverage_calibration_evidence_v1;
-/// Execute one half-open shard of prospectively declared coverage-calibration replications.
-pub use coverage_calibration_study::execute_coverage_calibration_shard;
+/// Coverage-calibration shard provenance and study execution contracts.
+pub use coverage_calibration_study::{
+    CoverageCalibrationShardRecord, CoverageCalibrationStudyError,
+    assemble_coverage_calibration_evidence_v1, execute_coverage_calibration_shard,
+    execute_coverage_calibration_shard_record,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,
