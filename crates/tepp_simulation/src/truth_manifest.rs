@@ -138,19 +138,7 @@ impl TruthManifest {
     /// Returns [`SimulationError::ManifestInvariantViolation`] when a true event
     /// transition references an event for which the manifest owns no original report.
     pub fn document_transition_pairs(&self) -> Result<Vec<(Uuid, Uuid)>, SimulationError> {
-        let mut canonical_document_by_event = BTreeMap::new();
-        for document in &self.documents {
-            if document.method_effect().is_derivative() {
-                continue;
-            }
-            canonical_document_by_event
-                .entry(document.event_id())
-                .and_modify(|current: &mut Uuid| {
-                    *current = (*current).min(document.document_id());
-                })
-                .or_insert_with(|| document.document_id());
-        }
-
+        let canonical_document_by_event = self.canonical_original_document_by_event();
         let mut document_pairs = BTreeSet::new();
         for relation in self
             .true_relations
@@ -168,6 +156,58 @@ impl TruthManifest {
             document_pairs.insert((source, target));
         }
         Ok(document_pairs.into_iter().collect())
+    }
+
+    /// Project noisy observed event transitions onto canonical original documents.
+    ///
+    /// Recovery fitting must consume the relation channel left by the simulation's
+    /// observation process, not the latent transition truth that generated document
+    /// state. Only observed `TransitionsTo` rows become numerical transition pairs;
+    /// false-positive `References` rows remain non-transition observations. The
+    /// simulation-only `is_true_positive` marker is deliberately ignored so it
+    /// cannot become an oracle filter for estimator input.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SimulationError::ManifestInvariantViolation`] when an observed
+    /// transition references an event for which the manifest owns no original report.
+    pub fn observed_document_transition_pairs(
+        &self,
+    ) -> Result<Vec<(Uuid, Uuid)>, SimulationError> {
+        let canonical_document_by_event = self.canonical_original_document_by_event();
+        let mut document_pairs = BTreeSet::new();
+        for relation in self
+            .observed_relations
+            .iter()
+            .filter(|relation| relation.kind().is_transition())
+        {
+            let source = canonical_document_by_event
+                .get(&relation.source_id())
+                .copied()
+                .ok_or(SimulationError::ManifestInvariantViolation)?;
+            let target = canonical_document_by_event
+                .get(&relation.target_id())
+                .copied()
+                .ok_or(SimulationError::ManifestInvariantViolation)?;
+            document_pairs.insert((source, target));
+        }
+        Ok(document_pairs.into_iter().collect())
+    }
+
+    fn canonical_original_document_by_event(&self) -> BTreeMap<Uuid, Uuid> {
+        let mut canonical_document_by_event = BTreeMap::new();
+        for document in &self.documents {
+            if document.method_effect().is_derivative() {
+                continue;
+            }
+            canonical_document_by_event
+                .entry(document.event_id())
+                .and_modify(|current: &mut Uuid| {
+                    *current = (*current).min(document.document_id());
+                })
+                .or_insert_with(|| document.document_id());
+        }
+        canonical_document_by_event
     }
 
     /// Verify scientific invariants required of every truth corpus.
