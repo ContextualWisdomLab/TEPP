@@ -11,7 +11,8 @@ use membership_core::{
 };
 use model_selection::{
     FittedCandidateKConfig, ModelSelectionError, RollingOriginRecoveryEvaluation,
-    fit_declared_recovery_candidates, select_declared_rolling_origin_recovery_candidate_k_for_cutoffs,
+    fit_declared_recovery_candidates,
+    select_declared_rolling_origin_recovery_candidate_k_for_cutoffs,
     selected_k_recovery_summary_from_results,
 };
 use relation_graph::{
@@ -21,7 +22,7 @@ use temporal_core::{
     EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval, TemporalPrecision,
 };
 use tepp_simulation::{
-    DocumentMethodEffect, SimulationConfig, SimulatedDocument, TopicDgpConfig, TruthManifest,
+    DocumentMethodEffect, SimulatedDocument, SimulationConfig, TopicDgpConfig, TruthManifest,
     generate,
 };
 use topic_measurement::{ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, SparseMatrix};
@@ -40,18 +41,7 @@ struct WindowFixture {
 
 fn simulation_config(seed: u64) -> SimulationConfig {
     SimulationConfig::new(
-        seed,
-        9,
-        2,
-        3,
-        12,
-        6,
-        0,
-        0,
-        500,
-        3_000,
-        3_000,
-        3_000,
+        seed, 9, 2, 3, 12, 6, 0, 0, 500, 3_000, 3_000, 3_000,
     )
     .expect("realistic recovery simulation config")
 }
@@ -115,8 +105,9 @@ fn membership_network(manifest: &TruthManifest) -> MembershipNetwork {
                     MembershipAssignment::new(
                         MemberId::from_uuid(document.document_id()),
                         GroupId::from_uuid(membership.group_id()),
-                        MembershipRole::from_wire_name(membership.role_label())
-                            .expect("simulation membership role belongs to the canonical vocabulary"),
+                        MembershipRole::from_wire_name(membership.role_label()).expect(
+                            "simulation membership role belongs to the canonical vocabulary",
+                        ),
                         MembershipWeight::new(f64::from(membership.weight_bps()) / 10_000.0)
                             .expect("simulation membership weight"),
                         event_time,
@@ -139,11 +130,13 @@ fn leakage_links(manifest: &TruthManifest) -> Vec<LeakageLink> {
             .or_default()
             .push(document.document_id());
         if let Some(parent) = document.parent_document_id() {
-            let kind = match document.method_effect() {
-                DocumentMethodEffect::Revision => LeakageLinkKind::Revision,
-                DocumentMethodEffect::Translation => LeakageLinkKind::Translation,
-                DocumentMethodEffect::TemplateCopy => LeakageLinkKind::CopiedVariant,
-                _ => LeakageLinkKind::CopiedVariant,
+            let method = document.method_effect();
+            let kind = if method == DocumentMethodEffect::Revision {
+                LeakageLinkKind::Revision
+            } else if method == DocumentMethodEffect::Translation {
+                LeakageLinkKind::Translation
+            } else {
+                LeakageLinkKind::CopiedVariant
             };
             links.push(LeakageLink {
                 left: parent,
@@ -294,11 +287,17 @@ fn assert_future_availability_rejected(manifest: &TruthManifest, cutoff: &Knowle
 
 fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
     let manifest = generate(simulation_config(seed)).expect("known-truth simulation");
-    manifest.verify_invariants().expect("truth manifest invariants");
+    manifest
+        .verify_invariants()
+        .expect("truth manifest invariants");
     assert_realistic_structure(&manifest);
 
     let cutoffs = recovery_cutoffs(&manifest);
-    assert_eq!(cutoffs.len(), 6, "five rolling-origin windows are predeclared");
+    assert_eq!(
+        cutoffs.len(),
+        6,
+        "five rolling-origin windows are predeclared"
+    );
     assert_future_availability_rejected(&manifest, &cutoffs[0]);
 
     let memberships = membership_network(&manifest);
@@ -306,7 +305,8 @@ fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
     let leakage = leakage_links(&manifest);
     let counts_by_document = topic_counts_by_document(&manifest);
     let event_times = event_time_by_document(&manifest);
-    let vocabulary_size = manifest.topic_truth().vocabulary_size() as usize;
+    let vocabulary_size = usize::try_from(manifest.topic_truth().vocabulary_size())
+        .expect("vocabulary size fits usize");
     let config = FittedCandidateKConfig::new(vec![2, 3, 4], vec![7, 11, 19], 2_000, 0.001)
         .expect("predeclared candidate-K design");
 
@@ -408,7 +408,11 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         summary.replication_count()
     );
     assert!(summary.failure_rate().is_finite());
-    assert!(summary.failure_rate_monte_carlo_standard_error().is_finite());
+    assert!(
+        summary
+            .failure_rate_monte_carlo_standard_error()
+            .is_finite()
+    );
     assert!(
         summary.success_count() >= 2,
         "CI-scale scientific recovery must retain enough successful replications to estimate Monte Carlo uncertainty"
