@@ -36,11 +36,27 @@ The coordinate map is linear. If `z = A x`, uncertainty expressed as covariance 
 
 This matrix operation is still validation-coordinate arithmetic. It does not turn the fitted approximation into a calibrated posterior, establish interval coverage, mutate estimator state, authenticate Evidence vocabulary/source provenance, or create semantic/release topic identity. Coverage remains an empirical repeated-recovery claim and must be tested after location and covariance have been expressed in the same truth basis.
 
+## EventTime feature-basis transformation
+
+Topic/ALR alignment does not by itself make prevalence coefficients comparable. The reference estimator learns the EventTime feature on the training window's frozen affine coordinate, while the known-topic simulator declares its prevalence intercepts and slopes against its own full-horizon time coordinate. An identical physical trajectory therefore has different intercept and slope values when the center or scale changes.
+
+Write the source coordinate as `x_s = (t - c_s) / s_s` and the target coordinate as `x_t = (t - c_t) / s_t`, with both centers measured in seconds from the same physical origin and both scales strictly positive. For a source trajectory `a_s + b_s x_s`, `validation_core::reexpress_linear_prevalence_time_basis(...)` uses the exact affine reparameterization
+
+`a_t = a_s + b_s (c_t - c_s) / s_s`
+
+and
+
+`b_t = b_s s_t / s_s`.
+
+The transformed coefficients produce the same trajectory at every physical time; only the feature coordinate changes. This operation is separate from `realign_additive_log_ratio(...)`: the EventTime transform acts on the prevalence feature axis, whereas topic alignment acts on the ALR/topic axis. A recovery harness that compares fitted and generating prevalence coefficients must establish both bases against one common physical origin and apply both transformations as required. Directly comparing window-standardized fitted coefficients with full-horizon simulator coefficients would manufacture intercept/slope bias even when the fitted physical trajectory is correct.
+
+`LinearTimeBasis` deliberately accepts already-derived center/scale values rather than reaching into simulation, temporal, or fitted-input owners. It does not authenticate EventTime, infer availability, or mint a cutoff receipt. The #680 acceptance composition must derive the source and target basis geometry from the owner-issued simulation truth and frozen `PrevalenceDesignBasis` before using this arithmetic.
+
 ## Recovery use
 
-For a replication whose selected/fitted `K` equals the known generating `K`, the returned `truth_to_fitted` map is applied consistently before topic-content residuals are formed. Fitted ALR document-state or prevalence locations are transformed into the truth reference basis before RMSE/bias. When interval or covariance recovery is evaluated, the corresponding fitted ALR covariance is transformed with `realign_additive_log_ratio_covariance(...)` before interval construction or coverage comparison. A failed `K` fit/selection remains a failed replication and is not repaired by alignment. When fitted `K != truth K`, this square alignment contract is inapplicable; selected-K error remains the model-selection recovery quantity.
+For a replication whose selected/fitted `K` equals the known generating `K`, the returned `truth_to_fitted` map is applied consistently before topic-content residuals are formed. Fitted ALR document-state or prevalence locations are transformed into the truth reference basis before RMSE/bias. Prevalence coefficient recovery additionally requires the fitted and generating EventTime features to be expressed in one affine time basis before intercept/slope residuals are formed. When interval or covariance recovery is evaluated, the corresponding fitted ALR covariance is transformed with `realign_additive_log_ratio_covariance(...)` before interval construction or coverage comparison. A failed `K` fit/selection remains a failed replication and is not repaired by alignment. When fitted `K != truth K`, this square alignment contract is inapplicable; selected-K error remains the model-selection recovery quantity.
 
-The owner contract is exercised by `crates/validation_core/tests/topic_alignment_contract.rs` and `crates/validation_core/tests/alr_covariance_alignment_edges.rs`, including an exact topic permutation, a case where row-wise greedy nearest-neighbor matching is not the global optimum, a three-topic case where the truth ALR reference maps to a non-reference fitted topic, identity/singular covariance preservation, the corresponding `A Σ Aᵀ` covariance result, and non-finite factorization failure paths.
+The owner contracts are exercised by `crates/validation_core/tests/topic_alignment_contract.rs`, `crates/validation_core/tests/alr_covariance_alignment_edges.rs`, and `crates/validation_core/tests/prevalence_time_basis_contract.rs`, including an exact topic permutation, a case where row-wise greedy nearest-neighbor matching is not the global optimum, a three-topic case where the truth ALR reference maps to a non-reference fitted topic, identity/singular covariance preservation, the corresponding `A Σ Aᵀ` covariance result, non-finite factorization failure paths, affine EventTime trajectory invariance, identity time-basis preservation, and invalid/overflowing time-basis geometry.
 
 ## References
 
