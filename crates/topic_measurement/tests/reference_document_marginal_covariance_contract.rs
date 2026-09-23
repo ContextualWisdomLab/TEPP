@@ -12,8 +12,8 @@ use temporal_core::{
     TemporalPrecision,
 };
 use topic_measurement::{
-    ReferenceTopicFit, ReferenceTopicInput, ReferenceTopicModelConfig, SparseMatrix,
-    TopicMeasurementError,
+    FitBoundDocumentMarginalCovariance, FittedTopicBasisIdentity, ReferenceTopicFit,
+    ReferenceTopicInput, ReferenceTopicModelConfig, SparseMatrix, TopicMeasurementError,
 };
 use uuid::Uuid;
 
@@ -133,6 +133,28 @@ fn relation_coupled_marginal_uses_full_inverse_precision() {
     assert!(full_inverse_marginal.is_finite() && full_inverse_marginal > 0.0);
     assert!((full_inverse_marginal - reciprocal_precision_diagonal).abs() > 1.0e-12);
     assert!((full_inverse_marginal - isolated_document_block_inverse).abs() > 1.0e-12);
+}
+
+#[test]
+fn fit_bound_marginal_retains_owner_topic_basis_identity() {
+    let fit = fit();
+    let expected_basis =
+        FittedTopicBasisIdentity::from_bound_fit(&fit).expect("fit-owned topic basis");
+    let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
+    let document_id = fit.input().document_ids()[0];
+
+    let marginal = FitBoundDocumentMarginalCovariance::from_bound_fit(
+        &fit,
+        topic_ids.clone(),
+        document_id,
+    )
+    .expect("fit-bound marginal covariance with basis identity");
+
+    assert_eq!(marginal.document_id(), document_id);
+    assert_eq!(marginal.topic_ids(), topic_ids);
+    assert_eq!(marginal.topic_basis_identity(), &expected_basis);
+    assert_eq!(marginal.values().len(), 1);
+    assert_eq!(marginal.values()[0].len(), 1);
 }
 
 #[test]
