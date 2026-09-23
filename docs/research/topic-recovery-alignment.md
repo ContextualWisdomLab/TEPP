@@ -28,13 +28,19 @@ Let `m(t)` be the fitted-topic index assigned to truth topic `t`. Restore the im
 
 This is the exact change of ALR reference induced by the topic permutation. It can be applied to document latent ALR coordinates and row-wise to prevalence coefficients expressed in the same fitted ALR basis. Aitchison (1982) establishes log-ratio treatment of compositional data; Egozcue et al. (2003) make explicit that log-ratio coordinates are basis dependent. The recovery transform therefore changes validation coordinates, not the fitted composition itself.
 
-The current contract does **not** transform covariance matrices. Any covariance recovery under a changed ALR basis requires the corresponding linear map `A Σ Aᵀ` as its own validated matrix contract rather than applying this vector helper element-wise.
+The coordinate map is linear. If `z = A x`, uncertainty expressed as covariance in the fitted ALR basis must be carried into the same truth-reference basis as
+
+`Σ_z = A Σ_x Aᵀ`.
+
+`validation_core::realign_additive_log_ratio_covariance(...)` constructs the same topic/reference contrast used by the vector transform and applies that matrix propagation. It accepts only exact `(K - 1) × (K - 1)` finite symmetric positive-semidefinite input, with local scale-relative tolerances limited to binary64 roundoff. Dimension mismatch, ragged matrices, material asymmetry, negative/indefinite covariance, non-finite factorization intermediates, or non-finite transformed output fail closed. A singular covariance is valid when it is positive semidefinite.
+
+This matrix operation is still validation-coordinate arithmetic. It does not turn the fitted approximation into a calibrated posterior, establish interval coverage, mutate estimator state, authenticate Evidence vocabulary/source provenance, or create semantic/release topic identity. Coverage remains an empirical repeated-recovery claim and must be tested after location and covariance have been expressed in the same truth basis.
 
 ## Recovery use
 
-For a replication whose selected/fitted `K` equals the known generating `K`, the returned `truth_to_fitted` map is applied consistently before topic-content residuals are formed. Fitted ALR document-state or prevalence quantities are additionally transformed into the truth reference basis before RMSE/bias/coverage. A failed `K` fit/selection remains a failed replication and is not repaired by alignment. When fitted `K != truth K`, this square alignment contract is inapplicable; selected-K error remains the model-selection recovery quantity.
+For a replication whose selected/fitted `K` equals the known generating `K`, the returned `truth_to_fitted` map is applied consistently before topic-content residuals are formed. Fitted ALR document-state or prevalence locations are transformed into the truth reference basis before RMSE/bias. When interval or covariance recovery is evaluated, the corresponding fitted ALR covariance is transformed with `realign_additive_log_ratio_covariance(...)` before interval construction or coverage comparison. A failed `K` fit/selection remains a failed replication and is not repaired by alignment. When fitted `K != truth K`, this square alignment contract is inapplicable; selected-K error remains the model-selection recovery quantity.
 
-The owner contract is exercised by `crates/validation_core/tests/topic_alignment_contract.rs`, including an exact topic permutation, a case where row-wise greedy nearest-neighbor matching is not the global optimum, and a three-topic case where the truth ALR reference maps to a non-reference fitted topic.
+The owner contract is exercised by `crates/validation_core/tests/topic_alignment_contract.rs` and `crates/validation_core/tests/alr_covariance_alignment_edges.rs`, including an exact topic permutation, a case where row-wise greedy nearest-neighbor matching is not the global optimum, a three-topic case where the truth ALR reference maps to a non-reference fitted topic, identity/singular covariance preservation, the corresponding `A Σ Aᵀ` covariance result, and non-finite factorization failure paths.
 
 ## References
 
