@@ -1,7 +1,10 @@
 //! Interval coverage for recovered confidence/credible intervals.
 
 use crate::ValidationError;
-use crate::monte_carlo::{MonteCarloSummary, summarize_replications};
+use crate::monte_carlo::{
+    MonteCarloRecoveryMetricSummary, MonteCarloSummary, summarize_recovery_metric_replications,
+    summarize_replications,
+};
 
 /// Empirical coverage of closed intervals `[lower, upper]` for truth values.
 ///
@@ -37,6 +40,24 @@ pub fn interval_coverage(
     Ok(covered as f64 / truth.len() as f64)
 }
 
+fn collapse_window_coverages(
+    replication_window_coverages: &[Vec<f64>],
+) -> Result<Vec<f64>, ValidationError> {
+    if replication_window_coverages.iter().any(|windows| {
+        windows.is_empty()
+            || windows
+                .iter()
+                .any(|coverage| !coverage.is_finite() || !(0.0..=1.0).contains(coverage))
+    }) {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    Ok(replication_window_coverages
+        .iter()
+        .map(|windows| windows.iter().sum::<f64>() / windows.len() as f64)
+        .collect())
+}
+
 /// Collapse rolling-origin coverage within each DGP replication before Monte Carlo inference.
 ///
 /// Each outer element is one independently generated DGP replication. Each inner
@@ -61,23 +82,52 @@ pub fn summarize_windowed_coverage_replications(
     lower_percentile: f64,
     upper_percentile: f64,
 ) -> Result<MonteCarloSummary, ValidationError> {
-    if replication_window_coverages.len() < 2
-        || replication_window_coverages.iter().any(|windows| {
-            windows.is_empty()
-                || windows
-                    .iter()
-                    .any(|coverage| !coverage.is_finite() || !(0.0..=1.0).contains(coverage))
-        })
-    {
+    if replication_window_coverages.len() < 2 {
         return Err(ValidationError::InvalidInput);
     }
-
-    let per_replication_coverage: Vec<f64> = replication_window_coverages
-        .iter()
-        .map(|windows| windows.iter().sum::<f64>() / windows.len() as f64)
-        .collect();
+    let per_replication_coverage = collapse_window_coverages(replication_window_coverages)?;
     summarize_replications(
         &per_replication_coverage,
+        lower_percentile,
+        upper_percentile,
+    )
+}
+
+/// Collapse successful rolling-origin coverage within DGP replications while retaining failures.
+///
+/// `attempted_replication_count` is the unconditional number of scientifically
+/// admissible DGP replications attempted. `successful_replication_window_coverages`
+/// contains window-level coverage only for attempts where that metric was
+/// numerically available. Each successful DGP is collapsed to one equal-window
+/// mean before the existing recovery-metric owner computes between-DGP Monte
+/// Carlo uncertainty and the unconditional failure denominator.
+///
+/// Structural experiment invalidity must be rejected by the owning workflow
+/// before calling this function. Missing successful coverage here represents only
+/// an owner-admitted numerical failure; it must not be used to launder malformed
+/// split, identity, covariance, or interval geometry into the failure denominator.
+///
+/// All-failed and one-success experiments remain reportable. One successful DGP
+/// retains its conditional coverage mean but does not fabricate a between-DGP
+/// standard deviation or Monte Carlo standard error.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when a successful DGP has no windows,
+/// any window coverage is non-finite or outside `[0, 1]`, the attempted count is
+/// zero, or successful replications outnumber attempts. Percentile configuration
+/// errors are propagated from the recovery-metric Monte Carlo owner.
+pub fn summarize_windowed_coverage_recovery_replications(
+    attempted_replication_count: usize,
+    successful_replication_window_coverages: &[Vec<f64>],
+    lower_percentile: f64,
+    upper_percentile: f64,
+) -> Result<MonteCarloRecoveryMetricSummary, ValidationError> {
+    let successful_dgp_coverages =
+        collapse_window_coverages(successful_replication_window_coverages)?;
+    summarize_recovery_metric_replications(
+        attempted_replication_count,
+        &successful_dgp_coverages,
         lower_percentile,
         upper_percentile,
     )
