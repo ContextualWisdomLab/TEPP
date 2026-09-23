@@ -1,7 +1,7 @@
-//! Signed mean bias recovery metric.
+//! Signed and parameter-wise bias recovery metrics.
 
 use crate::ValidationError;
-use crate::input::{require_finite, require_paired_finite};
+use crate::input::{require_finite, require_paired_finite, slice_is_finite};
 
 /// Mean signed bias `mean(recovered − truth)`.
 ///
@@ -23,6 +23,77 @@ pub fn mean_bias(truth: &[f64], recovered: &[f64]) -> Result<f64, ValidationErro
         }
     }
     require_finite(sum / truth.len() as f64)
+}
+
+/// Mean signed bias for every parameter across repeated recovery observations.
+///
+/// `truth[j]` is the fixed true value for parameter `j`. Every row in
+/// `recovered` must preserve that exact parameter geometry; the result at `j`
+/// is the mean of `recovered[i][j] - truth[j]` across observations. Keeping the
+/// parameter axis intact prevents simplex-wide positive and negative residuals
+/// from cancelling before bias is assessed.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when truth or recovery observations
+/// are empty, any recovery row changes parameter geometry, an input is
+/// non-finite, or intermediate bias arithmetic becomes non-finite.
+pub fn parameter_mean_biases(
+    truth: &[f64],
+    recovered: &[Vec<f64>],
+) -> Result<Vec<f64>, ValidationError> {
+    if truth.is_empty() || recovered.is_empty() || !slice_is_finite(truth) {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    let mut sums = vec![0.0_f64; truth.len()];
+    for row in recovered {
+        if row.len() != truth.len() || !slice_is_finite(row) {
+            return Err(ValidationError::InvalidInput);
+        }
+        for ((sum, recovered_value), truth_value) in sums.iter_mut().zip(row).zip(truth) {
+            let diff = recovered_value - truth_value;
+            if !diff.is_finite() {
+                return Err(ValidationError::InvalidInput);
+            }
+            *sum += diff;
+            if !sum.is_finite() {
+                return Err(ValidationError::InvalidInput);
+            }
+        }
+    }
+
+    let observation_count = recovered.len() as f64;
+    sums.into_iter()
+        .map(|sum| require_finite(sum / observation_count))
+        .collect()
+}
+
+/// Mean absolute parameter-wise bias across repeated recovery observations.
+///
+/// This first computes signed bias independently for each parameter and only
+/// then averages absolute magnitudes. It therefore cannot report perfect bias
+/// merely because constrained parameters (for example, simplex cells) have
+/// residuals that sum to zero by construction.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when
+/// [`parameter_mean_biases`] rejects the recovery geometry or values, or when
+/// the absolute-bias aggregation becomes non-finite.
+pub fn mean_absolute_parameter_bias(
+    truth: &[f64],
+    recovered: &[Vec<f64>],
+) -> Result<f64, ValidationError> {
+    let biases = parameter_mean_biases(truth, recovered)?;
+    let mut absolute_sum = 0.0_f64;
+    for bias in &biases {
+        absolute_sum += bias.abs();
+        if !absolute_sum.is_finite() {
+            return Err(ValidationError::InvalidInput);
+        }
+    }
+    require_finite(absolute_sum / biases.len() as f64)
 }
 
 /// Standard error of the mean signed bias under independent observations.
@@ -60,7 +131,9 @@ pub fn bias_standard_error(truth: &[f64], recovered: &[f64]) -> Result<f64, Vali
 
 #[cfg(test)]
 mod tests {
-    use super::{bias_standard_error, mean_bias};
+    use super::{
+        bias_standard_error, mean_absolute_parameter_bias, mean_bias, parameter_mean_biases,
+    };
     use crate::ValidationError;
 
     #[test]
@@ -91,6 +164,59 @@ mod tests {
         );
         assert_eq!(
             bias_standard_error(&[f64::MAX, 0.0], &[-f64::MAX, 0.0]),
+            Err(ValidationError::InvalidInput)
+        );
+    }
+
+    #[test]
+    fn parameterwise_bias_preserves_geometry_before_absolute_summary() {
+        let truth = [0.6, 0.4];
+        let recovered = vec![vec![0.7, 0.3], vec![0.7, 0.3], vec![0.7, 0.3]];
+        let biases = parameter_mean_biases(&truth, &recovered).expect("parameter biases");
+        assert!((biases[0] - 0.1).abs() < 1.0e-12);
+        assert!((biases[1] + 0.1).abs() < 1.0e-12);
+        assert!(biases.iter().sum::<f64>().abs() < 1.0e-12);
+        assert!(
+            (mean_absolute_parameter_bias(&truth, &recovered).expect("absolute bias") - 0.1).abs()
+                < 1.0e-12
+        );
+    }
+
+    #[test]
+    fn parameterwise_bias_rejects_invalid_geometry_values_and_arithmetic() {
+        assert_eq!(
+            parameter_mean_biases(&[], &[vec![]]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            parameter_mean_biases(&[1.0], &[]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            parameter_mean_biases(&[f64::NAN], &[vec![1.0]]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            parameter_mean_biases(&[1.0, 2.0], &[vec![1.0]]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            parameter_mean_biases(&[1.0], &[vec![f64::INFINITY]]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            parameter_mean_biases(&[-f64::MAX], &[vec![f64::MAX]]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            parameter_mean_biases(&[0.0], &[vec![f64::MAX], vec![f64::MAX]]),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            mean_absolute_parameter_bias(
+                &[0.0, 0.0],
+                &[vec![f64::MAX, f64::MAX]],
+            ),
             Err(ValidationError::InvalidInput)
         );
     }
