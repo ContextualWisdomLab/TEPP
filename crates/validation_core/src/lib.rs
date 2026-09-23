@@ -20,6 +20,7 @@ mod graph_metrics;
 mod input;
 mod matching;
 mod monte_carlo;
+mod prevalence_time_basis;
 mod report;
 mod rmse;
 mod temporal_order;
@@ -67,6 +68,12 @@ pub use monte_carlo::MonteCarloSummary;
 pub use monte_carlo::accept_within_standard_errors;
 /// Aggregate Monte Carlo replications.
 pub use monte_carlo::summarize_replications;
+/// One affine EventTime coordinate for prevalence coefficient comparison.
+pub use prevalence_time_basis::LinearTimeBasis;
+/// Prevalence coefficients expressed in one affine EventTime basis.
+pub use prevalence_time_basis::LinearPrevalenceTimeCoefficients;
+/// Re-express prevalence intercept/slope vectors in a target affine EventTime basis.
+pub use prevalence_time_basis::reexpress_linear_prevalence_time_basis;
 /// Machine-readable validation report.
 pub use report::ValidationReport;
 /// RMSE standard error.
