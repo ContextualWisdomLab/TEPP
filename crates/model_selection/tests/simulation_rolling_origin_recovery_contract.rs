@@ -11,7 +11,7 @@ use membership_core::{
 };
 use model_selection::{
     FittedCandidateKConfig, ModelSelectionError, RollingOriginRecoveryEvaluation,
-    fit_declared_recovery_candidates,
+    fit_declared_recovery_candidates, rolling_origin_prevalence_mean_predictive_log_likelihood,
     select_declared_rolling_origin_recovery_candidate_k_for_cutoffs,
     selected_k_recovery_summary_from_results,
 };
@@ -285,6 +285,28 @@ fn assert_future_availability_rejected(manifest: &TruthManifest, cutoff: &Knowle
     );
 }
 
+fn assert_generated_rebinding_rejected(
+    fixtures: &[WindowFixture],
+    memberships: &MembershipNetwork,
+) {
+    let first = &fixtures[0];
+    let later = &fixtures[1];
+    let mut substituted_ids = first.evaluation_document_ids.clone();
+    substituted_ids[0] = later.evaluation_document_ids[0];
+    assert_eq!(
+        rolling_origin_prevalence_mean_predictive_log_likelihood(
+            &first.partition,
+            &first.fits[0],
+            &substituted_ids,
+            &first.evaluation_document_term,
+            &first.evaluation_event_times,
+            None,
+            memberships,
+        ),
+        Err(ModelSelectionError::PartitionInputMismatch)
+    );
+}
+
 fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
     let manifest = generate(simulation_config(seed)).expect("known-truth simulation");
     manifest
@@ -311,9 +333,9 @@ fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
         .expect("predeclared candidate-K design");
 
     let mut fixtures = Vec::new();
-    for window_index in 0..cutoffs.len() - 1 {
-        let training_snapshot = snapshot_at(&manifest, &cutoffs[window_index]);
-        let evaluation_snapshot = snapshot_at(&manifest, &cutoffs[window_index + 1]);
+    for (window_index, cutoff_pair) in cutoffs.windows(2).enumerate() {
+        let training_snapshot = snapshot_at(&manifest, &cutoff_pair[0]);
+        let evaluation_snapshot = snapshot_at(&manifest, &cutoff_pair[1]);
         let training_snapshot_ids: BTreeSet<_> = training_snapshot.document_ids().collect();
         let evaluation_document_ids: Vec<_> = evaluation_snapshot
             .document_ids()
@@ -369,6 +391,7 @@ fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
         });
     }
 
+    assert_generated_rebinding_rejected(&fixtures, &memberships);
     let evaluations: Result<Vec<_>, _> = fixtures
         .iter()
         .map(|fixture| {
