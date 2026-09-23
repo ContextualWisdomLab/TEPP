@@ -268,7 +268,13 @@ fn is_positive_semidefinite(covariance: &[Vec<f64>]) -> bool {
             let correction = (0..column)
                 .map(|previous| lower[row][previous] * lower[column][previous])
                 .sum::<f64>();
+            if !correction.is_finite() {
+                return false;
+            }
             let residual = covariance[row][column] - correction;
+            if !residual.is_finite() {
+                return false;
+            }
             let local_scale = covariance[row][column]
                 .abs()
                 .max(correction.abs())
