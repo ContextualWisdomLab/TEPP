@@ -78,4 +78,13 @@ fn marginal_normal_intervals_fail_closed_on_invalid_geometry_or_arithmetic() {
         normal_marginal_interval_bounds(&[0.0], &[vec![4.0]], f64::MAX),
         Err(ValidationError::InvalidInput)
     );
+    // The margin can remain finite while one closed bound overflows.
+    assert_eq!(
+        normal_marginal_interval_bounds(&[f64::MAX], &[vec![1.0]], f64::MAX),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        normal_marginal_interval_bounds(&[-f64::MAX], &[vec![1.0]], f64::MAX),
+        Err(ValidationError::InvalidInput)
+    );
 }
