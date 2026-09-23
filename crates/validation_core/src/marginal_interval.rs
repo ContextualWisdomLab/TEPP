@@ -7,9 +7,7 @@
 //! separate recovery question.
 
 use crate::ValidationError;
-
-const COVARIANCE_SYMMETRY_RELATIVE_TOLERANCE: f64 = 1.0e-10;
-const COVARIANCE_PSD_RELATIVE_TOLERANCE: f64 = 1.0e-12;
+use crate::topic_alignment::validate_covariance_matrix;
 
 /// Closed marginal interval bounds in the same coordinate order as their location.
 #[derive(Clone, Debug, PartialEq)]
@@ -67,11 +65,7 @@ pub fn normal_marginal_interval_bounds(
     let mut lower = Vec::with_capacity(location.len());
     let mut upper = Vec::with_capacity(location.len());
     for (index, center) in location.iter().copied().enumerate() {
-        let variance = covariance[index][index];
-        if variance < 0.0 {
-            return Err(ValidationError::InvalidInput);
-        }
-        let margin = z * variance.sqrt();
+        let margin = z * covariance[index][index].sqrt();
         let low = center - margin;
         let high = center + margin;
         if !margin.is_finite() || !low.is_finite() || !high.is_finite() {
@@ -82,81 +76,4 @@ pub fn normal_marginal_interval_bounds(
     }
 
     Ok(MarginalIntervalBounds { lower, upper })
-}
-
-fn validate_covariance_matrix(
-    covariance: &[Vec<f64>],
-    coordinate_count: usize,
-) -> Result<(), ValidationError> {
-    if covariance.len() != coordinate_count
-        || covariance.iter().any(|row| row.len() != coordinate_count)
-        || covariance.iter().flatten().any(|value| !value.is_finite())
-    {
-        return Err(ValidationError::InvalidInput);
-    }
-
-    for row in 0..coordinate_count {
-        if covariance[row][row] < 0.0 {
-            return Err(ValidationError::InvalidInput);
-        }
-        for column in 0..row {
-            let scale = covariance[row][column]
-                .abs()
-                .max(covariance[column][row].abs())
-                .max(f64::EPSILON);
-            let tolerance = COVARIANCE_SYMMETRY_RELATIVE_TOLERANCE * scale;
-            if (covariance[row][column] - covariance[column][row]).abs() > tolerance {
-                return Err(ValidationError::InvalidInput);
-            }
-        }
-    }
-
-    if !is_positive_semidefinite(covariance) {
-        return Err(ValidationError::InvalidInput);
-    }
-    Ok(())
-}
-
-fn is_positive_semidefinite(covariance: &[Vec<f64>]) -> bool {
-    let coordinate_count = covariance.len();
-    let mut lower = vec![vec![0.0_f64; coordinate_count]; coordinate_count];
-
-    for row in 0..coordinate_count {
-        for column in 0..=row {
-            let correction = (0..column)
-                .map(|previous| lower[row][previous] * lower[column][previous])
-                .sum::<f64>();
-            if !correction.is_finite() {
-                return false;
-            }
-            let residual = covariance[row][column] - correction;
-            if !residual.is_finite() {
-                return false;
-            }
-            let local_scale = covariance[row][column]
-                .abs()
-                .max(correction.abs())
-                .max(f64::EPSILON);
-            let tolerance = COVARIANCE_PSD_RELATIVE_TOLERANCE * local_scale;
-
-            if row == column {
-                if residual < -tolerance {
-                    return false;
-                }
-                lower[row][column] = if residual <= tolerance {
-                    0.0
-                } else {
-                    residual.sqrt()
-                };
-            } else if lower[column][column] > 0.0 {
-                lower[row][column] = residual / lower[column][column];
-                if !lower[row][column].is_finite() {
-                    return false;
-                }
-            } else if residual.abs() > tolerance {
-                return false;
-            }
-        }
-    }
-    true
 }
