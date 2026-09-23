@@ -1,7 +1,7 @@
 # Fit-bound document marginal covariance from joint precision
 
-Issue: #704  
-Owner: `topic_measurement::JointCoordinatePrecision`  
+Issues: #704, #705  
+Owner: `topic_measurement`  
 Consumer frontier: #703 → #680
 
 ## Scientific question
@@ -13,6 +13,8 @@ For one requested document, the bounded CPU reference path therefore solves
 `P X = E_d`
 
 where the columns of `E_d` are the unit vectors for that document's `K-1` ALR coordinates. The returned rows at the same coordinates form the document marginal covariance block. TEPP factors `P = L Lᵀ` once for the request and performs forward/back substitutions for only those `K-1` right-hand sides; it does not materialize the complete dense inverse.
+
+A second coordinate question is distinct from that linear algebra. `ReferenceTopicFit::build_joint_coordinate_precision(...)` still accepts a provisional caller UUID vector for compatibility, while `FittedTopicBasisIdentity` is derived from the actual fitted topic-term rows. The #705 fit-bound covariance projection therefore retains the fitted basis identity from the same owner-issued `ReferenceTopicFit`; caller topic UUIDs remain visible compatibility coordinates but cannot substitute for fit-local numerical basis identity.
 
 ## Numerical contract
 
@@ -26,7 +28,9 @@ where the columns of `E_d` are the unit vectors for that document's `K-1` ALR co
 - reconciles only symmetry differences within a documented `1e-10 × (1 + scale)` floating-point tolerance, then requires the returned principal covariance block to remain positive-definite;
 - is bounded by `MAX_JOINT_COORDINATES = 4096`. With joint dimension `N` and requested document coordinate count `C = K-1`, the current dense reference path is `O(N^3 + C N^2)` time and `O(N^2)` memory.
 
-The contract test uses a relation-coupled fitted precision and requires the full-inverse marginal to differ from both the reciprocal precision diagonal and the inverse of the isolated one-coordinate document block. Internal edge tests cover missing identity, retained-dimension mismatch, non-finite triangular solve, symmetry roundoff, material asymmetry, and non-positive-definite output.
+`FitBoundDocumentMarginalCovariance::from_bound_fit(...)` composes that numerical result with `FittedTopicBasisIdentity::from_bound_fit(...)` from the same `ReferenceTopicFit`. It does not recalculate `P`, invert another matrix, or accept a caller-supplied basis identity. The resulting value retains document identity, EventTime, provisional topic UUID order, covariance values, and the content-bound fitted basis identity.
+
+The contract test uses a relation-coupled fitted precision and requires the full-inverse marginal to differ from both the reciprocal precision diagonal and the inverse of the isolated one-coordinate document block. The same real fitted state must also reproduce its `FittedTopicBasisIdentity` through the #705 projection. Internal edge tests cover missing identity, retained-dimension mismatch, non-finite triangular solve, symmetry roundoff, material asymmetry, and non-positive-definite output.
 
 ## Statistical interpretation
 
@@ -36,7 +40,7 @@ Tierney and Kadane (1986) describe Laplace approximations for posterior moments,
 
 ## Claim boundary
 
-The #704 solve does **not** establish empirical interval coverage, calibrated posterior probability, Evidence source/vocabulary provenance, source/event-time authenticity, Membership provenance, relation activation authority, release topic identity, or CPU/MLX/CUDA/OpenCL parity. #703 may re-express this covariance into the truth-reference ALR basis as `A Σ Aᵀ`; #680 still requires repeated leakage-safe rolling-origin recovery with Monte Carlo uncertainty before a scientific recovery claim can be promoted.
+The #704 solve and #705 basis binding do **not** establish empirical interval coverage, calibrated posterior probability, Evidence source/vocabulary provenance, source/event-time authenticity, Membership provenance, relation activation authority, released semantic topic identity, or CPU/MLX/CUDA/OpenCL parity. `FittedTopicBasisIdentity` is fit-local numerical identity only; #658/#663 remain the source/vocabulary/release authority path. #703 may re-express the covariance into the truth-reference ALR basis as `A Σ Aᵀ`; #680 still requires repeated leakage-safe rolling-origin recovery with Monte Carlo uncertainty before a scientific recovery claim can be promoted.
 
 ## References
 
@@ -46,8 +50,9 @@ Tierney, L., & Kadane, J. B. (1986). Accurate approximations for posterior momen
 
 ## Code traceability
 
-- Owner value: `crates/topic_measurement/src/reference.rs` → `JointCoordinatePrecision`
+- Joint precision owner: `crates/topic_measurement/src/reference.rs` → `JointCoordinatePrecision`
 - Marginal solve: `crates/topic_measurement/src/marginal_covariance.rs`
+- Fit-basis binding: `crates/topic_measurement/src/fit_bound_marginal_covariance.rs`
 - Public export: `crates/topic_measurement/src/lib.rs`
 - Fit-bound RED/contract: `crates/topic_measurement/tests/reference_document_marginal_covariance_contract.rs`
 - Truth-basis covariance consumer: #703
