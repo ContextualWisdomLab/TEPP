@@ -72,8 +72,10 @@ fn marginal_normal_intervals_fail_closed_on_invalid_geometry_or_arithmetic() {
         normal_marginal_interval_bounds(&[0.0], &[vec![1.0]], f64::NAN),
         Err(ValidationError::InvalidConfiguration)
     );
+    // `z` itself is finite, but multiplying it by a positive standard deviation
+    // overflows; the owner must reject that arithmetic rather than emit infinities.
     assert_eq!(
-        normal_marginal_interval_bounds(&[f64::MAX], &[vec![f64::MAX]], 1.96),
+        normal_marginal_interval_bounds(&[0.0], &[vec![4.0]], f64::MAX),
         Err(ValidationError::InvalidInput)
     );
 }
