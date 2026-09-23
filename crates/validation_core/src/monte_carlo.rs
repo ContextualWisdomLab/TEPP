@@ -52,6 +52,121 @@ impl MonteCarloSummary {
     }
 }
 
+/// Monte Carlo scalar recovery together with its unconditional failure denominator.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MonteCarloRecoveryMetricSummary {
+    attempted_replication_count: usize,
+    successful_replication_count: usize,
+    failure_count: usize,
+    failure_rate: f64,
+    failure_rate_standard_error: f64,
+    successful_metric_summary: Option<MonteCarloSummary>,
+}
+
+impl MonteCarloRecoveryMetricSummary {
+    /// Number of scientifically admissible replications attempted.
+    #[must_use]
+    pub const fn attempted_replication_count(self) -> usize {
+        self.attempted_replication_count
+    }
+
+    /// Number of attempts that produced the scalar recovery metric.
+    #[must_use]
+    pub const fn successful_replication_count(self) -> usize {
+        self.successful_replication_count
+    }
+
+    /// Number of attempted replications without a scalar recovery metric.
+    #[must_use]
+    pub const fn failure_count(self) -> usize {
+        self.failure_count
+    }
+
+    /// Unconditional failure proportion across attempted replications.
+    #[must_use]
+    pub const fn failure_rate(self) -> f64 {
+        self.failure_rate
+    }
+
+    /// Bernoulli Monte Carlo standard error of the failure proportion.
+    #[must_use]
+    pub const fn failure_rate_standard_error(self) -> f64 {
+        self.failure_rate_standard_error
+    }
+
+    /// Conditional scalar summary for successful replications, if any succeeded.
+    #[must_use]
+    pub const fn successful_metric_summary(self) -> Option<MonteCarloSummary> {
+        self.successful_metric_summary
+    }
+}
+
+/// Aggregate scalar recovery while retaining the attempted-replication denominator.
+///
+/// `successful_samples` contains the scalar metric only for replications where
+/// that metric was numerically available. The attempted count remains explicit,
+/// so non-convergence or other owner-admitted numerical failures cannot disappear
+/// from the scientific evidence merely because RMSE, bias, or another scalar is
+/// undefined for those attempts. Structural experiment invalidity must be rejected
+/// by the owning workflow before calling this function; it must not be encoded as
+/// an attempted failure here.
+///
+/// The successful values are summarized with [`summarize_replications`]. When all
+/// attempts fail, the successful metric summary is `None` rather than a fabricated
+/// numeric value. Failure-rate Monte Carlo uncertainty uses the Bernoulli standard
+/// error `sqrt(p(1-p)/n)` over the unconditional attempted denominator.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when there are no attempted
+/// replications, successful values outnumber attempts, or a successful metric is
+/// non-finite. Returns [`ValidationError::InvalidConfiguration`] when percentile
+/// bounds fall outside `[0, 1]` or are reversed.
+pub fn summarize_recovery_metric_replications(
+    attempted_replication_count: usize,
+    successful_samples: &[f64],
+    lower_percentile: f64,
+    upper_percentile: f64,
+) -> Result<MonteCarloRecoveryMetricSummary, ValidationError> {
+    if attempted_replication_count == 0
+        || successful_samples.len() > attempted_replication_count
+        || successful_samples.iter().any(|value| !value.is_finite())
+    {
+        return Err(ValidationError::InvalidInput);
+    }
+    if !(0.0..=1.0).contains(&lower_percentile)
+        || !(0.0..=1.0).contains(&upper_percentile)
+        || lower_percentile > upper_percentile
+    {
+        return Err(ValidationError::InvalidConfiguration);
+    }
+
+    let successful_replication_count = successful_samples.len();
+    let failure_count = attempted_replication_count - successful_replication_count;
+    let attempted = attempted_replication_count as f64;
+    let failure_rate = failure_count as f64 / attempted;
+    let failure_rate_standard_error =
+        require_finite((failure_rate * (1.0 - failure_rate) / attempted).sqrt())?;
+    let successful_metric_summary = if successful_samples.is_empty() {
+        None
+    } else {
+        Some(summarize_replications(
+            successful_samples,
+            lower_percentile,
+            upper_percentile,
+        )?)
+    };
+
+    Ok(MonteCarloRecoveryMetricSummary {
+        attempted_replication_count,
+        successful_replication_count,
+        failure_count,
+        failure_rate,
+        failure_rate_standard_error,
+        successful_metric_summary,
+    })
+}
+
 /// Aggregate Monte Carlo metric replications with percentile bounds.
 ///
 /// Percentiles use the inclusive nearest-rank method on sorted finite samples.
