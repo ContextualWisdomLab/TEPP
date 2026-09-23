@@ -2,27 +2,29 @@
 
 use crate::{
     CoverageCalibrationDesign, CoverageCalibrationReplicationOutcome, ValidationError,
-    assess_coverage_calibration, parse_commit_head,
+    assess_coverage_calibration, indexed_coverage_outcome_fingerprint, parse_commit_head,
     summarize_indexed_windowed_coverage_recovery_replications,
 };
 use serde::Serialize;
 
-const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 1;
+const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 2;
 
 /// Immutable evidence record for one prospective coverage-calibration experiment.
 ///
 /// The record keeps validation criterion identity separate from simulation
 /// scenario identity while binding both to an exact source commit. It preserves
-/// the exact declared replication identity set, unconditional failure denominator,
-/// and Monte Carlo uncertainty alongside conditional interval-calibration metrics.
-/// A positive [`Self::supports_calibration_claim`] value is intentionally narrower
-/// than estimator robustness, scientific promotion, or release authority.
+/// the exact declared replication outcome ledger through a canonical SHA-256
+/// fingerprint, the unconditional failure denominator, and Monte Carlo
+/// uncertainty alongside conditional interval-calibration metrics. A positive
+/// [`Self::supports_calibration_claim`] value is intentionally narrower than
+/// estimator robustness, scientific promotion, or release authority.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CoverageCalibrationEvidenceRecord {
     schema_version: u32,
     validation_design_id: String,
     simulation_scenario_id: String,
     simulation_scenario_fingerprint: String,
+    replication_outcome_fingerprint: String,
     source_head: String,
     attempted_replication_count: usize,
     successful_replication_count: usize,
@@ -50,8 +52,10 @@ impl CoverageCalibrationEvidenceRecord {
     /// `source_head` must be an exact lowercase forty-hex Git commit identity.
     /// The indexed aggregation boundary requires an exact permutation of the
     /// prospective design's replication identities before any summary can be
-    /// serialized, preventing duplicate/omitted shard results from preserving a
-    /// superficially correct attempt count.
+    /// serialized. The same canonical indexed ledger is hashed into
+    /// [`Self::replication_outcome_fingerprint`] so persisted evidence remains
+    /// distinguishable when the same aggregate statistics arise from different
+    /// declared DGP success/failure identities.
     ///
     /// # Errors
     ///
@@ -86,6 +90,10 @@ impl CoverageCalibrationEvidenceRecord {
             lower_percentile,
             upper_percentile,
         )?;
+        let replication_outcome_fingerprint = indexed_coverage_outcome_fingerprint(
+            design.attempted_dgp_count(),
+            outcomes,
+        )?;
         let assessment = assess_coverage_calibration(design, &summary)?;
         let successful_metric_summary = summary.successful_metric_summary();
 
@@ -94,6 +102,7 @@ impl CoverageCalibrationEvidenceRecord {
             validation_design_id: design.design_id().to_owned(),
             simulation_scenario_id: simulation_scenario_id.to_owned(),
             simulation_scenario_fingerprint: simulation_scenario_fingerprint.to_owned(),
+            replication_outcome_fingerprint,
             source_head: source_head.to_owned(),
             attempted_replication_count: assessment.attempted_replication_count(),
             successful_replication_count: assessment.successful_replication_count(),
@@ -139,6 +148,12 @@ impl CoverageCalibrationEvidenceRecord {
     #[must_use]
     pub fn simulation_scenario_fingerprint(&self) -> &str {
         &self.simulation_scenario_fingerprint
+    }
+
+    /// SHA-256 fingerprint of the exact indexed success/failure and window ledger.
+    #[must_use]
+    pub fn replication_outcome_fingerprint(&self) -> &str {
+        &self.replication_outcome_fingerprint
     }
 
     /// Exact lowercase Git source commit that produced the evidence.
