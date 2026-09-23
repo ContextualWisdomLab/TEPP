@@ -99,7 +99,8 @@ pub fn indexed_coverage_outcome_fingerprint(
         }
     }
 
-    Ok(lower_hex(hasher.finalize().as_slice()))
+    let digest = hasher.finalize();
+    Ok(lower_hex(&digest))
 }
 
 /// Aggregate coverage only from an exact permutation of declared replication identities.
