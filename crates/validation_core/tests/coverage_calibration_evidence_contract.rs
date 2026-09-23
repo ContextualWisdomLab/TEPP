@@ -22,10 +22,36 @@ fn outcomes(successful: usize) -> Vec<CoverageCalibrationReplicationOutcome> {
         .collect()
 }
 
+fn outcomes_with_failures(failure_indices: &[usize]) -> Vec<CoverageCalibrationReplicationOutcome> {
+    (0..10_000)
+        .map(|replication_index| {
+            if failure_indices.contains(&replication_index) {
+                CoverageCalibrationReplicationOutcome::numerical_failure(replication_index)
+            } else {
+                CoverageCalibrationReplicationOutcome::successful(replication_index, vec![0.95])
+            }
+        })
+        .collect()
+}
+
 fn evidence(successful: usize) -> Result<CoverageCalibrationEvidenceRecord, ValidationError> {
     CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
         &CoverageCalibrationDesign::tepp_nominal_95_v1(),
         &outcomes(successful),
+        LOWER_PERCENTILE,
+        UPPER_PERCENTILE,
+        SCENARIO_ID,
+        SCENARIO_FINGERPRINT,
+        SOURCE_HEAD,
+    )
+}
+
+fn evidence_from_outcomes(
+    outcomes: &[CoverageCalibrationReplicationOutcome],
+) -> Result<CoverageCalibrationEvidenceRecord, ValidationError> {
+    CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
+        &CoverageCalibrationDesign::tepp_nominal_95_v1(),
+        outcomes,
         LOWER_PERCENTILE,
         UPPER_PERCENTILE,
         SCENARIO_ID,
@@ -73,6 +99,28 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(json.contains(SCENARIO_FINGERPRINT));
     assert!(json.contains(SOURCE_HEAD));
     assert_eq!(record.to_json().expect("repeat json"), json);
+}
+
+#[test]
+fn persisted_evidence_distinguishes_exact_indexed_failure_identity_pattern() {
+    let early_failures = evidence_from_outcomes(&outcomes_with_failures(&[0, 1]))
+        .expect("early-failure evidence");
+    let late_failures = evidence_from_outcomes(&outcomes_with_failures(&[9_998, 9_999]))
+        .expect("late-failure evidence");
+
+    assert_eq!(early_failures.attempted_replication_count(), 10_000);
+    assert_eq!(late_failures.attempted_replication_count(), 10_000);
+    assert_eq!(early_failures.successful_replication_count(), 9_998);
+    assert_eq!(late_failures.successful_replication_count(), 9_998);
+    assert_eq!(early_failures.failure_count(), 2);
+    assert_eq!(late_failures.failure_count(), 2);
+    assert_eq!(early_failures.coverage_mean(), Some(0.95));
+    assert_eq!(late_failures.coverage_mean(), Some(0.95));
+    assert_ne!(
+        early_failures.to_json().expect("early json"),
+        late_failures.to_json().expect("late json"),
+        "persisted evidence must retain which declared DGP identities failed"
+    );
 }
 
 #[test]
