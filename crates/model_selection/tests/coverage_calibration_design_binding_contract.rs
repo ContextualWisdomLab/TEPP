@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use tepp_simulation::CoverageCalibrationSimulationDesign;
 use validation_core::{
     CoverageCalibrationDesign, CoverageCalibrationEvidenceRecord,
-    summarize_windowed_coverage_recovery_replications,
+    CoverageCalibrationReplicationOutcome,
 };
 
 const CI_COVERAGE_REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
@@ -48,21 +48,24 @@ fn prospective_coverage_seed_schedule_is_unique_and_disjoint_from_ci_fixture() {
 fn persisted_calibration_evidence_uses_owner_scenario_identity_and_fingerprint() {
     let scenario = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
     let criterion = CoverageCalibrationDesign::tepp_nominal_95_v1();
-    let successful_coverages = [vec![0.95], vec![0.95]];
-    let summary = summarize_windowed_coverage_recovery_replications(
-        criterion.attempted_dgp_count(),
-        &successful_coverages,
-        0.025,
-        0.975,
-    )
-    .expect("denominator-preserving composition fixture");
+    let outcomes: Vec<_> = (0..criterion.attempted_dgp_count())
+        .map(|replication_index| {
+            if replication_index < 2 {
+                CoverageCalibrationReplicationOutcome::successful(replication_index, vec![0.95])
+            } else {
+                CoverageCalibrationReplicationOutcome::numerical_failure(replication_index)
+            }
+        })
+        .collect();
     let scenario_fingerprint = scenario
         .scenario_fingerprint()
         .expect("owner-issued scenario fingerprint");
 
-    let evidence = CoverageCalibrationEvidenceRecord::from_summary(
+    let evidence = CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
         &criterion,
-        &summary,
+        &outcomes,
+        0.025,
+        0.975,
         scenario.scenario_id(),
         &scenario_fingerprint,
         TEST_SOURCE_HEAD,
@@ -79,4 +82,6 @@ fn persisted_calibration_evidence_uses_owner_scenario_identity_and_fingerprint()
         evidence.attempted_replication_count(),
         scenario.attempted_replication_count()
     );
+    assert_eq!(evidence.coverage_percentile_lower_probability(), 0.025);
+    assert_eq!(evidence.coverage_percentile_upper_probability(), 0.975);
 }
