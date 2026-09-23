@@ -1,6 +1,6 @@
 use analysis_engine::{
-    CoverageCalibrationStudyError, assemble_coverage_calibration_evidence_v1,
-    execute_coverage_calibration_shard_record,
+    CoverageCalibrationShardRecord, CoverageCalibrationStudyError,
+    assemble_coverage_calibration_evidence_v1, execute_coverage_calibration_shard_record,
 };
 use tepp_simulation::CoverageCalibrationSimulationDesign;
 
@@ -27,6 +27,23 @@ fn shard_record_binds_declared_range_scenario_source_and_digest() {
     assert_eq!(record.outcomes()[0].replication_index(), 0);
     assert_eq!(record.sha256().expect("shard digest").len(), 64);
     assert!(record.to_json().expect("shard json").contains(SOURCE_HEAD));
+}
+
+#[test]
+fn persisted_shard_round_trip_rehydrates_the_same_provenance_digest() {
+    let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+    let record = execute_coverage_calibration_shard_record(design, 0, 1, SOURCE_HEAD)
+        .expect("first declared shard must be structurally executable");
+    let json = record.to_json().expect("owner shard json");
+
+    let recovered = CoverageCalibrationShardRecord::from_json(&json)
+        .expect("owner JSON must rehydrate the typed shard record");
+
+    assert_eq!(recovered, record);
+    assert_eq!(
+        recovered.sha256().expect("recovered shard digest"),
+        record.sha256().expect("original shard digest")
+    );
 }
 
 #[test]
