@@ -24,6 +24,10 @@ pub enum ModelSelectionError {
     RecoveryCandidateInputInvalid,
     /// A held-out predictive payload is structurally incompatible with its fitted training state.
     PredictiveEvaluationInputInvalid,
+    /// Held-out document-state inference failed numerically for an otherwise admissible recovery input.
+    HeldOutStateRecoveryFailed,
+    /// A held-out document-state payload is structurally incompatible with its admitted recovery window.
+    HeldOutStateEvaluationInputInvalid,
     /// Fewer than two successful recovery replications remain after failures.
     InsufficientRecoveryReplications,
     /// A rolling-origin numerical input did not match the admitted split identities.
@@ -63,6 +67,12 @@ impl fmt::Display for ModelSelectionError {
             }
             Self::PredictiveEvaluationInputInvalid => {
                 "rolling-origin predictive evaluation input is structurally incompatible with the fitted training state"
+            }
+            Self::HeldOutStateRecoveryFailed => {
+                "rolling-origin held-out document-state recovery failed numerically"
+            }
+            Self::HeldOutStateEvaluationInputInvalid => {
+                "rolling-origin held-out document-state input is structurally incompatible with the admitted recovery window"
             }
             Self::InsufficientRecoveryReplications => {
                 "at least two successful recovery replications are required"
@@ -135,6 +145,14 @@ mod tests {
             (
                 ModelSelectionError::PredictiveEvaluationInputInvalid,
                 "rolling-origin predictive evaluation input is structurally incompatible with the fitted training state",
+            ),
+            (
+                ModelSelectionError::HeldOutStateRecoveryFailed,
+                "rolling-origin held-out document-state recovery failed numerically",
+            ),
+            (
+                ModelSelectionError::HeldOutStateEvaluationInputInvalid,
+                "rolling-origin held-out document-state input is structurally incompatible with the admitted recovery window",
             ),
             (
                 ModelSelectionError::InsufficientRecoveryReplications,
