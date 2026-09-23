@@ -141,4 +141,12 @@ fn alr_identity_alignment_is_exact_and_invalid_coordinates_fail_closed() {
         realign_additive_log_ratio(&alignment, &[0.25, f64::NAN]),
         Err(ValidationError::InvalidInput)
     );
+
+    let permuted = vec![basis[2].clone(), basis[0].clone(), basis[1].clone()];
+    let permuted_alignment =
+        align_topic_probability_rows(&basis, &permuted).expect("permuted alignment");
+    assert_eq!(
+        realign_additive_log_ratio(&permuted_alignment, &[f64::MAX, -f64::MAX]),
+        Err(ValidationError::InvalidInput)
+    );
 }
