@@ -18,6 +18,7 @@ mod coverage;
 mod error;
 mod graph_metrics;
 mod input;
+mod marginal_interval;
 mod matching;
 mod monte_carlo;
 mod prevalence_time_basis;
@@ -63,6 +64,10 @@ pub use graph_metrics::EdgeIdentity;
 pub use graph_metrics::edge_precision;
 /// Edge recovery recall.
 pub use graph_metrics::edge_recall;
+/// Closed marginal normal interval bounds in location-coordinate order.
+pub use marginal_interval::MarginalIntervalBounds;
+/// Construct marginal normal intervals from one validated location/covariance basis.
+pub use marginal_interval::normal_marginal_interval_bounds;
 /// Absolute residual vector.
 pub use matching::absolute_residuals;
 /// Tolerance match counts.
