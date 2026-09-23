@@ -22,6 +22,8 @@ pub enum ModelSelectionError {
     RecoveryCandidateFitFailed,
     /// One declared scientific-recovery candidate is structurally incompatible with the training input.
     RecoveryCandidateInputInvalid,
+    /// A held-out predictive payload is structurally incompatible with its fitted training state.
+    PredictiveEvaluationInputInvalid,
     /// Fewer than two successful recovery replications remain after failures.
     InsufficientRecoveryReplications,
     /// A rolling-origin numerical input did not match the admitted split identities.
@@ -56,6 +58,9 @@ impl fmt::Display for ModelSelectionError {
             }
             Self::RecoveryCandidateInputInvalid => {
                 "a declared scientific-recovery candidate is structurally incompatible with the training input"
+            }
+            Self::PredictiveEvaluationInputInvalid => {
+                "rolling-origin predictive evaluation input is structurally incompatible with the fitted training state"
             }
             Self::InsufficientRecoveryReplications => {
                 "at least two successful recovery replications are required"
@@ -121,6 +126,10 @@ mod tests {
             (
                 ModelSelectionError::RecoveryCandidateInputInvalid,
                 "a declared scientific-recovery candidate is structurally incompatible with the training input",
+            ),
+            (
+                ModelSelectionError::PredictiveEvaluationInputInvalid,
+                "rolling-origin predictive evaluation input is structurally incompatible with the fitted training state",
             ),
             (
                 ModelSelectionError::InsufficientRecoveryReplications,
