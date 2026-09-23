@@ -1,0 +1,3 @@
+- Added the versioned `tepp.simulation.rolling_origin_coverage.v1` simulation scenario for prospective interval-calibration evidence, with an exact domain-separated 10,000-replication seed schedule and owner-issued realistic `SimulationConfig`.
+- Exported `CoverageCalibrationSimulationDesign` from `tepp_simulation` and added a cross-owner contract that binds its attempted replication count to `CoverageCalibrationDesign::tepp_nominal_95_v1()` without copying either owner's count constant.
+- The prospective acceptance seed schedule is verified unique and disjoint from the four CI coverage seeds; this does not execute or promote the 10,000-DGP acceptance run.
