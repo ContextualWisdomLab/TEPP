@@ -185,6 +185,13 @@ fn alr_covariance_identity_is_exact_and_semidefinite_input_is_allowed() {
         realign_additive_log_ratio_covariance(&alignment, &covariance),
         Ok(covariance)
     );
+    assert_eq!(
+        realign_additive_log_ratio_covariance(
+            &alignment,
+            &[vec![0.0, 0.0], vec![0.0, 0.0]],
+        ),
+        Ok(vec![vec![0.0, 0.0], vec![0.0, 0.0]])
+    );
 }
 
 #[test]
@@ -203,6 +210,7 @@ fn malformed_alr_covariance_fails_closed() {
         vec![vec![1.0, 0.25], vec![0.5, 1.0]],
         vec![vec![-1.0, 0.0], vec![0.0, 1.0]],
         vec![vec![1.0, 2.0], vec![2.0, 1.0]],
+        vec![vec![1.0, f64::MAX], vec![f64::MAX, f64::MAX]],
     ] {
         assert_eq!(
             realign_additive_log_ratio_covariance(&alignment, &invalid),
