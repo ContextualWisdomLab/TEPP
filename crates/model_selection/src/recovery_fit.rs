@@ -17,7 +17,9 @@ fn recovery_fit_result<T>(
     result: Result<T, TopicMeasurementError>,
 ) -> Result<T, ModelSelectionError> {
     result.map_err(|error| match error {
-        TopicMeasurementError::DidNotConverge | TopicMeasurementError::NonFiniteEstimate => {
+        TopicMeasurementError::DidNotConverge
+        | TopicMeasurementError::NonFiniteEstimate
+        | TopicMeasurementError::InvalidLogRatioDimension => {
             ModelSelectionError::RecoveryCandidateFitFailed
         }
         _ => ModelSelectionError::RecoveryCandidateInputInvalid,
@@ -43,9 +45,9 @@ fn recovery_fit_result<T>(
 ///
 /// Returns the configuration owner's typed validation failure when a declared
 /// candidate cannot be converted to the reference configuration,
-/// [`ModelSelectionError::RecoveryCandidateFitFailed`] when fitting fails by
-/// non-convergence or a non-finite numerical estimate, or
-/// [`ModelSelectionError::RecoveryCandidateInputInvalid`] for structural
+/// [`ModelSelectionError::RecoveryCandidateFitFailed`] for non-convergence,
+/// non-finite arithmetic, or ALR representability failure reached while fitting,
+/// or [`ModelSelectionError::RecoveryCandidateInputInvalid`] for structural
 /// topic-measurement failures. Unknown future topic-measurement failures fail
 /// closed as structural invalidity until explicitly classified.
 pub fn fit_declared_recovery_candidates(
@@ -75,6 +77,7 @@ mod tests {
         for error in [
             TopicMeasurementError::DidNotConverge,
             TopicMeasurementError::NonFiniteEstimate,
+            TopicMeasurementError::InvalidLogRatioDimension,
         ] {
             assert_eq!(
                 recovery_fit_result::<()>(Err(error)),
@@ -90,7 +93,6 @@ mod tests {
             TopicMeasurementError::InvalidModelInput,
             TopicMeasurementError::InvalidSparseMatrix,
             TopicMeasurementError::InvalidComposition,
-            TopicMeasurementError::InvalidLogRatioDimension,
             TopicMeasurementError::LexicalWeightForbidden,
             TopicMeasurementError::JointPosteriorUnavailable,
         ] {
