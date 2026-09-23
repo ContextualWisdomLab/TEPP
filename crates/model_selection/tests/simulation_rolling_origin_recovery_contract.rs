@@ -28,8 +28,8 @@ use tepp_simulation::{
 use topic_measurement::{ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, SparseMatrix};
 use uuid::Uuid;
 use validation_core::{
-    align_topic_probability_rows, mean_absolute_parameter_bias, root_mean_square_error,
-    summarize_recovery_metric_replications,
+    align_topic_probability_rows, mean_absolute_parameter_bias, realign_topic_probability_rows,
+    root_mean_square_error, summarize_recovery_metric_replications,
 };
 
 const REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
@@ -43,12 +43,23 @@ struct WindowFixture {
     evaluation_event_times: Vec<EventTime>,
     topic_term_rmse: f64,
     aligned_topic_term_probabilities: Vec<f64>,
+    document_state_rmse: f64,
+    mean_absolute_document_state_residual: f64,
 }
 
 struct RecoveryReplication {
     selected_k: u32,
     mean_topic_term_rmse: f64,
     mean_absolute_topic_term_bias: f64,
+    mean_document_state_rmse: f64,
+    mean_absolute_document_state_residual: f64,
+}
+
+struct WindowRecoveryMetrics {
+    topic_term_rmse: f64,
+    aligned_topic_term_probabilities: Vec<f64>,
+    document_state_rmse: f64,
+    mean_absolute_document_state_residual: f64,
 }
 
 fn simulation_config(seed: u64) -> SimulationConfig {
@@ -244,29 +255,88 @@ fn count_matrix(
     .expect("simulator count matrix")
 }
 
-fn topic_term_recovery(
+fn window_recovery_metrics(
     manifest: &TruthManifest,
     fits: &[ReferenceTopicTrainingFit],
-) -> (f64, Vec<f64>) {
-    let truth = manifest.topic_truth().topic_term_probabilities();
+) -> WindowRecoveryMetrics {
+    let truth_topic_terms = manifest.topic_truth().topic_term_probabilities();
     let truth_k = usize::try_from(manifest.topic_truth().true_topic_count())
         .expect("true topic count fits usize");
-    let fitted = fits
+    let truth_fit = fits
         .iter()
         .find(|fit| fit.reference_fit().model().topic_term_probabilities.len() == truth_k)
-        .expect("complete declared grid retains truth-K fit")
-        .reference_fit()
-        .model();
-    let alignment = align_topic_probability_rows(truth, &fitted.topic_term_probabilities)
-        .expect("truth-K topic alignment");
-    let truth_flat: Vec<_> = truth.iter().flatten().copied().collect();
-    let recovered_flat: Vec<_> = alignment
+        .expect("complete declared grid retains truth-K fit");
+    let reference_fit = truth_fit.reference_fit();
+    let fitted = reference_fit.model();
+    let alignment = align_topic_probability_rows(
+        truth_topic_terms,
+        &fitted.topic_term_probabilities,
+    )
+    .expect("truth-K topic alignment");
+
+    let truth_topic_term_flat: Vec<_> = truth_topic_terms.iter().flatten().copied().collect();
+    let aligned_topic_term_probabilities: Vec<_> = alignment
         .truth_to_fitted()
         .iter()
         .flat_map(|fitted_index| fitted.topic_term_probabilities[*fitted_index].iter().copied())
         .collect();
-    let rmse = root_mean_square_error(&truth_flat, &recovered_flat).expect("topic-term RMSE");
-    (rmse, recovered_flat)
+    let topic_term_rmse = root_mean_square_error(
+        &truth_topic_term_flat,
+        &aligned_topic_term_probabilities,
+    )
+    .expect("topic-term RMSE");
+
+    let truth_state_by_document: BTreeMap<_, _> = manifest
+        .topic_truth()
+        .document_states()
+        .iter()
+        .map(|state| (state.document_id(), state.topic_mixture()))
+        .collect();
+    assert_eq!(
+        truth_state_by_document.len(),
+        manifest.topic_truth().document_states().len(),
+        "simulator truth document identities must be unique"
+    );
+    let fit_document_ids = reference_fit.input().document_ids();
+    assert_eq!(
+        fit_document_ids.len(),
+        fitted.document_topic_proportions.len(),
+        "fit-retained document identities must bind every fitted topic-state row"
+    );
+    let aligned_document_states =
+        realign_topic_probability_rows(&alignment, &fitted.document_topic_proportions)
+            .expect("aligned fitted document states");
+    let mut truth_document_state_flat = Vec::new();
+    let mut recovered_document_state_flat = Vec::new();
+    for (document_id, recovered_state) in fit_document_ids.iter().zip(&aligned_document_states) {
+        let truth_state = *truth_state_by_document
+            .get(document_id)
+            .expect("fit-retained training document must have simulator truth");
+        assert_eq!(
+            truth_state.len(),
+            recovered_state.len(),
+            "truth and aligned fitted state widths must match"
+        );
+        truth_document_state_flat.extend_from_slice(truth_state);
+        recovered_document_state_flat.extend_from_slice(recovered_state);
+    }
+    let document_state_rmse = root_mean_square_error(
+        &truth_document_state_flat,
+        &recovered_document_state_flat,
+    )
+    .expect("fit-bound document-state RMSE");
+    let mean_absolute_document_state_residual = mean_absolute_parameter_bias(
+        &truth_document_state_flat,
+        std::slice::from_ref(&recovered_document_state_flat),
+    )
+    .expect("fit-bound non-cancelling document-state residual");
+
+    WindowRecoveryMetrics {
+        topic_term_rmse,
+        aligned_topic_term_probabilities,
+        document_state_rmse,
+        mean_absolute_document_state_residual,
+    }
 }
 
 fn mean(values: &[f64]) -> f64 {
@@ -418,8 +488,7 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
         )
         .expect("owner-admitted numerical training state");
         let fits = fit_declared_recovery_candidates(&training_input, &config)?;
-        let (topic_term_rmse, aligned_topic_term_probabilities) =
-            topic_term_recovery(&manifest, &fits);
+        let recovery = window_recovery_metrics(&manifest, &fits);
 
         let evaluation_document_term =
             count_matrix(&evaluation_document_ids, vocabulary_size, &counts_by_document);
@@ -433,8 +502,10 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
             evaluation_document_ids,
             evaluation_document_term,
             evaluation_event_times,
-            topic_term_rmse,
-            aligned_topic_term_probabilities,
+            topic_term_rmse: recovery.topic_term_rmse,
+            aligned_topic_term_probabilities: recovery.aligned_topic_term_probabilities,
+            document_state_rmse: recovery.document_state_rmse,
+            mean_absolute_document_state_residual: recovery.mean_absolute_document_state_residual,
         });
     }
 
@@ -459,6 +530,14 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
         &evaluations?,
     )?;
     let topic_term_rmse: Vec<_> = fixtures.iter().map(|fixture| fixture.topic_term_rmse).collect();
+    let document_state_rmse: Vec<_> = fixtures
+        .iter()
+        .map(|fixture| fixture.document_state_rmse)
+        .collect();
+    let document_state_residual: Vec<_> = fixtures
+        .iter()
+        .map(|fixture| fixture.mean_absolute_document_state_residual)
+        .collect();
     let truth_flat: Vec<_> = manifest
         .topic_truth()
         .topic_term_probabilities()
@@ -477,6 +556,8 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
         selected_k,
         mean_topic_term_rmse: mean(&topic_term_rmse),
         mean_absolute_topic_term_bias,
+        mean_document_state_rmse: mean(&document_state_rmse),
+        mean_absolute_document_state_residual: mean(&document_state_residual),
     })
 }
 
@@ -490,12 +571,17 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
     let mut selected_results = Vec::with_capacity(outcomes.len());
     let mut topic_term_rmse = Vec::new();
     let mut topic_term_mean_absolute_bias = Vec::new();
+    let mut document_state_rmse = Vec::new();
+    let mut document_state_mean_absolute_residual = Vec::new();
     for outcome in outcomes {
         match outcome {
             Ok(replication) => {
                 selected_results.push(Ok(replication.selected_k));
                 topic_term_rmse.push(replication.mean_topic_term_rmse);
                 topic_term_mean_absolute_bias.push(replication.mean_absolute_topic_term_bias);
+                document_state_rmse.push(replication.mean_document_state_rmse);
+                document_state_mean_absolute_residual
+                    .push(replication.mean_absolute_document_state_residual);
             }
             Err(error) => selected_results.push(Err(error)),
         }
@@ -521,14 +607,23 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         summary.success_count() >= 2,
         "CI-scale scientific recovery must retain enough successful replications to estimate Monte Carlo uncertainty"
     );
-    assert_eq!(topic_term_rmse.len(), summary.success_count());
-    assert_eq!(
+    for successful_metric_count in [
+        topic_term_rmse.len(),
         topic_term_mean_absolute_bias.len(),
-        summary.success_count()
-    );
+        document_state_rmse.len(),
+        document_state_mean_absolute_residual.len(),
+    ] {
+        assert_eq!(successful_metric_count, summary.success_count());
+    }
     assert!(topic_term_rmse.iter().all(|value| value.is_finite()));
     assert!(
         topic_term_mean_absolute_bias
+            .iter()
+            .all(|value| value.is_finite())
+    );
+    assert!(document_state_rmse.iter().all(|value| value.is_finite()));
+    assert!(
+        document_state_mean_absolute_residual
             .iter()
             .all(|value| value.is_finite())
     );
@@ -547,8 +642,27 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         0.975,
     )
     .expect("topic-term bias recovery summary");
+    let document_state_rmse_recovery = summarize_recovery_metric_replications(
+        summary.replication_count(),
+        &document_state_rmse,
+        0.025,
+        0.975,
+    )
+    .expect("document-state RMSE recovery summary");
+    let document_state_residual_recovery = summarize_recovery_metric_replications(
+        summary.replication_count(),
+        &document_state_mean_absolute_residual,
+        0.025,
+        0.975,
+    )
+    .expect("document-state absolute-residual recovery summary");
 
-    for metric in [topic_rmse_recovery, topic_bias_recovery] {
+    for metric in [
+        topic_rmse_recovery,
+        topic_bias_recovery,
+        document_state_rmse_recovery,
+        document_state_residual_recovery,
+    ] {
         assert_eq!(
             metric.attempted_replication_count(),
             summary.replication_count()
@@ -564,30 +678,28 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         );
     }
 
-    let topic_rmse_monte_carlo = topic_rmse_recovery
-        .successful_metric_summary()
-        .expect("successful topic-term RMSE summary");
-    let topic_bias_monte_carlo = topic_bias_recovery
-        .successful_metric_summary()
-        .expect("successful topic-term bias summary");
-    assert_eq!(
-        topic_rmse_monte_carlo.replication_count,
-        summary.success_count()
-    );
-    assert_eq!(
-        topic_bias_monte_carlo.replication_count,
-        summary.success_count()
-    );
-    assert!(topic_rmse_monte_carlo.mean.is_finite());
-    assert!(topic_rmse_monte_carlo.standard_deviation.is_finite());
-    assert!(topic_rmse_monte_carlo.standard_error.is_finite());
-    assert!(topic_rmse_monte_carlo.percentile_lower.is_finite());
-    assert!(topic_rmse_monte_carlo.percentile_upper.is_finite());
-    assert!(topic_bias_monte_carlo.mean.is_finite());
-    assert!(topic_bias_monte_carlo.standard_deviation.is_finite());
-    assert!(topic_bias_monte_carlo.standard_error.is_finite());
-    assert!(topic_bias_monte_carlo.percentile_lower.is_finite());
-    assert!(topic_bias_monte_carlo.percentile_upper.is_finite());
+    let monte_carlo_summaries = [
+        topic_rmse_recovery
+            .successful_metric_summary()
+            .expect("successful topic-term RMSE summary"),
+        topic_bias_recovery
+            .successful_metric_summary()
+            .expect("successful topic-term bias summary"),
+        document_state_rmse_recovery
+            .successful_metric_summary()
+            .expect("successful document-state RMSE summary"),
+        document_state_residual_recovery
+            .successful_metric_summary()
+            .expect("successful document-state absolute-residual summary"),
+    ];
+    for monte_carlo in monte_carlo_summaries {
+        assert_eq!(monte_carlo.replication_count, summary.success_count());
+        assert!(monte_carlo.mean.is_finite());
+        assert!(monte_carlo.standard_deviation.is_finite());
+        assert!(monte_carlo.standard_error.is_finite());
+        assert!(monte_carlo.percentile_lower.is_finite());
+        assert!(monte_carlo.percentile_upper.is_finite());
+    }
 
     assert!(summary.bias().is_some());
     assert!(summary.root_mean_square_error().is_some());
