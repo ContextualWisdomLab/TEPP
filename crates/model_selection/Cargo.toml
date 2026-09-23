@@ -23,6 +23,7 @@ uuid.workspace = true
 [dev-dependencies]
 relation_graph = { path = "../relation_graph", version = "0.2.0" }
 tepp_simulation = { path = "../tepp_simulation", version = "0.2.0" }
+validation_core = { path = "../validation_core", version = "0.2.0" }
 
 [lints]
 workspace = true
