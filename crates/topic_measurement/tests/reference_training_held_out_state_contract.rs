@@ -181,13 +181,62 @@ fn held_out_state_uses_counts_without_batch_context_or_global_refit() {
 #[test]
 fn held_out_state_fails_closed_on_evaluation_geometry() {
     let (fit, memberships, focal, _) = training_fit();
+    let valid =
+        SparseMatrix::from_csr(1, 4, vec![0, 2], vec![0, 1], vec![70.0, 30.0]).expect("valid");
+    let wrong_rows = SparseMatrix::from_csr(
+        2,
+        4,
+        vec![0, 1, 2],
+        vec![0, 1],
+        vec![1.0, 1.0],
+    )
+    .expect("wrong rows");
     let wrong_vocabulary =
         SparseMatrix::from_csr(1, 3, vec![0, 1], vec![0], vec![1.0]).expect("wrong vocab");
     let empty = SparseMatrix::from_csr(1, 4, vec![0, 0], vec![], vec![]).expect("empty row");
     let negative =
         SparseMatrix::from_csr(1, 4, vec![0, 1], vec![0], vec![-1.0]).expect("negative count");
+    let zero = SparseMatrix::from_csr(1, 4, vec![0, 1], vec![0], vec![0.0]).expect("zero count");
+    let overflowed_total = SparseMatrix::from_csr(
+        1,
+        4,
+        vec![0, 2],
+        vec![0, 1],
+        vec![f64::MAX, f64::MAX],
+    )
+    .expect("overflowed total");
 
-    for invalid in [&wrong_vocabulary, &empty, &negative] {
+    assert_eq!(
+        fit.infer_held_out_document_topic_proportions(
+            &[focal],
+            &wrong_rows,
+            &[event_time(5)],
+            None,
+            &memberships,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    assert_eq!(
+        fit.infer_held_out_document_topic_proportions(
+            &[focal],
+            &wrong_vocabulary,
+            &[event_time(5)],
+            None,
+            &memberships,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    assert_eq!(
+        fit.infer_held_out_document_topic_proportions(
+            &[focal],
+            &valid,
+            &[],
+            None,
+            &memberships,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
+    for invalid in [&empty, &negative, &zero, &overflowed_total] {
         assert_eq!(
             fit.infer_held_out_document_topic_proportions(
                 &[focal],
@@ -199,4 +248,14 @@ fn held_out_state_fails_closed_on_evaluation_geometry() {
             Err(TopicMeasurementError::InvalidModelInput)
         );
     }
+    assert_eq!(
+        fit.infer_held_out_document_topic_proportions(
+            &[focal],
+            &valid,
+            &[event_time(5)],
+            None,
+            &MembershipNetwork::new(),
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    );
 }
