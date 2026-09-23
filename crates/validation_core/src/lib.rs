@@ -52,6 +52,12 @@ pub use claim::parse_commit_head;
 pub use claim::promote_claim;
 /// Promote a scientific claim from computed RMSE, not a hardcoded threshold.
 pub use claim::promote_scientific_recovery;
+/// Assess denominator-preserving interval coverage against a prospective design.
+pub use coverage::assess_coverage_calibration;
+/// Denominator-bearing assessment of one prospective interval-calibration run.
+pub use coverage::CoverageCalibrationAssessment;
+/// Prospective interval-calibration design fixed before the expensive DGP run.
+pub use coverage::CoverageCalibrationDesign;
 /// Empirical interval coverage.
 pub use coverage::interval_coverage;
 /// Collapse rolling-origin coverage within DGP replications before Monte Carlo inference.
