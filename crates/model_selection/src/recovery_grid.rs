@@ -26,6 +26,22 @@ fn unique_candidate_topic_counts(
     Ok(topic_counts)
 }
 
+fn validate_shared_training_state(
+    candidate_training_fits: &[ReferenceTopicTrainingFit],
+) -> Result<(), ModelSelectionError> {
+    let Some(first) = candidate_training_fits.first() else {
+        return Ok(());
+    };
+    if candidate_training_fits.iter().skip(1).any(|fit| {
+        !first
+            .training_input()
+            .shares_numerical_training_state(fit.training_input())
+    }) {
+        return Err(ModelSelectionError::PredictiveCandidateTrainingStateMismatch);
+    }
+    Ok(())
+}
+
 /// One rolling-origin evaluation whose fitted candidate dimensions and exact
 /// numerical configurations are retained for comparison against the predeclared
 /// recovery design.
@@ -44,10 +60,17 @@ impl<'a> RollingOriginRecoveryEvaluation<'a> {
     /// Group one predictive window while retaining fitted dimensions and the
     /// exact owner-issued configuration attached to each training fit.
     ///
+    /// Every candidate in the window must also originate from one exact retained
+    /// numerical training state. Candidate K is the experimental factor; term
+    /// counts, event times, frozen prevalence coordinates, and admitted transition
+    /// pairs cannot vary by K while still entering one recovery comparison.
+    ///
     /// # Errors
     ///
     /// Returns [`ModelSelectionError::DuplicateCandidateK`] when two supplied
-    /// training fits represent the same fitted topic dimension.
+    /// training fits represent the same fitted topic dimension, or
+    /// [`ModelSelectionError::PredictiveCandidateTrainingStateMismatch`] when
+    /// candidate fits were produced from different numerical training states.
     pub fn new(
         partition: &'a RollingOriginPartition,
         candidate_training_fits: &'a [ReferenceTopicTrainingFit],
@@ -57,6 +80,7 @@ impl<'a> RollingOriginRecoveryEvaluation<'a> {
         evaluation_covariates: Option<&'a SparseMatrix>,
         memberships: &'a MembershipNetwork,
     ) -> Result<Self, ModelSelectionError> {
+        validate_shared_training_state(candidate_training_fits)?;
         let candidate_topic_counts = unique_candidate_topic_counts(
             candidate_training_fits.iter().map(|fit| {
                 fit.reference_fit()
@@ -106,7 +130,9 @@ impl<'a> RollingOriginRecoveryEvaluation<'a> {
 /// from the same declared recovery design, including deterministic seeds,
 /// convergence controls, and hyperparameters. A dimension-compatible fit from a
 /// different optimizer configuration is a failed scientific replication, not an
-/// interchangeable candidate.
+/// interchangeable candidate. [`RollingOriginRecoveryEvaluation::new`] separately
+/// requires every candidate within one window to share one exact numerical
+/// training state, preventing K from being confounded with different observations.
 ///
 /// This stricter path is for scientific recovery/validation. The generic
 /// multi-window predictive selector retains its operational survivor semantics.
@@ -159,7 +185,7 @@ pub fn select_declared_rolling_origin_recovery_candidate_k(
 
 #[cfg(test)]
 mod tests {
-    use super::unique_candidate_topic_counts;
+    use super::{unique_candidate_topic_counts, validate_shared_training_state};
     use crate::ModelSelectionError;
 
     #[test]
@@ -172,5 +198,6 @@ mod tests {
             unique_candidate_topic_counts([2, 2], 2),
             Err(ModelSelectionError::DuplicateCandidateK)
         );
+        assert_eq!(validate_shared_training_state(&[]), Ok(()));
     }
 }
