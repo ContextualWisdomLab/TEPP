@@ -17,6 +17,8 @@ fn only_numerical_recovery_failures_enter_the_failed_replication_denominator() {
         ModelSelectionError::EmptyCandidateSet,
         ModelSelectionError::LlmVoteIsNotStatisticalAuthority,
         ModelSelectionError::LexicalWeightForbidden,
+        ModelSelectionError::RecoveryCandidateInputInvalid,
+        ModelSelectionError::PredictiveEvaluationInputInvalid,
         ModelSelectionError::InsufficientRecoveryReplications,
         ModelSelectionError::PartitionInputMismatch,
         ModelSelectionError::DuplicateCandidateK,
