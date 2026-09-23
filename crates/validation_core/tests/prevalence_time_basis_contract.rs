@@ -4,7 +4,12 @@ use validation_core::{
     LinearTimeBasis, ValidationError, reexpress_linear_prevalence_time_basis,
 };
 
-fn trajectory_value(intercept: f64, slope: f64, basis: LinearTimeBasis, time_seconds: f64) -> f64 {
+fn trajectory_value(
+    intercept: f64,
+    slope: f64,
+    basis: LinearTimeBasis,
+    time_seconds: f64,
+) -> f64 {
     intercept + slope * ((time_seconds - basis.center_seconds()) / basis.scale_seconds())
 }
 
@@ -80,6 +85,26 @@ fn identity_basis_is_exact_and_invalid_geometry_fails_closed() {
     );
     assert_eq!(
         reexpress_linear_prevalence_time_basis(&[0.0], &[f64::INFINITY], basis, basis),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let tiny_scale = LinearTimeBasis::new(0.0, f64::MIN_POSITIVE).expect("tiny finite scale");
+    let huge_center = LinearTimeBasis::new(f64::MAX, 1.0).expect("huge finite center");
+    assert_eq!(
+        reexpress_linear_prevalence_time_basis(&[0.0], &[1.0], tiny_scale, huge_center),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let huge_scale = LinearTimeBasis::new(0.0, f64::MAX).expect("huge finite scale");
+    assert_eq!(
+        reexpress_linear_prevalence_time_basis(&[0.0], &[1.0], tiny_scale, huge_scale),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let source = LinearTimeBasis::new(0.0, 1.0).expect("source");
+    let large_shift = LinearTimeBasis::new(f64::MAX / 2.0, 1.0).expect("large shift");
+    assert_eq!(
+        reexpress_linear_prevalence_time_basis(&[0.0], &[4.0], source, large_shift),
         Err(ValidationError::InvalidInput)
     );
 }
