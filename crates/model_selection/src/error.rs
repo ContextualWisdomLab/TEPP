@@ -32,6 +32,8 @@ pub enum ModelSelectionError {
     DuplicateCandidateK,
     /// Rolling-origin windows were not a contiguous chronological sequence.
     RollingOriginWindowMismatch,
+    /// The scientific recovery evaluations did not cover the full declared rolling-origin horizon.
+    RecoveryWindowSetMismatch,
     /// One document identity appeared in more than one evaluation window.
     RepeatedEvaluationDocument,
     /// Rolling-origin windows did not expose the same unique candidate-K set.
@@ -68,6 +70,9 @@ impl fmt::Display for ModelSelectionError {
             Self::PartitionInputMismatch => "rolling-origin partition input mismatch",
             Self::DuplicateCandidateK => "duplicate predictive candidate k",
             Self::RollingOriginWindowMismatch => "rolling-origin window sequence mismatch",
+            Self::RecoveryWindowSetMismatch => {
+                "scientific recovery does not cover the complete declared rolling-origin horizon"
+            }
             Self::RepeatedEvaluationDocument => "repeated rolling-origin evaluation document",
             Self::PredictiveCandidateSetMismatch => {
                 "rolling-origin predictive candidate set mismatch"
@@ -146,6 +151,10 @@ mod tests {
             (
                 ModelSelectionError::RollingOriginWindowMismatch,
                 "rolling-origin window sequence mismatch",
+            ),
+            (
+                ModelSelectionError::RecoveryWindowSetMismatch,
+                "scientific recovery does not cover the complete declared rolling-origin horizon",
             ),
             (
                 ModelSelectionError::RepeatedEvaluationDocument,
