@@ -2,6 +2,7 @@
 
 use validation_core::{
     ValidationError, align_topic_probability_rows, realign_additive_log_ratio,
+    realign_additive_log_ratio_covariance,
 };
 
 #[test]
@@ -147,6 +148,76 @@ fn alr_identity_alignment_is_exact_and_invalid_coordinates_fail_closed() {
         align_topic_probability_rows(&basis, &permuted).expect("permuted alignment");
     assert_eq!(
         realign_additive_log_ratio(&permuted_alignment, &[f64::MAX, -f64::MAX]),
+        Err(ValidationError::InvalidInput)
+    );
+}
+
+#[test]
+fn alr_covariance_recovery_moves_uncertainty_into_the_truth_reference_basis() {
+    let truth = vec![
+        vec![0.8, 0.1, 0.1],
+        vec![0.1, 0.8, 0.1],
+        vec![0.1, 0.1, 0.8],
+    ];
+    let fitted = vec![truth[2].clone(), truth[0].clone(), truth[1].clone()];
+    let alignment = align_topic_probability_rows(&truth, &fitted).expect("topic alignment");
+    let fitted_covariance = vec![vec![4.0, 1.0], vec![1.0, 9.0]];
+
+    // m = [1, 2, 0], so z = [x1 - x0, -x0]. The corresponding
+    // A Σ Aᵀ is [[11, 3], [3, 4]].
+    assert_eq!(
+        realign_additive_log_ratio_covariance(&alignment, &fitted_covariance),
+        Ok(vec![vec![11.0, 3.0], vec![3.0, 4.0]])
+    );
+}
+
+#[test]
+fn alr_covariance_identity_is_exact_and_semidefinite_input_is_allowed() {
+    let basis = vec![
+        vec![0.8, 0.1, 0.1],
+        vec![0.1, 0.8, 0.1],
+        vec![0.1, 0.1, 0.8],
+    ];
+    let alignment = align_topic_probability_rows(&basis, &basis).expect("identity alignment");
+    let covariance = vec![vec![1.0, 1.0], vec![1.0, 1.0]];
+
+    assert_eq!(
+        realign_additive_log_ratio_covariance(&alignment, &covariance),
+        Ok(covariance)
+    );
+}
+
+#[test]
+fn malformed_alr_covariance_fails_closed() {
+    let basis = vec![
+        vec![0.8, 0.1, 0.1],
+        vec![0.1, 0.8, 0.1],
+        vec![0.1, 0.1, 0.8],
+    ];
+    let alignment = align_topic_probability_rows(&basis, &basis).expect("identity alignment");
+
+    for invalid in [
+        vec![vec![1.0]],
+        vec![vec![1.0, 0.0], vec![0.0]],
+        vec![vec![1.0, f64::NAN], vec![f64::NAN, 1.0]],
+        vec![vec![1.0, 0.25], vec![0.5, 1.0]],
+        vec![vec![-1.0, 0.0], vec![0.0, 1.0]],
+        vec![vec![1.0, 2.0], vec![2.0, 1.0]],
+    ] {
+        assert_eq!(
+            realign_additive_log_ratio_covariance(&alignment, &invalid),
+            Err(ValidationError::InvalidInput)
+        );
+    }
+
+    let permuted = vec![basis[2].clone(), basis[0].clone(), basis[1].clone()];
+    let permuted_alignment =
+        align_topic_probability_rows(&basis, &permuted).expect("permuted alignment");
+    assert_eq!(
+        realign_additive_log_ratio_covariance(
+            &permuted_alignment,
+            &[vec![f64::MAX, 0.0], vec![0.0, f64::MAX]],
+        ),
         Err(ValidationError::InvalidInput)
     );
 }
