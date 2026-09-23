@@ -56,7 +56,7 @@ fn evidence_from_outcomes(
 fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty() {
     let record = evidence(9_998).expect("calibration evidence");
 
-    assert_eq!(record.schema_version(), 2);
+    assert_eq!(record.schema_version(), 3);
     assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
     assert_eq!(record.simulation_scenario_id(), SCENARIO_ID);
     assert_eq!(record.simulation_scenario_fingerprint(), SCENARIO_FINGERPRINT);
@@ -65,6 +65,13 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert_eq!(record.replication_outcomes()[9_999].replication_index(), 9_999);
     assert!(record.replication_outcomes()[9_998].window_coverages().is_none());
     assert!(record.replication_outcomes()[9_999].window_coverages().is_none());
+    assert_eq!(record.replication_outcomes_sha256().len(), 64);
+    assert!(
+        record
+            .replication_outcomes_sha256()
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
     assert_eq!(record.source_head(), SOURCE_HEAD);
     assert_eq!(record.attempted_replication_count(), 10_000);
     assert_eq!(record.successful_replication_count(), 9_998);
@@ -84,9 +91,11 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(record.supports_calibration_claim());
 
     let json = record.to_json().expect("deterministic evidence json");
-    assert!(json.contains("\"schema_version\":2"));
+    assert!(json.contains("\"schema_version\":3"));
     assert!(json.contains("\"replication_outcomes\":["));
     assert!(json.contains("\"replication_index\":9999,\"window_coverages\":null"));
+    assert!(json.contains("\"replication_outcomes_sha256\":"));
+    assert!(json.contains(record.replication_outcomes_sha256()));
     assert!(json.contains("\"attempted_replication_count\":10000"));
     assert!(json.contains("\"successful_replication_count\":9998"));
     assert!(json.contains("\"failure_count\":2"));
@@ -118,6 +127,11 @@ fn persisted_evidence_distinguishes_exact_indexed_failure_identity_pattern() {
     assert!(early_failures.replication_outcomes()[0].window_coverages().is_none());
     assert!(late_failures.replication_outcomes()[0].window_coverages().is_some());
     assert_ne!(
+        early_failures.replication_outcomes_sha256(),
+        late_failures.replication_outcomes_sha256(),
+        "fingerprint must retain which declared DGP identities failed"
+    );
+    assert_ne!(
         early_failures.to_json().expect("early json"),
         late_failures.to_json().expect("late json"),
         "persisted evidence must retain which declared DGP identities failed"
@@ -125,7 +139,7 @@ fn persisted_evidence_distinguishes_exact_indexed_failure_identity_pattern() {
 }
 
 #[test]
-fn canonical_outcome_ledger_is_independent_of_shard_completion_order() {
+fn canonical_outcome_ledger_and_fingerprint_are_independent_of_shard_completion_order() {
     let ordered = outcomes_with_failures(&[7, 83]);
     let mut reversed = ordered.clone();
     reversed.reverse();
@@ -136,6 +150,10 @@ fn canonical_outcome_ledger_is_independent_of_shard_completion_order() {
     assert_eq!(
         ordered_record.replication_outcomes(),
         reversed_record.replication_outcomes()
+    );
+    assert_eq!(
+        ordered_record.replication_outcomes_sha256(),
+        reversed_record.replication_outcomes_sha256()
     );
     assert_eq!(
         ordered_record.to_json().expect("ordered json"),
