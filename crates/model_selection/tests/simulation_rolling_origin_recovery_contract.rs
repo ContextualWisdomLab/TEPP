@@ -25,15 +25,20 @@ use tepp_simulation::{
     DocumentMethodEffect, SimulatedDocument, SimulationConfig, TopicDgpConfig, TruthManifest,
     generate,
 };
-use topic_measurement::{ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, SparseMatrix};
+use topic_measurement::{
+    PrevalenceFeature, ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, SparseMatrix,
+};
 use uuid::Uuid;
 use validation_core::{
-    align_topic_probability_rows, mean_absolute_parameter_bias, realign_topic_probability_rows,
-    root_mean_square_error, summarize_recovery_metric_replications,
+    LinearTimeBasis, align_topic_probability_rows, mean_absolute_parameter_bias,
+    realign_additive_log_ratio, realign_topic_probability_rows,
+    reexpress_linear_prevalence_time_basis, root_mean_square_error,
+    summarize_recovery_metric_replications,
 };
 
 const REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
 const FIRST_TRAINING_EVENT_INDEX: usize = 3;
+const NANOS_PER_SECOND: f64 = 1_000_000_000.0;
 
 struct WindowFixture {
     partition: RollingOriginPartition,
@@ -45,6 +50,10 @@ struct WindowFixture {
     aligned_topic_term_probabilities: Vec<f64>,
     document_state_rmse: f64,
     mean_absolute_document_state_residual: f64,
+    prevalence_intercept_rmse: f64,
+    prevalence_time_slope_rmse: f64,
+    mean_absolute_prevalence_intercept_residual: f64,
+    mean_absolute_prevalence_time_slope_residual: f64,
 }
 
 struct RecoveryReplication {
@@ -53,6 +62,10 @@ struct RecoveryReplication {
     mean_absolute_topic_term_bias: f64,
     mean_document_state_rmse: f64,
     mean_absolute_document_state_residual: f64,
+    mean_prevalence_intercept_rmse: f64,
+    mean_prevalence_time_slope_rmse: f64,
+    mean_absolute_prevalence_intercept_residual: f64,
+    mean_absolute_prevalence_time_slope_residual: f64,
 }
 
 struct WindowRecoveryMetrics {
@@ -60,6 +73,10 @@ struct WindowRecoveryMetrics {
     aligned_topic_term_probabilities: Vec<f64>,
     document_state_rmse: f64,
     mean_absolute_document_state_residual: f64,
+    prevalence_intercept_rmse: f64,
+    prevalence_time_slope_rmse: f64,
+    mean_absolute_prevalence_intercept_residual: f64,
+    mean_absolute_prevalence_time_slope_residual: f64,
 }
 
 fn simulation_config(seed: u64) -> SimulationConfig {
@@ -255,13 +272,22 @@ fn count_matrix(
     .expect("simulator count matrix")
 }
 
+#[allow(clippy::cast_precision_loss)]
+fn seconds_from_origin(origin: EventTime, time: EventTime) -> f64 {
+    let delta = time
+        .instant()
+        .as_nanosecond()
+        .checked_sub(origin.instant().as_nanosecond())
+        .expect("generated training EventTime cannot precede simulator origin");
+    delta as f64 / NANOS_PER_SECOND
+}
+
 fn window_recovery_metrics(
     manifest: &TruthManifest,
     fits: &[ReferenceTopicTrainingFit],
 ) -> WindowRecoveryMetrics {
     let truth_topic_terms = manifest.topic_truth().topic_term_probabilities();
-    let truth_k = usize::try_from(manifest.topic_truth().true_topic_count())
-        .expect("true topic count fits usize");
+    let truth_k = usize::try_from(manifest.topic_truth().true_k()).expect("true topic count fits usize");
     let truth_fit = fits
         .iter()
         .find(|fit| fit.reference_fit().model().topic_term_probabilities.len() == truth_k)
@@ -331,11 +357,87 @@ fn window_recovery_metrics(
     )
     .expect("fit-bound non-cancelling document-state residual");
 
+    let intercept_feature = fitted
+        .prevalence_features
+        .iter()
+        .position(|feature| *feature == PrevalenceFeature::Intercept)
+        .expect("reference prevalence basis retains an intercept");
+    let event_time_feature = fitted
+        .prevalence_features
+        .iter()
+        .position(|feature| *feature == PrevalenceFeature::EventTime)
+        .expect("reference prevalence basis retains EventTime");
+    let aligned_fitted_intercepts = realign_additive_log_ratio(
+        &alignment,
+        &fitted.prevalence_coefficients[intercept_feature],
+    )
+    .expect("aligned prevalence intercepts");
+    let aligned_fitted_time_slopes = realign_additive_log_ratio(
+        &alignment,
+        &fitted.prevalence_coefficients[event_time_feature],
+    )
+    .expect("aligned prevalence EventTime slopes");
+
+    let (truth_time_origin, truth_time_center_seconds, truth_time_scale_seconds) = manifest
+        .prevalence_time_basis()
+        .expect("simulator-owned prevalence EventTime basis");
+    let truth_time_basis = LinearTimeBasis::new(
+        truth_time_center_seconds,
+        truth_time_scale_seconds,
+    )
+    .expect("finite simulator prevalence EventTime basis");
+    let fitted_design_basis = truth_fit.prevalence_design_basis();
+    let fitted_origin_seconds = seconds_from_origin(
+        truth_time_origin,
+        *fitted_design_basis.event_time_origin(),
+    );
+    let fitted_time_basis = LinearTimeBasis::new(
+        fitted_origin_seconds + fitted_design_basis.event_time_location_seconds(),
+        fitted_design_basis.event_time_scale_seconds(),
+    )
+    .expect("finite frozen training EventTime basis");
+    let fitted_in_truth_time_basis = reexpress_linear_prevalence_time_basis(
+        &aligned_fitted_intercepts,
+        &aligned_fitted_time_slopes,
+        fitted_time_basis,
+        truth_time_basis,
+    )
+    .expect("prevalence coefficients in simulator EventTime basis");
+
+    let truth_intercepts = manifest.topic_truth().prevalence_intercepts();
+    let truth_time_slopes = manifest.topic_truth().prevalence_time_slopes();
+    let prevalence_intercept_rmse = root_mean_square_error(
+        truth_intercepts,
+        fitted_in_truth_time_basis.intercepts(),
+    )
+    .expect("prevalence intercept RMSE");
+    let prevalence_time_slope_rmse = root_mean_square_error(
+        truth_time_slopes,
+        fitted_in_truth_time_basis.event_time_slopes(),
+    )
+    .expect("prevalence EventTime slope RMSE");
+    let fitted_intercepts_in_truth_basis = fitted_in_truth_time_basis.intercepts().to_vec();
+    let fitted_time_slopes_in_truth_basis = fitted_in_truth_time_basis.event_time_slopes().to_vec();
+    let mean_absolute_prevalence_intercept_residual = mean_absolute_parameter_bias(
+        truth_intercepts,
+        std::slice::from_ref(&fitted_intercepts_in_truth_basis),
+    )
+    .expect("prevalence intercept absolute residual");
+    let mean_absolute_prevalence_time_slope_residual = mean_absolute_parameter_bias(
+        truth_time_slopes,
+        std::slice::from_ref(&fitted_time_slopes_in_truth_basis),
+    )
+    .expect("prevalence EventTime slope absolute residual");
+
     WindowRecoveryMetrics {
         topic_term_rmse,
         aligned_topic_term_probabilities,
         document_state_rmse,
         mean_absolute_document_state_residual,
+        prevalence_intercept_rmse,
+        prevalence_time_slope_rmse,
+        mean_absolute_prevalence_intercept_residual,
+        mean_absolute_prevalence_time_slope_residual,
     }
 }
 
@@ -506,6 +608,12 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
             aligned_topic_term_probabilities: recovery.aligned_topic_term_probabilities,
             document_state_rmse: recovery.document_state_rmse,
             mean_absolute_document_state_residual: recovery.mean_absolute_document_state_residual,
+            prevalence_intercept_rmse: recovery.prevalence_intercept_rmse,
+            prevalence_time_slope_rmse: recovery.prevalence_time_slope_rmse,
+            mean_absolute_prevalence_intercept_residual: recovery
+                .mean_absolute_prevalence_intercept_residual,
+            mean_absolute_prevalence_time_slope_residual: recovery
+                .mean_absolute_prevalence_time_slope_residual,
         });
     }
 
@@ -538,6 +646,22 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
         .iter()
         .map(|fixture| fixture.mean_absolute_document_state_residual)
         .collect();
+    let prevalence_intercept_rmse: Vec<_> = fixtures
+        .iter()
+        .map(|fixture| fixture.prevalence_intercept_rmse)
+        .collect();
+    let prevalence_time_slope_rmse: Vec<_> = fixtures
+        .iter()
+        .map(|fixture| fixture.prevalence_time_slope_rmse)
+        .collect();
+    let prevalence_intercept_residual: Vec<_> = fixtures
+        .iter()
+        .map(|fixture| fixture.mean_absolute_prevalence_intercept_residual)
+        .collect();
+    let prevalence_time_slope_residual: Vec<_> = fixtures
+        .iter()
+        .map(|fixture| fixture.mean_absolute_prevalence_time_slope_residual)
+        .collect();
     let truth_flat: Vec<_> = manifest
         .topic_truth()
         .topic_term_probabilities()
@@ -558,6 +682,10 @@ fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelec
         mean_absolute_topic_term_bias,
         mean_document_state_rmse: mean(&document_state_rmse),
         mean_absolute_document_state_residual: mean(&document_state_residual),
+        mean_prevalence_intercept_rmse: mean(&prevalence_intercept_rmse),
+        mean_prevalence_time_slope_rmse: mean(&prevalence_time_slope_rmse),
+        mean_absolute_prevalence_intercept_residual: mean(&prevalence_intercept_residual),
+        mean_absolute_prevalence_time_slope_residual: mean(&prevalence_time_slope_residual),
     })
 }
 
@@ -573,6 +701,10 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
     let mut topic_term_mean_absolute_bias = Vec::new();
     let mut document_state_rmse = Vec::new();
     let mut document_state_mean_absolute_residual = Vec::new();
+    let mut prevalence_intercept_rmse = Vec::new();
+    let mut prevalence_time_slope_rmse = Vec::new();
+    let mut prevalence_intercept_mean_absolute_residual = Vec::new();
+    let mut prevalence_time_slope_mean_absolute_residual = Vec::new();
     for outcome in outcomes {
         match outcome {
             Ok(replication) => {
@@ -582,6 +714,12 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
                 document_state_rmse.push(replication.mean_document_state_rmse);
                 document_state_mean_absolute_residual
                     .push(replication.mean_absolute_document_state_residual);
+                prevalence_intercept_rmse.push(replication.mean_prevalence_intercept_rmse);
+                prevalence_time_slope_rmse.push(replication.mean_prevalence_time_slope_rmse);
+                prevalence_intercept_mean_absolute_residual
+                    .push(replication.mean_absolute_prevalence_intercept_residual);
+                prevalence_time_slope_mean_absolute_residual
+                    .push(replication.mean_absolute_prevalence_time_slope_residual);
             }
             Err(error) => selected_results.push(Err(error)),
         }
@@ -612,21 +750,25 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         topic_term_mean_absolute_bias.len(),
         document_state_rmse.len(),
         document_state_mean_absolute_residual.len(),
+        prevalence_intercept_rmse.len(),
+        prevalence_time_slope_rmse.len(),
+        prevalence_intercept_mean_absolute_residual.len(),
+        prevalence_time_slope_mean_absolute_residual.len(),
     ] {
         assert_eq!(successful_metric_count, summary.success_count());
     }
-    assert!(topic_term_rmse.iter().all(|value| value.is_finite()));
-    assert!(
-        topic_term_mean_absolute_bias
-            .iter()
-            .all(|value| value.is_finite())
-    );
-    assert!(document_state_rmse.iter().all(|value| value.is_finite()));
-    assert!(
-        document_state_mean_absolute_residual
-            .iter()
-            .all(|value| value.is_finite())
-    );
+    for metric_values in [
+        &topic_term_rmse,
+        &topic_term_mean_absolute_bias,
+        &document_state_rmse,
+        &document_state_mean_absolute_residual,
+        &prevalence_intercept_rmse,
+        &prevalence_time_slope_rmse,
+        &prevalence_intercept_mean_absolute_residual,
+        &prevalence_time_slope_mean_absolute_residual,
+    ] {
+        assert!(metric_values.iter().all(|value| value.is_finite()));
+    }
 
     let topic_rmse_recovery = summarize_recovery_metric_replications(
         summary.replication_count(),
@@ -656,12 +798,44 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         0.975,
     )
     .expect("document-state absolute-residual recovery summary");
+    let prevalence_intercept_rmse_recovery = summarize_recovery_metric_replications(
+        summary.replication_count(),
+        &prevalence_intercept_rmse,
+        0.025,
+        0.975,
+    )
+    .expect("prevalence-intercept RMSE recovery summary");
+    let prevalence_time_slope_rmse_recovery = summarize_recovery_metric_replications(
+        summary.replication_count(),
+        &prevalence_time_slope_rmse,
+        0.025,
+        0.975,
+    )
+    .expect("prevalence-time-slope RMSE recovery summary");
+    let prevalence_intercept_residual_recovery = summarize_recovery_metric_replications(
+        summary.replication_count(),
+        &prevalence_intercept_mean_absolute_residual,
+        0.025,
+        0.975,
+    )
+    .expect("prevalence-intercept absolute-residual recovery summary");
+    let prevalence_time_slope_residual_recovery = summarize_recovery_metric_replications(
+        summary.replication_count(),
+        &prevalence_time_slope_mean_absolute_residual,
+        0.025,
+        0.975,
+    )
+    .expect("prevalence-time-slope absolute-residual recovery summary");
 
     for metric in [
         topic_rmse_recovery,
         topic_bias_recovery,
         document_state_rmse_recovery,
         document_state_residual_recovery,
+        prevalence_intercept_rmse_recovery,
+        prevalence_time_slope_rmse_recovery,
+        prevalence_intercept_residual_recovery,
+        prevalence_time_slope_residual_recovery,
     ] {
         assert_eq!(
             metric.attempted_replication_count(),
@@ -691,6 +865,18 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         document_state_residual_recovery
             .successful_metric_summary()
             .expect("successful document-state absolute-residual summary"),
+        prevalence_intercept_rmse_recovery
+            .successful_metric_summary()
+            .expect("successful prevalence-intercept RMSE summary"),
+        prevalence_time_slope_rmse_recovery
+            .successful_metric_summary()
+            .expect("successful prevalence-time-slope RMSE summary"),
+        prevalence_intercept_residual_recovery
+            .successful_metric_summary()
+            .expect("successful prevalence-intercept absolute-residual summary"),
+        prevalence_time_slope_residual_recovery
+            .successful_metric_summary()
+            .expect("successful prevalence-time-slope absolute-residual summary"),
     ];
     for monte_carlo in monte_carlo_summaries {
         assert_eq!(monte_carlo.replication_count, summary.success_count());
