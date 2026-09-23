@@ -56,6 +56,8 @@ pub use claim::promote_scientific_recovery;
 pub use coverage::interval_coverage;
 /// Collapse rolling-origin coverage within DGP replications before Monte Carlo inference.
 pub use coverage::summarize_windowed_coverage_replications;
+/// Collapse successful rolling-origin coverage while retaining the attempted DGP denominator.
+pub use coverage::summarize_windowed_coverage_recovery_replications;
 /// Wilson bounds for coverage proportions.
 pub use coverage::wilson_coverage_interval;
 /// Fail-closed validation errors.
