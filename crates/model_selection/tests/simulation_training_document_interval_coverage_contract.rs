@@ -27,7 +27,7 @@ use uuid::Uuid;
 use validation_core::{
     align_topic_probability_rows, interval_coverage, normal_marginal_interval_bounds,
     realign_additive_log_ratio, realign_additive_log_ratio_covariance,
-    summarize_windowed_coverage_replications,
+    summarize_windowed_coverage_recovery_replications,
 };
 
 const REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
@@ -377,7 +377,7 @@ fn replication_window_coverages(seed: u64) -> Vec<f64> {
 }
 
 #[test]
-fn repeated_truth_k_interval_coverage_uses_dgp_not_interval_count_for_monte_carlo() {
+fn repeated_truth_k_interval_coverage_retains_attempted_dgp_denominator() {
     let coverage_by_replication: Vec<_> = REPLICATION_SEEDS
         .iter()
         .copied()
@@ -388,17 +388,30 @@ fn repeated_truth_k_interval_coverage_uses_dgp_not_interval_count_for_monte_carl
         coverage.is_finite() && (0.0..=1.0).contains(coverage)
     }));
 
-    let summary = summarize_windowed_coverage_replications(
+    let summary = summarize_windowed_coverage_recovery_replications(
+        REPLICATION_SEEDS.len(),
         &coverage_by_replication,
         0.025,
         0.975,
     )
-    .expect("between-DGP Monte Carlo coverage summary");
+    .expect("denominator-preserving between-DGP Monte Carlo coverage summary");
 
-    assert_eq!(summary.replication_count, REPLICATION_SEEDS.len());
-    assert!((0.0..=1.0).contains(&summary.mean));
-    assert!(summary.standard_deviation.is_finite());
-    assert!(summary.standard_error.is_finite());
-    assert!((0.0..=1.0).contains(&summary.percentile_lower));
-    assert!((0.0..=1.0).contains(&summary.percentile_upper));
+    assert_eq!(summary.attempted_replication_count(), REPLICATION_SEEDS.len());
+    assert_eq!(summary.successful_replication_count(), REPLICATION_SEEDS.len());
+    assert_eq!(summary.failure_count(), 0);
+    assert!((summary.failure_rate() - 0.0).abs() < f64::EPSILON);
+    assert!((summary.failure_rate_standard_error() - 0.0).abs() < f64::EPSILON);
+    let mean = summary
+        .successful_metric_mean()
+        .expect("successful coverage mean");
+    assert!((0.0..=1.0).contains(&mean));
+    let successful = summary
+        .successful_metric_summary()
+        .expect("four successful DGPs estimate between-replication uncertainty");
+    assert_eq!(successful.replication_count, REPLICATION_SEEDS.len());
+    assert!((0.0..=1.0).contains(&successful.mean));
+    assert!(successful.standard_deviation.is_finite());
+    assert!(successful.standard_error.is_finite());
+    assert!((0.0..=1.0).contains(&successful.percentile_lower));
+    assert!((0.0..=1.0).contains(&successful.percentile_upper));
 }
