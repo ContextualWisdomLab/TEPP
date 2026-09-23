@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use corpus_split::RollingOriginPartition;
 use membership_core::MembershipNetwork;
 use temporal_core::EventTime;
-use topic_measurement::{ReferenceTopicTrainingFit, SparseMatrix};
+use topic_measurement::{ReferenceTopicTrainingFit, SparseMatrix, TopicMeasurementError};
 use uuid::Uuid;
 
 use crate::ModelSelectionError;
@@ -39,6 +39,17 @@ fn add_predictive_score(total: &mut f64, score: f64) -> Result<(), ModelSelectio
     } else {
         Err(ModelSelectionError::InvalidDiagnostic)
     }
+}
+
+fn predictive_evaluation_result<T>(
+    result: Result<T, TopicMeasurementError>,
+) -> Result<T, ModelSelectionError> {
+    result.map_err(|error| match error {
+        TopicMeasurementError::NonFiniteEstimate | TopicMeasurementError::InvalidLogRatioDimension => {
+            ModelSelectionError::InvalidDiagnostic
+        }
+        _ => ModelSelectionError::PredictiveEvaluationInputInvalid,
+    })
 }
 
 /// Borrowed numerical payload for one admitted rolling-origin evaluation window.
@@ -95,13 +106,20 @@ impl<'a> RollingOriginPredictiveEvaluation<'a> {
 /// prevalence-mean predictive log likelihoods. It is not STM document-completion
 /// likelihood, the in-sample Schwarz score, or a new split/cutoff authority.
 ///
+/// Evaluation geometry rejected structurally by `topic_measurement` remains a
+/// structural model-selection error. Only non-finite likelihood arithmetic or an
+/// unrepresentable fitted ALR mean is a numerical diagnostic failure eligible for
+/// the scientific recovery failure denominator.
+///
 /// # Errors
 ///
 /// Returns [`ModelSelectionError::PartitionInputMismatch`] when training or
-/// evaluation identities do not exactly match the admitted partition. Returns
-/// [`ModelSelectionError::InvalidDiagnostic`] when the topic-measurement owner
-/// rejects evaluation geometry/coordinates/counts or when finite per-document
-/// scores overflow while aggregating the partition diagnostic.
+/// evaluation identities do not exactly match the admitted partition;
+/// [`ModelSelectionError::PredictiveEvaluationInputInvalid`] when evaluation
+/// dimensions, counts, or frozen prevalence-feature coordinates are structurally
+/// incompatible with the fitted training state; or
+/// [`ModelSelectionError::InvalidDiagnostic`] for numerical predictive failures
+/// and finite per-document scores whose aggregate overflows.
 pub fn rolling_origin_prevalence_mean_predictive_log_likelihood(
     partition: &RollingOriginPartition,
     training_fit: &ReferenceTopicTrainingFit,
@@ -129,15 +147,15 @@ pub fn rolling_origin_prevalence_mean_predictive_log_likelihood(
         return Err(ModelSelectionError::PartitionInputMismatch);
     }
 
-    let scores = training_fit
-        .prevalence_mean_predictive_log_likelihoods(
+    let scores = predictive_evaluation_result(
+        training_fit.prevalence_mean_predictive_log_likelihoods(
             evaluation_document_ids,
             evaluation_document_term,
             evaluation_event_times,
             evaluation_covariates,
             memberships,
-        )
-        .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+        ),
+    )?;
     let diagnostic = scores.into_iter().sum::<f64>();
     if !diagnostic.is_finite() {
         return Err(ModelSelectionError::InvalidDiagnostic);
@@ -317,9 +335,10 @@ pub fn select_rolling_origin_predictive_candidate_k_across_windows(
 mod tests {
     use super::{
         add_predictive_score, candidate_k_from_topic_count, predictive_candidate_is_better,
-        select_best_predictive_candidate,
+        predictive_evaluation_result, select_best_predictive_candidate,
     };
     use crate::ModelSelectionError;
+    use topic_measurement::TopicMeasurementError;
 
     #[test]
     fn topic_count_conversion_is_fail_closed() {
@@ -361,5 +380,30 @@ mod tests {
             add_predictive_score(&mut extreme, f64::MAX),
             Err(ModelSelectionError::InvalidDiagnostic)
         );
+    }
+
+    #[test]
+    fn predictive_owner_errors_keep_structural_and_numerical_failure_classes_distinct() {
+        for error in [
+            TopicMeasurementError::NonFiniteEstimate,
+            TopicMeasurementError::InvalidLogRatioDimension,
+        ] {
+            assert_eq!(
+                predictive_evaluation_result::<()>(Err(error)),
+                Err(ModelSelectionError::InvalidDiagnostic)
+            );
+        }
+        for error in [
+            TopicMeasurementError::InvalidModelInput,
+            TopicMeasurementError::InvalidSparseMatrix,
+            TopicMeasurementError::InvalidComposition,
+            TopicMeasurementError::LexicalWeightForbidden,
+            TopicMeasurementError::JointPosteriorUnavailable,
+        ] {
+            assert_eq!(
+                predictive_evaluation_result::<()>(Err(error)),
+                Err(ModelSelectionError::PredictiveEvaluationInputInvalid)
+            );
+        }
     }
 }
