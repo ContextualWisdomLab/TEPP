@@ -27,6 +27,7 @@ use tepp_simulation::{
 };
 use topic_measurement::{ReferenceTopicTrainingFit, ReferenceTopicTrainingInput, SparseMatrix};
 use uuid::Uuid;
+use validation_core::{align_topic_probability_rows, mean_bias, root_mean_square_error};
 
 const REPLICATION_SEEDS: [u64; 4] = [101, 211, 307, 401];
 const FIRST_TRAINING_EVENT_INDEX: usize = 3;
@@ -37,6 +38,14 @@ struct WindowFixture {
     evaluation_document_ids: Vec<Uuid>,
     evaluation_document_term: SparseMatrix,
     evaluation_event_times: Vec<EventTime>,
+    topic_term_rmse: f64,
+    topic_term_bias: f64,
+}
+
+struct RecoveryReplication {
+    selected_k: u32,
+    mean_topic_term_rmse: f64,
+    mean_topic_term_bias: f64,
 }
 
 fn simulation_config(seed: u64) -> SimulationConfig {
@@ -232,6 +241,38 @@ fn count_matrix(
     .expect("simulator count matrix")
 }
 
+fn topic_term_recovery(
+    manifest: &TruthManifest,
+    fits: &[ReferenceTopicTrainingFit],
+) -> (f64, f64) {
+    let truth = manifest.topic_truth().topic_term_probabilities();
+    let truth_k = usize::try_from(manifest.topic_truth().true_topic_count())
+        .expect("true topic count fits usize");
+    let fitted = fits
+        .iter()
+        .find(|fit| fit.reference_fit().model().topic_term_probabilities.len() == truth_k)
+        .expect("complete declared grid retains truth-K fit")
+        .reference_fit()
+        .model();
+    let alignment = align_topic_probability_rows(truth, &fitted.topic_term_probabilities)
+        .expect("truth-K topic alignment");
+    let truth_flat: Vec<_> = truth.iter().flatten().copied().collect();
+    let recovered_flat: Vec<_> = alignment
+        .truth_to_fitted()
+        .iter()
+        .flat_map(|fitted_index| fitted.topic_term_probabilities[*fitted_index].iter().copied())
+        .collect();
+    (
+        root_mean_square_error(&truth_flat, &recovered_flat).expect("topic-term RMSE"),
+        mean_bias(&truth_flat, &recovered_flat).expect("topic-term bias"),
+    )
+}
+
+fn mean(values: &[f64]) -> f64 {
+    let count = u32::try_from(values.len()).expect("CI-scale metric count fits u32");
+    values.iter().sum::<f64>() / f64::from(count)
+}
+
 fn assert_realistic_structure(manifest: &TruthManifest) {
     assert!(
         manifest
@@ -307,7 +348,8 @@ fn assert_generated_rebinding_rejected(
     );
 }
 
-fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
+#[allow(clippy::too_many_lines)]
+fn run_recovery_replication(seed: u64) -> Result<RecoveryReplication, ModelSelectionError> {
     let manifest = generate(simulation_config(seed)).expect("known-truth simulation");
     manifest
         .verify_invariants()
@@ -375,6 +417,7 @@ fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
         )
         .expect("owner-admitted numerical training state");
         let fits = fit_declared_recovery_candidates(&training_input, &config)?;
+        let (topic_term_rmse, topic_term_bias) = topic_term_recovery(&manifest, &fits);
 
         let evaluation_document_term =
             count_matrix(&evaluation_document_ids, vocabulary_size, &counts_by_document);
@@ -388,6 +431,8 @@ fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
             evaluation_document_ids,
             evaluation_document_term,
             evaluation_event_times,
+            topic_term_rmse,
+            topic_term_bias,
         });
     }
 
@@ -406,22 +451,43 @@ fn run_recovery_replication(seed: u64) -> Result<u32, ModelSelectionError> {
             )
         })
         .collect();
-    select_declared_rolling_origin_recovery_candidate_k_for_cutoffs(
+    let selected_k = select_declared_rolling_origin_recovery_candidate_k_for_cutoffs(
         &config,
         &cutoffs,
         &evaluations?,
-    )
+    )?;
+    let topic_term_rmse: Vec<_> = fixtures.iter().map(|fixture| fixture.topic_term_rmse).collect();
+    let topic_term_bias: Vec<_> = fixtures.iter().map(|fixture| fixture.topic_term_bias).collect();
+    Ok(RecoveryReplication {
+        selected_k,
+        mean_topic_term_rmse: mean(&topic_term_rmse),
+        mean_topic_term_bias: mean(&topic_term_bias),
+    })
 }
 
 #[test]
 fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_uncertainty() {
-    let results: Vec<_> = REPLICATION_SEEDS
+    let outcomes: Vec<_> = REPLICATION_SEEDS
         .iter()
         .copied()
         .map(run_recovery_replication)
         .collect();
+    let mut selected_results = Vec::with_capacity(outcomes.len());
+    let mut topic_term_rmse = Vec::new();
+    let mut topic_term_bias = Vec::new();
+    for outcome in outcomes {
+        match outcome {
+            Ok(replication) => {
+                selected_results.push(Ok(replication.selected_k));
+                topic_term_rmse.push(replication.mean_topic_term_rmse);
+                topic_term_bias.push(replication.mean_topic_term_bias);
+            }
+            Err(error) => selected_results.push(Err(error)),
+        }
+    }
+
     let truth_k = TopicDgpConfig::ci_default().true_topic_count();
-    let summary = selected_k_recovery_summary_from_results(results, truth_k)
+    let summary = selected_k_recovery_summary_from_results(selected_results, truth_k)
         .expect("structurally valid repeated recovery experiment");
 
     assert_eq!(summary.truth_k(), truth_k);
@@ -440,6 +506,12 @@ fn repeated_known_truth_recovery_reports_unconditional_failure_and_monte_carlo_u
         summary.success_count() >= 2,
         "CI-scale scientific recovery must retain enough successful replications to estimate Monte Carlo uncertainty"
     );
+    assert_eq!(topic_term_rmse.len(), summary.success_count());
+    assert_eq!(topic_term_bias.len(), summary.success_count());
+    assert!(topic_term_rmse.iter().all(|value| value.is_finite()));
+    assert!(topic_term_bias.iter().all(|value| value.is_finite()));
+    assert!(mean(&topic_term_rmse) <= 1.0);
+    assert!(mean(&topic_term_bias).abs() <= 1.0);
     assert!(summary.bias().is_some());
     assert!(summary.root_mean_square_error().is_some());
     assert!(summary.bias_monte_carlo_standard_error().is_some());
