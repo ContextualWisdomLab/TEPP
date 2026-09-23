@@ -16,7 +16,12 @@ use crate::{FittedCandidateKConfig, ModelSelectionError};
 fn recovery_fit_result<T>(
     result: Result<T, TopicMeasurementError>,
 ) -> Result<T, ModelSelectionError> {
-    result.map_err(|_| ModelSelectionError::RecoveryCandidateFitFailed)
+    result.map_err(|error| match error {
+        TopicMeasurementError::DidNotConverge | TopicMeasurementError::NonFiniteEstimate => {
+            ModelSelectionError::RecoveryCandidateFitFailed
+        }
+        _ => ModelSelectionError::RecoveryCandidateInputInvalid,
+    })
 }
 
 /// Fit every candidate in one predeclared scientific recovery design.
@@ -25,9 +30,11 @@ fn recovery_fit_result<T>(
 /// [`FittedCandidateKConfig::candidate_topic_counts`]. Each estimator
 /// configuration is minted through the configuration owner's canonical
 /// conversion, so seeds, convergence controls, and hyperparameters cannot drift
-/// through a second consumer-side construction path. If any candidate fit fails,
-/// no survivor subset is returned; the caller must record the replication as a
-/// failure in the scientific denominator.
+/// through a second consumer-side construction path. If any candidate fails
+/// numerically, no survivor subset is returned and the caller may record the
+/// replication as a numerical failure. A deterministic input/configuration or
+/// authority failure invalidates the recovery experiment instead of entering the
+/// failed-replication denominator.
 ///
 /// Generic operational selection deliberately keeps its existing survivor
 /// semantics. This function is only the stricter scientific-recovery path.
@@ -35,9 +42,12 @@ fn recovery_fit_result<T>(
 /// # Errors
 ///
 /// Returns the configuration owner's typed validation failure when a declared
-/// candidate cannot be converted to the reference configuration, or
-/// [`ModelSelectionError::RecoveryCandidateFitFailed`] when any declared
-/// training fit fails numerically.
+/// candidate cannot be converted to the reference configuration,
+/// [`ModelSelectionError::RecoveryCandidateFitFailed`] when fitting fails by
+/// non-convergence or a non-finite numerical estimate, or
+/// [`ModelSelectionError::RecoveryCandidateInputInvalid`] for structural
+/// topic-measurement failures. Unknown future topic-measurement failures fail
+/// closed as structural invalidity until explicitly classified.
 pub fn fit_declared_recovery_candidates(
     training_input: &ReferenceTopicTrainingInput,
     config: &FittedCandidateKConfig,
@@ -61,11 +71,33 @@ mod tests {
     use topic_measurement::TopicMeasurementError;
 
     #[test]
-    fn one_failed_declared_candidate_fails_the_recovery_grid() {
-        assert_eq!(
-            recovery_fit_result::<()>(Err(TopicMeasurementError::DidNotConverge)),
-            Err(ModelSelectionError::RecoveryCandidateFitFailed)
-        );
+    fn numerical_failures_enter_the_recovery_failure_path() {
+        for error in [
+            TopicMeasurementError::DidNotConverge,
+            TopicMeasurementError::NonFiniteEstimate,
+        ] {
+            assert_eq!(
+                recovery_fit_result::<()>(Err(error)),
+                Err(ModelSelectionError::RecoveryCandidateFitFailed)
+            );
+        }
         assert_eq!(recovery_fit_result(Ok(7_u8)), Ok(7_u8));
+    }
+
+    #[test]
+    fn structural_topic_failures_invalidate_the_recovery_experiment() {
+        for error in [
+            TopicMeasurementError::InvalidModelInput,
+            TopicMeasurementError::InvalidSparseMatrix,
+            TopicMeasurementError::InvalidComposition,
+            TopicMeasurementError::InvalidLogRatioDimension,
+            TopicMeasurementError::LexicalWeightForbidden,
+            TopicMeasurementError::JointPosteriorUnavailable,
+        ] {
+            assert_eq!(
+                recovery_fit_result::<()>(Err(error)),
+                Err(ModelSelectionError::RecoveryCandidateInputInvalid)
+            );
+        }
     }
 }
