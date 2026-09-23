@@ -18,6 +18,7 @@ mod coverage;
 mod coverage_evidence;
 mod error;
 mod graph_metrics;
+mod indexed_coverage;
 mod input;
 mod marginal_interval;
 mod matching;
@@ -77,6 +78,10 @@ pub use graph_metrics::EdgeIdentity;
 pub use graph_metrics::edge_precision;
 /// Edge recovery recall.
 pub use graph_metrics::edge_recall;
+/// One declared coverage-calibration replication and numerical outcome.
+pub use indexed_coverage::CoverageCalibrationReplicationOutcome;
+/// Aggregate coverage only from the exact declared replication identity set.
+pub use indexed_coverage::summarize_indexed_windowed_coverage_recovery_replications;
 /// Closed marginal normal interval bounds in location-coordinate order.
 pub use marginal_interval::MarginalIntervalBounds;
 /// Construct marginal normal intervals from one validated location/covariance basis.
