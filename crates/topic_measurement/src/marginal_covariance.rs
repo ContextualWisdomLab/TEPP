@@ -6,6 +6,7 @@
 //! precision. It does not treat reciprocal precision diagonals or an isolated
 //! document block inverse as a marginal posterior covariance.
 
+use temporal_core::EventTime;
 use uuid::Uuid;
 
 use crate::{JointCoordinatePrecision, TopicMeasurementError, reference::cholesky};
@@ -16,6 +17,7 @@ const SYMMETRY_RELATIVE_TOLERANCE: f64 = 1.0e-10;
 #[derive(Clone, Debug, PartialEq)]
 pub struct DocumentMarginalCovariance {
     document_id: Uuid,
+    event_time: EventTime,
     topic_ids: Vec<Uuid>,
     values: Vec<Vec<f64>>,
 }
@@ -25,6 +27,12 @@ impl DocumentMarginalCovariance {
     #[must_use]
     pub const fn document_id(&self) -> Uuid {
         self.document_id
+    }
+
+    /// Return the event time retained for the fitted document row.
+    #[must_use]
+    pub const fn event_time(&self) -> EventTime {
+        self.event_time
     }
 
     /// Return ALR numerator topics followed by the retained reference topic.
@@ -51,9 +59,10 @@ impl JointCoordinatePrecision {
     /// Cholesky factorization plus `O(C N^2)` for triangular solves and `O(N^2)`
     /// memory. This is a validation primitive, not a calibrated posterior claim.
     ///
-    /// The returned coordinates remain bound to this precision's document and
-    /// topic order. Evidence provenance, release topic identity, empirical
-    /// coverage, and backend parity remain separate owner responsibilities.
+    /// The returned coordinates remain bound to this precision's document,
+    /// event-time, and topic order. Evidence provenance, release topic identity,
+    /// empirical coverage, and backend parity remain separate owner
+    /// responsibilities.
     ///
     /// # Errors
     ///
@@ -79,6 +88,7 @@ impl JointCoordinatePrecision {
             .ok_or(TopicMeasurementError::InvalidModelInput)?;
         if self.values.len() != dimension
             || self.coordinate_means.len() != dimension
+            || self.event_times.len() != self.document_ids.len()
             || self.values.iter().any(|row| row.len() != dimension)
         {
             return Err(TopicMeasurementError::InvalidModelInput);
@@ -104,6 +114,7 @@ impl JointCoordinatePrecision {
 
         Ok(DocumentMarginalCovariance {
             document_id,
+            event_time: self.event_times[document_index],
             topic_ids: self.topic_ids.clone(),
             values: covariance,
         })
@@ -211,9 +222,42 @@ mod tests {
             .document_marginal_covariance(Uuid::from_u128(1))
             .expect("marginal covariance");
         assert_eq!(marginal.document_id(), Uuid::from_u128(1));
+        assert_eq!(marginal.event_time(), event_time(1));
         assert_eq!(marginal.topic_ids(), precision.topic_ids());
         assert!((marginal.values()[0][0] - 2.0 / 3.0).abs() < 1.0e-12);
         assert!((marginal.values()[0][0] - 0.5).abs() > 1.0e-6);
+    }
+
+    #[test]
+    fn multi_coordinate_block_comes_from_the_full_joint_inverse() {
+        let precision = JointCoordinatePrecision {
+            document_ids: vec![Uuid::from_u128(1), Uuid::from_u128(2)],
+            topic_ids: vec![
+                Uuid::from_u128(11),
+                Uuid::from_u128(12),
+                Uuid::from_u128(13),
+            ],
+            event_times: vec![event_time(1), event_time(2)],
+            coordinate_means: vec![0.0; 4],
+            values: vec![
+                vec![4.0, 1.0, -1.0, 0.2],
+                vec![1.0, 3.0, 0.1, -0.5],
+                vec![-1.0, 0.1, 3.5, 0.8],
+                vec![0.2, -0.5, 0.8, 2.8],
+            ],
+        };
+        let marginal = precision
+            .document_marginal_covariance(Uuid::from_u128(1))
+            .expect("two-coordinate marginal");
+
+        assert_eq!(marginal.values().len(), 2);
+        assert!((marginal.values()[0][0] - 0.311_047_30).abs() < 1.0e-7);
+        assert!((marginal.values()[0][1] + 0.119_807_86).abs() < 1.0e-7);
+        assert!((marginal.values()[1][0] + 0.119_807_86).abs() < 1.0e-7);
+        assert!((marginal.values()[1][1] - 0.391_846_59).abs() < 1.0e-7);
+
+        let isolated_block_inverse_00 = 3.0 / 11.0;
+        assert!((marginal.values()[0][0] - isolated_block_inverse_00).abs() > 1.0e-3);
     }
 
     #[test]
@@ -229,10 +273,16 @@ mod tests {
             malformed.document_marginal_covariance(Uuid::from_u128(1)),
             Err(TopicMeasurementError::InvalidModelInput)
         );
-        let mut malformed_means = precision;
+        let mut malformed_means = precision.clone();
         malformed_means.coordinate_means.pop();
         assert_eq!(
             malformed_means.document_marginal_covariance(Uuid::from_u128(1)),
+            Err(TopicMeasurementError::InvalidModelInput)
+        );
+        let mut malformed_times = precision;
+        malformed_times.event_times.pop();
+        assert_eq!(
+            malformed_times.document_marginal_covariance(Uuid::from_u128(1)),
             Err(TopicMeasurementError::InvalidModelInput)
         );
     }
@@ -260,7 +310,10 @@ mod tests {
 
         let mut near_symmetric = vec![vec![2.0, 0.5], vec![0.5 + 1.0e-12, 2.0]];
         reconcile_roundoff_and_validate(&mut near_symmetric).expect("roundoff reconciliation");
-        assert_eq!(near_symmetric[0][1], near_symmetric[1][0]);
+        assert_eq!(
+            near_symmetric[0][1].to_bits(),
+            near_symmetric[1][0].to_bits()
+        );
 
         let mut asymmetric = vec![vec![2.0, 0.5], vec![0.6, 2.0]];
         assert_eq!(
@@ -278,11 +331,13 @@ mod tests {
     fn public_value_object_accessors_preserve_owner_coordinates() {
         let value = DocumentMarginalCovariance {
             document_id: Uuid::from_u128(1),
+            event_time: event_time(1),
             topic_ids: vec![Uuid::from_u128(11), Uuid::from_u128(12)],
             values: vec![vec![0.25]],
         };
         assert_eq!(value.document_id(), Uuid::from_u128(1));
+        assert_eq!(value.event_time(), event_time(1));
         assert_eq!(value.topic_ids(), &[Uuid::from_u128(11), Uuid::from_u128(12)]);
-        assert_eq!(value.values(), &[vec![0.25]]);
+        assert!((value.values()[0][0] - 0.25).abs() < f64::EPSILON);
     }
 }
