@@ -48,6 +48,8 @@ fn malformed_probability_bases_fail_closed() {
         vec![vec![0.5, 0.5], vec![f64::NAN, 1.0]],
         vec![vec![0.5, 0.5], vec![-0.1, 1.1]],
         vec![vec![0.5, 0.5], vec![0.0, 0.0]],
+        vec![vec![0.5, 0.5], vec![0.4, 0.4]],
+        vec![vec![0.5, 0.5], vec![f64::MAX, f64::MAX]],
     ] {
         assert_eq!(
             align_topic_probability_rows(&valid, &invalid),
@@ -57,6 +59,20 @@ fn malformed_probability_bases_fail_closed() {
 
     assert_eq!(
         align_topic_probability_rows(&[vec![0.7, 0.3]], &[vec![0.7, 0.3]]),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        align_topic_probability_rows(
+            &valid,
+            &[vec![0.7, 0.2, 0.1], vec![0.1, 0.2, 0.7]],
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+    assert_eq!(
+        align_topic_probability_rows(
+            &valid,
+            &[vec![0.8, 0.2], vec![0.2, 0.8], vec![0.5, 0.5]],
+        ),
         Err(ValidationError::InvalidInput)
     );
 }
