@@ -10,6 +10,7 @@ fn tepp_nominal_95_design_is_versioned_before_the_larger_run() {
     assert_eq!(design.design_id(), "tepp.coverage.nominal95.v1");
     assert_eq!(design.attempted_dgp_count(), 10_000);
     assert!((design.nominal_coverage() - 0.95).abs() < f64::EPSILON);
+    assert!((design.normal_critical_value() - 1.959_963_984_540_054).abs() < f64::EPSILON);
     assert!((design.practical_lower_coverage() - 0.91).abs() < f64::EPSILON);
     assert!((design.practical_upper_coverage() - 0.98).abs() < f64::EPSILON);
     assert!((design.maximum_monte_carlo_standard_error() - 0.005).abs() < f64::EPSILON);
