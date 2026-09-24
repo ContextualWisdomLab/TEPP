@@ -408,7 +408,8 @@ fn truth_k_window_coverage(
         return Err(CoverageCalibrationExecutionError::InvalidPosteriorGeometry);
     }
 
-    let normal_critical_value = CoverageCalibrationDesign::tepp_nominal_95_v1().normal_critical_value();
+    let normal_critical_value =
+        CoverageCalibrationDesign::tepp_nominal_95_v1().normal_critical_value();
     let mut truth = Vec::new();
     let mut lower = Vec::new();
     let mut upper = Vec::new();
