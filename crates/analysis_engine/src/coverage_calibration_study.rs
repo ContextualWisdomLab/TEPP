@@ -20,8 +20,6 @@ use validation_core::{
 
 use crate::{CoverageCalibrationExecutionError, execute_coverage_calibration_replication};
 
-const LOWER_COVERAGE_PERCENTILE: f64 = 0.025;
-const UPPER_COVERAGE_PERCENTILE: f64 = 0.975;
 const COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION: u32 = 2;
 const COVERAGE_CALIBRATION_SHARD_FINGERPRINT_DOMAIN: &[u8] =
     b"tepp.analysis.coverage-calibration-shard.v2\0";
@@ -439,8 +437,6 @@ pub fn assemble_coverage_calibration_evidence_v1(
     map_evidence_result(CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
         &validation_design,
         &outcomes,
-        LOWER_COVERAGE_PERCENTILE,
-        UPPER_COVERAGE_PERCENTILE,
         simulation_design.scenario_id(),
         &scenario_fingerprint,
         &source_head,
