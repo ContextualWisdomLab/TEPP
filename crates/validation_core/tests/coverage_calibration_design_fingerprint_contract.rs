@@ -1,6 +1,7 @@
 use validation_core::{
     CoverageCalibrationDesign, CoverageCalibrationEvidenceRecord,
     CoverageCalibrationReplicationOutcome, coverage_calibration_design_sha256,
+    summarize_replications,
 };
 
 const SOURCE_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
@@ -53,4 +54,15 @@ fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() 
     assert!(json.contains(DESIGN_FINGERPRINT_V1));
     assert!(json.contains("\"coverage_percentile_method_id\":"));
     assert!(json.contains(PERCENTILE_METHOD_ID));
+}
+
+#[test]
+fn percentile_method_identity_matches_the_owner_nearest_rank_arithmetic() {
+    let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    assert_eq!(design.coverage_percentile_method_id(), PERCENTILE_METHOD_ID);
+
+    let summary = summarize_replications(&[1.0, 2.0, 3.0, 4.0], 0.25, 0.75)
+        .expect("nearest-rank percentile oracle");
+    assert_eq!(summary.percentile_lower, 1.0);
+    assert_eq!(summary.percentile_upper, 3.0);
 }
