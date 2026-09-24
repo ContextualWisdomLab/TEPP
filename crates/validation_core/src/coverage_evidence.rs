@@ -8,22 +8,24 @@ use crate::{
 };
 use serde::Serialize;
 
-const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 4;
+const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 5;
 
 /// Immutable evidence record for one prospective coverage-calibration experiment.
 ///
-/// The record keeps validation criterion identity separate from simulation
+/// The record keeps validation design/estimand identity separate from simulation
 /// scenario identity while binding the exact prospective criterion, scenario,
 /// indexed outcomes, and source commit. It persists the complete canonical
 /// declared replication ledger, compact SHA-256 provenance bindings, the
 /// unconditional failure denominator, and Monte Carlo uncertainty alongside
 /// conditional interval-calibration metrics. A positive
 /// [`Self::supports_calibration_claim`] value is intentionally narrower than
-/// estimator robustness, scientific promotion, or release authority.
+/// estimator robustness, held-out/predictive validity, scientific promotion, or
+/// release authority.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CoverageCalibrationEvidenceRecord {
     schema_version: u32,
     validation_design_id: String,
+    validation_estimand_id: String,
     validation_design_fingerprint: String,
     simulation_scenario_id: String,
     simulation_scenario_fingerprint: String,
@@ -53,10 +55,11 @@ impl CoverageCalibrationEvidenceRecord {
     /// `simulation_scenario_id` and `simulation_scenario_fingerprint` are opaque
     /// values supplied by the simulation owner. This crate validates only their
     /// persistence-safe shape rather than importing simulation-domain source.
-    /// The validation design is fingerprinted from its owner-issued identity,
-    /// attempted count, nominal coverage, practical band, and Monte Carlo precision
-    /// target so a stable design name cannot hide criterion drift. `source_head`
-    /// must be an exact lowercase forty-hex Git commit identity.
+    /// The validation design persists its owner-issued design and estimand identities
+    /// and is fingerprinted from those identities, attempted count, nominal coverage,
+    /// interval rule, practical band, and Monte Carlo precision target so a stable
+    /// design name cannot hide covered-population, aggregation, or criterion drift.
+    /// `source_head` must be an exact lowercase forty-hex Git commit identity.
     ///
     /// The indexed aggregation boundary requires an exact permutation of the
     /// prospective design's replication identities before any summary can be
@@ -114,6 +117,7 @@ impl CoverageCalibrationEvidenceRecord {
         Ok(Self {
             schema_version: COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION,
             validation_design_id: design.design_id().to_owned(),
+            validation_estimand_id: design.estimand().estimand_id().to_owned(),
             validation_design_fingerprint,
             simulation_scenario_id: simulation_scenario_id.to_owned(),
             simulation_scenario_fingerprint: simulation_scenario_fingerprint.to_owned(),
@@ -154,7 +158,13 @@ impl CoverageCalibrationEvidenceRecord {
         &self.validation_design_id
     }
 
-    /// Canonical SHA-256 fingerprint of the prospective validation criterion.
+    /// Prospective covered-population and repeated-observation aggregation identity.
+    #[must_use]
+    pub fn validation_estimand_id(&self) -> &str {
+        &self.validation_estimand_id
+    }
+
+    /// Canonical SHA-256 fingerprint of the prospective validation criterion and estimand.
     #[must_use]
     pub fn validation_design_fingerprint(&self) -> &str {
         &self.validation_design_fingerprint
