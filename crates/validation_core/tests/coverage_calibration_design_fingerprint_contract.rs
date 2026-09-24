@@ -10,9 +10,8 @@ const SCENARIO_FINGERPRINT: &str =
 const ESTIMAND_ID: &str =
     "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1";
 const PERCENTILE_METHOD_ID: &str = "tepp.coverage.percentile.inclusive_nearest_rank.v1";
-// Updated after the percentile estimator identity is bound into the canonical design fingerprint.
 const DESIGN_FINGERPRINT_V1: &str =
-    "PENDING_PERCENTILE_METHOD_FINGERPRINT";
+    "b4733bdaea49439e1d45749227d5e6131ebd14a0fb56df3dc0878e4fc3bf9954";
 
 #[test]
 fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() {
