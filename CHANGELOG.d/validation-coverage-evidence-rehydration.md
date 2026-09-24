@@ -1,0 +1,3 @@
+### Fixed
+
+- Added validation-owner recovery for persisted coverage-calibration evidence. Schema-v9 JSON is now treated as untrusted input, reconstructed from the canonical indexed outcome ledger through `CoverageCalibrationEvidenceRecord::from_indexed_outcomes(...)`, and accepted only when every persisted provenance, reporting-method, summary, digest, and criterion field matches owner recomputation. Unknown top-level or per-outcome fields fail closed. This is application-level scientific-evidence recovery and does not authenticate external storage, runners, or builds, execute the 10,000-DGP study, or define numerical-failure acceptability.
