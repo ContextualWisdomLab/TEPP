@@ -36,7 +36,7 @@ impl CoverageCalibrationDesign {
     /// intervals. Held-out state recovery and predictive evaluation remain separate
     /// validation claims and must not be described as this calibration estimand.
     #[must_use]
-    pub const fn estimand(self) -> CoverageCalibrationEstimand {
+    pub const fn estimand(&self) -> CoverageCalibrationEstimand {
         CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
     }
 }
