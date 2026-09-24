@@ -1,18 +1,25 @@
 use validation_core::{
-    CoverageCalibrationReplicationOutcome, ValidationError,
+    CoverageCalibrationDesign, CoverageCalibrationReplicationOutcome, ValidationError,
     summarize_indexed_windowed_coverage_recovery_replications,
 };
+
+fn complete_windows(value: f64) -> Vec<f64> {
+    vec![
+        value;
+        CoverageCalibrationDesign::tepp_nominal_95_v1().declared_rolling_origin_window_count()
+    ]
+}
 
 #[test]
 fn indexed_coverage_aggregation_preserves_exact_denominator_and_canonical_order() {
     let outcomes = [
-        CoverageCalibrationReplicationOutcome::successful(2, vec![0.8, 0.9]),
+        CoverageCalibrationReplicationOutcome::successful(2, complete_windows(0.85)),
         CoverageCalibrationReplicationOutcome::numerical_failure(0),
-        CoverageCalibrationReplicationOutcome::successful(1, vec![0.95, 0.95]),
+        CoverageCalibrationReplicationOutcome::successful(1, complete_windows(0.95)),
     ];
 
     assert_eq!(outcomes[0].replication_index(), 2);
-    assert_eq!(outcomes[0].window_coverages(), Some(&[0.8, 0.9][..]));
+    assert_eq!(outcomes[0].window_coverages(), Some(&[0.85; 5][..]));
     assert_eq!(outcomes[1].replication_index(), 0);
     assert_eq!(outcomes[1].window_coverages(), None);
 
@@ -67,7 +74,7 @@ fn indexed_coverage_aggregation_rejects_duplicate_missing_and_out_of_range_ident
 }
 
 #[test]
-fn indexed_coverage_delegates_window_and_percentile_validation_to_existing_owner() {
+fn indexed_coverage_enforces_declared_window_cardinality_and_delegates_value_validation() {
     let empty_success = [CoverageCalibrationReplicationOutcome::successful(0, vec![])];
     assert_eq!(
         summarize_indexed_windowed_coverage_recovery_replications(
@@ -79,7 +86,26 @@ fn indexed_coverage_delegates_window_and_percentile_validation_to_existing_owner
         Err(ValidationError::InvalidInput)
     );
 
-    let invalid_coverage = [CoverageCalibrationReplicationOutcome::successful(0, vec![1.1])];
+    let shortened_success = [CoverageCalibrationReplicationOutcome::successful(
+        0,
+        vec![0.95; 4],
+    )];
+    assert_eq!(
+        summarize_indexed_windowed_coverage_recovery_replications(
+            1,
+            &shortened_success,
+            0.025,
+            0.975,
+        ),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let mut invalid_windows = complete_windows(0.95);
+    invalid_windows[2] = 1.1;
+    let invalid_coverage = [CoverageCalibrationReplicationOutcome::successful(
+        0,
+        invalid_windows,
+    )];
     assert_eq!(
         summarize_indexed_windowed_coverage_recovery_replications(
             1,
@@ -90,7 +116,10 @@ fn indexed_coverage_delegates_window_and_percentile_validation_to_existing_owner
         Err(ValidationError::InvalidInput)
     );
 
-    let valid = [CoverageCalibrationReplicationOutcome::successful(0, vec![0.95])];
+    let valid = [CoverageCalibrationReplicationOutcome::successful(
+        0,
+        complete_windows(0.95),
+    )];
     assert_eq!(
         summarize_indexed_windowed_coverage_recovery_replications(1, &valid, 0.9, 0.1),
         Err(ValidationError::InvalidConfiguration)
