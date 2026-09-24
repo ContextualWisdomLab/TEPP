@@ -40,6 +40,18 @@ impl CoverageCalibrationDesign {
         CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
     }
 
+    /// Stable identity of the empirical percentile estimator used in durable evidence.
+    ///
+    /// The current Monte Carlo owner uses the inclusive nearest-rank convention:
+    /// sort finite successful DGP values, compute `ceil(p * n)`, then select the
+    /// corresponding one-based rank with endpoint saturation. Binding this method
+    /// prevents a future interpolation-rule change from retaining the same
+    /// prospective design identity.
+    #[must_use]
+    pub const fn coverage_percentile_method_id(&self) -> &'static str {
+        "tepp.coverage.percentile.inclusive_nearest_rank.v1"
+    }
+
     /// Lower empirical percentile probability fixed before the calibration run.
     #[must_use]
     pub const fn coverage_percentile_lower_probability(&self) -> f64 {
