@@ -9,13 +9,18 @@ const SCENARIO_FINGERPRINT: &str =
     "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
 
 fn persisted_json() -> String {
+    let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    let windows = vec![0.95; design.declared_rolling_origin_window_count()];
     let outcomes: Vec<_> = (0..10_000)
         .map(|replication_index| {
-            CoverageCalibrationReplicationOutcome::successful(replication_index, vec![0.95])
+            CoverageCalibrationReplicationOutcome::successful(
+                replication_index,
+                windows.clone(),
+            )
         })
         .collect();
     CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
-        &CoverageCalibrationDesign::tepp_nominal_95_v1(),
+        &design,
         &outcomes,
         SCENARIO_ID,
         SCENARIO_FINGERPRINT,
@@ -40,8 +45,8 @@ fn persisted_evidence_recovery_rejects_duplicate_json_members() {
     );
 
     let duplicate_outcome_member = json.replacen(
-        "\"replication_index\":0,\"window_coverages\":[0.95]",
-        "\"replication_index\":0,\"replication_index\":0,\"window_coverages\":[0.95]",
+        "\"replication_index\":0,\"window_coverages\":[0.95,0.95,0.95,0.95,0.95]",
+        "\"replication_index\":0,\"replication_index\":0,\"window_coverages\":[0.95,0.95,0.95,0.95,0.95]",
         1,
     );
     assert_eq!(
