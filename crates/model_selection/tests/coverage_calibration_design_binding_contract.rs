@@ -64,8 +64,6 @@ fn persisted_calibration_evidence_uses_owner_scenario_identity_and_fingerprint()
     let evidence = CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
         &criterion,
         &outcomes,
-        0.025,
-        0.975,
         scenario.scenario_id(),
         &scenario_fingerprint,
         TEST_SOURCE_HEAD,
@@ -82,6 +80,12 @@ fn persisted_calibration_evidence_uses_owner_scenario_identity_and_fingerprint()
         evidence.attempted_replication_count(),
         scenario.attempted_replication_count()
     );
-    assert_eq!(evidence.coverage_percentile_lower_probability(), 0.025);
-    assert_eq!(evidence.coverage_percentile_upper_probability(), 0.975);
+    assert_eq!(
+        evidence.coverage_percentile_lower_probability(),
+        criterion.coverage_percentile_lower_probability()
+    );
+    assert_eq!(
+        evidence.coverage_percentile_upper_probability(),
+        criterion.coverage_percentile_upper_probability()
+    );
 }
