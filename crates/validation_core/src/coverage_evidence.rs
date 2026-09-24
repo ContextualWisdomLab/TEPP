@@ -56,8 +56,9 @@ impl CoverageCalibrationEvidenceRecord {
     /// persistence-safe shape rather than importing simulation-domain source.
     /// The validation design persists its owner-issued design and estimand identities
     /// and is fingerprinted from those identities, attempted count, nominal coverage,
-    /// interval rule, practical band, and Monte Carlo precision target so a stable
-    /// design name cannot hide covered-population, aggregation, or criterion drift.
+    /// interval rule, practical band, Monte Carlo precision target, and empirical
+    /// percentile reporting probabilities so a stable design name cannot hide
+    /// covered-population, aggregation, criterion, or reporting-configuration drift.
     /// `source_head` must be an exact lowercase forty-hex Git commit identity.
     ///
     /// The indexed aggregation boundary requires an exact permutation of the
@@ -79,14 +80,11 @@ impl CoverageCalibrationEvidenceRecord {
     /// Returns [`ValidationError::InvalidInput`] for an empty/control-bearing
     /// scenario identity, non-canonical SHA-256 scenario fingerprint or Git head,
     /// malformed coverage outcome, replication identity drift, or a design whose
-    /// canonical wire geometry cannot be represented. Returns
-    /// [`ValidationError::InvalidConfiguration`] for invalid percentile bounds.
-    #[allow(clippy::too_many_arguments)]
+    /// canonical wire geometry cannot be represented. The validation owner supplies
+    /// the percentile probabilities used by the Monte Carlo summary.
     pub fn from_indexed_outcomes(
         design: &CoverageCalibrationDesign,
         outcomes: &[CoverageCalibrationReplicationOutcome],
-        lower_percentile: f64,
-        upper_percentile: f64,
         simulation_scenario_id: &str,
         simulation_scenario_fingerprint: &str,
         source_head: &str,
@@ -103,6 +101,8 @@ impl CoverageCalibrationEvidenceRecord {
         }
         parse_commit_head(source_head)?;
         let validation_design_fingerprint = coverage_calibration_design_sha256(design)?;
+        let lower_percentile = design.coverage_percentile_lower_probability();
+        let upper_percentile = design.coverage_percentile_upper_probability();
         let summary = summarize_indexed_windowed_coverage_recovery_replications(
             design.attempted_dgp_count(),
             outcomes,
