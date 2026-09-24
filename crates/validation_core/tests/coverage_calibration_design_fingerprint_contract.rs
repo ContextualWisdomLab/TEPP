@@ -10,16 +10,20 @@ const SCENARIO_FINGERPRINT: &str =
     "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
 const ESTIMAND_ID: &str =
     "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1";
+const ROLLING_ORIGIN_GEOMETRY_ID: &str =
+    "tepp.coverage.rolling_origin_geometry.latest_event_availability_adjacent_expanding.v1";
 const FAILURE_RATE_MCSE_METHOD_ID: &str =
     "tepp.coverage.failure_rate_mcse.bernoulli_plugin_sqrt_p_one_minus_p_over_n.v1";
 const MCSE_METHOD_ID: &str = "tepp.coverage.mcse.sample_sd_n_minus_1_over_sqrt_n.v1";
 const PERCENTILE_METHOD_ID: &str = "tepp.coverage.percentile.inclusive_nearest_rank.v1";
 const DESIGN_FINGERPRINT_V1: &str =
-    "2871ae32842a65273d15d1106b977244981cbf6bd69773ec44d427a35ba4d130";
+    "f6fd3855ec7ef413309cbb0b48b3572853d4fa87d4c46e47f265e06074aeffa0";
 
 #[test]
 fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() {
     let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    assert_eq!(design.rolling_origin_geometry_id(), ROLLING_ORIGIN_GEOMETRY_ID);
+    assert_eq!(design.first_training_event_index(), 3);
     assert_eq!(design.declared_rolling_origin_window_count(), 5);
     assert_eq!(
         design.failure_rate_monte_carlo_standard_error_method_id(),

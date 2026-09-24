@@ -36,7 +36,6 @@ use validation_core::{
     realign_additive_log_ratio_covariance,
 };
 
-const FIRST_TRAINING_EVENT_INDEX: usize = 3;
 const RECOVERY_FIT_SEEDS: [u64; 3] = [7, 11, 19];
 const RECOVERY_MAXIMUM_ITERATIONS: usize = 2_000;
 const RECOVERY_TOLERANCE: f64 = 0.001;
@@ -170,7 +169,7 @@ fn recovery_cutoffs(
 ) -> Result<Vec<KnowledgeCutoff>, CoverageCalibrationExecutionError> {
     let events = manifest.events();
     let source_events = events
-        .get(FIRST_TRAINING_EVENT_INDEX..)
+        .get(validation_design.first_training_event_index()..)
         .ok_or(CoverageCalibrationExecutionError::InvalidSimulationScenario)?;
     let cutoffs: Result<Vec<_>, _> = source_events
         .iter()
@@ -549,14 +548,14 @@ fn replication_window_coverages(
 #[cfg(test)]
 mod tests {
     use super::{
-        CoverageCalibrationExecutionError, execute_coverage_calibration_replication,
-        replication_window_coverages,
+        CoverageCalibrationExecutionError, cutoff_after_event,
+        execute_coverage_calibration_replication, recovery_cutoffs, replication_window_coverages,
     };
     use tepp_simulation::{CoverageCalibrationSimulationDesign, generate};
     use validation_core::CoverageCalibrationDesign;
 
     #[test]
-    fn regression_seed_uses_the_validation_owner_window_cardinality() {
+    fn regression_seed_uses_the_validation_owner_rolling_origin_geometry() {
         let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
         let validation_design = CoverageCalibrationDesign::tepp_nominal_95_v1();
         let manifest = generate(
@@ -566,6 +565,18 @@ mod tests {
         )
         .expect("known-truth simulation");
         manifest.verify_invariants().expect("truth invariants");
+        let cutoffs = recovery_cutoffs(&manifest, &validation_design)
+            .expect("owner-issued rolling-origin cutoff geometry");
+        assert_eq!(
+            cutoffs.len(),
+            validation_design.declared_rolling_origin_window_count() + 1
+        );
+        let first_declared_event = manifest.events()[validation_design.first_training_event_index()]
+            .event_id();
+        let expected_first_cutoff = cutoff_after_event(&manifest, first_declared_event)
+            .expect("latest availability cutoff for first declared event");
+        assert_eq!(cutoffs[0], expected_first_cutoff);
+
         let windows = replication_window_coverages(&manifest)
             .expect("structurally valid regression composition")
             .expect("regression fit must succeed for the fixed seed");

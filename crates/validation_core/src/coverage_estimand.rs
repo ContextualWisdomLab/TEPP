@@ -40,6 +40,29 @@ impl CoverageCalibrationDesign {
         CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
     }
 
+    /// Stable identity of the rolling-origin cutoff geometry declared for v1.
+    ///
+    /// The current geometry starts from the owner-issued first training event,
+    /// anchors one knowledge cutoff at the latest document availability time for
+    /// each selected event, and forms adjacent-cutoff expanding-history windows.
+    /// The executor owns snapshot and partition construction; this identity makes
+    /// that temporal geometry part of the prospective validation design.
+    #[must_use]
+    pub const fn rolling_origin_geometry_id(&self) -> &'static str {
+        "tepp.coverage.rolling_origin_geometry.latest_event_availability_adjacent_expanding.v1"
+    }
+
+    /// Zero-based event index at which the v1 rolling-origin cutoff sequence begins.
+    ///
+    /// Events before this index provide the initial historical context. The
+    /// execution owner consumes this value rather than maintaining an independent
+    /// literal, so changing the prospective geometry necessarily changes the design
+    /// fingerprint before new calibration outcomes are produced.
+    #[must_use]
+    pub const fn first_training_event_index(&self) -> usize {
+        3
+    }
+
     /// Number of rolling-origin windows that every successful v1 DGP must contribute.
     ///
     /// Equal-window aggregation is scientifically meaningful only when every

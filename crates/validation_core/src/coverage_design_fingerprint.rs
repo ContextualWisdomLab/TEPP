@@ -5,21 +5,23 @@ use sha2::{Digest, Sha256};
 use crate::{CoverageCalibrationDesign, ValidationError};
 
 const COVERAGE_CALIBRATION_DESIGN_FINGERPRINT_DOMAIN: &[u8] =
-    b"tepp.validation.coverage-calibration-design.v8\0";
+    b"tepp.validation.coverage-calibration-design.v9\0";
 
 /// Compute the canonical SHA-256 fingerprint of a prospective coverage-calibration design.
 ///
 /// The digest binds the versioned design identity, the exact covered-population/
-/// aggregation estimand, the declared rolling-origin window cardinality, attempted
-/// independent-DGP count, nominal coverage, exact normal critical value used by the
-/// declared marginal interval rule, practical lower and upper coverage bounds,
-/// maximum accepted Monte Carlo standard error, the versioned unconditional
-/// failure-rate Monte Carlo standard-error estimator, the versioned coverage-mean
-/// Monte Carlo standard-error estimator, the versioned empirical percentile estimator
-/// identity, and the lower/upper percentile probabilities reported in durable
-/// calibration evidence. Floating-point criteria are encoded from their exact
-/// IEEE-754 binary64 bit patterns; integer/string lengths use explicit little-endian
-/// `u64` wire geometry. The domain tag prevents reuse as another TEPP evidence digest.
+/// aggregation estimand, the versioned rolling-origin cutoff geometry identity,
+/// the owner-issued first training event index, declared rolling-origin window
+/// cardinality, attempted independent-DGP count, nominal coverage, exact normal
+/// critical value used by the declared marginal interval rule, practical lower
+/// and upper coverage bounds, maximum accepted Monte Carlo standard error, the
+/// versioned unconditional failure-rate Monte Carlo standard-error estimator, the
+/// versioned coverage-mean Monte Carlo standard-error estimator, the versioned
+/// empirical percentile estimator identity, and the lower/upper percentile
+/// probabilities reported in durable calibration evidence. Floating-point criteria
+/// are encoded from their exact IEEE-754 binary64 bit patterns; integer/string
+/// lengths use explicit little-endian `u64` wire geometry. The domain tag prevents
+/// reuse as another TEPP evidence digest.
 ///
 /// This fingerprint is provenance only. It does not execute a simulation, assess
 /// observed coverage, define numerical-failure acceptability, or promote a claim.
@@ -27,8 +29,9 @@ const COVERAGE_CALIBRATION_DESIGN_FINGERPRINT_DOMAIN: &[u8] =
 /// # Errors
 ///
 /// Returns [`ValidationError::InvalidInput`] if the platform cannot represent the
-/// owner-issued design/estimand/reporting-method identity lengths, window count, or
-/// attempted-replication count as canonical `u64` wire values.
+/// owner-issued design/estimand/geometry/reporting-method identity lengths, first
+/// event index, window count, or attempted-replication count as canonical `u64`
+/// wire values.
 pub fn coverage_calibration_design_sha256(
     design: &CoverageCalibrationDesign,
 ) -> Result<String, ValidationError> {
@@ -37,6 +40,11 @@ pub fn coverage_calibration_design_sha256(
     let estimand_id = design.estimand().estimand_id().as_bytes();
     let estimand_id_len =
         u64::try_from(estimand_id.len()).map_err(|_| ValidationError::InvalidInput)?;
+    let rolling_origin_geometry_id = design.rolling_origin_geometry_id().as_bytes();
+    let rolling_origin_geometry_id_len = u64::try_from(rolling_origin_geometry_id.len())
+        .map_err(|_| ValidationError::InvalidInput)?;
+    let first_training_event_index = u64::try_from(design.first_training_event_index())
+        .map_err(|_| ValidationError::InvalidInput)?;
     let declared_rolling_origin_window_count =
         u64::try_from(design.declared_rolling_origin_window_count())
             .map_err(|_| ValidationError::InvalidInput)?;
@@ -65,6 +73,9 @@ pub fn coverage_calibration_design_sha256(
     hasher.update(design_id);
     hasher.update(estimand_id_len.to_le_bytes());
     hasher.update(estimand_id);
+    hasher.update(rolling_origin_geometry_id_len.to_le_bytes());
+    hasher.update(rolling_origin_geometry_id);
+    hasher.update(first_training_event_index.to_le_bytes());
     hasher.update(declared_rolling_origin_window_count.to_le_bytes());
     hasher.update(attempted_dgp_count.to_le_bytes());
     hasher.update(design.nominal_coverage().to_bits().to_le_bytes());
