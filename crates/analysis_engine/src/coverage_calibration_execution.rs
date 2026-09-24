@@ -14,7 +14,9 @@ use corpus_split::{
 use membership_core::{
     GroupId, MemberId, MembershipAssignment, MembershipNetwork, MembershipRole, MembershipWeight,
 };
-use model_selection::{FittedCandidateKConfig, ModelSelectionError, fit_declared_recovery_candidates};
+use model_selection::{
+    CoverageCalibrationFitDesign, ModelSelectionError, fit_declared_recovery_candidates,
+};
 use relation_graph::{
     RelationEdge, RelationEndpointId, RelationEvidenceStatus, RelationGraph, RelationKind,
 };
@@ -35,10 +37,6 @@ use validation_core::{
     interval_coverage, normal_marginal_interval_bounds, realign_additive_log_ratio,
     realign_additive_log_ratio_covariance,
 };
-
-const RECOVERY_FIT_SEEDS: [u64; 3] = [7, 11, 19];
-const RECOVERY_MAXIMUM_ITERATIONS: usize = 2_000;
-const RECOVERY_TOLERANCE: f64 = 0.001;
 
 /// Fail-closed error from one declared coverage-calibration replication.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -469,13 +467,10 @@ fn replication_window_coverages(
     let vocabulary_size = usize::try_from(manifest.topic_truth().vocabulary_size())
         .map_err(|_| CoverageCalibrationExecutionError::ArithmeticOverflow)?;
     let truth_k = manifest.topic_truth().true_k();
-    let config = FittedCandidateKConfig::new(
-        vec![truth_k],
-        RECOVERY_FIT_SEEDS.to_vec(),
-        RECOVERY_MAXIMUM_ITERATIONS,
-        RECOVERY_TOLERANCE,
-    )
-    .map_err(CoverageCalibrationExecutionError::ModelSelection)?;
+    let fit_design = CoverageCalibrationFitDesign::truth_k_v1();
+    let config = fit_design
+        .config_for_truth_k(truth_k)
+        .map_err(CoverageCalibrationExecutionError::ModelSelection)?;
 
     let mut coverage_by_window = Vec::with_capacity(declared_window_count);
     for (window_index, cutoff_pair) in cutoffs.windows(2).enumerate() {
