@@ -40,6 +40,17 @@ impl CoverageCalibrationDesign {
         CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
     }
 
+    /// Number of rolling-origin windows that every successful v1 DGP must contribute.
+    ///
+    /// Equal-window aggregation is scientifically meaningful only when every
+    /// successful DGP contains the complete prospectively declared window set.
+    /// Numerical failure is represented by the absence of a coverage vector; it
+    /// must not be represented by silently shortening this window set.
+    #[must_use]
+    pub const fn declared_rolling_origin_window_count(&self) -> usize {
+        5
+    }
+
     /// Stable identity of the Monte Carlo standard-error estimator for the failure rate.
     ///
     /// The current validation owner treats numerical failure as a Bernoulli outcome
