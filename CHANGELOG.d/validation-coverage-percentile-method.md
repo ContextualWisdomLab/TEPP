@@ -1,0 +1,3 @@
+### Changed
+
+- Bind the empirical coverage percentile estimator identity `tepp.coverage.percentile.inclusive_nearest_rank.v1` into `tepp.coverage.nominal95.v1` before the first 10,000-DGP acceptance run. The coverage-design fingerprint domain advances to v5 and schema-v7 evidence persists the method identity alongside the existing `0.025` / `0.975` probabilities. The numerical nearest-rank implementation, nominal 0.95 target, z `1.959963984540054`, practical `[0.91, 0.98]` band, 10,000 attempted DGPs, MCSE criterion, estimand, scenario and undefined numerical-failure acceptability are unchanged.
