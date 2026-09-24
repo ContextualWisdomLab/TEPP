@@ -19,7 +19,10 @@ fn persisted_shard_rehydration_verifies_the_expected_owner_digest() {
     assert_eq!(recovered, record);
 
     let mut wrong_digest = digest.clone();
-    wrong_digest.replace_range(0..1, if &digest[0..1] == "0" { "1" } else { "0" });
+    wrong_digest.replace_range(
+        0..1,
+        if &digest[0..1] == "0" { "1" } else { "0" },
+    );
     assert_eq!(
         CoverageCalibrationShardRecord::from_json_with_sha256(&json, &wrong_digest),
         Err(CoverageCalibrationStudyError::InvalidShardProvenance)
