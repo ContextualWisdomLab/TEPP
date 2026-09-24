@@ -5,9 +5,16 @@ use analysis_engine::{
 };
 use model_selection::ModelSelectionError;
 use tepp_simulation::CoverageCalibrationSimulationDesign;
+use validation_core::{CoverageCalibrationDesign, CoverageCalibrationEstimand};
 
 #[test]
 fn declared_coverage_executor_is_indexed_and_fail_closed() {
+    let validation_design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    assert_eq!(
+        validation_design.estimand(),
+        CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
+    );
+
     let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
     assert_eq!(
         execute_coverage_calibration_replication(
