@@ -14,11 +14,21 @@ const FAILURE_RATE_MCSE_METHOD_ID: &str =
 const MCSE_METHOD_ID: &str = "tepp.coverage.mcse.sample_sd_n_minus_1_over_sqrt_n.v1";
 const PERCENTILE_METHOD_ID: &str = "tepp.coverage.percentile.inclusive_nearest_rank.v1";
 
+fn complete_windows() -> Vec<f64> {
+    vec![
+        0.95;
+        CoverageCalibrationDesign::tepp_nominal_95_v1().declared_rolling_origin_window_count()
+    ]
+}
+
 fn outcomes(successful: usize) -> Vec<CoverageCalibrationReplicationOutcome> {
     (0..10_000)
         .map(|replication_index| {
             if replication_index < successful {
-                CoverageCalibrationReplicationOutcome::successful(replication_index, vec![0.95])
+                CoverageCalibrationReplicationOutcome::successful(
+                    replication_index,
+                    complete_windows(),
+                )
             } else {
                 CoverageCalibrationReplicationOutcome::numerical_failure(replication_index)
             }
@@ -32,7 +42,10 @@ fn outcomes_with_failures(failure_indices: &[usize]) -> Vec<CoverageCalibrationR
             if failure_indices.contains(&replication_index) {
                 CoverageCalibrationReplicationOutcome::numerical_failure(replication_index)
             } else {
-                CoverageCalibrationReplicationOutcome::successful(replication_index, vec![0.95])
+                CoverageCalibrationReplicationOutcome::successful(
+                    replication_index,
+                    complete_windows(),
+                )
             }
         })
         .collect()
@@ -276,8 +289,8 @@ fn persisted_evidence_rehydrates_only_when_owner_recomputation_matches_every_fie
     );
 
     let unknown_outcome = json.replacen(
-        "\"window_coverages\":[0.95]",
-        "\"window_coverages\":[0.95],\"unexpected\":true",
+        "\"window_coverages\":[0.95,0.95,0.95,0.95,0.95]",
+        "\"window_coverages\":[0.95,0.95,0.95,0.95,0.95],\"unexpected\":true",
         1,
     );
     assert_eq!(
