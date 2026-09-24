@@ -8,7 +8,7 @@ use crate::{
 };
 use serde::Serialize;
 
-const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 5;
+const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 6;
 
 /// Immutable evidence record for one prospective coverage-calibration experiment.
 ///
@@ -17,10 +17,10 @@ const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 5;
 /// indexed outcomes, and source commit. It persists the complete canonical
 /// declared replication ledger, compact SHA-256 provenance bindings, the
 /// unconditional failure denominator, and Monte Carlo uncertainty alongside
-/// conditional interval-calibration metrics. A positive
-/// [`Self::supports_calibration_claim`] value is intentionally narrower than
-/// estimator robustness, held-out/predictive validity, scientific promotion, or
-/// release authority.
+/// conditional interval-calibration metrics. It deliberately does not serialize
+/// one aggregate pass/fail flag while numerical-failure acceptability remains
+/// prospectively undefined; consumers must inspect the component criterion
+/// decisions together with the unconditional failure evidence.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CoverageCalibrationEvidenceRecord {
     schema_version: u32,
@@ -46,7 +46,6 @@ pub struct CoverageCalibrationEvidenceRecord {
     coverage_percentile_upper: Option<f64>,
     coverage_within_practical_band: bool,
     monte_carlo_precision_sufficient: bool,
-    supports_calibration_claim: bool,
 }
 
 impl CoverageCalibrationEvidenceRecord {
@@ -69,6 +68,11 @@ impl CoverageCalibrationEvidenceRecord {
     /// auditable down to which declared DGP failed and each successful rolling-origin
     /// coverage value. The canonical ledger is the recovery representation; the
     /// digest is a compact immutable binding for evidence transfer and comparison.
+    ///
+    /// This record intentionally persists the practical-band and Monte Carlo
+    /// precision decisions separately. It does not combine them into an overall
+    /// scientific acceptance flag because the prospective design does not define
+    /// acceptable numerical-failure frequency.
     ///
     /// # Errors
     ///
@@ -142,7 +146,6 @@ impl CoverageCalibrationEvidenceRecord {
                 .map(|metric| metric.percentile_upper),
             coverage_within_practical_band: assessment.coverage_within_practical_band(),
             monte_carlo_precision_sufficient: assessment.monte_carlo_precision_sufficient(),
-            supports_calibration_claim: assessment.supports_calibration_claim(),
         })
     }
 
@@ -282,12 +285,6 @@ impl CoverageCalibrationEvidenceRecord {
     #[must_use]
     pub const fn monte_carlo_precision_sufficient(&self) -> bool {
         self.monte_carlo_precision_sufficient
-    }
-
-    /// Whether this record supports the narrow conditional calibration claim.
-    #[must_use]
-    pub const fn supports_calibration_claim(&self) -> bool {
-        self.supports_calibration_claim
     }
 
     /// Serialize the immutable evidence record to deterministic struct-order JSON.
