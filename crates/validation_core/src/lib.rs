@@ -16,6 +16,7 @@ mod bias;
 mod claim;
 mod coverage;
 mod coverage_design_fingerprint;
+mod coverage_estimand;
 mod coverage_evidence;
 mod error;
 mod graph_metrics;
@@ -71,6 +72,8 @@ pub use coverage::summarize_windowed_coverage_recovery_replications;
 pub use coverage::wilson_coverage_interval;
 /// Fingerprint one prospective coverage-calibration design with canonical SHA-256 bytes.
 pub use coverage_design_fingerprint::coverage_calibration_design_sha256;
+/// Versioned covered population and aggregation rule for calibration evidence.
+pub use coverage_estimand::CoverageCalibrationEstimand;
 /// Immutable machine-readable evidence for one prospective calibration experiment.
 pub use coverage_evidence::CoverageCalibrationEvidenceRecord;
 /// Fail-closed validation errors.
