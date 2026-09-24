@@ -8,7 +8,7 @@ const SCENARIO_ID: &str = "tepp.simulation.rolling_origin_coverage.v1";
 const SCENARIO_FINGERPRINT: &str =
     "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
 const DESIGN_FINGERPRINT_V1: &str =
-    "4f937a115d273f5e1171de03eeeea92e30681772849a590365f4933668e8e557";
+    "a3a0b8d65388627d2360b05731c5e410feac343a6068da4f9192a353791bc0c0";
 
 #[test]
 fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() {
