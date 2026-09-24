@@ -11,6 +11,7 @@
 //! optimum (ADR 0012).
 
 mod candidate;
+mod coverage_calibration_fit;
 mod error;
 mod fitted;
 mod gate;
@@ -22,6 +23,8 @@ mod rolling_origin_state;
 
 /// One candidate `K` with statistical or LLM-only support.
 pub use candidate::ModelCandidate;
+/// Versioned numerical fit design for prospective coverage-calibration studies.
+pub use coverage_calibration_fit::CoverageCalibrationFitDesign;
 /// Fail-closed model-selection errors.
 pub use error::ModelSelectionError;
 /// Seeds, iteration budget, and candidate topic counts for fitted selection.
