@@ -47,6 +47,50 @@ fn persisted_shard_round_trip_rehydrates_the_same_provenance_digest() {
 }
 
 #[test]
+fn persisted_shard_rehydration_rejects_schema_source_fingerprint_range_and_identity_drift() {
+    let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+    let record = execute_coverage_calibration_shard_record(design, 0, 1, SOURCE_HEAD)
+        .expect("first declared shard must be structurally executable");
+    let json = record.to_json().expect("owner shard json");
+    let baseline: serde_json::Value = serde_json::from_str(&json).expect("valid owner JSON");
+
+    let mut wrong_schema = baseline.clone();
+    wrong_schema["schema_version"] = serde_json::json!(2);
+    assert_eq!(
+        CoverageCalibrationShardRecord::from_json(&wrong_schema.to_string()),
+        Err(CoverageCalibrationStudyError::InvalidShardProvenance)
+    );
+
+    let mut wrong_source = baseline.clone();
+    wrong_source["source_head"] = serde_json::json!("ABCDEF0123456789abcdef0123456789abcdef01");
+    assert_eq!(
+        CoverageCalibrationShardRecord::from_json(&wrong_source.to_string()),
+        Err(CoverageCalibrationStudyError::InvalidShardProvenance)
+    );
+
+    let mut wrong_fingerprint = baseline.clone();
+    wrong_fingerprint["simulation_scenario_fingerprint"] = serde_json::json!("abc123");
+    assert_eq!(
+        CoverageCalibrationShardRecord::from_json(&wrong_fingerprint.to_string()),
+        Err(CoverageCalibrationStudyError::InvalidShardProvenance)
+    );
+
+    let mut empty_range = baseline.clone();
+    empty_range["end_replication_index_exclusive"] = serde_json::json!(0);
+    assert_eq!(
+        CoverageCalibrationShardRecord::from_json(&empty_range.to_string()),
+        Err(CoverageCalibrationStudyError::InvalidShardProvenance)
+    );
+
+    let mut wrong_identity = baseline;
+    wrong_identity["outcomes"][0]["replication_index"] = serde_json::json!(1);
+    assert_eq!(
+        CoverageCalibrationShardRecord::from_json(&wrong_identity.to_string()),
+        Err(CoverageCalibrationStudyError::InvalidShardProvenance)
+    );
+}
+
+#[test]
 fn shard_execution_rejects_noncanonical_source_identity_before_persistence() {
     let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
     assert_eq!(
