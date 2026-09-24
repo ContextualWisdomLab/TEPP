@@ -58,7 +58,7 @@ fn evidence_from_outcomes(
 fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty() {
     let record = evidence(9_998).expect("calibration evidence");
 
-    assert_eq!(record.schema_version(), 5);
+    assert_eq!(record.schema_version(), 6);
     assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
     assert_eq!(record.validation_estimand_id(), ESTIMAND_ID);
     assert_eq!(record.validation_design_fingerprint().len(), 64);
@@ -98,10 +98,9 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert_eq!(record.coverage_percentile_upper(), Some(0.95));
     assert!(record.coverage_within_practical_band());
     assert!(record.monte_carlo_precision_sufficient());
-    assert!(record.supports_calibration_claim());
 
     let json = record.to_json().expect("deterministic evidence json");
-    assert!(json.contains("\"schema_version\":5"));
+    assert!(json.contains("\"schema_version\":6"));
     assert!(json.contains("\"validation_estimand_id\":"));
     assert!(json.contains(ESTIMAND_ID));
     assert!(json.contains("\"validation_design_fingerprint\":"));
@@ -118,6 +117,7 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(json.contains("\"coverage_percentile_upper_probability\":0.975"));
     assert!(json.contains("\"coverage_percentile_lower\":0.95"));
     assert!(json.contains("\"coverage_percentile_upper\":0.95"));
+    assert!(!json.contains("\"supports_calibration_claim\""));
     assert!(json.contains(SCENARIO_FINGERPRINT));
     assert!(json.contains(SOURCE_HEAD));
     assert_eq!(record.to_json().expect("repeat json"), json);
@@ -185,7 +185,12 @@ fn singleton_success_keeps_point_evidence_without_fabricating_dispersion() {
     assert_eq!(record.coverage_percentile_lower(), None);
     assert_eq!(record.coverage_percentile_upper(), None);
     assert!(!record.monte_carlo_precision_sufficient());
-    assert!(!record.supports_calibration_claim());
+    assert!(!
+        record
+            .to_json()
+            .expect("singleton evidence json")
+            .contains("\"supports_calibration_claim\"")
+    );
 }
 
 #[test]
