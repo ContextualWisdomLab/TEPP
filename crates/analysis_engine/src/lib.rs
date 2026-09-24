@@ -12,6 +12,7 @@
 
 mod case_deletion_refit;
 mod coverage_calibration_execution;
+mod coverage_calibration_scientific_provenance;
 mod coverage_calibration_study;
 mod lineage_criterion;
 mod topic_context_posterior;
@@ -47,6 +48,12 @@ pub use case_deletion_refit::fit_exhaustive_case_deletion;
 pub use coverage_calibration_execution::CoverageCalibrationExecutionError;
 /// Execute one prospectively declared coverage-calibration replication.
 pub use coverage_calibration_execution::execute_coverage_calibration_replication;
+/// Cross-owner coverage-calibration fit-provenance contracts.
+pub use coverage_calibration_scientific_provenance::{
+    CoverageCalibrationScientificEvidenceRecord, CoverageCalibrationScientificShardRecord,
+    assemble_coverage_calibration_scientific_evidence_v1,
+    execute_coverage_calibration_scientific_shard_record,
+};
 /// Coverage-calibration shard provenance and study execution contracts.
 pub use coverage_calibration_study::{
     CoverageCalibrationShardRecord, CoverageCalibrationStudyError,
