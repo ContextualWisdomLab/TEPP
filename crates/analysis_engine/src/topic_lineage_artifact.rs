@@ -16,14 +16,87 @@ use uuid::Uuid;
 use crate::{AnalysisEngineError, format_digest, require_receipt_identity, valid_identifier};
 
 /// Versioned schema for a completed TRSL topic-lineage artifact.
-pub const TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION: &str = "tepp.trsl_topic_lineage.v1";
+pub const TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION: &str = "tepp.trsl_topic_lineage.v2";
 /// Model contract required by the CPU `f64` reference execution path.
 pub const TOPIC_LINEAGE_MODEL_CONTRACT_VERSION: &str = "trsl_tm_cpu_f64_v1";
 /// Analysis-run output profile required for a topic-lineage artifact.
-pub const TOPIC_LINEAGE_OUTPUT_PROFILE: &str = "trsl_topic_lineage_v1";
+pub const TOPIC_LINEAGE_OUTPUT_PROFILE: &str = "trsl_topic_lineage_v2";
 /// Maximum canonical artifact JSON size.
 pub const TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT: usize = 256 * 1024;
 const TOPIC_LINEAGE_EDGE_LIMIT: usize = 100_000;
+const TOPIC_LINEAGE_CONFIGURATION_BYTE_LIMIT: usize = 8 * 1024;
+const TOPIC_LINEAGE_CONFIGURATION_SCHEMA_VERSION: &str =
+    "tepp.trsl_topic_lineage.reference_config.v1";
+const TOPIC_LINEAGE_ESTIMATOR_BACKEND: &str = "cpu_f64_reference";
+const TOPIC_LINEAGE_POSTERIOR_APPROXIMATION: &str = "diagonal_laplace";
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct TopicLineageMethodConfiguration {
+    configuration_schema_version: String,
+    topic_count: u64,
+    seeds: Vec<u64>,
+    maximum_iterations: u64,
+    tolerance: f64,
+    prior_variance: f64,
+    relation_strength: f64,
+    ridge: f64,
+    topic_smoothing: f64,
+    step_size: f64,
+}
+
+impl TopicLineageMethodConfiguration {
+    fn parse(payload: &str) -> Result<Self, ()> {
+        if payload.len() > TOPIC_LINEAGE_CONFIGURATION_BYTE_LIMIT {
+            return Err(());
+        }
+        let value: Self = serde_json::from_str(payload).map_err(|_| ())?;
+        if value.seeds.contains(&0)
+            || value.seeds.iter().copied().collect::<BTreeSet<_>>().len() != value.seeds.len()
+            || (value.relation_strength == 0.0 && value.relation_strength.is_sign_negative())
+            || (value.ridge == 0.0 && value.ridge.is_sign_negative())
+        {
+            return Err(());
+        }
+        if value.configuration_schema_version != TOPIC_LINEAGE_CONFIGURATION_SCHEMA_VERSION
+            || value.canonical_json()? != payload
+        {
+            return Err(());
+        }
+        value.reference_config()?;
+        Ok(value)
+    }
+
+    fn canonical_json(&self) -> Result<String, ()> {
+        serde_json::to_string(self).map_err(|_| ())
+    }
+
+    fn sha256(&self) -> Result<String, ()> {
+        self.canonical_json()
+            .map(|json| format_digest(Sha256::digest(json.into_bytes())))
+    }
+
+    fn reference_config(&self) -> Result<ReferenceTopicModelConfig, ()> {
+        let topic_count = usize::try_from(self.topic_count).map_err(|_| ())?;
+        let maximum_iterations = usize::try_from(self.maximum_iterations).map_err(|_| ())?;
+        ReferenceTopicModelConfig::new(
+            topic_count,
+            self.seeds.clone(),
+            maximum_iterations,
+            self.tolerance,
+        )
+        .and_then(|config| {
+            config.with_hyperparameters(
+                self.prior_variance,
+                self.relation_strength,
+                self.ridge,
+                self.topic_smoothing,
+                self.step_size,
+            )
+        })
+        .map_err(|_| ())
+    }
+}
 
 /// One fitted same-topic predecessor/successor association.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -39,6 +112,28 @@ pub struct TopicLineageArtifactEdge {
     pub association_strength: f64,
 }
 
+/// One diagonal-Laplace variance bound to an explicit ALR coordinate.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TopicLineageArtifactUncertaintyCoordinate {
+    /// Numerator topic index in the artifact-local global topic order.
+    pub numerator_topic_index: u64,
+    /// Reference topic index used as the ALR denominator.
+    pub reference_topic_index: u64,
+    /// Strictly positive finite diagonal-Laplace variance.
+    pub variance: f64,
+}
+
+/// Diagonal-Laplace coordinates for one modeled evidence document.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct TopicLineageArtifactDocumentUncertainty {
+    /// Canonical lowercase UUID for the modeled document.
+    pub document_id: String,
+    /// Ordered ALR-coordinate variances for this document.
+    pub coordinates: Vec<TopicLineageArtifactUncertaintyCoordinate>,
+}
+
 /// Completed, bounded topic-lineage result consumed by product-history clients.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -51,6 +146,18 @@ pub struct TopicLineageArtifact {
     pub snapshot_id: String,
     /// Historical evidence cutoff used by the estimator.
     pub knowledge_cutoff: String,
+    /// Exact owner model contract that interpreted the configuration.
+    pub model_contract_version: String,
+    /// Canonical reconstruction JSON for the exact estimator configuration.
+    pub method_configuration_json: String,
+    /// SHA-256 of `method_configuration_json`.
+    pub method_configuration_sha256: String,
+    /// Runtime/backend identity whose numerical parity is part of this contract.
+    pub estimator_backend: String,
+    /// Posterior uncertainty approximation retained by this result.
+    pub posterior_approximation: String,
+    /// Document- and ALR-coordinate-bound diagonal-Laplace variances.
+    pub diagonal_laplace_uncertainty: Vec<TopicLineageArtifactDocumentUncertainty>,
     /// Selected deterministic initialization seed.
     pub selected_seed: u64,
     /// Iterations used by the selected converged fit.
@@ -77,7 +184,8 @@ impl TopicLineageArtifact {
     /// # Errors
     ///
     /// Returns [`AnalysisEngineError::InvalidTopicLineageArtifact`] when the
-    /// schema, dimensions, identifiers, counts, edges, or claim boundary fail.
+    /// schema, dimensions, identifiers, counts, uncertainty coordinates, edges,
+    /// claim boundary, or canonical JSON byte identity fails.
     pub fn from_json(payload: &str) -> Result<Self, AnalysisEngineError> {
         if payload.len() > TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT {
             return Err(AnalysisEngineError::LimitExceeded);
@@ -85,6 +193,11 @@ impl TopicLineageArtifact {
         let artifact: Self = serde_json::from_str(payload)
             .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
         artifact.validate()?;
+        let canonical = serde_json::to_string(&artifact)
+            .map_err(|_| AnalysisEngineError::SerializationFailure)?;
+        if canonical != payload {
+            return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+        }
         Ok(artifact)
     }
 
@@ -114,12 +227,28 @@ impl TopicLineageArtifact {
     }
 
     fn validate(&self) -> Result<(), AnalysisEngineError> {
+        let knowledge_cutoff = KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff)
+            .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+        let method_configuration =
+            TopicLineageMethodConfiguration::parse(&self.method_configuration_json)
+                .map_err(|()| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+        let configuration_sha256 = method_configuration
+            .sha256()
+            .map_err(|()| AnalysisEngineError::InvalidTopicLineageArtifact)?;
         if self.schema_version != TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION
             || !valid_identifier(&self.run_id)
             || !valid_identifier(&self.snapshot_id)
-            || KnowledgeCutoff::parse_rfc3339(&self.knowledge_cutoff).is_err()
+            || self.knowledge_cutoff != knowledge_cutoff.to_rfc3339()
+            || self.model_contract_version != TOPIC_LINEAGE_MODEL_CONTRACT_VERSION
+            || self.method_configuration_sha256 != configuration_sha256
+            || self.estimator_backend != TOPIC_LINEAGE_ESTIMATOR_BACKEND
+            || self.posterior_approximation != TOPIC_LINEAGE_POSTERIOR_APPROXIMATION
+            || self.topic_count != method_configuration.topic_count
+            || !method_configuration.seeds.contains(&self.selected_seed)
             || self.iterations == 0
+            || self.iterations > method_configuration.maximum_iterations
             || !self.objective.is_finite()
+            || (self.objective == 0.0 && self.objective.is_sign_negative())
             || self.topic_count < 2
             || self.evidence_count < 2
             || self.connected_post_count > self.evidence_count
@@ -129,15 +258,55 @@ impl TopicLineageArtifact {
         {
             return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
         }
+
+        let uncertainty_row_count = u64::try_from(self.diagonal_laplace_uncertainty.len())
+            .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+        let coordinate_count = usize::try_from(self.topic_count - 1)
+            .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+        let reference_topic_index = self.topic_count - 1;
+        if uncertainty_row_count != self.evidence_count {
+            return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+        }
+        let mut uncertainty_documents = BTreeSet::new();
+        let mut previous_uncertainty_document = None;
+        for row in &self.diagonal_laplace_uncertainty {
+            let document = Uuid::parse_str(&row.document_id)
+                .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+            if row.document_id != document.to_string()
+                || previous_uncertainty_document.is_some_and(|previous| previous >= document)
+                || row.coordinates.len() != coordinate_count
+                || !uncertainty_documents.insert(document)
+            {
+                return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+            }
+            for (index, coordinate) in row.coordinates.iter().enumerate() {
+                let numerator_topic_index = u64::try_from(index)
+                    .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
+                if coordinate.numerator_topic_index != numerator_topic_index
+                    || coordinate.reference_topic_index != reference_topic_index
+                    || !coordinate.variance.is_finite()
+                    || coordinate.variance <= 0.0
+                {
+                    return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+                }
+            }
+            previous_uncertainty_document = Some(document);
+        }
+
         let mut pairs = BTreeSet::new();
         let mut connected = BTreeSet::new();
         let mut lineages = BTreeSet::new();
+        let mut previous_edge_coordinate = None;
         for edge in &self.sequence_edges {
             let predecessor = Uuid::parse_str(&edge.predecessor_document_id)
                 .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
             let successor = Uuid::parse_str(&edge.successor_document_id)
                 .map_err(|_| AnalysisEngineError::InvalidTopicLineageArtifact)?;
-            if predecessor == successor
+            let edge_coordinate = (predecessor, successor, edge.topic_index);
+            if edge.predecessor_document_id != predecessor.to_string()
+                || edge.successor_document_id != successor.to_string()
+                || previous_edge_coordinate.is_some_and(|previous| previous >= edge_coordinate)
+                || predecessor == successor
                 || edge.topic_index >= self.topic_count
                 || !edge.association_strength.is_finite()
                 || edge.association_strength <= 0.0
@@ -146,12 +315,14 @@ impl TopicLineageArtifact {
             {
                 return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
             }
+            previous_edge_coordinate = Some(edge_coordinate);
             connected.insert(predecessor);
             connected.insert(successor);
             lineages.insert(edge.topic_index);
         }
         if self.connected_post_count != connected.len() as u64
             || self.lineage_count != lineages.len() as u64
+            || !connected.is_subset(&uncertainty_documents)
         {
             return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
         }
@@ -172,20 +343,22 @@ pub struct TopicLineageExecution {
 ///
 /// The caller supplies the exact snapshot identity and cutoff used to construct
 /// `input`; both must exactly match the already-validated analysis request.
-/// This executor preserves the estimator result and does not select `K`, infer
-/// causal edges, or emit a partial artifact.
+/// `method_configuration_json` is the canonical, versioned estimator
+/// configuration. The executor constructs the actual estimator configuration
+/// from those bytes so the released artifact can reconstruct the exact settings
+/// rather than trusting a detached digest or caller-side object.
 ///
 /// # Errors
 ///
-/// Returns a request/receipt/snapshot/cutoff/profile error, estimator failure,
-/// arithmetic error, or invalid/oversized artifact error.
+/// Returns a request/receipt/snapshot/cutoff/profile/configuration error,
+/// estimator failure, arithmetic error, or invalid/oversized artifact error.
 pub fn execute_topic_lineage_run(
     request: &AnalysisRunRequest,
     accepted: &AnalysisRunAccepted,
     snapshot_id: &str,
     knowledge_cutoff: KnowledgeCutoff,
     input: &ReferenceTopicInput,
-    config: &ReferenceTopicModelConfig,
+    method_configuration_json: &str,
     completed_at: impl Into<String>,
 ) -> Result<TopicLineageExecution, AnalysisEngineError> {
     request.to_json()?;
@@ -200,8 +373,16 @@ pub fn execute_topic_lineage_run(
     {
         return Err(AnalysisEngineError::InvalidEvidence);
     }
+    let method_configuration = TopicLineageMethodConfiguration::parse(method_configuration_json)
+        .map_err(|()| AnalysisEngineError::InvalidEvidence)?;
+    let config = method_configuration
+        .reference_config()
+        .map_err(|()| AnalysisEngineError::InvalidEvidence)?;
+    let method_configuration_sha256 = method_configuration
+        .sha256()
+        .map_err(|()| AnalysisEngineError::InvalidEvidence)?;
 
-    let model = fit_reference_topic_model(input, config)?;
+    let model = fit_reference_topic_model(input, &config)?;
     let topic_count = u64::try_from(model.topic_term_probabilities.len())
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let evidence_count = u64::try_from(input.document_count())
@@ -210,7 +391,39 @@ pub fn execute_topic_lineage_run(
         .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
     let lineage_count =
         u64::try_from(model.lineage_count).map_err(|_| AnalysisEngineError::ArithmeticOverflow)?;
-    let sequence_edges: Vec<_> = model
+    if input.document_ids().len() != model.document_coordinate_variances.len() {
+        return Err(AnalysisEngineError::InvalidTopicLineageArtifact);
+    }
+    let reference_topic_index = topic_count
+        .checked_sub(1)
+        .ok_or(AnalysisEngineError::InvalidTopicLineageArtifact)?;
+    let mut diagonal_laplace_uncertainty: Vec<_> = input
+        .document_ids()
+        .iter()
+        .zip(&model.document_coordinate_variances)
+        .map(|(document_id, variances)| {
+            let coordinates = variances
+                .iter()
+                .copied()
+                .enumerate()
+                .map(|(index, variance)| {
+                    Ok(TopicLineageArtifactUncertaintyCoordinate {
+                        numerator_topic_index: u64::try_from(index)
+                            .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
+                        reference_topic_index,
+                        variance,
+                    })
+                })
+                .collect::<Result<Vec<_>, AnalysisEngineError>>()?;
+            Ok(TopicLineageArtifactDocumentUncertainty {
+                document_id: document_id.to_string(),
+                coordinates,
+            })
+        })
+        .collect::<Result<_, AnalysisEngineError>>()?;
+    diagonal_laplace_uncertainty.sort_by(|left, right| left.document_id.cmp(&right.document_id));
+
+    let mut sequence_edges: Vec<_> = model
         .sequence_edges
         .iter()
         .map(|edge| {
@@ -223,11 +436,23 @@ pub fn execute_topic_lineage_run(
             })
         })
         .collect::<Result<_, AnalysisEngineError>>()?;
+    sequence_edges.sort_by(|left, right| {
+        left.predecessor_document_id
+            .cmp(&right.predecessor_document_id)
+            .then_with(|| left.successor_document_id.cmp(&right.successor_document_id))
+            .then_with(|| left.topic_index.cmp(&right.topic_index))
+    });
     let artifact = TopicLineageArtifact {
         schema_version: TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION.into(),
         run_id: accepted.run_id.clone(),
         snapshot_id: snapshot_id.to_owned(),
         knowledge_cutoff: knowledge_cutoff.to_rfc3339(),
+        model_contract_version: TOPIC_LINEAGE_MODEL_CONTRACT_VERSION.into(),
+        method_configuration_json: method_configuration_json.to_owned(),
+        method_configuration_sha256,
+        estimator_backend: TOPIC_LINEAGE_ESTIMATOR_BACKEND.into(),
+        posterior_approximation: TOPIC_LINEAGE_POSTERIOR_APPROXIMATION.into(),
+        diagonal_laplace_uncertainty,
         selected_seed: model.seed,
         iterations: u64::try_from(model.iterations)
             .map_err(|_| AnalysisEngineError::ArithmeticOverflow)?,
@@ -248,7 +473,7 @@ pub fn execute_topic_lineage_run(
         "trsl_topic_lineage",
         evidence_count,
         statistic_count,
-        "reference_estimator_converged",
+        "validated",
     );
     let summary = summary?;
     let terminal_result = AnalysisRunTerminalResult::succeeded(
@@ -271,9 +496,24 @@ pub fn execute_topic_lineage_run(
 mod tests {
     use super::{
         TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
-        TOPIC_LINEAGE_EDGE_LIMIT, TopicLineageArtifact, TopicLineageArtifactEdge,
+        TOPIC_LINEAGE_EDGE_LIMIT, TopicLineageArtifact, TopicLineageArtifactDocumentUncertainty,
+        TopicLineageArtifactEdge, TopicLineageArtifactUncertaintyCoordinate,
     };
     use crate::AnalysisEngineError;
+
+    const CONFIG_JSON: &str = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[7,11],\"maximum_iterations\":2000,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.5,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
+    const CONFIG_SHA256: &str = "c99da5cab3050e3d5e357bcdccca5405b05263ca2493fdfc74f3080948a3763b";
+
+    fn uncertainty_row(document_id: u128, variance: f64) -> TopicLineageArtifactDocumentUncertainty {
+        TopicLineageArtifactDocumentUncertainty {
+            document_id: uuid::Uuid::from_u128(document_id).to_string(),
+            coordinates: vec![TopicLineageArtifactUncertaintyCoordinate {
+                numerator_topic_index: 0,
+                reference_topic_index: 1,
+                variance,
+            }],
+        }
+    }
 
     fn artifact() -> TopicLineageArtifact {
         TopicLineageArtifact {
@@ -281,6 +521,15 @@ mod tests {
             run_id: "run-1".into(),
             snapshot_id: "snapshot-1".into(),
             knowledge_cutoff: "2026-08-01T00:00:00Z".into(),
+            model_contract_version: "trsl_tm_cpu_f64_v1".into(),
+            method_configuration_json: CONFIG_JSON.into(),
+            method_configuration_sha256: CONFIG_SHA256.into(),
+            estimator_backend: "cpu_f64_reference".into(),
+            posterior_approximation: "diagonal_laplace".into(),
+            diagonal_laplace_uncertainty: vec![
+                uncertainty_row(1, 0.125),
+                uncertainty_row(2, 0.25),
+            ],
             selected_seed: 7,
             iterations: 4,
             objective: -1.0,
@@ -322,7 +571,6 @@ mod tests {
             TopicLineageArtifact::from_json(&"x".repeat(TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT + 1)),
             Err(AnalysisEngineError::LimitExceeded)
         );
-
         let mut oversized = artifact;
         oversized.sequence_edges = (1_u128..=2_000)
             .map(|index| TopicLineageArtifactEdge {
@@ -331,6 +579,9 @@ mod tests {
                 topic_index: 0,
                 association_strength: 0.8,
             })
+            .collect();
+        oversized.diagonal_laplace_uncertainty = (1_u128..=2_001)
+            .map(|index| uncertainty_row(index, 0.125))
             .collect();
         oversized.evidence_count = 2_001;
         oversized.connected_post_count = 2_001;
@@ -359,6 +610,26 @@ mod tests {
             {
                 let mut value = artifact.clone();
                 value.knowledge_cutoff = "invalid".into();
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.model_contract_version = "floating".into();
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.method_configuration_sha256 = "0".repeat(64);
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.estimator_backend = "unknown".into();
+                value
+            },
+            {
+                let mut value = artifact.clone();
+                value.posterior_approximation = "joint_gauss_newton_laplace".into();
                 value
             },
             {

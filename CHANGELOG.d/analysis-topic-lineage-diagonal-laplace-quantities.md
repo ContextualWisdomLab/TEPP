@@ -1,0 +1,4 @@
+### Added
+
+- The unreleased `tepp.trsl_topic_lineage.v2` artifact now retains the CPU reference fit's existing per-document diagonal-Laplace variances instead of publishing only the approximation label. Every variance is bound to a canonical modeled document UUID and an explicit ALR numerator/reference topic coordinate, rows use one canonical UUID order, and the values participate in the artifact SHA-256 and terminal-result identity.
+- Missing, duplicate, reordered, or edge-detached document rows, wrong ALR coordinates, and non-finite or non-positive variances fail closed. Analysis projects fit-owned quantities without recomputing joint curvature; this does not claim joint covariance, independent plausible values, interval coverage, calibration quality, or source-snapshot provenance. Broader input provenance remains the Evidence-owned #658 boundary. (#638, #662)

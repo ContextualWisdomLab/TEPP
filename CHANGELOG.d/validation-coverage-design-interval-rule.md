@@ -1,0 +1,3 @@
+# Validation
+
+- Complete the prospective `tepp.coverage.nominal95.v1` interval-calibration identity before its first 10,000-DGP acceptance run by moving the exact two-sided normal critical value `1.959963984540054` into `CoverageCalibrationDesign` and making `analysis_engine` consume that owner-issued value instead of a caller-local constant. The interval value remains encoded by exact IEEE-754 binary64 bits in the design fingerprint; after #741 additionally bound the covered-population/aggregation estimand, the current v1 design fingerprint is `a3a0b8d65388627d2360b05731c5e410feac343a6068da4f9192a353791bc0c0`. This is prospective design/provenance repair only; it does not execute the acceptance study or define numerical-failure acceptability.

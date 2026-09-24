@@ -1,0 +1,176 @@
+//! Integration contract for deterministic known-topic simulation truth.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use tepp_simulation::{SimulationConfig, TopicDgpConfig, generate};
+
+#[test]
+fn generated_manifest_owns_digest_bound_topic_truth() {
+    let topic_dgp = TopicDgpConfig::new(3, 12, 96, 6_500, 800, 1_200, 400, 300)
+        .expect("topic DGP");
+    let config = SimulationConfig::ci_default(2026)
+        .with_topic_dgp(topic_dgp)
+        .expect("simulation config");
+
+    let manifest = generate(config).expect("known-topic corpus");
+    manifest.verify_invariants().expect("manifest invariants");
+    let truth = manifest.topic_truth();
+
+    assert_eq!(truth.true_k(), 3);
+    assert_eq!(truth.vocabulary_size(), 12);
+    assert_eq!(truth.document_length(), 96);
+    assert_eq!(truth.topic_term_probabilities().len(), 3);
+    assert_eq!(truth.prevalence_intercepts().len(), 2);
+    assert_eq!(truth.prevalence_time_slopes().len(), 2);
+    assert_eq!(truth.prevalence_covariance().len(), 2);
+
+    for probabilities in truth.topic_term_probabilities() {
+        assert_eq!(probabilities.len(), 12);
+        let total: f64 = probabilities.iter().sum();
+        assert!((total - 1.0).abs() < 1.0e-12);
+        assert!(probabilities.iter().all(|value| *value > 0.0));
+    }
+
+    let document_ids: BTreeSet<_> = manifest
+        .documents()
+        .iter()
+        .map(tepp_simulation::SimulatedDocument::document_id)
+        .collect();
+    let truth_ids: BTreeSet<_> = truth
+        .document_states()
+        .iter()
+        .map(tepp_simulation::DocumentTopicTruth::document_id)
+        .collect();
+    assert_eq!(truth_ids, document_ids);
+
+    for state in truth.document_states() {
+        assert_eq!(state.logistic_normal_coordinates().len(), 2);
+        assert_eq!(state.topic_mixture().len(), 3);
+        assert_eq!(state.term_counts().len(), 12);
+        assert_eq!(state.term_counts().iter().sum::<u32>(), 96);
+        let mixture_total: f64 = state.topic_mixture().iter().sum();
+        assert!((mixture_total - 1.0).abs() < 1.0e-12);
+    }
+
+    let changed = generate(
+        SimulationConfig::ci_default(2026)
+            .with_topic_dgp(
+                TopicDgpConfig::new(3, 12, 96, 6_500, 1_600, 1_200, 400, 300)
+                    .expect("changed topic DGP"),
+            )
+            .expect("changed simulation config"),
+    )
+    .expect("changed corpus");
+    assert_ne!(manifest.config_digest(), changed.config_digest());
+    assert_ne!(manifest.content_digest(), changed.content_digest());
+}
+
+#[test]
+fn membership_truth_is_weighted_and_cross_classified() {
+    let config = SimulationConfig::new(2027, 4, 1, 4, 0, 0, 0, 0, 0, 0, 0, 0)
+        .expect("simulation config");
+    let manifest = generate(config).expect("known-membership corpus");
+
+    let mut group_events: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+    for document in manifest.documents() {
+        assert_eq!(
+            document
+                .memberships()
+                .iter()
+                .map(tepp_simulation::SimulatedMembership::weight_bps)
+                .sum::<u32>(),
+            10_000
+        );
+        for membership in document.memberships() {
+            group_events
+                .entry(membership.group_id())
+                .or_default()
+                .insert(document.event_id());
+        }
+    }
+    assert!(
+        group_events.values().any(|event_ids| event_ids.len() > 1),
+        "at least one classification must recur across events"
+    );
+    assert!(
+        manifest
+            .topic_truth()
+            .document_states()
+            .iter()
+            .flat_map(tepp_simulation::DocumentTopicTruth::membership_contribution)
+            .any(|value| value.abs() > f64::EPSILON)
+    );
+}
+
+#[test]
+fn event_transition_truth_projects_to_owned_document_identities() {
+    let config = SimulationConfig::new(2028, 4, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0)
+        .expect("simulation config");
+    let manifest = generate(config).expect("known-relation corpus");
+
+    let event_ids: BTreeSet<_> = manifest
+        .events()
+        .iter()
+        .map(tepp_simulation::LatentEvent::event_id)
+        .collect();
+    let document_ids: BTreeSet<_> = manifest
+        .documents()
+        .iter()
+        .map(tepp_simulation::SimulatedDocument::document_id)
+        .collect();
+    let raw_transition_pairs: BTreeSet<_> = manifest
+        .true_relations()
+        .iter()
+        .filter(|relation| relation.kind().is_transition())
+        .map(|relation| (relation.source_id(), relation.target_id()))
+        .collect();
+
+    assert!(!raw_transition_pairs.is_empty());
+    assert!(raw_transition_pairs.iter().all(|(source, target)| {
+        event_ids.contains(source)
+            && event_ids.contains(target)
+            && !document_ids.contains(source)
+            && !document_ids.contains(target)
+    }));
+
+    let projected = manifest
+        .document_transition_pairs()
+        .expect("document transition projection");
+    assert_eq!(projected.len(), raw_transition_pairs.len());
+    assert!(projected.iter().all(|(source, target)| {
+        document_ids.contains(source) && document_ids.contains(target)
+    }));
+
+    let document_event: BTreeMap<_, _> = manifest
+        .documents()
+        .iter()
+        .map(|document| (document.document_id(), document.event_id()))
+        .collect();
+    let canonical_document_by_event: BTreeMap<_, _> = manifest
+        .documents()
+        .iter()
+        .fold(BTreeMap::new(), |mut canonical, document| {
+            canonical
+                .entry(document.event_id())
+                .and_modify(|current| {
+                    if document.document_id() < *current {
+                        *current = document.document_id();
+                    }
+                })
+                .or_insert_with(|| document.document_id());
+            canonical
+        });
+    let event_order: BTreeMap<_, _> = manifest
+        .events()
+        .iter()
+        .map(|event| (event.event_id(), event.ordinal()))
+        .collect();
+    for (source_document, target_document) in projected {
+        let source_event = document_event[&source_document];
+        let target_event = document_event[&target_document];
+        assert!(raw_transition_pairs.contains(&(source_event, target_event)));
+        assert_eq!(source_document, canonical_document_by_event[&source_event]);
+        assert_eq!(target_document, canonical_document_by_event[&target_event]);
+        assert!(event_order[&source_event] < event_order[&target_event]);
+    }
+}

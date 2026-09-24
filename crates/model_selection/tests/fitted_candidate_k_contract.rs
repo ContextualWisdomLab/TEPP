@@ -15,7 +15,9 @@ use temporal_core::{
     AvailableTime, EventTime, KnowledgeCutoff, TemporalBoundary, TemporalInterval,
     TemporalPrecision,
 };
-use topic_measurement::{ReferenceTopicInput, ReferenceTopicModel, SparseMatrix};
+use topic_measurement::{
+    ReferenceTopicFit, ReferenceTopicInput, ReferenceTopicModelConfig, SparseMatrix,
+};
 use uuid::Uuid;
 
 fn event_time(day: u8) -> EventTime {
@@ -352,49 +354,14 @@ fn invalid_fitted_configuration_fails_closed() {
 }
 
 #[test]
-fn statistical_candidate_from_fit_refuses_unusable_diagnostics() {
-    let input = separated_topic_input();
-    let matching = ReferenceTopicModel {
-        seed: 1,
-        iterations: 4,
-        objective: -1.0,
-        topic_term_probabilities: vec![vec![0.25; 4]; 2],
-        document_topic_proportions: vec![vec![0.5, 0.5]; 6],
-        document_coordinate_variances: vec![vec![0.1]; 6],
-        prevalence_coefficients: vec![vec![0.0]; 5],
-        prevalence_features: Vec::new(),
-        sequence_edges: Vec::new(),
-        connected_post_count: 0,
-        lineage_count: 0,
-    };
-    assert!(statistical_candidate_from_fit(&input, 2, &matching).is_ok());
-    assert_eq!(
-        statistical_candidate_from_fit(&input, 1, &matching),
-        Err(ModelSelectionError::NonPositiveCandidateK)
-    );
-    let mut short = matching.clone();
-    short.document_topic_proportions.pop();
-    assert_eq!(
-        statistical_candidate_from_fit(&input, 2, &short),
-        Err(ModelSelectionError::InvalidDiagnostic)
-    );
-
-    let tiny = two_document_input([0.2, 0.2, 0.2, 0.2]);
-    let tiny_model = ReferenceTopicModel {
-        seed: 1,
-        iterations: 4,
-        objective: -1.0,
-        topic_term_probabilities: vec![vec![0.5, 0.5], vec![0.5, 0.5]],
-        document_topic_proportions: vec![vec![0.5, 0.5], vec![0.5, 0.5]],
-        document_coordinate_variances: vec![vec![0.1], vec![0.1]],
-        prevalence_coefficients: vec![vec![0.0]; 3],
-        prevalence_features: Vec::new(),
-        sequence_edges: Vec::new(),
-        connected_post_count: 0,
-        lineage_count: 0,
-    };
-    assert_eq!(
-        statistical_candidate_from_fit(&tiny, 2, &tiny_model),
-        Err(ModelSelectionError::InvalidDiagnostic)
-    );
+fn statistical_candidate_from_fit_scores_owner_issued_fit() {
+    let input = two_document_input([30.0, 10.0, 10.0, 30.0]);
+    let config = ReferenceTopicModelConfig::new(2, vec![7, 11], 2_000, 1e-5)
+        .expect("reference configuration")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("reference hyperparameters");
+    let fit = ReferenceTopicFit::fit(&input, &config).expect("owner-issued reference fit");
+    let candidate = statistical_candidate_from_fit(&fit).expect("statistical candidate");
+    assert_eq!(candidate.candidate_k(), 2);
+    assert!(candidate.schwarz_score().expect("Schwarz score").is_finite());
 }

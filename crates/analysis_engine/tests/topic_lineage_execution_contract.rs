@@ -16,8 +16,10 @@ use temporal_core::{
     TemporalPrecision,
 };
 use tepp_api::{AnalysisRunAccepted, AnalysisRunRequest, AnalysisRunTerminalState};
-use topic_measurement::{ReferenceTopicInput, ReferenceTopicModelConfig, SparseMatrix};
+use topic_measurement::{ReferenceTopicInput, SparseMatrix};
 use uuid::Uuid;
+
+const CONFIG_JSON: &str = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[7,11],\"maximum_iterations\":2000,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.5,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
 
 fn event_time(day: u8) -> EventTime {
     EventTime::parse_rfc3339(&format!("2026-07-{day:02}T00:00:00Z")).expect("event time")
@@ -95,17 +97,21 @@ fn request() -> AnalysisRunRequest {
     }
 }
 
-#[test]
-fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
-    let (snapshot, ids, times, memberships, relations) = fixture();
-    let counts = SparseMatrix::from_csr(
+fn fitted_counts(values: Vec<f64>) -> SparseMatrix {
+    SparseMatrix::from_csr(
         4,
         4,
         vec![0, 2, 4, 6, 8],
         vec![0, 1, 0, 1, 2, 3, 2, 3],
-        vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0],
+        values,
     )
-    .expect("counts");
+    .expect("counts")
+}
+
+#[test]
+fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let counts = fitted_counts(vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0]);
     let input = ReferenceTopicInput::new(
         &snapshot,
         ids,
@@ -116,10 +122,6 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         &relations,
     )
     .expect("input");
-    let config = ReferenceTopicModelConfig::new(2, vec![7, 11], 2_000, 1e-5)
-        .expect("config")
-        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
-        .expect("hyperparameters");
     let request = request();
     let accepted =
         AnalysisRunAccepted::new("run-topic-lineage", "accepted", &request.idempotency_key)
@@ -130,7 +132,7 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         "snapshot-topic-lineage",
         KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
         &input,
-        &config,
+        CONFIG_JSON,
         "2026-08-02T00:00:00Z",
     )
     .expect("execution");
@@ -139,6 +141,32 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         execution.artifact.schema_version,
         TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION
     );
+    assert_eq!(execution.artifact.model_contract_version, TOPIC_LINEAGE_MODEL_CONTRACT_VERSION);
+    assert_eq!(execution.artifact.method_configuration_json, CONFIG_JSON);
+    assert_eq!(execution.artifact.estimator_backend, "cpu_f64_reference");
+    assert_eq!(execution.artifact.posterior_approximation, "diagonal_laplace");
+    assert_eq!(execution.artifact.diagonal_laplace_uncertainty.len(), 4);
+    assert_eq!(
+        execution
+            .artifact
+            .diagonal_laplace_uncertainty
+            .iter()
+            .map(|row| row.document_id.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+            "00000000-0000-0000-0000-000000000003",
+            "00000000-0000-0000-0000-000000000004",
+        ]
+    );
+    for row in &execution.artifact.diagonal_laplace_uncertainty {
+        assert_eq!(row.coordinates.len(), 1);
+        assert_eq!(row.coordinates[0].numerator_topic_index, 0);
+        assert_eq!(row.coordinates[0].reference_topic_index, 1);
+        assert!(row.coordinates[0].variance.is_finite());
+        assert!(row.coordinates[0].variance > 0.0);
+    }
     assert_eq!(execution.artifact.connected_post_count, 4);
     assert_eq!(execution.artifact.lineage_count, 2);
     assert_eq!(execution.artifact.sequence_edges.len(), 2);
@@ -155,6 +183,72 @@ fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
         Some(TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION)
     );
     assert!(execution.artifact.to_json().is_ok());
+}
+
+#[test]
+fn fit_b_uncertainty_cannot_rebind_to_fit_a_terminal_digest() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let counts_a = fitted_counts(vec![90.0, 10.0, 85.0, 15.0, 10.0, 90.0, 15.0, 85.0]);
+    let counts_b = fitted_counts(vec![120.0, 5.0, 110.0, 10.0, 5.0, 120.0, 10.0, 110.0]);
+    let input_a = ReferenceTopicInput::new(
+        &snapshot,
+        ids.clone(),
+        &counts_a,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("input a");
+    let input_b = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &counts_b,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("input b");
+    let request = request();
+    let accepted =
+        AnalysisRunAccepted::new("run-topic-lineage", "accepted", &request.idempotency_key)
+            .expect("accepted");
+    let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
+    let execution_a = execute_topic_lineage_run(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input_a,
+        CONFIG_JSON,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("execution a");
+    let execution_b = execute_topic_lineage_run(
+        &request,
+        &accepted,
+        "snapshot-topic-lineage",
+        cutoff,
+        &input_b,
+        CONFIG_JSON,
+        "2026-08-02T00:00:00Z",
+    )
+    .expect("execution b");
+
+    assert_ne!(
+        execution_a.artifact.diagonal_laplace_uncertainty,
+        execution_b.artifact.diagonal_laplace_uncertainty,
+        "the fixture must exercise distinct fit-owned uncertainty quantities"
+    );
+    let mut rebound = execution_a.artifact.clone();
+    rebound.diagonal_laplace_uncertainty = execution_b.artifact.diagonal_laplace_uncertainty;
+    let rebound_digest = rebound.sha256().expect("rebound artifact stays structurally valid");
+    assert_ne!(
+        execution_a.terminal_result.result_sha256.as_deref(),
+        Some(rebound_digest.as_str()),
+        "fit-B uncertainty must not preserve fit-A terminal-result identity"
+    );
 }
 
 #[test]
@@ -177,7 +271,7 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
         AnalysisRunAccepted::new("run-topic-lineage", "accepted", &request.idempotency_key)
             .expect("accepted");
     let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
-    let config = ReferenceTopicModelConfig::new(2, vec![1], 2, 1e-12).expect("config");
+    let nonconvergent_config = "{\"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[1],\"maximum_iterations\":2,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.25,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}";
 
     assert_eq!(
         execute_topic_lineage_run(
@@ -186,7 +280,7 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
             "other-snapshot",
             cutoff,
             &input,
-            &config,
+            nonconvergent_config,
             "2026-08-02T00:00:00Z",
         ),
         Err(AnalysisEngineError::SnapshotMismatch)
@@ -215,7 +309,7 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
                 "snapshot-topic-lineage",
                 cutoff,
                 &input,
-                &config,
+                nonconvergent_config,
                 "2026-08-02T00:00:00Z",
             ),
             Err(AnalysisEngineError::InvalidEvidence)
@@ -228,11 +322,52 @@ fn execution_refuses_binding_and_nonconvergence_without_an_artifact() {
             "snapshot-topic-lineage",
             cutoff,
             &input,
-            &config,
+            nonconvergent_config,
             "2026-08-02T00:00:00Z",
         ),
         Err(AnalysisEngineError::TopicMeasurement(
             topic_measurement::TopicMeasurementError::DidNotConverge
         ))
     );
+}
+
+#[test]
+fn malformed_or_noncanonical_configuration_fails_before_estimation() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let counts = SparseMatrix::from_csr(4, 2, vec![0, 1, 2, 3, 4], vec![0, 0, 1, 1], vec![1.0; 4])
+        .expect("counts");
+    let input = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("input");
+    let request = request();
+    let accepted =
+        AnalysisRunAccepted::new("run-topic-lineage", "accepted", &request.idempotency_key)
+            .expect("accepted");
+    let cutoff = KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff");
+
+    for invalid_config in [
+        "{}",
+        "{\"configuration_schema_version\":\"floating\",\"topic_count\":2,\"seeds\":[1],\"maximum_iterations\":2,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.25,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}",
+        "{ \"configuration_schema_version\":\"tepp.trsl_topic_lineage.reference_config.v1\",\"topic_count\":2,\"seeds\":[1],\"maximum_iterations\":2,\"tolerance\":0.001,\"prior_variance\":1.0,\"relation_strength\":0.25,\"ridge\":0.01,\"topic_smoothing\":0.05,\"step_size\":0.2}",
+    ] {
+        assert_eq!(
+            execute_topic_lineage_run(
+                &request,
+                &accepted,
+                "snapshot-topic-lineage",
+                cutoff,
+                &input,
+                invalid_config,
+                "2026-08-02T00:00:00Z",
+            ),
+            Err(AnalysisEngineError::InvalidEvidence)
+        );
+    }
 }

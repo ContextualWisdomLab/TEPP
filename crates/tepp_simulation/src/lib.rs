@@ -8,16 +8,22 @@
 //! noise, and emit a digest-bound truth manifest for scientific recovery tests.
 
 mod configuration;
+mod coverage_calibration;
 mod document_process;
 mod error;
 mod latent_event;
 mod missingness;
 mod relation_process;
 mod rng;
+mod topic_process;
 mod truth_manifest;
 
 /// Bounded parameters for a reproducible truth simulation.
 pub use configuration::SimulationConfig;
+/// Deterministic parameters for the known-topic data-generating process.
+pub use configuration::TopicDgpConfig;
+/// Owner-issued prospective interval-calibration simulation scenario.
+pub use coverage_calibration::CoverageCalibrationSimulationDesign;
 /// Method-effect labels for generated documents.
 pub use document_process::DocumentMethodEffect;
 /// Synthetic non-wrapping calendar bound in hours.
@@ -50,12 +56,20 @@ pub use relation_process::SimulatedRelationKind;
 pub use relation_process::TrueRelation;
 /// Deterministic generator.
 pub use rng::SeededRng;
+/// Known latent topic state and generated counts for one document.
+pub use topic_process::DocumentTopicTruth;
+/// Seed-domain separator for known-topic generation.
+pub use topic_process::TOPIC_DGP_SEED_DOMAIN;
+/// Digest-bound known-topic content/prevalence truth.
+pub use topic_process::TopicTruthManifest;
 /// Digest-bound known-truth corpus.
 pub use truth_manifest::TruthManifest;
 /// Digest helper for configuration fingerprints.
 pub use truth_manifest::digest_bytes;
 
 use uuid::Uuid;
+
+const MEMBERSHIP_GROUP_SEED_DOMAIN: u64 = 0x4d45_4d42_4552_4752;
 
 /// Generate a deterministic truth corpus from a validated configuration.
 ///
@@ -98,6 +112,7 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
                 &mut rng,
                 config,
                 event_id,
+                ordinal,
                 event_time,
                 document_time,
                 available_time,
@@ -120,6 +135,7 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
                 &mut documents,
                 &mut true_relations,
                 event_id,
+                ordinal,
                 event_time,
                 event_hour_index,
                 report_delay,
@@ -135,6 +151,7 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
                 &mut documents,
                 &mut true_relations,
                 event_id,
+                ordinal,
                 event_time,
                 event_hour_index,
                 report_delay,
@@ -150,6 +167,7 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
                 &mut documents,
                 &mut true_relations,
                 event_id,
+                ordinal,
                 event_time,
                 event_hour_index,
                 report_delay,
@@ -172,6 +190,8 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
     }
 
     let observed_relations = apply_relation_noise(&mut rng, config, &true_relations, &documents);
+    let topic_truth =
+        topic_process::generate_topic_truth(config, &events, &documents, &true_relations);
     Ok(TruthManifest::new(
         config.seed(),
         config_digest,
@@ -179,10 +199,12 @@ pub fn generate(config: SimulationConfig) -> Result<TruthManifest, SimulationErr
         documents,
         true_relations,
         observed_relations,
+        topic_truth,
     ))
 }
 
 fn config_fingerprint(config: SimulationConfig) -> Vec<u8> {
+    let topic = config.topic_dgp();
     let mut bytes = Vec::new();
     for value in [
         config.seed(),
@@ -197,6 +219,14 @@ fn config_fingerprint(config: SimulationConfig) -> Vec<u8> {
         u64::from(config.revision_rate_bps()),
         u64::from(config.translation_rate_bps()),
         u64::from(config.template_copy_rate_bps()),
+        u64::from(topic.true_topic_count()),
+        u64::from(topic.vocabulary_size()),
+        u64::from(topic.document_length()),
+        u64::from(topic.topic_separation_bps()),
+        u64::from(topic.temporal_drift_bps()),
+        u64::from(topic.latent_standard_deviation_bps()),
+        u64::from(topic.membership_effect_bps()),
+        u64::from(topic.relation_effect_bps()),
     ] {
         bytes.extend(value.to_le_bytes());
     }
@@ -212,11 +242,32 @@ fn next_id(rng: &mut SeededRng) -> Uuid {
     Uuid::from_bytes(bytes)
 }
 
+fn membership_group_id(seed: u64, event_ordinal: u32, membership_index: u32) -> Uuid {
+    let classification = match membership_index % 4 {
+        0 => event_ordinal % 2,
+        1 => (event_ordinal / 2) % 2,
+        2 => 0,
+        _ => event_ordinal % 3,
+    };
+    let lane = u64::from(membership_index) << 32;
+    let mut rng = SeededRng::new(
+        seed ^ MEMBERSHIP_GROUP_SEED_DOMAIN ^ lane ^ u64::from(classification),
+    );
+    next_id(&mut rng)
+}
+
+fn membership_weight_bps(membership_index: u32, membership_targets: u32) -> u32 {
+    let base = 10_000 / membership_targets;
+    let remainder = 10_000 % membership_targets;
+    base + u32::from(membership_index < remainder)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_document(
     rng: &mut SeededRng,
     config: SimulationConfig,
     event_id: Uuid,
+    event_ordinal: u32,
     event_time: temporal_core::EventTime,
     document_time: temporal_core::DocumentTime,
     available_time: temporal_core::AvailableTime,
@@ -226,9 +277,9 @@ fn build_document(
     let mut memberships = Vec::with_capacity(config.membership_targets() as usize);
     for index in 0..config.membership_targets() {
         memberships.push(SimulatedMembership::new(
-            next_id(rng),
+            membership_group_id(config.seed(), event_ordinal, index),
             membership_role_at(index as usize),
-            10_000 / config.membership_targets().max(1),
+            membership_weight_bps(index, config.membership_targets()),
         ));
     }
     let is_missing = rng.bernoulli_bps(config.missingness_rate_bps());
@@ -252,6 +303,7 @@ fn push_variant_if_drawn(
     documents: &mut Vec<SimulatedDocument>,
     true_relations: &mut Vec<TrueRelation>,
     event_id: Uuid,
+    event_ordinal: u32,
     event_time: temporal_core::EventTime,
     event_hour_index: u32,
     report_delay: u32,
@@ -273,6 +325,7 @@ fn push_variant_if_drawn(
         rng,
         config,
         event_id,
+        event_ordinal,
         event_time,
         document_time,
         available_time,
@@ -347,7 +400,7 @@ fn can_inject_false_positive(
 mod tests {
     use super::{
         SYNTHETIC_YEAR_HOURS, SimulationConfig, SimulationError, can_inject_false_positive,
-        generate, sample_delay_hours,
+        generate, membership_group_id, membership_weight_bps, sample_delay_hours,
     };
 
     #[test]
@@ -389,6 +442,16 @@ mod tests {
         assert_eq!(
             SimulationConfig::new(1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0),
             Err(SimulationError::InvalidConfiguration)
+        );
+    }
+
+    #[test]
+    fn membership_groups_recur_and_weights_sum_exactly() {
+        assert_eq!(membership_group_id(7, 0, 2), membership_group_id(7, 3, 2));
+        assert_ne!(membership_group_id(7, 0, 0), membership_group_id(7, 1, 0));
+        assert_eq!(
+            (0..3).map(|index| membership_weight_bps(index, 3)).sum::<u32>(),
+            10_000
         );
     }
 

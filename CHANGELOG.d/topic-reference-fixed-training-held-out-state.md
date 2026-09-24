@@ -1,0 +1,3 @@
+### Scientific validation
+
+- Added deterministic held-out document-state inference on `ReferenceTopicTrainingFit`: evaluation EventTime, covariates, and Membership are projected through the frozen training prevalence basis, then only each evaluation document's local ALR coordinate is optimized from its own counts and fitted Gaussian prevalence prior. Topic-term probabilities, prevalence coefficients, training coordinates, relation parameters, and other global fit state remain frozen; invalid geometry, non-finite arithmetic, and non-convergence fail closed. This state-recovery estimand remains distinct from prevalence-mean predictive likelihood and from calibrated interval coverage.

@@ -15,19 +15,31 @@
 mod bias;
 mod claim;
 mod coverage;
+mod coverage_design_fingerprint;
+mod coverage_estimand;
+mod coverage_evidence;
 mod error;
 mod graph_metrics;
+mod indexed_coverage;
 mod input;
+mod marginal_interval;
 mod matching;
 mod monte_carlo;
+mod prevalence_time_basis;
 mod report;
 mod rmse;
 mod temporal_order;
+mod topic_alignment;
+mod topic_state_alignment;
 
 /// Standard error of mean signed bias.
 pub use bias::bias_standard_error;
+/// Mean absolute parameter-wise bias across repeated recovery observations.
+pub use bias::mean_absolute_parameter_bias;
 /// Mean signed bias.
 pub use bias::mean_bias;
+/// Mean signed bias for every parameter across repeated recovery observations.
+pub use bias::parameter_mean_biases;
 /// Four ADR 0014 claim authorities.
 pub use claim::ClaimAuthority;
 /// One evidence item offered for promotion.
@@ -44,10 +56,26 @@ pub use claim::parse_commit_head;
 pub use claim::promote_claim;
 /// Promote a scientific claim from computed RMSE, not a hardcoded threshold.
 pub use claim::promote_scientific_recovery;
+/// Assess denominator-preserving interval coverage against a prospective design.
+pub use coverage::assess_coverage_calibration;
+/// Denominator-bearing assessment of one prospective interval-calibration run.
+pub use coverage::CoverageCalibrationAssessment;
+/// Prospective interval-calibration design fixed before the expensive DGP run.
+pub use coverage::CoverageCalibrationDesign;
 /// Empirical interval coverage.
 pub use coverage::interval_coverage;
+/// Collapse rolling-origin coverage within DGP replications before Monte Carlo inference.
+pub use coverage::summarize_windowed_coverage_replications;
+/// Collapse successful rolling-origin coverage while retaining the attempted DGP denominator.
+pub use coverage::summarize_windowed_coverage_recovery_replications;
 /// Wilson bounds for coverage proportions.
 pub use coverage::wilson_coverage_interval;
+/// Fingerprint one prospective coverage-calibration design with canonical SHA-256 bytes.
+pub use coverage_design_fingerprint::coverage_calibration_design_sha256;
+/// Versioned covered population and aggregation rule for calibration evidence.
+pub use coverage_estimand::CoverageCalibrationEstimand;
+/// Immutable machine-readable evidence for one prospective calibration experiment.
+pub use coverage_evidence::CoverageCalibrationEvidenceRecord;
 /// Fail-closed validation errors.
 pub use error::ValidationError;
 /// Undirected edge identity.
@@ -56,16 +84,38 @@ pub use graph_metrics::EdgeIdentity;
 pub use graph_metrics::edge_precision;
 /// Edge recovery recall.
 pub use graph_metrics::edge_recall;
+/// One declared coverage-calibration replication and numerical outcome.
+pub use indexed_coverage::CoverageCalibrationReplicationOutcome;
+/// Canonicalize an exact indexed coverage outcome ledger in declared identity order.
+pub use indexed_coverage::canonical_indexed_coverage_outcomes;
+/// Fingerprint the canonical indexed coverage outcome ledger with SHA-256.
+pub use indexed_coverage::canonical_indexed_coverage_outcomes_sha256;
+/// Aggregate coverage only from the exact declared replication identity set.
+pub use indexed_coverage::summarize_indexed_windowed_coverage_recovery_replications;
+/// Closed marginal normal interval bounds in location-coordinate order.
+pub use marginal_interval::MarginalIntervalBounds;
+/// Construct marginal normal intervals from one validated location/covariance basis.
+pub use marginal_interval::normal_marginal_interval_bounds;
 /// Absolute residual vector.
 pub use matching::absolute_residuals;
 /// Tolerance match counts.
 pub use matching::match_count;
+/// Monte Carlo recovery metric summary with an unconditional failure denominator.
+pub use monte_carlo::MonteCarloRecoveryMetricSummary;
 /// Monte Carlo replication summary.
 pub use monte_carlo::MonteCarloSummary;
 /// SE-aware acceptance gate.
 pub use monte_carlo::accept_within_standard_errors;
+/// Aggregate scalar recovery while retaining attempted and failed replications.
+pub use monte_carlo::summarize_recovery_metric_replications;
 /// Aggregate Monte Carlo replications.
 pub use monte_carlo::summarize_replications;
+/// One affine EventTime coordinate for prevalence coefficient comparison.
+pub use prevalence_time_basis::LinearTimeBasis;
+/// Prevalence coefficients expressed in one affine EventTime basis.
+pub use prevalence_time_basis::LinearPrevalenceTimeCoefficients;
+/// Re-express prevalence intercept/slope vectors in a target affine EventTime basis.
+pub use prevalence_time_basis::reexpress_linear_prevalence_time_basis;
 /// Machine-readable validation report.
 pub use report::ValidationReport;
 /// RMSE standard error.
@@ -74,3 +124,13 @@ pub use rmse::rmse_standard_error;
 pub use rmse::root_mean_square_error;
 /// Pairwise temporal-order accuracy.
 pub use temporal_order::temporal_order_accuracy;
+/// Deterministic fitted-topic to known-truth probability-basis alignment.
+pub use topic_alignment::{TopicAlignment, align_topic_probability_rows};
+/// Re-express fitted additive-log-ratio coordinates in the aligned truth basis.
+pub use topic_alignment::realign_additive_log_ratio;
+/// Propagate fitted additive-log-ratio covariance into the aligned truth basis.
+pub use topic_alignment::realign_additive_log_ratio_covariance;
+/// Re-express fitted document topic-state rows in known-truth topic order.
+pub use topic_state_alignment::realign_topic_probability_rows;
+/// Re-express one fitted document topic-state vector in known-truth topic order.
+pub use topic_state_alignment::realign_topic_probability_vector;

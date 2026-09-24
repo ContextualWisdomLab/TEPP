@@ -1,0 +1,300 @@
+use validation_core::{
+    CoverageCalibrationDesign, CoverageCalibrationEvidenceRecord,
+    CoverageCalibrationReplicationOutcome, ValidationError,
+};
+
+const SOURCE_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
+const SCENARIO_ID: &str = "tepp.simulation.rolling_origin_coverage.v1";
+const SCENARIO_FINGERPRINT: &str =
+    "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
+const ESTIMAND_ID: &str =
+    "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1";
+const FAILURE_RATE_MCSE_METHOD_ID: &str =
+    "tepp.coverage.failure_rate_mcse.bernoulli_plugin_sqrt_p_one_minus_p_over_n.v1";
+const MCSE_METHOD_ID: &str = "tepp.coverage.mcse.sample_sd_n_minus_1_over_sqrt_n.v1";
+const PERCENTILE_METHOD_ID: &str = "tepp.coverage.percentile.inclusive_nearest_rank.v1";
+
+fn complete_windows() -> Vec<f64> {
+    vec![
+        0.95;
+        CoverageCalibrationDesign::tepp_nominal_95_v1().declared_rolling_origin_window_count()
+    ]
+}
+
+fn outcomes(successful: usize) -> Vec<CoverageCalibrationReplicationOutcome> {
+    (0..10_000)
+        .map(|replication_index| {
+            if replication_index < successful {
+                CoverageCalibrationReplicationOutcome::successful(
+                    replication_index,
+                    complete_windows(),
+                )
+            } else {
+                CoverageCalibrationReplicationOutcome::numerical_failure(replication_index)
+            }
+        })
+        .collect()
+}
+
+fn outcomes_with_failures(failure_indices: &[usize]) -> Vec<CoverageCalibrationReplicationOutcome> {
+    (0..10_000)
+        .map(|replication_index| {
+            if failure_indices.contains(&replication_index) {
+                CoverageCalibrationReplicationOutcome::numerical_failure(replication_index)
+            } else {
+                CoverageCalibrationReplicationOutcome::successful(
+                    replication_index,
+                    complete_windows(),
+                )
+            }
+        })
+        .collect()
+}
+
+fn evidence(successful: usize) -> Result<CoverageCalibrationEvidenceRecord, ValidationError> {
+    evidence_from_outcomes(&outcomes(successful))
+}
+
+fn evidence_from_outcomes(
+    outcomes: &[CoverageCalibrationReplicationOutcome],
+) -> Result<CoverageCalibrationEvidenceRecord, ValidationError> {
+    CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
+        &CoverageCalibrationDesign::tepp_nominal_95_v1(),
+        outcomes,
+        SCENARIO_ID,
+        SCENARIO_FINGERPRINT,
+        SOURCE_HEAD,
+    )
+}
+
+#[test]
+fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty() {
+    let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    let record = evidence(9_998).expect("calibration evidence");
+
+    assert_eq!(record.schema_version(), 9);
+    assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
+    assert_eq!(record.validation_estimand_id(), ESTIMAND_ID);
+    assert_eq!(record.validation_design_fingerprint().len(), 64);
+    assert!(
+        record
+            .validation_design_fingerprint()
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
+    assert_eq!(record.simulation_scenario_id(), SCENARIO_ID);
+    assert_eq!(record.simulation_scenario_fingerprint(), SCENARIO_FINGERPRINT);
+    assert_eq!(record.replication_outcomes().len(), 10_000);
+    assert_eq!(record.replication_outcomes()[0].replication_index(), 0);
+    assert_eq!(record.replication_outcomes()[9_999].replication_index(), 9_999);
+    assert!(record.replication_outcomes()[9_998].window_coverages().is_none());
+    assert!(record.replication_outcomes()[9_999].window_coverages().is_none());
+    assert_eq!(record.replication_outcomes_sha256().len(), 64);
+    assert!(
+        record
+            .replication_outcomes_sha256()
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    );
+    assert_eq!(record.source_head(), SOURCE_HEAD);
+    assert_eq!(record.attempted_replication_count(), 10_000);
+    assert_eq!(record.successful_replication_count(), 9_998);
+    assert_eq!(record.failure_count(), 2);
+    assert!((record.failure_rate() - 0.0002).abs() < f64::EPSILON);
+    assert_eq!(
+        record.failure_rate_monte_carlo_standard_error_method_id(),
+        FAILURE_RATE_MCSE_METHOD_ID
+    );
+    assert!(record.failure_rate_standard_error().is_finite());
+    assert!(record.failure_rate_standard_error() > 0.0);
+    assert_eq!(record.coverage_mean(), Some(0.95));
+    assert_eq!(record.coverage_standard_deviation(), Some(0.0));
+    assert_eq!(
+        record.coverage_monte_carlo_standard_error_method_id(),
+        MCSE_METHOD_ID
+    );
+    assert_eq!(record.coverage_monte_carlo_standard_error(), Some(0.0));
+    assert_eq!(record.coverage_percentile_method_id(), PERCENTILE_METHOD_ID);
+    assert_eq!(
+        record.coverage_percentile_lower_probability(),
+        design.coverage_percentile_lower_probability()
+    );
+    assert_eq!(
+        record.coverage_percentile_upper_probability(),
+        design.coverage_percentile_upper_probability()
+    );
+    assert_eq!(record.coverage_percentile_lower(), Some(0.95));
+    assert_eq!(record.coverage_percentile_upper(), Some(0.95));
+    assert!(record.coverage_within_practical_band());
+    assert!(record.monte_carlo_precision_sufficient());
+
+    let json = record.to_json().expect("deterministic evidence json");
+    assert!(json.contains("\"schema_version\":9"));
+    assert!(json.contains("\"validation_estimand_id\":"));
+    assert!(json.contains(ESTIMAND_ID));
+    assert!(json.contains("\"validation_design_fingerprint\":"));
+    assert!(json.contains(record.validation_design_fingerprint()));
+    assert!(json.contains("\"replication_outcomes\":["));
+    assert!(json.contains("\"replication_index\":9999,\"window_coverages\":null"));
+    assert!(json.contains("\"replication_outcomes_sha256\":"));
+    assert!(json.contains(record.replication_outcomes_sha256()));
+    assert!(json.contains("\"attempted_replication_count\":10000"));
+    assert!(json.contains("\"successful_replication_count\":9998"));
+    assert!(json.contains("\"failure_count\":2"));
+    assert!(json.contains("\"failure_rate_monte_carlo_standard_error_method_id\":"));
+    assert!(json.contains(FAILURE_RATE_MCSE_METHOD_ID));
+    assert!(json.contains("\"failure_rate_standard_error\":"));
+    assert!(json.contains("\"coverage_monte_carlo_standard_error_method_id\":"));
+    assert!(json.contains(MCSE_METHOD_ID));
+    assert!(json.contains("\"coverage_percentile_method_id\":"));
+    assert!(json.contains(PERCENTILE_METHOD_ID));
+    assert!(json.contains("\"coverage_percentile_lower_probability\":0.025"));
+    assert!(json.contains("\"coverage_percentile_upper_probability\":0.975"));
+    assert!(json.contains("\"coverage_percentile_lower\":0.95"));
+    assert!(json.contains("\"coverage_percentile_upper\":0.95"));
+    assert!(!json.contains("\"supports_calibration_claim\""));
+    assert!(json.contains(SCENARIO_FINGERPRINT));
+    assert!(json.contains(SOURCE_HEAD));
+    assert_eq!(record.to_json().expect("repeat json"), json);
+}
+
+#[test]
+fn persisted_evidence_distinguishes_exact_indexed_failure_identity_pattern() {
+    let early_failures = evidence_from_outcomes(&outcomes_with_failures(&[0, 1]))
+        .expect("early-failure evidence");
+    let late_failures = evidence_from_outcomes(&outcomes_with_failures(&[9_998, 9_999]))
+        .expect("late-failure evidence");
+
+    assert_eq!(early_failures.attempted_replication_count(), 10_000);
+    assert_eq!(late_failures.attempted_replication_count(), 10_000);
+    assert_eq!(early_failures.successful_replication_count(), 9_998);
+    assert_eq!(late_failures.successful_replication_count(), 9_998);
+    assert_eq!(early_failures.failure_count(), 2);
+    assert_eq!(late_failures.failure_count(), 2);
+    assert_eq!(early_failures.coverage_mean(), Some(0.95));
+    assert_eq!(late_failures.coverage_mean(), Some(0.95));
+    assert!(early_failures.replication_outcomes()[0].window_coverages().is_none());
+    assert!(late_failures.replication_outcomes()[0].window_coverages().is_some());
+    assert_ne!(
+        early_failures.replication_outcomes_sha256(),
+        late_failures.replication_outcomes_sha256(),
+        "fingerprint must retain which declared DGP identities failed"
+    );
+    assert_ne!(
+        early_failures.to_json().expect("early json"),
+        late_failures.to_json().expect("late json"),
+        "persisted evidence must retain which declared DGP identities failed"
+    );
+}
+
+#[test]
+fn canonical_outcome_ledger_and_fingerprint_are_independent_of_shard_completion_order() {
+    let ordered = outcomes_with_failures(&[7, 83]);
+    let mut reversed = ordered.clone();
+    reversed.reverse();
+
+    let ordered_record = evidence_from_outcomes(&ordered).expect("ordered evidence");
+    let reversed_record = evidence_from_outcomes(&reversed).expect("reversed evidence");
+
+    assert_eq!(
+        ordered_record.replication_outcomes(),
+        reversed_record.replication_outcomes()
+    );
+    assert_eq!(
+        ordered_record.replication_outcomes_sha256(),
+        reversed_record.replication_outcomes_sha256()
+    );
+    assert_eq!(
+        ordered_record.to_json().expect("ordered json"),
+        reversed_record.to_json().expect("reversed json")
+    );
+}
+
+#[test]
+fn singleton_success_keeps_point_evidence_without_fabricating_dispersion() {
+    let record = evidence(1).expect("singleton evidence remains reportable");
+
+    assert_eq!(record.coverage_mean(), Some(0.95));
+    assert_eq!(record.coverage_standard_deviation(), None);
+    assert_eq!(
+        record.coverage_monte_carlo_standard_error_method_id(),
+        MCSE_METHOD_ID
+    );
+    assert_eq!(record.coverage_monte_carlo_standard_error(), None);
+    assert_eq!(record.coverage_percentile_lower(), None);
+    assert_eq!(record.coverage_percentile_upper(), None);
+    assert!(!record.monte_carlo_precision_sufficient());
+    assert!(!
+        record
+            .to_json()
+            .expect("singleton evidence json")
+            .contains("\"supports_calibration_claim\"")
+    );
+}
+
+#[test]
+fn calibration_evidence_fails_closed_on_identity_digest_or_head_drift() {
+    let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    let valid_outcomes = outcomes(2);
+
+    for (scenario_id, fingerprint, source_head) in [
+        ("", SCENARIO_FINGERPRINT, SOURCE_HEAD),
+        ("tepp.\u{1}scenario", SCENARIO_FINGERPRINT, SOURCE_HEAD),
+        (SCENARIO_ID, "abc", SOURCE_HEAD),
+        (
+            SCENARIO_ID,
+            "E5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a",
+            SOURCE_HEAD,
+        ),
+        (
+            SCENARIO_ID,
+            SCENARIO_FINGERPRINT,
+            "0123456789ABCDEF0123456789abcdef01234567",
+        ),
+        (SCENARIO_ID, SCENARIO_FINGERPRINT, "not-a-git-head"),
+    ] {
+        assert_eq!(
+            CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
+                &design,
+                &valid_outcomes,
+                scenario_id,
+                fingerprint,
+                source_head,
+            ),
+            Err(ValidationError::InvalidInput)
+        );
+    }
+}
+
+#[test]
+fn persisted_evidence_rehydrates_only_when_owner_recomputation_matches_every_field() {
+    let record = evidence(9_998).expect("calibration evidence");
+    let json = record.to_json().expect("persisted evidence json");
+
+    assert_eq!(
+        CoverageCalibrationEvidenceRecord::from_json(&json).expect("owner rehydration"),
+        record
+    );
+
+    let tampered_mean = json.replacen("\"coverage_mean\":0.95", "\"coverage_mean\":0.94", 1);
+    assert_eq!(
+        CoverageCalibrationEvidenceRecord::from_json(&tampered_mean),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let unknown_top_level = json.replacen('{', "{\"unexpected\":true,", 1);
+    assert_eq!(
+        CoverageCalibrationEvidenceRecord::from_json(&unknown_top_level),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let unknown_outcome = json.replacen(
+        "\"window_coverages\":[0.95,0.95,0.95,0.95,0.95]",
+        "\"window_coverages\":[0.95,0.95,0.95,0.95,0.95],\"unexpected\":true",
+        1,
+    );
+    assert_eq!(
+        CoverageCalibrationEvidenceRecord::from_json(&unknown_outcome),
+        Err(ValidationError::InvalidInput)
+    );
+}

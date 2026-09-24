@@ -11,11 +11,17 @@
 //! forbidden inferential coordinates.
 
 mod coordinates;
+mod document_coordinate;
 mod error;
+mod fit_bound_marginal_covariance;
 mod lexical;
+mod marginal_covariance;
 mod posterior_draw;
+mod prevalence_design;
 mod reference;
+mod reference_fit;
 mod sparse;
+mod topic_basis;
 
 /// Additive log-ratio map from a simplex vector.
 pub use coordinates::additive_log_ratio;
@@ -27,16 +33,32 @@ pub use coordinates::from_additive_log_ratio;
 pub use coordinates::from_isometric_log_ratio;
 /// Isometric log-ratio map from a simplex vector.
 pub use coordinates::isometric_log_ratio;
+/// Version of the fit-local document-coordinate summary contract.
+pub use document_coordinate::FITTED_DOCUMENT_COORDINATE_SUMMARY_VERSION;
+/// One fitted ALR location paired with its diagonal-Laplace variance.
+pub use document_coordinate::FittedDocumentCoordinate;
+/// All fitted ALR coordinates for one admitted modeled document.
+pub use document_coordinate::FittedDocumentCoordinateRow;
+/// Fit-local document ALR locations and diagonal variances.
+pub use document_coordinate::FittedDocumentCoordinateSummary;
 /// Fail-closed topic-coordinate errors.
 pub use error::TopicMeasurementError;
+/// One document marginal covariance bound to the fitted topic-term basis.
+pub use fit_bound_marginal_covariance::FitBoundDocumentMarginalCovariance;
 /// Refuse lexical retrieval weights as inferential coordinates.
 pub use lexical::refuse_lexical_inferential_weight;
+/// One fit-bound document marginal covariance in retained ALR topic order.
+pub use marginal_covariance::DocumentMarginalCovariance;
 /// Stable counter-based draw algorithm identity.
 pub use posterior_draw::JOINT_POSTERIOR_DRAW_ALGORITHM_VERSION;
 /// Versioned deterministic joint Gaussian plausible-value draw set.
 pub use posterior_draw::JointPosteriorDrawSet;
 /// One exact fit-bound plausible value before artifact provenance binding.
 pub use posterior_draw::JointPosteriorPlausibleValue;
+/// Frozen numerical coordinate system for structural prevalence projection.
+pub use prevalence_design::PrevalenceDesignBasis;
+/// Training admission that binds a reference input to its frozen prevalence basis.
+pub use prevalence_design::ReferenceTopicTrainingInput;
 /// Identified joint precision in document-major ALR coordinate order.
 pub use reference::JointCoordinatePrecision;
 /// Posterior uncertainty representation retained by a fitted reference model.
@@ -53,7 +75,17 @@ pub use reference::ReferenceTopicModelConfig;
 pub use reference::TopicSequenceEdge;
 /// Fit the bounded deterministic CPU `f64` TRSL-TM reference estimator.
 pub use reference::fit_reference_topic_model;
+/// Owner-issued aggregate binding one admitted input, configuration, and fit.
+pub use reference_fit::ReferenceTopicFit;
+/// Owner-issued aggregate binding one frozen training basis to its exact fitted state.
+pub use reference_fit::ReferenceTopicTrainingFit;
 /// Validated compressed sparse numeric matrix.
 pub use sparse::SparseMatrix;
 /// Whether compressed values are grouped by row or by column.
 pub use sparse::SparseOrientation;
+/// Version of the fit-local topic-basis identity contract.
+pub use topic_basis::FITTED_TOPIC_BASIS_IDENTITY_VERSION;
+/// Ordered identity of the exact fitted topic-term basis.
+pub use topic_basis::FittedTopicBasisIdentity;
+/// Content-bound identity for one fitted topic row.
+pub use topic_basis::FittedTopicCoordinateIdentity;

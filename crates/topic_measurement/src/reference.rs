@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use corpus_split::CorpusSnapshot;
 use membership_core::{GroupId, MemberId, MembershipNetwork, MembershipRole};
-use relation_graph::RelationGraph;
+use relation_graph::{RelationEvidenceStatus, RelationGraph};
 use temporal_core::EventTime;
 use uuid::Uuid;
 
@@ -55,9 +55,11 @@ impl ReferenceTopicInput {
     /// `document_term` may be CSR or CSC. `covariates`, when present, may also
     /// use either orientation. Every document must occur in `snapshot`, have a
     /// nonempty nonnegative term row, span at least two event times, and have at
-    /// least one active membership across the modeled corpus. Only validated
-    /// forward transition edges with both endpoints in the corpus affect the
-    /// relational objective; all other relation kinds remain provenance only.
+    /// least one active membership at its own event time. Only directly observed,
+    /// validated forward transition edges with both endpoints in the corpus and
+    /// endpoint intervals containing the modeled event times affect the relational
+    /// objective; inferred transitions remain provenance until explicitly promoted
+    /// by their owner.
     ///
     /// # Errors
     ///
@@ -102,7 +104,7 @@ impl ReferenceTopicInput {
         }
 
         let (design, features) = build_design(&document_ids, event_times, covariates, memberships)?;
-        let transition_pairs = collect_transition_pairs(&index_by_id, relations)?;
+        let transition_pairs = collect_transition_pairs(&index_by_id, event_times, relations)?;
 
         Ok(Self {
             document_ids,
@@ -119,6 +121,16 @@ impl ReferenceTopicInput {
     #[must_use]
     pub fn document_count(&self) -> usize {
         self.document_ids.len()
+    }
+
+    /// Return modeled document identities in estimator row order.
+    ///
+    /// These read-only coordinates preserve the binding between admitted input
+    /// rows and fit-owned quantities; they do not create source-snapshot
+    /// provenance authority outside the evidence owner boundary.
+    #[must_use]
+    pub fn document_ids(&self) -> &[Uuid] {
+        &self.document_ids
     }
 
     /// Return the vocabulary size.
@@ -237,6 +249,9 @@ fn build_design(
         .zip(event_times)
         .map(|(id, time)| memberships.active_memberships_for(MemberId::from_uuid(*id), *time))
         .collect();
+    if active.iter().any(Vec::is_empty) {
+        return Err(TopicMeasurementError::InvalidModelInput);
+    }
     let membership_keys: BTreeSet<_> = active
         .iter()
         .flatten()
@@ -281,16 +296,24 @@ fn build_design(
 
 fn collect_transition_pairs(
     index_by_id: &HashMap<Uuid, usize>,
+    event_times: &[EventTime],
     relations: &RelationGraph,
 ) -> Result<Vec<(usize, usize)>, TopicMeasurementError> {
     let mut transition_pairs = BTreeSet::new();
-    for edge in relations.edges().filter(|edge| edge.is_transition_edge()) {
+    for edge in relations.edges().filter(|edge| {
+        edge.is_transition_edge() && edge.evidence_status() == RelationEvidenceStatus::Observed
+    }) {
         let Some(&source) = index_by_id.get(&edge.source().as_uuid()) else {
             continue;
         };
         let Some(&target) = index_by_id.get(&edge.target().as_uuid()) else {
             continue;
         };
+        if !edge.source_event_time().contains(event_times[source])
+            || !edge.target_event_time().contains(event_times[target])
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
         transition_pairs.insert((source, target));
     }
     if transition_pairs.is_empty() {
@@ -320,8 +343,8 @@ impl ReferenceTopicModelConfig {
     /// # Errors
     ///
     /// Returns [`TopicMeasurementError::InvalidModelInput`] unless `topic_count`
-    /// is at least two, seeds are nonempty, the iteration budget is at least
-    /// two, and tolerance is finite and positive.
+    /// is at least two, seeds are nonempty, nonzero, and unique, the iteration
+    /// budget is at least two, and tolerance is finite and positive.
     pub fn new(
         topic_count: usize,
         seeds: Vec<u64>,
@@ -367,9 +390,35 @@ impl ReferenceTopicModelConfig {
         Ok(self)
     }
 
+    /// Return the maximum deterministic iteration budget for fit-local inference.
+    #[must_use]
+    pub(crate) const fn maximum_iterations(&self) -> usize {
+        self.maximum_iterations
+    }
+
+    /// Return the convergence tolerance retained by this fitted configuration.
+    #[must_use]
+    pub(crate) const fn tolerance(&self) -> f64 {
+        self.tolerance
+    }
+
+    /// Return the Gaussian prevalence-prior variance retained by this fit.
+    #[must_use]
+    pub(crate) const fn prior_variance(&self) -> f64 {
+        self.prior_variance
+    }
+
+    /// Return the deterministic ALR update step retained by this fit.
+    #[must_use]
+    pub(crate) const fn step_size(&self) -> f64 {
+        self.step_size
+    }
+
     fn validate(&self) -> Result<(), TopicMeasurementError> {
         if self.topic_count < 2
             || self.seeds.is_empty()
+            || self.seeds.contains(&0)
+            || self.seeds.iter().copied().collect::<BTreeSet<_>>().len() != self.seeds.len()
             || self.maximum_iterations < 2
             || !self.tolerance.is_finite()
             || self.tolerance <= 0.0
@@ -511,6 +560,12 @@ impl ReferenceTopicModel {
 impl ReferenceTopicInput {
     /// Build the identified joint ALR precision at a converged MAP fit.
     ///
+    /// Owner-internal callers use this arithmetic primitive after the public
+    /// [`crate::ReferenceTopicFit`] aggregate has bound input, configuration,
+    /// and fitted model. Keeping the detached form crate-private prevents
+    /// downstream consumers from manufacturing owner-looking precision by
+    /// recombining dimension-compatible state from different fits.
+    ///
     /// The document likelihood block is the exact conditional multinomial
     /// information from the generalized-EM coordinate update, the Gaussian
     /// prevalence prior contributes its precision, and the nonlinear network
@@ -522,7 +577,7 @@ impl ReferenceTopicInput {
     ///
     /// Returns a typed invalid-input or non-finite error when dimensions,
     /// identities, numerical values, symmetry, or positive-definiteness fail.
-    pub fn build_joint_coordinate_precision(
+    pub(crate) fn build_joint_coordinate_precision(
         &self,
         model: &ReferenceTopicModel,
         config: &ReferenceTopicModelConfig,
@@ -605,6 +660,21 @@ fn softmax_jacobian(theta: &[f64], coordinate_count: usize) -> Vec<Vec<f64>> {
         .collect()
 }
 
+fn relation_precision_entry(
+    left_jacobian: &[Vec<f64>],
+    right_jacobian: &[Vec<f64>],
+    row: usize,
+    column: usize,
+    strength: f64,
+) -> f64 {
+    strength
+        * left_jacobian
+            .iter()
+            .zip(right_jacobian)
+            .map(|(left, right)| left[row] * right[column])
+            .sum::<f64>()
+}
+
 fn add_relation_precision(
     precision: &mut [Vec<f64>],
     source: usize,
@@ -617,22 +687,27 @@ fn add_relation_precision(
     let target_jacobian = softmax_jacobian(&theta[target], coordinate_count);
     for row in 0..coordinate_count {
         for column in 0..coordinate_count {
-            let source_source = strength
-                * source_jacobian
-                    .iter()
-                    .map(|topic| topic[row] * topic[column])
-                    .sum::<f64>();
-            let target_target = strength
-                * target_jacobian
-                    .iter()
-                    .map(|topic| topic[row] * topic[column])
-                    .sum::<f64>();
-            let source_target = -strength
-                * source_jacobian
-                    .iter()
-                    .zip(&target_jacobian)
-                    .map(|(left, right)| left[row] * right[column])
-                    .sum::<f64>();
+            let source_source = relation_precision_entry(
+                &source_jacobian,
+                &source_jacobian,
+                row,
+                column,
+                strength,
+            );
+            let target_target = relation_precision_entry(
+                &target_jacobian,
+                &target_jacobian,
+                row,
+                column,
+                strength,
+            );
+            let source_target = -relation_precision_entry(
+                &source_jacobian,
+                &target_jacobian,
+                row,
+                column,
+                strength,
+            );
             let source_row = source * coordinate_count + row;
             let source_column = source * coordinate_count + column;
             let target_row = target * coordinate_count + row;
@@ -643,6 +718,36 @@ fn add_relation_precision(
             precision[target_column][source_row] += source_target;
         }
     }
+}
+
+fn relation_precision_diagonal(
+    theta: &[Vec<f64>],
+    transition_pairs: &[(usize, usize)],
+    coordinate_count: usize,
+    strength: f64,
+) -> Vec<Vec<f64>> {
+    let mut diagonal = vec![vec![0.0; coordinate_count]; theta.len()];
+    for &(source, target) in transition_pairs {
+        let source_jacobian = softmax_jacobian(&theta[source], coordinate_count);
+        let target_jacobian = softmax_jacobian(&theta[target], coordinate_count);
+        for coordinate in 0..coordinate_count {
+            diagonal[source][coordinate] += relation_precision_entry(
+                &source_jacobian,
+                &source_jacobian,
+                coordinate,
+                coordinate,
+                strength,
+            );
+            diagonal[target][coordinate] += relation_precision_entry(
+                &target_jacobian,
+                &target_jacobian,
+                coordinate,
+                coordinate,
+                strength,
+            );
+        }
+    }
+    diagonal
 }
 
 pub(crate) fn cholesky(matrix: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, TopicMeasurementError> {
@@ -959,25 +1064,27 @@ fn build_result(
     state: FitState,
 ) -> Result<ReferenceTopicModel, TopicMeasurementError> {
     let theta = topic_proportions(&state.eta)?;
-    let mut degrees = vec![0_usize; input.document_ids.len()];
-    for &(source, target) in &input.transition_pairs {
-        degrees[source] += 1;
-        degrees[target] += 1;
-    }
+    let coordinate_count = config.topic_count - 1;
+    let relation_diagonal = relation_precision_diagonal(
+        &theta,
+        &input.transition_pairs,
+        coordinate_count,
+        config.relation_strength,
+    );
     let mut variances = Vec::with_capacity(theta.len());
     for (document, proportions) in theta.iter().enumerate() {
         let token_count = input.term_rows[document]
             .iter()
             .map(|(_, count)| count)
             .sum::<f64>();
-        let degree = bounded_count(degrees[document])?;
         variances.push(
-            proportions[..config.topic_count - 1]
+            proportions[..coordinate_count]
                 .iter()
-                .map(|value| {
+                .enumerate()
+                .map(|(coordinate, value)| {
                     1.0 / (token_count * value * (1.0 - value)
                         + 1.0 / config.prior_variance
-                        + degree * config.relation_strength)
+                        + relation_diagonal[document][coordinate])
                 })
                 .collect(),
         );

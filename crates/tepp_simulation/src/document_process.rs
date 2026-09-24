@@ -4,6 +4,17 @@ use crate::SimulationError;
 use temporal_core::{AvailableTime, DocumentTime, EventTime, KnowledgeCutoff};
 use uuid::Uuid;
 
+const MEMBERSHIP_ROLES: [&str; 6] = [
+    "author",
+    "department",
+    "organization",
+    "project",
+    "template",
+    "episode",
+];
+
+pub(crate) const MEMBERSHIP_ROLE_COUNT: u32 = MEMBERSHIP_ROLES.len() as u32;
+
 /// Governed method-effect labels for generated document variants.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[non_exhaustive]
@@ -262,15 +273,7 @@ fn hour_stamp(hour_index: u32) -> String {
 /// Role vocabulary used for multilevel membership generation.
 #[must_use]
 pub fn membership_role_at(index: usize) -> &'static str {
-    const ROLES: [&str; 6] = [
-        "author",
-        "department",
-        "organization",
-        "project",
-        "template",
-        "episode",
-    ];
-    ROLES[index % ROLES.len()]
+    MEMBERSHIP_ROLES[index % MEMBERSHIP_ROLES.len()]
 }
 
 #[cfg(test)]

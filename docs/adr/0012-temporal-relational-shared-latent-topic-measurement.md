@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-24
 **Decision status:** Accepted
-**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring is this PR; method effects and GPU remain accepted-target.
+**Implementation maturity:** partial — coordinates and the CPU `f64` reference estimator are implemented-main; fitted candidate-`K` scoring, frozen training-prevalence projection, fixed-training rolling-origin predictive selection, and deterministic known-topic recovery truth are active-PR; method effects in the estimator and GPU remain accepted-target.
 **Supersedes:** None; refines ADR 0004 and ADR 0005 without replacing their multilingual and psychometric authorities.
 
 ## Context
@@ -50,6 +50,37 @@ cross-classified/multiple-membership assignment. This is the logistic-normal
 prevalence boundary of correlated/structural topic models, not a raw-simplex
 regression (Blei & Lafferty, 2007; Roberts et al., 2019).
 
+The standardized event-time coordinate and ordered prevalence-feature basis are
+training-state parameters. Held-out or rolling-origin evaluation must reuse the
+training `EventTime` origin/location/scale and the exact ordered
+`PrevalenceFeature` basis; evaluation-horizon rows must not be re-standardized
+against their own batch or combined with training rows merely to recover a
+shared transform. Evaluation covariate or membership coordinates that cannot be
+represented by the training basis fail closed rather than being reordered or
+dropped. This frozen basis is numerical coordinate authority only. It does not
+authenticate source evidence, Membership provenance, relation promotion, or the
+validity/availability clocks. A future `EventTime` is therefore not rejected
+solely because it is later than the training cutoff; leakage safety depends on
+the separate Evidence/availability authority and on keeping the training
+preprocessing state fixed (Roberts et al., 2019).
+
+Active-PR rolling-origin predictive evaluation keeps that frozen training state
+and the admitted split authority together. A predictive evaluation row is
+scored only when its exact training fit identities equal the partition training
+set and its duplicate-free evaluation identities equal the partition evaluation
+set. Candidate `K` is derived from the owner-issued fitted topic dimension, not
+from a detached caller label. Within one admitted window, the highest finite
+fixed-training prevalence-mean predictive log likelihood is the predictive
+candidate criterion, with deterministic smaller-`K` exact-tie handling.
+Across multiple origins, windows must be contiguous (`test_cutoff_i =
+train_cutoff_{i+1}`), every origin must expose the same unique fitted candidate
+set, and finite predictive log likelihoods are summed by `K` before the same
+deterministic comparison. Per-window winner voting, mixing the in-sample
+Schwarz score into this predictive aggregate, or calling this quantity STM
+document-completion likelihood is not allowed. This active-PR gate is a
+prerequisite for realistic known-`K` rolling-origin recovery; it is not itself
+that recovery evidence.
+
 For explicit observed predecessor/successor relations only, the reference
 objective adds the harmonic network penalty
 
@@ -61,6 +92,12 @@ R(\Theta,G)=\frac{1}{2}\sum_{(d,e)\in E}a_{de}
 so absent relations remain unobserved rather than negative. This follows the
 document-network regularization estimand of Mei et al. (2008); it is not a
 causal edge, an event-identity promotion, or an RTM link-probability claim.
+An observed transition enters this numerical relation set only when the modeled
+`EventTime` for each admitted endpoint is contained by that edge's already
+validated source/target event-time interval. Contradictory relation timing fails
+closed rather than being silently dropped or widening an interval. This local
+consistency check does not authenticate a caller-supplied event time against
+Evidence/source truth; that remains an Evidence/Temporal Semantics boundary.
 The full bounded MAP objective is
 
 \[
@@ -72,16 +109,19 @@ The full bounded MAP objective is
 Production inference uses deterministic generalized EM: normalized latent
 term-topic responsibilities, smoothed multinomial `β` updates, bounded
 gradient updates for `η` and structural coefficients, and a diagonal Laplace
-curvature approximation for document-coordinate uncertainty. For the ADR 0024
-producer prerequisite, the CPU path also constructs a bounded document-major
-joint generalized-Gauss-Newton Laplace precision from the conditional
-multinomial information, Gaussian prior, and admitted relation-residual
-Jacobians; this matrix is not a covariance or posterior draw set. Multiple seeded
-initializations retain the best finite converged objective. A non-finite
-intermediate, invalid sparse matrix, missing cutoff-safe document, reverse
-transition, or exhausted iteration budget returns a typed failure; it never
-emits a partial topic artifact. Recovery gates remain caller-owned promotion
-criteria over completed validation evidence.
+curvature approximation for document-coordinate uncertainty. The retained
+diagonal variance is the reciprocal of the matching generalized-Gauss-Newton
+precision diagonal, including the exact softmax-Jacobian relation curvature;
+it is not `diag(P^{-1})` and does not represent marginal variance from the full
+joint posterior. For the ADR 0024 producer prerequisite, the CPU path also
+constructs a bounded document-major joint generalized-Gauss-Newton Laplace
+precision from the conditional multinomial information, Gaussian prior, and
+admitted relation-residual Jacobians; this matrix is not a covariance or
+posterior draw set. Multiple seeded initializations retain the best finite
+converged objective. A non-finite intermediate, invalid sparse matrix, missing
+cutoff-safe document, reverse transition, or exhausted iteration budget returns
+a typed failure; it never emits a partial topic artifact. Recovery gates remain
+caller-owned promotion criteria over completed validation evidence.
 
 ## Non-goals
 
@@ -116,7 +156,9 @@ Backend changes require a versioned model contract, migration notes, reproducibi
 
 ## Verification
 
-Required evidence includes known-truth topic/covariate/covariance recovery, bias/RMSE/interval coverage, held-out predictive evidence, seed/bootstrap stability, relation-aware split integrity, language alignment/invariance, method-effect recovery, known-K/acceptable-set behavior, posterior calibration, and downstream coordinate compatibility. CPU/GPU implementations additionally require parity under ADR 0001/0006.
+Required evidence includes known-truth topic/covariate/covariance recovery, bias/RMSE/interval coverage, held-out predictive evidence, seed/bootstrap stability, relation-aware split integrity, language alignment/invariance, method-effect recovery, known-K/acceptable-set behavior, posterior calibration, and downstream coordinate compatibility. Held-out evidence additionally requires a frozen training prevalence basis so the same evaluation observation has the same projected design row regardless of which other evaluation-horizon observations share its batch. Rolling-origin K evidence additionally requires contiguous owner-admitted windows, identical unique candidate sets across origins, exact training/evaluation identity binding, deliberate future-availability leakage refusal, realistic repeated true-K recovery that preserves temporal/relational and multilevel/multiple-membership composition, and Monte Carlo uncertainty over both successful recovery metrics and failure rate. CPU/GPU implementations additionally require parity under ADR 0001/0006.
+
+The active-PR `tepp_simulation` recovery owner supplies the prerequisite deterministic truth rather than hand-authored estimator fixtures: a versioned integer configuration declares true `K`, vocabulary/document size, topic separation, temporal prevalence drift, residual logistic-normal scale, weighted multiple-membership strength, and true-transition strength. A separate topic seed domain generates positive normalized topic-term probabilities, the declared prevalence intercept/slope/covariance state, document ALR coordinates/topic mixtures, method/membership/relation contributions, and fixed-length term counts. Role-specific membership groups recur across events and their weights sum to 10,000 basis points so generated recovery studies contain actual shared cross-classification rather than atomized document-only groups. The configuration and every generated topic-truth row are digest-bound to the `TruthManifest`. This is simulation truth only: it does not mint production Evidence, Membership, relation-activation, source/event-time, or release authority, and it is not by itself #680 scientific acceptance.
 
 ## Rollback and supersession
 

@@ -1,0 +1,5 @@
+# Digest-bound known-topic simulation truth
+
+`tepp_simulation` now owns a deterministic known-topic data-generating process alongside temporal/event truth. The simulation configuration declares true K, vocabulary/document size, topic separation, temporal prevalence drift, residual logistic-normal scale, weighted multiple-membership effects, and incoming-transition effects. Generated truth records positive normalized topic-term probabilities, prevalence coefficients/covariance, per-document ALR coordinates and topic mixtures, method/membership/relation contributions, and fixed-length term counts.
+
+Topic configuration and all generated topic truth are included in the configuration/content digests. Simulation memberships now sum to exactly 10,000 basis points and include recurring role-specific classification groups across events so recovery studies can exercise weighted multiple-membership and cross-classified structure. This is synthetic scientific truth for recovery studies, not production Evidence, Membership, relation-activation, or source-provenance authority, and it does not by itself satisfy #680 replicated rolling-origin acceptance.

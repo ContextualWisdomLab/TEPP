@@ -1,0 +1,1 @@
+`tepp.trsl_topic_lineage.v2` now binds `posterior_approximation = diagonal_laplace`, matching the uncertainty representation retained by the CPU `f64` reference fit. Unknown labels and stronger claims such as joint Gauss-Newton/Laplace uncertainty fail closed; the standalone result does not manufacture joint posterior authority that the fitted model does not retain.

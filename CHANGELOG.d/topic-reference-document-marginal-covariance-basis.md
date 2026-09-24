@@ -1,0 +1,1 @@
+`topic_measurement` now exposes `FitBoundDocumentMarginalCovariance`, which pairs the #704 full-joint document marginal covariance with `FittedTopicBasisIdentity` derived from the same owner-issued `ReferenceTopicFit`. Provisional caller topic UUIDs remain compatibility coordinates and are not promoted to source/vocabulary or semantic topic authority.

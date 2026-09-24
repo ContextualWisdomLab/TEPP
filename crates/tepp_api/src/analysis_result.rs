@@ -21,6 +21,7 @@ pub const DEFAULT_ANALYSIS_RESULT_BYTE_LIMIT: usize = 64 * 1024;
 
 const MAXIMUM_SUMMARY_COUNT: u64 = 1_000_000_000;
 const MAXIMUM_FAILURE_CODE_BYTES: usize = 64;
+const VALIDATED_STATUS: &str = "validated";
 
 /// Canonical terminal lifecycle state for an analysis run.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -42,7 +43,7 @@ pub struct AnalysisResultSummary {
     pub evidence_count: u64,
     /// Number of reported statistics or parameters.
     pub statistic_count: u64,
-    /// Provider-authored validation status.
+    /// Canonical scientific validation state; successful results admit only `validated`.
     pub validation_status: String,
 }
 
@@ -51,8 +52,10 @@ impl AnalysisResultSummary {
     ///
     /// # Errors
     ///
-    /// Returns a fail-closed contract error for empty labels or unbounded
-    /// counts.
+    /// Returns a fail-closed contract error for empty labels, any validation
+    /// state other than `validated`, or unbounded counts. Non-convergence,
+    /// insufficient evidence, and unverifiable outcomes belong to the terminal
+    /// failed shape and cannot masquerade as successful result artifacts.
     pub fn new(
         analysis_family: impl Into<String>,
         evidence_count: u64,
@@ -72,6 +75,9 @@ impl AnalysisResultSummary {
     fn validate(&self) -> Result<(), ApiError> {
         require_nonempty(&self.analysis_family)?;
         require_nonempty(&self.validation_status)?;
+        if self.validation_status != VALIDATED_STATUS {
+            return Err(ApiError::InvalidWirePayload);
+        }
         if self.evidence_count > MAXIMUM_SUMMARY_COUNT
             || self.statistic_count > MAXIMUM_SUMMARY_COUNT
         {
@@ -113,7 +119,7 @@ pub struct AnalysisRunTerminalResult {
     pub result_sha256: Option<String>,
     /// Versioned result-schema identity.
     pub result_schema_version: Option<String>,
-    /// Strict RFC 3339 system time at terminal completion.
+    /// Canonical UTC RFC 3339 system time at terminal completion.
     pub completed_at: String,
     /// Bounded summary for a succeeded run.
     pub summary: Option<AnalysisResultSummary>,
@@ -241,7 +247,11 @@ impl AnalysisRunTerminalResult {
             require_nonempty(value)?;
         }
         require_rfc3339_knowledge_cutoff(&self.knowledge_cutoff)?;
-        SystemTime::parse_rfc3339(&self.completed_at).map_err(|_| ApiError::InvalidWirePayload)?;
+        let completed_at = SystemTime::parse_rfc3339(&self.completed_at)
+            .map_err(|_| ApiError::InvalidWirePayload)?;
+        if self.completed_at != completed_at.to_rfc3339() {
+            return Err(ApiError::InvalidWirePayload);
+        }
 
         match self.run_state {
             AnalysisRunTerminalState::Succeeded => self.validate_succeeded(),

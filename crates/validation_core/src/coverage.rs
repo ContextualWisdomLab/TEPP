@@ -1,6 +1,10 @@
 //! Interval coverage for recovered confidence/credible intervals.
 
 use crate::ValidationError;
+use crate::monte_carlo::{
+    MonteCarloRecoveryMetricSummary, MonteCarloSummary, summarize_recovery_metric_replications,
+    summarize_replications,
+};
 
 /// Empirical coverage of closed intervals `[lower, upper]` for truth values.
 ///
@@ -34,6 +38,302 @@ pub fn interval_coverage(
         }
     }
     Ok(covered as f64 / truth.len() as f64)
+}
+
+fn collapse_window_coverages(
+    replication_window_coverages: &[Vec<f64>],
+) -> Result<Vec<f64>, ValidationError> {
+    if replication_window_coverages.iter().any(|windows| {
+        windows.is_empty()
+            || windows
+                .iter()
+                .any(|coverage| !coverage.is_finite() || !(0.0..=1.0).contains(coverage))
+    }) {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    Ok(replication_window_coverages
+        .iter()
+        .map(|windows| windows.iter().sum::<f64>() / windows.len() as f64)
+        .collect())
+}
+
+/// Collapse rolling-origin coverage within each DGP replication before Monte Carlo inference.
+///
+/// Each outer element is one independently generated DGP replication. Each inner
+/// vector contains already-computed coverage proportions for the declared
+/// rolling-origin windows within that replication. Windows are weighted equally
+/// inside a DGP replication; the resulting per-DGP means are the only samples
+/// passed to the Monte Carlo summary owner.
+///
+/// This contract prevents repeated document, coordinate, or expanding-window
+/// intervals from inflating the Monte Carlo replication count. It does not assert
+/// independence within a DGP replication and does not construct binomial/Wilson
+/// intervals from the flattened interval count.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when fewer than two independent DGP
+/// replications are supplied, any replication has no declared windows, or any
+/// window coverage is non-finite or outside `[0, 1]`. Percentile configuration
+/// errors are propagated from [`summarize_replications`].
+pub fn summarize_windowed_coverage_replications(
+    replication_window_coverages: &[Vec<f64>],
+    lower_percentile: f64,
+    upper_percentile: f64,
+) -> Result<MonteCarloSummary, ValidationError> {
+    if replication_window_coverages.len() < 2 {
+        return Err(ValidationError::InvalidInput);
+    }
+    let per_replication_coverage = collapse_window_coverages(replication_window_coverages)?;
+    summarize_replications(
+        &per_replication_coverage,
+        lower_percentile,
+        upper_percentile,
+    )
+}
+
+/// Collapse successful rolling-origin coverage within DGP replications while retaining failures.
+///
+/// `attempted_replication_count` is the unconditional number of scientifically
+/// admissible DGP replications attempted. `successful_replication_window_coverages`
+/// contains window-level coverage only for attempts where that metric was
+/// numerically available. Each successful DGP is collapsed to one equal-window
+/// mean before the existing recovery-metric owner computes between-DGP Monte
+/// Carlo uncertainty and the unconditional failure denominator.
+///
+/// Structural experiment invalidity must be rejected by the owning workflow
+/// before calling this function. Missing successful coverage here represents only
+/// an owner-admitted numerical failure; it must not be used to launder malformed
+/// split, identity, covariance, or interval geometry into the failure denominator.
+///
+/// All-failed and one-success experiments remain reportable. One successful DGP
+/// retains its conditional coverage mean but does not fabricate a between-DGP
+/// standard deviation or Monte Carlo standard error.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when a successful DGP has no windows,
+/// any window coverage is non-finite or outside `[0, 1]`, the attempted count is
+/// zero, or successful replications outnumber attempts. Percentile configuration
+/// errors are propagated from the recovery-metric Monte Carlo owner.
+pub fn summarize_windowed_coverage_recovery_replications(
+    attempted_replication_count: usize,
+    successful_replication_window_coverages: &[Vec<f64>],
+    lower_percentile: f64,
+    upper_percentile: f64,
+) -> Result<MonteCarloRecoveryMetricSummary, ValidationError> {
+    let successful_dgp_coverages =
+        collapse_window_coverages(successful_replication_window_coverages)?;
+    summarize_recovery_metric_replications(
+        attempted_replication_count,
+        &successful_dgp_coverages,
+        lower_percentile,
+        upper_percentile,
+    )
+}
+
+/// Prospective interval-calibration design for one versioned scientific acceptance run.
+///
+/// This value records the design before the expensive DGP experiment is run. It
+/// intentionally separates a practical psychometric coverage band from Monte
+/// Carlo precision and from numerical-failure reporting. The design also owns the
+/// exact normal critical value used to construct the declared marginal intervals,
+/// so the persisted design identity covers the interval rule that generates the
+/// coverage estimand rather than only its nominal target. The design does not
+/// define an acceptable failure-rate threshold and therefore cannot by itself
+/// promote a full scientific or release claim.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CoverageCalibrationDesign {
+    design_id: &'static str,
+    attempted_dgp_count: usize,
+    nominal_coverage: f64,
+    normal_critical_value: f64,
+    practical_lower_coverage: f64,
+    practical_upper_coverage: f64,
+    maximum_monte_carlo_standard_error: f64,
+}
+
+impl CoverageCalibrationDesign {
+    /// TEPP's prospectively declared nominal-95% coverage design, version 1.
+    ///
+    /// Marginal normal intervals use the fixed two-sided 95% standard-normal
+    /// critical value `1.959963984540054`. The practical `[0.91, 0.98]` band
+    /// follows the Muthén and Muthén (2002) psychometric simulation convention.
+    /// Ten thousand independent DGP attempts are predeclared so a complete
+    /// successful sample of bounded `[0,1]` DGP-level coverage values has
+    /// worst-case Monte Carlo standard error at most `0.005`. The actual
+    /// owner-reported standard error remains authoritative when numerical
+    /// failures reduce the successful sample.
+    #[must_use]
+    pub const fn tepp_nominal_95_v1() -> Self {
+        Self {
+            design_id: "tepp.coverage.nominal95.v1",
+            attempted_dgp_count: 10_000,
+            nominal_coverage: 0.95,
+            normal_critical_value: 1.959_963_984_540_054,
+            practical_lower_coverage: 0.91,
+            practical_upper_coverage: 0.98,
+            maximum_monte_carlo_standard_error: 0.005,
+        }
+    }
+
+    /// Stable versioned identity for the prospective design.
+    #[must_use]
+    pub const fn design_id(self) -> &'static str {
+        self.design_id
+    }
+
+    /// Number of independent DGP replications declared before execution.
+    #[must_use]
+    pub const fn attempted_dgp_count(self) -> usize {
+        self.attempted_dgp_count
+    }
+
+    /// Nominal interval coverage targeted by the estimator.
+    #[must_use]
+    pub const fn nominal_coverage(self) -> f64 {
+        self.nominal_coverage
+    }
+
+    /// Exact standard-normal critical value used by the declared marginal interval rule.
+    #[must_use]
+    pub const fn normal_critical_value(self) -> f64 {
+        self.normal_critical_value
+    }
+
+    /// Lower practical coverage bound declared before execution.
+    #[must_use]
+    pub const fn practical_lower_coverage(self) -> f64 {
+        self.practical_lower_coverage
+    }
+
+    /// Upper practical coverage bound declared before execution.
+    #[must_use]
+    pub const fn practical_upper_coverage(self) -> f64 {
+        self.practical_upper_coverage
+    }
+
+    /// Maximum accepted Monte Carlo standard error of the successful DGP coverage mean.
+    #[must_use]
+    pub const fn maximum_monte_carlo_standard_error(self) -> f64 {
+        self.maximum_monte_carlo_standard_error
+    }
+}
+
+/// Assessment of one denominator-preserving coverage summary against a prospective design.
+///
+/// This assessment exposes the two prospectively declared conditional calibration
+/// criteria separately from the unconditional numerical-failure denominator. It
+/// deliberately does not expose one aggregate claim/promotion boolean while the
+/// design has no prospective failure-rate acceptability policy.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CoverageCalibrationAssessment {
+    attempted_replication_count: usize,
+    successful_replication_count: usize,
+    failure_count: usize,
+    failure_rate: f64,
+    coverage_mean: Option<f64>,
+    coverage_monte_carlo_standard_error: Option<f64>,
+    coverage_within_practical_band: bool,
+    monte_carlo_precision_sufficient: bool,
+}
+
+impl CoverageCalibrationAssessment {
+    /// Unconditional attempted DGP count.
+    #[must_use]
+    pub const fn attempted_replication_count(self) -> usize {
+        self.attempted_replication_count
+    }
+
+    /// DGP count with numerically available coverage.
+    #[must_use]
+    pub const fn successful_replication_count(self) -> usize {
+        self.successful_replication_count
+    }
+
+    /// Owner-admitted numerical failures among attempted DGP replications.
+    #[must_use]
+    pub const fn failure_count(self) -> usize {
+        self.failure_count
+    }
+
+    /// Unconditional numerical failure rate.
+    #[must_use]
+    pub const fn failure_rate(self) -> f64 {
+        self.failure_rate
+    }
+
+    /// Conditional mean DGP-level coverage, when at least one replication succeeded.
+    #[must_use]
+    pub const fn coverage_mean(self) -> Option<f64> {
+        self.coverage_mean
+    }
+
+    /// Between-DGP Monte Carlo standard error, available only with at least two successes.
+    #[must_use]
+    pub const fn coverage_monte_carlo_standard_error(self) -> Option<f64> {
+        self.coverage_monte_carlo_standard_error
+    }
+
+    /// Whether the conditional coverage mean lies inside the prospective practical band.
+    #[must_use]
+    pub const fn coverage_within_practical_band(self) -> bool {
+        self.coverage_within_practical_band
+    }
+
+    /// Whether between-DGP coverage uncertainty meets the prospective precision target.
+    #[must_use]
+    pub const fn monte_carlo_precision_sufficient(self) -> bool {
+        self.monte_carlo_precision_sufficient
+    }
+}
+
+/// Assess denominator-preserving coverage evidence against one prospective design.
+///
+/// The attempted DGP count must match the design exactly, preventing a caller
+/// from shrinking or extending the experiment after seeing outcomes while still
+/// claiming the same design identity. Coverage and its Monte Carlo standard
+/// error are read only from the owner summary; this function does not recompute
+/// window/document/coordinate arithmetic or remove failed attempts. The result
+/// intentionally keeps practical-band and Monte Carlo precision decisions as
+/// separate components; it does not make a full scientific acceptance decision.
+///
+/// # Errors
+///
+/// Returns [`ValidationError::InvalidInput`] when the summary's attempted DGP
+/// count differs from the prospective design. Structural experiment invalidity
+/// must already have failed closed before a recovery summary is minted.
+pub fn assess_coverage_calibration(
+    design: &CoverageCalibrationDesign,
+    summary: &MonteCarloRecoveryMetricSummary,
+) -> Result<CoverageCalibrationAssessment, ValidationError> {
+    if summary.attempted_replication_count() != design.attempted_dgp_count {
+        return Err(ValidationError::InvalidInput);
+    }
+
+    let coverage_mean = summary.successful_metric_mean();
+    let coverage_monte_carlo_standard_error = summary
+        .successful_metric_summary()
+        .map(|metric| metric.standard_error);
+    let coverage_within_practical_band = coverage_mean.is_some_and(|mean| {
+        (design.practical_lower_coverage..=design.practical_upper_coverage).contains(&mean)
+    });
+    let monte_carlo_precision_sufficient = coverage_monte_carlo_standard_error
+        .is_some_and(|standard_error| {
+            standard_error <= design.maximum_monte_carlo_standard_error
+        });
+
+    Ok(CoverageCalibrationAssessment {
+        attempted_replication_count: summary.attempted_replication_count(),
+        successful_replication_count: summary.successful_replication_count(),
+        failure_count: summary.failure_count(),
+        failure_rate: summary.failure_rate(),
+        coverage_mean,
+        coverage_monte_carlo_standard_error,
+        coverage_within_practical_band,
+        monte_carlo_precision_sufficient,
+    })
 }
 
 /// Wilson score lower/upper bounds for a binomial coverage proportion.
@@ -73,7 +373,9 @@ pub fn wilson_coverage_interval(
 
 #[cfg(test)]
 mod tests {
-    use super::{interval_coverage, wilson_coverage_interval};
+    use super::{
+        interval_coverage, summarize_windowed_coverage_replications, wilson_coverage_interval,
+    };
     use crate::ValidationError;
 
     #[test]
@@ -154,6 +456,51 @@ mod tests {
         // Finite z whose scaled Wilson terms still overflow.
         assert_eq!(
             wilson_coverage_interval(&truth, &lower, &upper, 1e200),
+            Err(ValidationError::InvalidConfiguration)
+        );
+    }
+
+    #[test]
+    fn windowed_coverage_collapses_within_dgp_before_monte_carlo() {
+        let summary = summarize_windowed_coverage_replications(
+            &[vec![1.0, 0.5], vec![0.5, 0.0]],
+            0.025,
+            0.975,
+        )
+        .expect("DGP-clustered coverage summary");
+
+        assert_eq!(summary.replication_count, 2);
+        assert!((summary.mean - 0.5).abs() < 1.0e-12);
+        assert!((summary.percentile_lower - 0.25).abs() < 1.0e-12);
+        assert!((summary.percentile_upper - 0.75).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn windowed_coverage_rejects_nonindependent_or_invalid_replication_geometry() {
+        assert_eq!(
+            summarize_windowed_coverage_replications(&[vec![0.95]], 0.025, 0.975),
+            Err(ValidationError::InvalidInput)
+        );
+        assert_eq!(
+            summarize_windowed_coverage_replications(&[vec![0.9], vec![]], 0.025, 0.975),
+            Err(ValidationError::InvalidInput)
+        );
+        for invalid in [f64::NAN, -0.1, 1.1] {
+            assert_eq!(
+                summarize_windowed_coverage_replications(
+                    &[vec![0.9], vec![invalid]],
+                    0.025,
+                    0.975,
+                ),
+                Err(ValidationError::InvalidInput)
+            );
+        }
+        assert_eq!(
+            summarize_windowed_coverage_replications(
+                &[vec![0.9], vec![0.8]],
+                0.9,
+                0.1,
+            ),
             Err(ValidationError::InvalidConfiguration)
         );
     }

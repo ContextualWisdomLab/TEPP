@@ -3,7 +3,7 @@
 use std::collections::BTreeSet;
 
 use topic_measurement::{
-    ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, fit_reference_topic_model,
+    ReferenceTopicFit, ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig,
     refuse_lexical_inferential_weight,
 };
 
@@ -43,7 +43,8 @@ impl FittedCandidateKConfig {
     /// `K` is supplied, [`ModelSelectionError::NonPositiveCandidateK`] when any
     /// candidate is less than two, or
     /// [`ModelSelectionError::InvalidDiagnostic`] when candidates are
-    /// duplicated or the seed/iteration/tolerance contract fails.
+    /// duplicated, the seed manifest is empty/zero/duplicated, or the
+    /// iteration/tolerance contract fails.
     pub fn new(
         candidate_topic_counts: Vec<u32>,
         seeds: Vec<u64>,
@@ -95,7 +96,7 @@ impl FittedCandidateKConfig {
         &self.candidate_topic_counts
     }
 
-    /// Return the estimator initialization seeds.
+    /// Return the estimator initialization seeds in caller order.
     #[must_use]
     pub fn seeds(&self) -> &[u64] {
         &self.seeds
@@ -113,6 +114,46 @@ impl FittedCandidateKConfig {
         self.tolerance
     }
 
+    /// Build the exact reference-estimator configuration for one declared candidate.
+    ///
+    /// This crate-owned conversion is the single numerical-design boundary used
+    /// both when fitting candidates and when scientific recovery verifies retained
+    /// fit configuration. Keeping seeds, convergence controls, and hyperparameters
+    /// here prevents those paths from drifting independently.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ModelSelectionError::PredictiveCandidateGridMismatch`] when
+    /// `candidate_k` is not part of the declared grid, or
+    /// [`ModelSelectionError::InvalidDiagnostic`] when the reference owner rejects
+    /// the resulting configuration.
+    pub(crate) fn reference_topic_model_config(
+        &self,
+        candidate_k: u32,
+    ) -> Result<ReferenceTopicModelConfig, ModelSelectionError> {
+        if !self.candidate_topic_counts.contains(&candidate_k) {
+            return Err(ModelSelectionError::PredictiveCandidateGridMismatch);
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        let topic_count = candidate_k as usize;
+        ReferenceTopicModelConfig::new(
+            topic_count,
+            self.seeds.clone(),
+            self.maximum_iterations,
+            self.tolerance,
+        )
+        .and_then(|value| {
+            value.with_hyperparameters(
+                self.prior_variance,
+                self.relation_strength,
+                self.ridge,
+                self.topic_smoothing,
+                self.step_size,
+            )
+        })
+        .map_err(|_| ModelSelectionError::InvalidDiagnostic)
+    }
+
     fn validate(&self) -> Result<(), ModelSelectionError> {
         if self.candidate_topic_counts.is_empty() {
             return Err(ModelSelectionError::EmptyCandidateSet);
@@ -127,6 +168,8 @@ impl FittedCandidateKConfig {
             }
         }
         if self.seeds.is_empty()
+            || self.seeds.contains(&0)
+            || self.seeds.iter().copied().collect::<BTreeSet<_>>().len() != self.seeds.len()
             || self.maximum_iterations < 2
             || !self.tolerance.is_finite()
             || self.tolerance <= 0.0
@@ -147,30 +190,33 @@ impl FittedCandidateKConfig {
     }
 }
 
-/// Build a statistically supported candidate from one actual fitted model.
+/// Build a statistically supported candidate from one owner-issued reference fit.
 ///
 /// The first diagnostic is Schwarz's (1978) large-sample maximizer
-/// `ℓ − (p ln N)/2` from the fitted `θ` and `β`. Complexity is the free
-/// parameter count `p`. A failed or non-finite diagnostic is returned as a
-/// typed error; it is never replaced with a fabricated likelihood.
+/// `ℓ − (p ln N)/2` from the retained fitted `θ` and `β`. Complexity is the
+/// free parameter count `p`. Input and model are read from the same
+/// [`ReferenceTopicFit`], so a dimension-compatible model from another fit
+/// cannot be rebound to different corpus/design coordinates at this public
+/// statistical-authority boundary. Candidate `K` is derived from the fit.
 ///
 /// # Errors
 ///
-/// Returns [`ModelSelectionError::NonPositiveCandidateK`] when `candidate_k`
-/// is less than two, or [`ModelSelectionError::InvalidDiagnostic`] when the
-/// fitted dimensions, likelihood, or parameter count are unusable.
+/// Returns [`ModelSelectionError::InvalidDiagnostic`] when the fitted
+/// dimensions, likelihood, candidate dimension, or parameter count are unusable.
 pub fn statistical_candidate_from_fit(
-    input: &ReferenceTopicInput,
-    candidate_k: u32,
-    model: &ReferenceTopicModel,
+    fit: &ReferenceTopicFit,
 ) -> Result<ModelCandidate, ModelSelectionError> {
+    let input = fit.input();
+    let model = fit.model();
+    let parameters = free_parameter_count(model)?;
+    let candidate_k = u32::try_from(model.topic_term_probabilities.len())
+        .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
     let log_likelihood = input
         .in_sample_log_likelihood(model)
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
     let tokens = input
         .token_count()
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
-    let parameters = free_parameter_count(model)?;
     let log_tokens = tokens.ln();
     if log_tokens < 0.0 {
         return Err(ModelSelectionError::InvalidDiagnostic);
@@ -182,12 +228,13 @@ pub fn statistical_candidate_from_fit(
 
 /// Fit each candidate `K` and select the admissible statistical topic count.
 ///
-/// Each candidate is fitted with [`fit_reference_topic_model`]. A typed
-/// `DidNotConverge`, `NonFiniteEstimate`, or `InvalidModelInput` is a failed
-/// candidate, not a fabricated diagnostic. LLM-vote-only values may be
-/// supplied as recommenders; they cannot win without a successful statistical
-/// fit. TF-IDF, BM25, stopword-deletion, and LLM labels are refused as
-/// inferential coordinates.
+/// Each candidate is fitted with [`ReferenceTopicFit::fit`], retaining the
+/// exact admitted input and deterministic configuration beside the model before
+/// scoring. A typed `DidNotConverge`, `NonFiniteEstimate`, or
+/// `InvalidModelInput` is a failed candidate, not a fabricated diagnostic.
+/// LLM-vote-only values may be supplied as recommenders; they cannot win
+/// without a successful statistical fit. TF-IDF, BM25, stopword-deletion, and
+/// LLM labels are refused as inferential coordinates.
 ///
 /// This wiring does not claim GPU execution, full Bayesian sampling, or topic
 /// birth/split/merge.
@@ -205,26 +252,9 @@ pub fn select_fitted_candidate_k(
     refuse_nonstatistical_method(method_name)?;
     let mut candidates = Vec::new();
     for &candidate_k in config.candidate_topic_counts() {
-        #[allow(clippy::cast_possible_truncation)]
-        let topic_count = candidate_k as usize;
-        let fit_config = ReferenceTopicModelConfig::new(
-            topic_count,
-            config.seeds().to_vec(),
-            config.maximum_iterations(),
-            config.tolerance(),
-        )
-        .and_then(|value| {
-            value.with_hyperparameters(
-                config.prior_variance,
-                config.relation_strength,
-                config.ridge,
-                config.topic_smoothing,
-                config.step_size,
-            )
-        })
-        .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
-        if let Ok(model) = fit_reference_topic_model(input, &fit_config) {
-            candidates.push(statistical_candidate_from_fit(input, candidate_k, &model)?);
+        let fit_config = config.reference_topic_model_config(candidate_k)?;
+        if let Ok(fit) = ReferenceTopicFit::fit(input, &fit_config) {
+            candidates.push(statistical_candidate_from_fit(&fit)?);
         }
     }
     for &vote in llm_votes {
@@ -290,7 +320,10 @@ fn free_parameter_count(model: &ReferenceTopicModel) -> Result<f64, ModelSelecti
 
 #[cfg(test)]
 mod tests {
-    use super::{FittedCandidateKConfig, free_parameter_count, refuse_nonstatistical_method};
+    use super::{
+        FittedCandidateKConfig, ReferenceTopicModelConfig, free_parameter_count,
+        refuse_nonstatistical_method,
+    };
     use crate::ModelSelectionError;
     use topic_measurement::{PrevalenceFeature, ReferenceTopicModel};
 
@@ -322,6 +355,17 @@ mod tests {
         assert_eq!(config.seeds(), &[7, 11]);
         assert_eq!(config.maximum_iterations(), 20);
         assert!((config.tolerance() - 1e-5).abs() < f64::EPSILON);
+        assert_eq!(
+            config
+                .reference_topic_model_config(2)
+                .expect("declared reference config"),
+            ReferenceTopicModelConfig::new(2, vec![7, 11], 20, 1e-5)
+                .expect("reference config")
+        );
+        assert_eq!(
+            config.reference_topic_model_config(4),
+            Err(ModelSelectionError::PredictiveCandidateGridMismatch)
+        );
         refuse_nonstatistical_method("trsl_tm_reference").expect("allowed");
         refuse_nonstatistical_method("logistic_normal").expect("allowed");
         for method in [

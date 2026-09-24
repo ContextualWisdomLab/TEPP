@@ -1,0 +1,6 @@
+# Bind prospective coverage criteria to persisted evidence
+
+- `validation_core::coverage_calibration_design_sha256` derives a domain-separated SHA-256 fingerprint from the versioned validation design identity, exact covered-population/aggregation estimand, attempted independent-DGP count, nominal coverage, exact normal critical value used by the declared marginal interval rule, practical lower/upper coverage bounds, and maximum Monte Carlo standard error using explicit little-endian integer lengths/counts and exact IEEE-754 binary64 bits.
+- `CoverageCalibrationEvidenceRecord` schema v5 persists the estimand identity and the complete design fingerprint beside `validation_design_id`, preventing a stable design name from hiding estimand, criterion, or interval-construction drift while keeping the full source head, simulation scenario fingerprint, indexed outcome ledger, and outcome digest as separate provenance dimensions.
+- A pinned `tepp.coverage.nominal95.v1` wire fixture fixes the complete prospective-design fingerprint at `a3a0b8d65388627d2360b05731c5e410feac343a6068da4f9192a353791bc0c0` and verifies deterministic JSON exposure.
+- This change does not execute the prospective 10,000-DGP study, define an acceptable numerical-failure rate, promote a scientific claim, or create a release.

@@ -10,6 +10,8 @@ pub enum CorpusSplitError {
     RelationLeakage,
     /// A document was unavailable at the requested knowledge cutoff.
     UnavailableAtCutoff,
+    /// A document insertion tried to change an already bound snapshot cutoff.
+    KnowledgeCutoffMismatch,
     /// A duplicate document identity was rejected.
     DuplicateDocumentIdentity,
     /// Split proportions or seeds were invalid.
@@ -27,6 +29,7 @@ impl fmt::Display for CorpusSplitError {
         let message = match self {
             Self::RelationLeakage => "relation-aware split leakage",
             Self::UnavailableAtCutoff => "document unavailable at knowledge cutoff",
+            Self::KnowledgeCutoffMismatch => "snapshot knowledge cutoff mismatch",
             Self::DuplicateDocumentIdentity => "duplicate document identity",
             Self::InvalidSplitConfiguration => "invalid split configuration",
             Self::EmptyCanonicalText => "empty canonical text",
@@ -52,6 +55,10 @@ mod tests {
         assert_eq!(
             CorpusSplitError::UnavailableAtCutoff.to_string(),
             "document unavailable at knowledge cutoff"
+        );
+        assert_eq!(
+            CorpusSplitError::KnowledgeCutoffMismatch.to_string(),
+            "snapshot knowledge cutoff mismatch"
         );
         assert_eq!(
             CorpusSplitError::DuplicateDocumentIdentity.to_string(),

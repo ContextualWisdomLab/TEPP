@@ -12,8 +12,8 @@ use temporal_core::{
     TemporalPrecision,
 };
 use topic_measurement::{
-    PosteriorApproximation, PrevalenceFeature, ReferenceTopicInput, ReferenceTopicModelConfig,
-    SparseMatrix, TopicMeasurementError, fit_reference_topic_model,
+    PosteriorApproximation, PrevalenceFeature, ReferenceTopicFit, ReferenceTopicInput,
+    ReferenceTopicModelConfig, SparseMatrix, TopicMeasurementError, fit_reference_topic_model,
 };
 use uuid::Uuid;
 use validation_core::root_mean_square_error;
@@ -157,7 +157,8 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
         .expect("configuration")
         .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
         .expect("hyperparameters");
-    let result = fit_reference_topic_model(&input, &config).expect("converged fit");
+    let fit = ReferenceTopicFit::fit(&input, &config).expect("converged fit");
+    let result = fit.model();
     assert_eq!(
         result.posterior_approximation(),
         PosteriorApproximation::DiagonalLaplace
@@ -167,8 +168,8 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
         Err(TopicMeasurementError::JointPosteriorUnavailable)
     );
     let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
-    let precision = input
-        .build_joint_coordinate_precision(&result, &config, topic_ids.clone())
+    let precision = fit
+        .build_joint_coordinate_precision(topic_ids.clone())
         .expect("joint precision");
     assert_eq!(
         precision.approximation(),
@@ -216,7 +217,7 @@ fn separated_topics_recover_and_emit_predecessor_successor_counts() {
     assert!(rmse < 0.25, "known-truth topic RMSE {rmse} exceeded 0.25");
 
     let log_likelihood = input
-        .in_sample_log_likelihood(&result)
+        .in_sample_log_likelihood(result)
         .expect("in-sample mixture log-likelihood");
     assert!(log_likelihood.is_finite());
     let tokens = input.token_count().expect("token count");

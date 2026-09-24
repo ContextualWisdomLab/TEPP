@@ -18,6 +18,36 @@ pub enum ModelSelectionError {
     LexicalWeightForbidden,
     /// Every fitted candidate failed to converge or produced a typed numeric failure.
     NoSuccessfulFit,
+    /// One declared scientific-recovery candidate failed numerically while fitting.
+    RecoveryCandidateFitFailed,
+    /// One declared scientific-recovery candidate is structurally incompatible with the training input.
+    RecoveryCandidateInputInvalid,
+    /// A held-out predictive payload is structurally incompatible with its fitted training state.
+    PredictiveEvaluationInputInvalid,
+    /// Held-out document-state inference failed numerically for an otherwise admissible recovery input.
+    HeldOutStateRecoveryFailed,
+    /// A held-out document-state payload is structurally incompatible with its admitted recovery window.
+    HeldOutStateEvaluationInputInvalid,
+    /// Fewer than two successful recovery replications remain after failures.
+    InsufficientRecoveryReplications,
+    /// A rolling-origin numerical input did not match the admitted split identities.
+    PartitionInputMismatch,
+    /// More than one predictive candidate represented the same fitted topic dimension.
+    DuplicateCandidateK,
+    /// Rolling-origin windows were not a contiguous chronological sequence.
+    RollingOriginWindowMismatch,
+    /// The scientific recovery evaluations did not cover the full declared rolling-origin horizon.
+    RecoveryWindowSetMismatch,
+    /// One document identity appeared in more than one evaluation window.
+    RepeatedEvaluationDocument,
+    /// Rolling-origin windows did not expose the same unique candidate-K set.
+    PredictiveCandidateSetMismatch,
+    /// Predictive fits did not cover the predeclared scientific candidate-K grid exactly.
+    PredictiveCandidateGridMismatch,
+    /// A recovery fit used a numerical configuration other than the declared design.
+    PredictiveCandidateConfigurationMismatch,
+    /// Recovery candidates in one window were fitted from different training states.
+    PredictiveCandidateTrainingStateMismatch,
 }
 
 impl fmt::Display for ModelSelectionError {
@@ -29,6 +59,43 @@ impl fmt::Display for ModelSelectionError {
             Self::LlmVoteIsNotStatisticalAuthority => "llm vote is not statistical authority",
             Self::LexicalWeightForbidden => "lexical inferential weights are forbidden",
             Self::NoSuccessfulFit => "no fitted candidate produced a finite diagnostic",
+            Self::RecoveryCandidateFitFailed => {
+                "a declared scientific-recovery candidate failed to fit"
+            }
+            Self::RecoveryCandidateInputInvalid => {
+                "a declared scientific-recovery candidate is structurally incompatible with the training input"
+            }
+            Self::PredictiveEvaluationInputInvalid => {
+                "rolling-origin predictive evaluation input is structurally incompatible with the fitted training state"
+            }
+            Self::HeldOutStateRecoveryFailed => {
+                "rolling-origin held-out document-state recovery failed numerically"
+            }
+            Self::HeldOutStateEvaluationInputInvalid => {
+                "rolling-origin held-out document-state input is structurally incompatible with the admitted recovery window"
+            }
+            Self::InsufficientRecoveryReplications => {
+                "at least two successful recovery replications are required"
+            }
+            Self::PartitionInputMismatch => "rolling-origin partition input mismatch",
+            Self::DuplicateCandidateK => "duplicate predictive candidate k",
+            Self::RollingOriginWindowMismatch => "rolling-origin window sequence mismatch",
+            Self::RecoveryWindowSetMismatch => {
+                "scientific recovery does not cover the complete declared rolling-origin horizon"
+            }
+            Self::RepeatedEvaluationDocument => "repeated rolling-origin evaluation document",
+            Self::PredictiveCandidateSetMismatch => {
+                "rolling-origin predictive candidate set mismatch"
+            }
+            Self::PredictiveCandidateGridMismatch => {
+                "rolling-origin predictive fits do not match the declared candidate k grid"
+            }
+            Self::PredictiveCandidateConfigurationMismatch => {
+                "rolling-origin predictive fit configuration does not match the declared recovery design"
+            }
+            Self::PredictiveCandidateTrainingStateMismatch => {
+                "rolling-origin recovery candidates do not share one numerical training state"
+            }
         };
         formatter.write_str(message)
     }
@@ -66,6 +133,66 @@ mod tests {
             (
                 ModelSelectionError::NoSuccessfulFit,
                 "no fitted candidate produced a finite diagnostic",
+            ),
+            (
+                ModelSelectionError::RecoveryCandidateFitFailed,
+                "a declared scientific-recovery candidate failed to fit",
+            ),
+            (
+                ModelSelectionError::RecoveryCandidateInputInvalid,
+                "a declared scientific-recovery candidate is structurally incompatible with the training input",
+            ),
+            (
+                ModelSelectionError::PredictiveEvaluationInputInvalid,
+                "rolling-origin predictive evaluation input is structurally incompatible with the fitted training state",
+            ),
+            (
+                ModelSelectionError::HeldOutStateRecoveryFailed,
+                "rolling-origin held-out document-state recovery failed numerically",
+            ),
+            (
+                ModelSelectionError::HeldOutStateEvaluationInputInvalid,
+                "rolling-origin held-out document-state input is structurally incompatible with the admitted recovery window",
+            ),
+            (
+                ModelSelectionError::InsufficientRecoveryReplications,
+                "at least two successful recovery replications are required",
+            ),
+            (
+                ModelSelectionError::PartitionInputMismatch,
+                "rolling-origin partition input mismatch",
+            ),
+            (
+                ModelSelectionError::DuplicateCandidateK,
+                "duplicate predictive candidate k",
+            ),
+            (
+                ModelSelectionError::RollingOriginWindowMismatch,
+                "rolling-origin window sequence mismatch",
+            ),
+            (
+                ModelSelectionError::RecoveryWindowSetMismatch,
+                "scientific recovery does not cover the complete declared rolling-origin horizon",
+            ),
+            (
+                ModelSelectionError::RepeatedEvaluationDocument,
+                "repeated rolling-origin evaluation document",
+            ),
+            (
+                ModelSelectionError::PredictiveCandidateSetMismatch,
+                "rolling-origin predictive candidate set mismatch",
+            ),
+            (
+                ModelSelectionError::PredictiveCandidateGridMismatch,
+                "rolling-origin predictive fits do not match the declared candidate k grid",
+            ),
+            (
+                ModelSelectionError::PredictiveCandidateConfigurationMismatch,
+                "rolling-origin predictive fit configuration does not match the declared recovery design",
+            ),
+            (
+                ModelSelectionError::PredictiveCandidateTrainingStateMismatch,
+                "rolling-origin recovery candidates do not share one numerical training state",
             ),
         ] {
             assert_eq!(error.to_string(), message);

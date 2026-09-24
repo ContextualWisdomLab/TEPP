@@ -11,6 +11,9 @@
 //! contracts and preserves their artifact meaning.
 
 mod case_deletion_refit;
+mod coverage_calibration_execution;
+mod coverage_calibration_scientific_provenance;
+mod coverage_calibration_study;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
@@ -41,6 +44,22 @@ pub use case_deletion_refit::ExhaustiveCaseDeletionError;
 pub use case_deletion_refit::ExhaustiveCaseDeletionFits;
 /// Fit the full corpus and every actual one-document deletion.
 pub use case_deletion_refit::fit_exhaustive_case_deletion;
+/// Indexed scientific coverage-calibration execution error.
+pub use coverage_calibration_execution::CoverageCalibrationExecutionError;
+/// Execute one prospectively declared coverage-calibration replication.
+pub use coverage_calibration_execution::execute_coverage_calibration_replication;
+/// Cross-owner coverage-calibration fit-provenance contracts.
+pub use coverage_calibration_scientific_provenance::{
+    CoverageCalibrationScientificEvidenceRecord, CoverageCalibrationScientificShardRecord,
+    assemble_coverage_calibration_scientific_evidence_v1,
+    execute_coverage_calibration_scientific_shard_record,
+};
+/// Coverage-calibration shard provenance and study execution contracts.
+pub use coverage_calibration_study::{
+    CoverageCalibrationShardRecord, CoverageCalibrationStudyError,
+    assemble_coverage_calibration_evidence_v1, execute_coverage_calibration_shard,
+    execute_coverage_calibration_shard_record,
+};
 /// Rust-owned independent TDT link-criterion posterior fitting contracts.
 pub use lineage_criterion::{
     LineageCriterionFit, LineageCriterionFitError, LineageCriterionObservation,

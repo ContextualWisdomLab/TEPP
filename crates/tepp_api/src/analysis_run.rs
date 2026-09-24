@@ -90,7 +90,9 @@ impl AnalysisRunRequest {
     ///
     /// # Errors
     ///
-    /// Returns wire, version, limit, or field-validation errors.
+    /// Returns wire, version, limit, or field-validation errors. This is a live
+    /// admission boundary: a syntactically valid cutoff after the current
+    /// receipt time is refused.
     pub fn from_json(payload: &str) -> Result<Self, ApiError> {
         Self::from_json_with_limit(payload, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT)
     }
@@ -99,15 +101,23 @@ impl AnalysisRunRequest {
     ///
     /// # Errors
     ///
-    /// Returns wire, version, limit, or field-validation errors.
+    /// Returns wire, version, limit, or field-validation errors. Live admission
+    /// additionally refuses a syntactically valid cutoff after the receipt
+    /// time; deterministic archival serialization remains wall-clock free.
     pub fn from_json_with_limit(payload: &str, maximum_bytes: usize) -> Result<Self, ApiError> {
         require_byte_limit(payload, maximum_bytes)?;
         let request: Self = from_json(payload)?;
-        request.validate()?;
+        request.validate_for_admission()?;
         Ok(request)
     }
 
-    /// Serialize this request to JSON after validation.
+    /// Serialize this request to canonical JSON after structural validation.
+    ///
+    /// Serialization intentionally does not consult the current wall clock.
+    /// This keeps immutable request evidence reproducible while live admission
+    /// remains responsible for refusing a not-yet-available knowledge cutoff.
+    /// The cutoff text itself must already be TEPP's canonical UTC spelling so
+    /// one absolute instant cannot produce multiple valid request byte strings.
     ///
     /// # Errors
     ///
@@ -124,19 +134,35 @@ impl AnalysisRunRequest {
         require_nonempty(&self.idempotency_key)?;
         require_nonempty(&self.tenant_workspace_id)?;
         require_nonempty(&self.snapshot_id)?;
-        require_rfc3339_knowledge_cutoff(&self.knowledge_cutoff)?;
+        require_rfc3339_knowledge_cutoff_syntax(&self.knowledge_cutoff)?;
         require_nonempty(&self.model_contract_version)?;
         require_nonempty(&self.output_profile)?;
         Ok(())
     }
+
+    fn validate_for_admission(&self) -> Result<(), ApiError> {
+        self.validate()?;
+        require_rfc3339_knowledge_cutoff(&self.knowledge_cutoff)
+    }
+}
+
+fn require_rfc3339_knowledge_cutoff_syntax(knowledge_cutoff: &str) -> Result<(), ApiError> {
+    require_nonempty(knowledge_cutoff)?;
+    let cutoff = KnowledgeCutoff::parse_rfc3339(knowledge_cutoff)
+        .map_err(|_| ApiError::InvalidWirePayload)?;
+    if knowledge_cutoff != cutoff.to_rfc3339() {
+        return Err(ApiError::InvalidWirePayload);
+    }
+    Ok(())
 }
 
 /// Parse `knowledge_cutoff` as a TEPP clock and refuse a cutoff after now.
 ///
 /// A buyer cannot claim analysis of evidence that is not yet available. The
 /// request receipt instant is treated as availability of the command itself.
+/// This wall-clock rule belongs to live admission, not canonical serialization.
 pub(crate) fn require_rfc3339_knowledge_cutoff(knowledge_cutoff: &str) -> Result<(), ApiError> {
-    require_nonempty(knowledge_cutoff)?;
+    require_rfc3339_knowledge_cutoff_syntax(knowledge_cutoff)?;
     let cutoff = KnowledgeCutoff::parse_rfc3339(knowledge_cutoff)
         .map_err(|_| ApiError::InvalidWirePayload)?;
     let receipt = KnowledgeCutoff::parse_rfc3339(&Timestamp::now().to_string())
