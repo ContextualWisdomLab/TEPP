@@ -4,7 +4,7 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    MonteCarloRecoveryMetricSummary, ValidationError,
+    CoverageCalibrationDesign, MonteCarloRecoveryMetricSummary, ValidationError,
     summarize_windowed_coverage_recovery_replications,
 };
 
@@ -142,9 +142,12 @@ pub fn canonical_indexed_coverage_outcomes_sha256(
 /// denominator-preserving Monte Carlo owner, so shard completion order cannot
 /// perturb binary64 accumulation order. The identity set must be exactly
 /// `0..attempted_replication_count`; duplicates, omissions, and out-of-range
-/// identities fail closed.
+/// identities fail closed. Every successful outcome must also carry exactly the
+/// number of rolling-origin windows prospectively owned by
+/// [`CoverageCalibrationDesign::tepp_nominal_95_v1`]; a shortened successful
+/// vector is structural invalidity rather than a different successful estimand.
 ///
-/// Window validation, within-DGP collapse, unconditional failure arithmetic,
+/// Window-value validation, within-DGP collapse, unconditional failure arithmetic,
 /// Monte Carlo standard errors, and empirical percentiles remain owned by
 /// [`summarize_windowed_coverage_recovery_replications`].
 ///
@@ -152,7 +155,8 @@ pub fn canonical_indexed_coverage_outcomes_sha256(
 ///
 /// Returns [`ValidationError::InvalidInput`] when no replications were declared,
 /// the number or identity set of outcomes differs from the declared experiment,
-/// or successful window coverage is structurally invalid. Returns
+/// a successful outcome omits or adds a declared rolling-origin window, or
+/// successful window coverage is structurally invalid. Returns
 /// [`ValidationError::InvalidConfiguration`] for invalid percentile bounds.
 pub fn summarize_indexed_windowed_coverage_recovery_replications(
     attempted_replication_count: usize,
@@ -161,6 +165,16 @@ pub fn summarize_indexed_windowed_coverage_recovery_replications(
     upper_percentile: f64,
 ) -> Result<MonteCarloRecoveryMetricSummary, ValidationError> {
     let ordered = ordered_outcomes(attempted_replication_count, outcomes)?;
+    let expected_window_count =
+        CoverageCalibrationDesign::tepp_nominal_95_v1().declared_rolling_origin_window_count();
+    if ordered.iter().any(|outcome| {
+        outcome
+            .window_coverages
+            .as_ref()
+            .is_some_and(|windows| windows.len() != expected_window_count)
+    }) {
+        return Err(ValidationError::InvalidInput);
+    }
     let successful_window_coverages: Vec<_> = ordered
         .into_iter()
         .filter_map(|outcome| outcome.window_coverages.clone())
