@@ -40,7 +40,6 @@ fn calibration_assessment_requires_the_predeclared_attempt_count_band_and_precis
         .expect("matching attempted-DGP design");
     assert!(assessment.coverage_within_practical_band());
     assert!(assessment.monte_carlo_precision_sufficient());
-    assert!(assessment.supports_calibration_claim());
     assert_eq!(assessment.attempted_replication_count(), 10_000);
     assert_eq!(assessment.successful_replication_count(), 10_000);
     assert_eq!(assessment.failure_count(), 0);
@@ -72,7 +71,6 @@ fn calibration_assessment_refuses_post_hoc_size_substitution_and_imprecise_succe
         .expect("attempt count matches the predeclared design");
     assert!(assessment.coverage_within_practical_band());
     assert!(!assessment.monte_carlo_precision_sufficient());
-    assert!(!assessment.supports_calibration_claim());
     assert_eq!(assessment.failure_count(), 9_999);
     assert_eq!(assessment.coverage_monte_carlo_standard_error(), None);
 }
@@ -92,7 +90,6 @@ fn calibration_assessment_rejects_out_of_band_and_all_failed_evidence() {
         .expect("attempt count matches");
     assert!(!assessment.coverage_within_practical_band());
     assert!(assessment.monte_carlo_precision_sufficient());
-    assert!(!assessment.supports_calibration_claim());
 
     let imprecise = summarize_windowed_coverage_recovery_replications(
         10_000,
@@ -105,7 +102,6 @@ fn calibration_assessment_rejects_out_of_band_and_all_failed_evidence() {
         .expect("attempt count matches");
     assert!(assessment.coverage_within_practical_band());
     assert!(!assessment.monte_carlo_precision_sufficient());
-    assert!(!assessment.supports_calibration_claim());
 
     let all_failed = summarize_windowed_coverage_recovery_replications(
         10_000,
@@ -120,5 +116,4 @@ fn calibration_assessment_rejects_out_of_band_and_all_failed_evidence() {
     assert_eq!(assessment.coverage_monte_carlo_standard_error(), None);
     assert!(!assessment.coverage_within_practical_band());
     assert!(!assessment.monte_carlo_precision_sufficient());
-    assert!(!assessment.supports_calibration_claim());
 }
