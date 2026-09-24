@@ -1,0 +1,3 @@
+## Fixed
+
+- Added `CoverageCalibrationShardRecord::from_json_with_sha256(...)` so persisted coverage-calibration shards can be rehydrated through the strict owner parser and checked against their expected canonical SHA-256 in one fail-closed recovery path. The method rejects malformed expected digests, digest mismatch, and otherwise-invalid JSON by reusing the existing schema/provenance parser and shard digest arithmetic rather than introducing a second wire or hashing implementation. This is application-level transfer integrity only; it does not authenticate storage, runners, builds, or execute/promote the 10,000-DGP acceptance study.
