@@ -39,7 +39,7 @@ fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() 
     )
     .expect("calibration evidence");
 
-    assert_eq!(record.schema_version(), 5);
+    assert_eq!(record.schema_version(), 6);
     assert_eq!(record.validation_estimand_id(), ESTIMAND_ID);
     assert_eq!(record.validation_design_fingerprint(), DESIGN_FINGERPRINT_V1);
     let json = record.to_json().expect("deterministic evidence json");
