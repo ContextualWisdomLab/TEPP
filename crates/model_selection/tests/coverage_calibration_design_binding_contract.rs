@@ -48,10 +48,14 @@ fn prospective_coverage_seed_schedule_is_unique_and_disjoint_from_ci_fixture() {
 fn persisted_calibration_evidence_uses_owner_scenario_identity_and_fingerprint() {
     let scenario = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
     let criterion = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    let complete_windows = vec![0.95; criterion.declared_rolling_origin_window_count()];
     let outcomes: Vec<_> = (0..criterion.attempted_dgp_count())
         .map(|replication_index| {
             if replication_index < 2 {
-                CoverageCalibrationReplicationOutcome::successful(replication_index, vec![0.95])
+                CoverageCalibrationReplicationOutcome::successful(
+                    replication_index,
+                    complete_windows.clone(),
+                )
             } else {
                 CoverageCalibrationReplicationOutcome::numerical_failure(replication_index)
             }
