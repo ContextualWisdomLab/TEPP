@@ -37,7 +37,6 @@ use validation_core::{
 };
 
 const FIRST_TRAINING_EVENT_INDEX: usize = 3;
-const EXPECTED_ROLLING_ORIGIN_WINDOW_COUNT: usize = 5;
 const RECOVERY_FIT_SEEDS: [u64; 3] = [7, 11, 19];
 const RECOVERY_MAXIMUM_ITERATIONS: usize = 2_000;
 const RECOVERY_TOLERANCE: f64 = 0.001;
@@ -167,6 +166,7 @@ fn cutoff_after_event(
 
 fn recovery_cutoffs(
     manifest: &TruthManifest,
+    validation_design: &CoverageCalibrationDesign,
 ) -> Result<Vec<KnowledgeCutoff>, CoverageCalibrationExecutionError> {
     let events = manifest.events();
     let source_events = events
@@ -177,7 +177,11 @@ fn recovery_cutoffs(
         .map(|event| cutoff_after_event(manifest, event.event_id()))
         .collect();
     let cutoffs = cutoffs?;
-    if cutoffs.len() != EXPECTED_ROLLING_ORIGIN_WINDOW_COUNT + 1 {
+    let expected_cutoff_count = validation_design
+        .declared_rolling_origin_window_count()
+        .checked_add(1)
+        .ok_or(CoverageCalibrationExecutionError::ArithmeticOverflow)?;
+    if cutoffs.len() != expected_cutoff_count {
         return Err(CoverageCalibrationExecutionError::InvalidSimulationScenario);
     }
     Ok(cutoffs)
@@ -455,7 +459,9 @@ fn truth_k_window_coverage(
 fn replication_window_coverages(
     manifest: &TruthManifest,
 ) -> Result<Option<Vec<f64>>, CoverageCalibrationExecutionError> {
-    let cutoffs = recovery_cutoffs(manifest)?;
+    let validation_design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    let declared_window_count = validation_design.declared_rolling_origin_window_count();
+    let cutoffs = recovery_cutoffs(manifest, &validation_design)?;
     let event_times = event_time_by_document(manifest)?;
     let memberships = membership_network(manifest, &event_times)?;
     let relations = relation_graph(manifest, &event_times)?;
@@ -472,7 +478,7 @@ fn replication_window_coverages(
     )
     .map_err(CoverageCalibrationExecutionError::ModelSelection)?;
 
-    let mut coverage_by_window = Vec::with_capacity(EXPECTED_ROLLING_ORIGIN_WINDOW_COUNT);
+    let mut coverage_by_window = Vec::with_capacity(declared_window_count);
     for (window_index, cutoff_pair) in cutoffs.windows(2).enumerate() {
         let training_snapshot = snapshot_at(manifest, &cutoff_pair[0])?;
         let evaluation_snapshot = snapshot_at(manifest, &cutoff_pair[1])?;
@@ -534,7 +540,7 @@ fn replication_window_coverages(
         }
         coverage_by_window.push(truth_k_window_coverage(manifest, &fits[0])?);
     }
-    if coverage_by_window.len() != EXPECTED_ROLLING_ORIGIN_WINDOW_COUNT {
+    if coverage_by_window.len() != declared_window_count {
         return Err(CoverageCalibrationExecutionError::InvalidRollingOriginPartition);
     }
     Ok(Some(coverage_by_window))
@@ -543,14 +549,16 @@ fn replication_window_coverages(
 #[cfg(test)]
 mod tests {
     use super::{
-        CoverageCalibrationExecutionError, EXPECTED_ROLLING_ORIGIN_WINDOW_COUNT,
-        execute_coverage_calibration_replication, replication_window_coverages,
+        CoverageCalibrationExecutionError, execute_coverage_calibration_replication,
+        replication_window_coverages,
     };
     use tepp_simulation::{CoverageCalibrationSimulationDesign, generate};
+    use validation_core::CoverageCalibrationDesign;
 
     #[test]
-    fn regression_seed_uses_the_same_owner_composition_without_acceptance_identity() {
+    fn regression_seed_uses_the_validation_owner_window_cardinality() {
         let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
+        let validation_design = CoverageCalibrationDesign::tepp_nominal_95_v1();
         let manifest = generate(
             design
                 .regression_config_for_seed(101)
@@ -561,7 +569,10 @@ mod tests {
         let windows = replication_window_coverages(&manifest)
             .expect("structurally valid regression composition")
             .expect("regression fit must succeed for the fixed seed");
-        assert_eq!(windows.len(), EXPECTED_ROLLING_ORIGIN_WINDOW_COUNT);
+        assert_eq!(
+            windows.len(),
+            validation_design.declared_rolling_origin_window_count()
+        );
         assert!(
             windows
                 .iter()
