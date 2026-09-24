@@ -9,7 +9,7 @@
 
 use std::fmt;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tepp_simulation::{CoverageCalibrationSimulationDesign, SimulationError};
 use validation_core::{
@@ -73,6 +73,23 @@ impl fmt::Display for CoverageCalibrationStudyError {
 }
 
 impl std::error::Error for CoverageCalibrationStudyError {}
+
+#[derive(Deserialize)]
+struct CoverageCalibrationShardWire {
+    schema_version: u32,
+    start_replication_index: usize,
+    end_replication_index_exclusive: usize,
+    simulation_scenario_id: String,
+    simulation_scenario_fingerprint: String,
+    source_head: String,
+    outcomes: Vec<CoverageCalibrationOutcomeWire>,
+}
+
+#[derive(Deserialize)]
+struct CoverageCalibrationOutcomeWire {
+    replication_index: usize,
+    window_coverages: Option<Vec<f64>>,
+}
 
 /// Immutable application-level provenance record for one executed calibration shard.
 ///
@@ -142,6 +159,64 @@ impl CoverageCalibrationShardRecord {
     /// unexpectedly fails.
     pub fn to_json(&self) -> Result<String, CoverageCalibrationStudyError> {
         serde_json::to_string(self).map_err(|_| CoverageCalibrationStudyError::InvalidEvidence)
+    }
+
+    /// Rehydrate one persisted shard through the application owner boundary.
+    ///
+    /// The parser accepts only the current shard schema and reconstructs indexed
+    /// outcomes through their public validation-owned constructors. It validates
+    /// self-contained provenance/range geometry here; current-scenario equality,
+    /// full-study tiling, and scientific coverage-value validation remain with the
+    /// final assembly and `validation_core` owners.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoverageCalibrationStudyError::InvalidShardProvenance`] when the
+    /// JSON shape, schema, source/fingerprint identity, half-open range, or exact
+    /// contiguous outcome identities are not canonical.
+    pub fn from_json(json: &str) -> Result<Self, CoverageCalibrationStudyError> {
+        let wire: CoverageCalibrationShardWire = serde_json::from_str(json)
+            .map_err(|_| CoverageCalibrationStudyError::InvalidShardProvenance)?;
+        if wire.schema_version != COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION
+            || wire.simulation_scenario_id.is_empty()
+        {
+            return Err(CoverageCalibrationStudyError::InvalidShardProvenance);
+        }
+        require_canonical_source_head(&wire.source_head)
+            .map_err(|_| CoverageCalibrationStudyError::InvalidShardProvenance)?;
+        require_canonical_scenario_fingerprint(&wire.simulation_scenario_fingerprint)?;
+        if wire.start_replication_index >= wire.end_replication_index_exclusive {
+            return Err(CoverageCalibrationStudyError::InvalidShardProvenance);
+        }
+
+        let outcomes: Vec<_> = wire
+            .outcomes
+            .into_iter()
+            .map(|outcome| match outcome.window_coverages {
+                Some(window_coverages) => CoverageCalibrationReplicationOutcome::successful(
+                    outcome.replication_index,
+                    window_coverages,
+                ),
+                None => CoverageCalibrationReplicationOutcome::numerical_failure(
+                    outcome.replication_index,
+                ),
+            })
+            .collect();
+        validate_outcome_range(
+            wire.start_replication_index,
+            wire.end_replication_index_exclusive,
+            &outcomes,
+        )?;
+
+        Ok(Self {
+            schema_version: wire.schema_version,
+            start_replication_index: wire.start_replication_index,
+            end_replication_index_exclusive: wire.end_replication_index_exclusive,
+            simulation_scenario_id: wire.simulation_scenario_id,
+            simulation_scenario_fingerprint: wire.simulation_scenario_fingerprint,
+            source_head: wire.source_head,
+            outcomes,
+        })
     }
 
     /// Return a domain-separated SHA-256 binding over exact shard provenance/outcomes.
@@ -243,6 +318,8 @@ pub fn execute_coverage_calibration_shard_record(
 ) -> Result<CoverageCalibrationShardRecord, CoverageCalibrationStudyError> {
     require_canonical_source_head(source_head)?;
     let scenario_fingerprint = map_scenario_fingerprint(design.scenario_fingerprint())?;
+    require_canonical_scenario_fingerprint(&scenario_fingerprint)
+        .map_err(|_| CoverageCalibrationStudyError::InvalidScenarioBinding)?;
     let outcomes = execute_coverage_calibration_shard(
         design,
         start_replication_index,
@@ -399,6 +476,19 @@ fn require_canonical_source_head(source_head: &str) -> Result<(), CoverageCalibr
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
     if !lowercase_hex || parse_commit_head(source_head).is_err() {
         return Err(CoverageCalibrationStudyError::InvalidSourceIdentity);
+    }
+    Ok(())
+}
+
+fn require_canonical_scenario_fingerprint(
+    fingerprint: &str,
+) -> Result<(), CoverageCalibrationStudyError> {
+    let lowercase_hex = fingerprint.len() == 64
+        && fingerprint
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte));
+    if !lowercase_hex {
+        return Err(CoverageCalibrationStudyError::InvalidShardProvenance);
     }
     Ok(())
 }
