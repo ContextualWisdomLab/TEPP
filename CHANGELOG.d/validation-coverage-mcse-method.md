@@ -1,0 +1,5 @@
+### Validation: bind coverage Monte Carlo standard-error method
+
+The prospective `tepp.coverage.nominal95.v1` design now binds the successful-DGP coverage-mean Monte Carlo standard-error estimator as `tepp.coverage.mcse.sample_sd_n_minus_1_over_sqrt_n.v1`. The validation owner continues to use Welford moments, sample variance with the `n - 1` denominator, and `sample_sd / sqrt(n)`; this change records that existing arithmetic in the prospective design fingerprint rather than changing it.
+
+Coverage-calibration evidence advances to schema v8 and persists the MCSE method identity next to the observed coverage standard error. The design fingerprint domain advances to v6 so a future finite-sample or standard-error estimator change cannot retain the same prospective validation identity. The nominal coverage target, exact normal critical value, practical band, attempted-DGP count, percentile estimator/probabilities, simulation scenario, estimand, and numerical-failure policy remain unchanged.
