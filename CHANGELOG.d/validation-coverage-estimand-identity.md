@@ -1,0 +1,3 @@
+### Validation
+
+- Bound the prospective `tepp.coverage.nominal95.v1` design to the explicit `tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1` estimand: fit-bound training-document ALR marginal intervals are pooled to one document×coordinate coverage proportion per declared rolling-origin window, those window proportions are equally weighted inside each independent DGP, and Monte Carlo inference remains between DGPs. The calibration design fingerprint domain is now v3 and includes this estimand identity, so training-fit interval calibration cannot be silently relabeled as held-out/predictive coverage under the same prospective fingerprint.
