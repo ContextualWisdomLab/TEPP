@@ -223,9 +223,10 @@ impl CoverageCalibrationDesign {
 
 /// Assessment of one denominator-preserving coverage summary against a prospective design.
 ///
-/// A passing conditional calibration assessment is not a convergence, robustness,
-/// scientific-promotion, or release decision. Numerical failures remain visible
-/// through the attempted/success/failure fields and require their own owner policy.
+/// This assessment exposes the two prospectively declared conditional calibration
+/// criteria separately from the unconditional numerical-failure denominator. It
+/// deliberately does not expose one aggregate claim/promotion boolean while the
+/// design has no prospective failure-rate acceptability policy.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct CoverageCalibrationAssessment {
     attempted_replication_count: usize,
@@ -286,16 +287,6 @@ impl CoverageCalibrationAssessment {
     pub const fn monte_carlo_precision_sufficient(self) -> bool {
         self.monte_carlo_precision_sufficient
     }
-
-    /// Whether this summary supports the **conditional coverage-calibration** claim.
-    ///
-    /// This deliberately does not judge the numerical failure rate. A caller must
-    /// not treat `true` as estimator robustness, full scientific promotion, or
-    /// release authority.
-    #[must_use]
-    pub const fn supports_calibration_claim(self) -> bool {
-        self.coverage_within_practical_band && self.monte_carlo_precision_sufficient
-    }
 }
 
 /// Assess denominator-preserving coverage evidence against one prospective design.
@@ -304,7 +295,9 @@ impl CoverageCalibrationAssessment {
 /// from shrinking or extending the experiment after seeing outcomes while still
 /// claiming the same design identity. Coverage and its Monte Carlo standard
 /// error are read only from the owner summary; this function does not recompute
-/// window/document/coordinate arithmetic or remove failed attempts.
+/// window/document/coordinate arithmetic or remove failed attempts. The result
+/// intentionally keeps practical-band and Monte Carlo precision decisions as
+/// separate components; it does not make a full scientific acceptance decision.
 ///
 /// # Errors
 ///
