@@ -7,6 +7,8 @@ const SOURCE_HEAD: &str = "0123456789abcdef0123456789abcdef01234567";
 const SCENARIO_ID: &str = "tepp.simulation.rolling_origin_coverage.v1";
 const SCENARIO_FINGERPRINT: &str =
     "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
+const ESTIMAND_ID: &str =
+    "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1";
 const LOWER_PERCENTILE: f64 = 0.025;
 const UPPER_PERCENTILE: f64 = 0.975;
 
@@ -56,8 +58,9 @@ fn evidence_from_outcomes(
 fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty() {
     let record = evidence(9_998).expect("calibration evidence");
 
-    assert_eq!(record.schema_version(), 4);
+    assert_eq!(record.schema_version(), 5);
     assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
+    assert_eq!(record.validation_estimand_id(), ESTIMAND_ID);
     assert_eq!(record.validation_design_fingerprint().len(), 64);
     assert!(
         record
@@ -98,7 +101,9 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(record.supports_calibration_claim());
 
     let json = record.to_json().expect("deterministic evidence json");
-    assert!(json.contains("\"schema_version\":4"));
+    assert!(json.contains("\"schema_version\":5"));
+    assert!(json.contains("\"validation_estimand_id\":"));
+    assert!(json.contains(ESTIMAND_ID));
     assert!(json.contains("\"validation_design_fingerprint\":"));
     assert!(json.contains(record.validation_design_fingerprint()));
     assert!(json.contains("\"replication_outcomes\":["));
