@@ -40,6 +40,18 @@ impl CoverageCalibrationDesign {
         CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
     }
 
+    /// Stable identity of the Monte Carlo standard-error estimator for the failure rate.
+    ///
+    /// The current validation owner treats numerical failure as a Bernoulli outcome
+    /// over the unconditional attempted-DGP denominator and reports the plug-in
+    /// Monte Carlo standard error `sqrt(p_hat * (1 - p_hat) / n)`. This identity is
+    /// reporting provenance only: it does not define an acceptable failure rate or
+    /// promote a scientific claim.
+    #[must_use]
+    pub const fn failure_rate_monte_carlo_standard_error_method_id(&self) -> &'static str {
+        "tepp.coverage.failure_rate_mcse.bernoulli_plugin_sqrt_p_one_minus_p_over_n.v1"
+    }
+
     /// Stable identity of the Monte Carlo standard-error estimator used for the coverage mean.
     ///
     /// The current validation owner computes the between-DGP sample standard deviation
