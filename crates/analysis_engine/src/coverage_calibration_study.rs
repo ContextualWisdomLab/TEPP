@@ -181,20 +181,7 @@ impl CoverageCalibrationShardRecord {
         serde_json::to_string(self).map_err(|_| CoverageCalibrationStudyError::InvalidEvidence)
     }
 
-    /// Rehydrate one persisted shard through the application owner boundary.
-    ///
-    /// The parser accepts only the current shard schema and reconstructs indexed
-    /// outcomes through their public validation-owned constructors. It validates
-    /// self-contained provenance/range geometry here; current-design/current-scenario
-    /// equality, full-study tiling, and scientific coverage-value validation remain
-    /// with final assembly and `validation_core` owners.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`CoverageCalibrationStudyError::InvalidShardProvenance`] when the
-    /// JSON shape, schema, design/source/fingerprint identity, half-open range, or
-    /// exact contiguous outcome identities are not canonical.
-    pub fn from_json(json: &str) -> Result<Self, CoverageCalibrationStudyError> {
+    fn from_json(json: &str) -> Result<Self, CoverageCalibrationStudyError> {
         let wire: CoverageCalibrationShardWire = serde_json::from_str(json)
             .map_err(|_| CoverageCalibrationStudyError::InvalidShardProvenance)?;
         if wire.schema_version != COVERAGE_CALIBRATION_SHARD_SCHEMA_VERSION
@@ -245,10 +232,10 @@ impl CoverageCalibrationShardRecord {
 
     /// Rehydrate one persisted shard and verify its expected owner digest.
     ///
-    /// This composes the strict JSON parser with the shard's canonical SHA-256
-    /// arithmetic so callers do not have to recreate transfer-integrity checks at
-    /// each persistence/resume boundary. The digest remains an application-level
-    /// integrity binding; it does not authenticate external storage, runners, or builds.
+    /// This composes the strict private JSON parser with the shard's canonical SHA-256
+    /// arithmetic so callers cannot bypass transfer-integrity verification at a
+    /// persistence/resume boundary. The digest remains an application-level integrity
+    /// binding; it does not authenticate external storage, runners, or builds.
     ///
     /// # Errors
     ///
