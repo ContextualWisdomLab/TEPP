@@ -399,7 +399,7 @@ pub fn execute_coverage_calibration_shard_record(
 /// identities/fingerprints. Only after those application-level provenance checks pass
 /// are outcomes flattened into `validation_core`, which remains authoritative for the
 /// exact full permutation, denominator, coverage, Monte Carlo uncertainty,
-/// percentiles, and schema-v6 evidence arithmetic.
+/// percentiles, and schema-v9 evidence arithmetic.
 ///
 /// # Errors
 ///
