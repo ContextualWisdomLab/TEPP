@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 use crate::{CoverageCalibrationDesign, ValidationError};
 
 const COVERAGE_CALIBRATION_DESIGN_FINGERPRINT_DOMAIN: &[u8] =
-    b"tepp.validation.coverage-calibration-design.v6\0";
+    b"tepp.validation.coverage-calibration-design.v7\0";
 
 /// Compute the canonical SHA-256 fingerprint of a prospective coverage-calibration design.
 ///
@@ -13,8 +13,9 @@ const COVERAGE_CALIBRATION_DESIGN_FINGERPRINT_DOMAIN: &[u8] =
 /// aggregation estimand, attempted independent-DGP count, nominal coverage, exact
 /// normal critical value used by the declared marginal interval rule, practical
 /// lower and upper coverage bounds, maximum accepted Monte Carlo standard error,
-/// the versioned coverage-mean Monte Carlo standard-error estimator identity, the
-/// versioned empirical percentile estimator identity, and the lower/upper percentile
+/// the versioned unconditional failure-rate Monte Carlo standard-error estimator,
+/// the versioned coverage-mean Monte Carlo standard-error estimator, the versioned
+/// empirical percentile estimator identity, and the lower/upper percentile
 /// probabilities reported in durable calibration evidence. Floating-point criteria
 /// are encoded from their exact IEEE-754 binary64 bit patterns; integer/string lengths
 /// use explicit little-endian `u64` wire geometry. The domain tag prevents reuse as
@@ -36,6 +37,13 @@ pub fn coverage_calibration_design_sha256(
     let estimand_id = design.estimand().estimand_id().as_bytes();
     let estimand_id_len =
         u64::try_from(estimand_id.len()).map_err(|_| ValidationError::InvalidInput)?;
+    let failure_rate_monte_carlo_standard_error_method_id = design
+        .failure_rate_monte_carlo_standard_error_method_id()
+        .as_bytes();
+    let failure_rate_monte_carlo_standard_error_method_id_len = u64::try_from(
+        failure_rate_monte_carlo_standard_error_method_id.len(),
+    )
+    .map_err(|_| ValidationError::InvalidInput)?;
     let monte_carlo_standard_error_method_id = design
         .coverage_monte_carlo_standard_error_method_id()
         .as_bytes();
@@ -65,6 +73,8 @@ pub fn coverage_calibration_design_sha256(
             .to_bits()
             .to_le_bytes(),
     );
+    hasher.update(failure_rate_monte_carlo_standard_error_method_id_len.to_le_bytes());
+    hasher.update(failure_rate_monte_carlo_standard_error_method_id);
     hasher.update(monte_carlo_standard_error_method_id_len.to_le_bytes());
     hasher.update(monte_carlo_standard_error_method_id);
     hasher.update(percentile_method_id_len.to_le_bytes());
