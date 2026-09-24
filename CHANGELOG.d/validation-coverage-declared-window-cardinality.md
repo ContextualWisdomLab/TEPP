@@ -1,0 +1,3 @@
+# Validation: bind declared coverage-window cardinality
+
+`tepp.coverage.nominal95.v1` now owns the five rolling-origin windows required by its training-fit equal-window estimand. The coverage-design fingerprint domain advances to v8 and binds that cardinality before the first 10,000-DGP run. Indexed evidence rejects a nominally successful DGP whose window vector is shorter or longer than the declared set, preventing partial-window omission from being averaged as a different successful estimand. Numerical failures remain explicit missing outcomes in the unconditional attempted-DGP denominator; no numerical-failure acceptance threshold is introduced.
