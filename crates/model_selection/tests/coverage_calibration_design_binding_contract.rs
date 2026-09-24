@@ -81,6 +81,10 @@ fn persisted_calibration_evidence_uses_owner_scenario_identity_and_fingerprint()
         scenario.attempted_replication_count()
     );
     assert_eq!(
+        evidence.coverage_monte_carlo_standard_error_method_id(),
+        criterion.coverage_monte_carlo_standard_error_method_id()
+    );
+    assert_eq!(
         evidence.coverage_percentile_method_id(),
         criterion.coverage_percentile_method_id()
     );
