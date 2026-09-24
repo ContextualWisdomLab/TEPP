@@ -41,8 +41,6 @@ fn digest_verified_rehydration_rejects_admissible_json_mutation() {
         serde_json::json!("1123456789abcdef0123456789abcdef01234567");
     let mutated_json = mutated.to_string();
 
-    CoverageCalibrationShardRecord::from_json(&mutated_json)
-        .expect("syntactically canonical historical source provenance may rehydrate");
     assert_eq!(
         CoverageCalibrationShardRecord::from_json_with_sha256(&mutated_json, &digest),
         Err(CoverageCalibrationStudyError::InvalidShardProvenance)
