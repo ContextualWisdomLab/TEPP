@@ -22,6 +22,8 @@ fn tepp_nominal_95_design_is_versioned_before_the_larger_run() {
     assert!((design.practical_lower_coverage() - 0.91).abs() < f64::EPSILON);
     assert!((design.practical_upper_coverage() - 0.98).abs() < f64::EPSILON);
     assert!((design.maximum_monte_carlo_standard_error() - 0.005).abs() < f64::EPSILON);
+    assert!((design.coverage_percentile_lower_probability() - 0.025).abs() < f64::EPSILON);
+    assert!((design.coverage_percentile_upper_probability() - 0.975).abs() < f64::EPSILON);
 }
 
 #[test]
