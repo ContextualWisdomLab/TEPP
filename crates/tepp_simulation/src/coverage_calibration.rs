@@ -62,12 +62,14 @@ impl CoverageCalibrationSimulationDesign {
     ///
     /// # Errors
     ///
-    /// Returns [`SimulationError::InvalidConfiguration`] if the owned DGP shape
-    /// becomes invalid under a future incompatible change.
+    /// Returns [`SimulationError::InvalidConfiguration`] when `seed` belongs to
+    /// the reserved acceptance schedule or when the owned DGP shape becomes
+    /// invalid under a future incompatible change.
     pub fn regression_config_for_seed(
         self,
         seed: u64,
     ) -> Result<SimulationConfig, SimulationError> {
+        reject_reserved_acceptance_seed(seed)?;
         rolling_origin_v1_config(seed)
     }
 
@@ -124,6 +126,18 @@ impl CoverageCalibrationSimulationDesign {
         }
         Ok(crate::digest_bytes(&bytes))
     }
+}
+
+fn reject_reserved_acceptance_seed(seed: u64) -> Result<(), SimulationError> {
+    let acceptance_seed_count = u64::try_from(COVERAGE_CALIBRATION_REPLICATION_COUNT)
+        .map_err(|_| SimulationError::InvalidConfiguration)?;
+    if seed
+        .checked_sub(COVERAGE_CALIBRATION_FIRST_SEED)
+        .is_some_and(|offset| offset < acceptance_seed_count)
+    {
+        return Err(SimulationError::InvalidConfiguration);
+    }
+    Ok(())
 }
 
 fn rolling_origin_v1_config(seed: u64) -> Result<SimulationConfig, SimulationError> {
