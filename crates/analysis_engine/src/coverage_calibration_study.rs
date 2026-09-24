@@ -75,6 +75,7 @@ impl fmt::Display for CoverageCalibrationStudyError {
 impl std::error::Error for CoverageCalibrationStudyError {}
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CoverageCalibrationShardWire {
     schema_version: u32,
     start_replication_index: usize,
@@ -86,6 +87,7 @@ struct CoverageCalibrationShardWire {
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct CoverageCalibrationOutcomeWire {
     replication_index: usize,
     window_coverages: Option<Vec<f64>>,
