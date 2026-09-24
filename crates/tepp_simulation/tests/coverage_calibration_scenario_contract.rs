@@ -47,17 +47,37 @@ fn coverage_calibration_v1_owns_exact_seed_schedule_and_realistic_dgp() {
 }
 
 #[test]
-fn coverage_calibration_v1_reuses_owner_dgp_shape_for_disjoint_ci_seeds() {
+fn coverage_calibration_v1_reuses_owner_dgp_shape_only_for_disjoint_regression_seeds() {
     let design = CoverageCalibrationSimulationDesign::rolling_origin_coverage_v1();
     let first_seed = design.seed_for_replication(0).expect("first seed");
+    let last_seed = design
+        .seed_for_replication(design.attempted_replication_count() - 1)
+        .expect("last declared seed");
 
     assert_eq!(
+        design.regression_config_for_seed(first_seed),
+        Err(SimulationError::InvalidConfiguration)
+    );
+    assert_eq!(
+        design.regression_config_for_seed(last_seed),
+        Err(SimulationError::InvalidConfiguration)
+    );
+
+    let before_reserved = first_seed - 1;
+    assert_eq!(
         design
-            .regression_config_for_seed(first_seed)
-            .expect("family-equivalent regression configuration"),
+            .regression_config_for_seed(before_reserved)
+            .expect("seed immediately before the reserved range")
+            .seed(),
+        before_reserved
+    );
+    let after_reserved = last_seed + 1;
+    assert_eq!(
         design
-            .config_for_replication(0)
-            .expect("declared replication configuration")
+            .regression_config_for_seed(after_reserved)
+            .expect("seed immediately after the reserved range")
+            .seed(),
+        after_reserved
     );
 
     let ci_seed = 101;
