@@ -15,11 +15,12 @@ const FAILURE_RATE_MCSE_METHOD_ID: &str =
 const MCSE_METHOD_ID: &str = "tepp.coverage.mcse.sample_sd_n_minus_1_over_sqrt_n.v1";
 const PERCENTILE_METHOD_ID: &str = "tepp.coverage.percentile.inclusive_nearest_rank.v1";
 const DESIGN_FINGERPRINT_V1: &str =
-    "1342c76126e06d3d56c9fbd49bb8d7d5a2b59fa95835a7bb39959e4f4ebd562b";
+    "2871ae32842a65273d15d1106b977244981cbf6bd69773ec44d427a35ba4d130";
 
 #[test]
 fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() {
     let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+    assert_eq!(design.declared_rolling_origin_window_count(), 5);
     assert_eq!(
         design.failure_rate_monte_carlo_standard_error_method_id(),
         FAILURE_RATE_MCSE_METHOD_ID
