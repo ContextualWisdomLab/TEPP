@@ -9,6 +9,8 @@ const SCENARIO_FINGERPRINT: &str =
     "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
 const ESTIMAND_ID: &str =
     "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1";
+const FAILURE_RATE_MCSE_METHOD_ID: &str =
+    "tepp.coverage.failure_rate_mcse.bernoulli_plugin_sqrt_p_one_minus_p_over_n.v1";
 const MCSE_METHOD_ID: &str = "tepp.coverage.mcse.sample_sd_n_minus_1_over_sqrt_n.v1";
 const PERCENTILE_METHOD_ID: &str = "tepp.coverage.percentile.inclusive_nearest_rank.v1";
 
@@ -57,7 +59,7 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
     let record = evidence(9_998).expect("calibration evidence");
 
-    assert_eq!(record.schema_version(), 8);
+    assert_eq!(record.schema_version(), 9);
     assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
     assert_eq!(record.validation_estimand_id(), ESTIMAND_ID);
     assert_eq!(record.validation_design_fingerprint().len(), 64);
@@ -86,6 +88,10 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert_eq!(record.successful_replication_count(), 9_998);
     assert_eq!(record.failure_count(), 2);
     assert!((record.failure_rate() - 0.0002).abs() < f64::EPSILON);
+    assert_eq!(
+        record.failure_rate_monte_carlo_standard_error_method_id(),
+        FAILURE_RATE_MCSE_METHOD_ID
+    );
     assert!(record.failure_rate_standard_error().is_finite());
     assert!(record.failure_rate_standard_error() > 0.0);
     assert_eq!(record.coverage_mean(), Some(0.95));
@@ -110,7 +116,7 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(record.monte_carlo_precision_sufficient());
 
     let json = record.to_json().expect("deterministic evidence json");
-    assert!(json.contains("\"schema_version\":8"));
+    assert!(json.contains("\"schema_version\":9"));
     assert!(json.contains("\"validation_estimand_id\":"));
     assert!(json.contains(ESTIMAND_ID));
     assert!(json.contains("\"validation_design_fingerprint\":"));
@@ -122,6 +128,8 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(json.contains("\"attempted_replication_count\":10000"));
     assert!(json.contains("\"successful_replication_count\":9998"));
     assert!(json.contains("\"failure_count\":2"));
+    assert!(json.contains("\"failure_rate_monte_carlo_standard_error_method_id\":"));
+    assert!(json.contains(FAILURE_RATE_MCSE_METHOD_ID));
     assert!(json.contains("\"failure_rate_standard_error\":"));
     assert!(json.contains("\"coverage_monte_carlo_standard_error_method_id\":"));
     assert!(json.contains(MCSE_METHOD_ID));
