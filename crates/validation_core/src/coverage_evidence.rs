@@ -7,6 +7,7 @@ use crate::{
     parse_commit_head, summarize_indexed_windowed_coverage_recovery_replications,
 };
 use serde::Serialize;
+use serde_json::{Map, Value};
 
 const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 9;
 
@@ -163,6 +164,74 @@ impl CoverageCalibrationEvidenceRecord {
             coverage_within_practical_band: assessment.coverage_within_practical_band(),
             monte_carlo_precision_sufficient: assessment.monte_carlo_precision_sufficient(),
         })
+    }
+
+    /// Rehydrate persisted evidence by recomputing every validation-owned field from its ledger.
+    ///
+    /// JSON is treated as untrusted input. The current schema/design/estimand identity,
+    /// canonical indexed outcome ledger, scenario/source shapes, all derived summaries,
+    /// reporting-method identities, criterion components, and outcome digest must agree
+    /// with a fresh [`Self::from_indexed_outcomes`] reconstruction. Extra top-level or
+    /// per-outcome fields therefore fail closed rather than being silently ignored.
+    ///
+    /// This is application-level scientific evidence recovery. It does not authenticate
+    /// external storage, the runner, or the Git build, and it does not validate that the
+    /// opaque simulation scenario fingerprint is the currently released simulation owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ValidationError::InvalidInput`] when JSON is malformed, the schema or
+    /// prospective validation identity is stale, the indexed outcome ledger is malformed,
+    /// or any persisted field differs from owner recomputation.
+    pub fn from_json(json: &str) -> Result<Self, ValidationError> {
+        let parsed: Value = serde_json::from_str(json).map_err(|_| ValidationError::InvalidInput)?;
+        let object = parsed.as_object().ok_or(ValidationError::InvalidInput)?;
+
+        let schema_version = object
+            .get("schema_version")
+            .and_then(Value::as_u64)
+            .ok_or(ValidationError::InvalidInput)?;
+        if schema_version != u64::from(COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION) {
+            return Err(ValidationError::InvalidInput);
+        }
+
+        let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
+        let expected_design_fingerprint = coverage_calibration_design_sha256(&design)?;
+        if string_field(object, "validation_design_id")? != design.design_id()
+            || string_field(object, "validation_estimand_id")? != design.estimand().estimand_id()
+            || string_field(object, "validation_design_fingerprint")?
+                != expected_design_fingerprint
+        {
+            return Err(ValidationError::InvalidInput);
+        }
+
+        let simulation_scenario_id = string_field(object, "simulation_scenario_id")?;
+        let simulation_scenario_fingerprint =
+            string_field(object, "simulation_scenario_fingerprint")?;
+        let source_head = string_field(object, "source_head")?;
+        let outcome_values = object
+            .get("replication_outcomes")
+            .and_then(Value::as_array)
+            .ok_or(ValidationError::InvalidInput)?;
+        let outcomes: Result<Vec<_>, _> = outcome_values
+            .iter()
+            .map(replication_outcome_from_json_value)
+            .collect();
+        let outcomes = outcomes?;
+
+        let reconstructed = Self::from_indexed_outcomes(
+            &design,
+            &outcomes,
+            simulation_scenario_id,
+            simulation_scenario_fingerprint,
+            source_head,
+        )?;
+        let reconstructed_value =
+            serde_json::to_value(&reconstructed).map_err(|_| ValidationError::InvalidInput)?;
+        if reconstructed_value != parsed {
+            return Err(ValidationError::InvalidInput);
+        }
+        Ok(reconstructed)
     }
 
     /// Evidence wire-schema version.
@@ -328,6 +397,49 @@ impl CoverageCalibrationEvidenceRecord {
     /// Returns [`ValidationError::InvalidInput`] if serialization unexpectedly fails.
     pub fn to_json(&self) -> Result<String, ValidationError> {
         serde_json::to_string(self).map_err(|_| ValidationError::InvalidInput)
+    }
+}
+
+fn string_field<'a>(object: &'a Map<String, Value>, field: &str) -> Result<&'a str, ValidationError> {
+    object
+        .get(field)
+        .and_then(Value::as_str)
+        .ok_or(ValidationError::InvalidInput)
+}
+
+fn replication_outcome_from_json_value(
+    value: &Value,
+) -> Result<CoverageCalibrationReplicationOutcome, ValidationError> {
+    let object = value.as_object().ok_or(ValidationError::InvalidInput)?;
+    if object.len() != 2
+        || !object.contains_key("replication_index")
+        || !object.contains_key("window_coverages")
+    {
+        return Err(ValidationError::InvalidInput);
+    }
+    let replication_index = object
+        .get("replication_index")
+        .and_then(Value::as_u64)
+        .and_then(|value| usize::try_from(value).ok())
+        .ok_or(ValidationError::InvalidInput)?;
+    match object
+        .get("window_coverages")
+        .ok_or(ValidationError::InvalidInput)?
+    {
+        Value::Null => Ok(CoverageCalibrationReplicationOutcome::numerical_failure(
+            replication_index,
+        )),
+        Value::Array(values) => {
+            let window_coverages: Result<Vec<_>, _> = values
+                .iter()
+                .map(|value| value.as_f64().ok_or(ValidationError::InvalidInput))
+                .collect();
+            Ok(CoverageCalibrationReplicationOutcome::successful(
+                replication_index,
+                window_coverages?,
+            ))
+        }
+        _ => Err(ValidationError::InvalidInput),
     }
 }
 
