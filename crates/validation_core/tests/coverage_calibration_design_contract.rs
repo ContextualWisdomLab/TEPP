@@ -1,5 +1,5 @@
 use validation_core::{
-    CoverageCalibrationDesign, assess_coverage_calibration,
+    CoverageCalibrationDesign, CoverageCalibrationEstimand, assess_coverage_calibration,
     summarize_windowed_coverage_recovery_replications,
 };
 
@@ -8,6 +8,14 @@ fn tepp_nominal_95_design_is_versioned_before_the_larger_run() {
     let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
 
     assert_eq!(design.design_id(), "tepp.coverage.nominal95.v1");
+    assert_eq!(
+        design.estimand(),
+        CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
+    );
+    assert_eq!(
+        design.estimand().estimand_id(),
+        "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1"
+    );
     assert_eq!(design.attempted_dgp_count(), 10_000);
     assert!((design.nominal_coverage() - 0.95).abs() < f64::EPSILON);
     assert!((design.normal_critical_value() - 1.959_963_984_540_054).abs() < f64::EPSILON);
