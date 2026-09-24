@@ -10,7 +10,7 @@ const SCENARIO_FINGERPRINT: &str =
 const ESTIMAND_ID: &str =
     "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1";
 const DESIGN_FINGERPRINT_V1: &str =
-    "a3a0b8d65388627d2360b05731c5e410feac343a6068da4f9192a353791bc0c0";
+    "0d4aa337cbc22b91f0ca39db3a44dcdac9f56464946e9f6585f6678fccf3908e";
 
 #[test]
 fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() {
@@ -31,8 +31,6 @@ fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() 
     let record = CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
         &design,
         &outcomes,
-        0.025,
-        0.975,
         SCENARIO_ID,
         SCENARIO_FINGERPRINT,
         SOURCE_HEAD,
@@ -42,6 +40,8 @@ fn prospective_design_has_a_pinned_canonical_fingerprint_and_evidence_binding() 
     assert_eq!(record.schema_version(), 6);
     assert_eq!(record.validation_estimand_id(), ESTIMAND_ID);
     assert_eq!(record.validation_design_fingerprint(), DESIGN_FINGERPRINT_V1);
+    assert_eq!(record.coverage_percentile_lower_probability(), 0.025);
+    assert_eq!(record.coverage_percentile_upper_probability(), 0.975);
     let json = record.to_json().expect("deterministic evidence json");
     assert!(json.contains("\"validation_estimand_id\":"));
     assert!(json.contains(ESTIMAND_ID));
