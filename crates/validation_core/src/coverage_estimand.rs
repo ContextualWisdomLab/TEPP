@@ -39,4 +39,16 @@ impl CoverageCalibrationDesign {
     pub const fn estimand(&self) -> CoverageCalibrationEstimand {
         CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
     }
+
+    /// Lower empirical percentile probability fixed before the calibration run.
+    #[must_use]
+    pub const fn coverage_percentile_lower_probability(&self) -> f64 {
+        0.025
+    }
+
+    /// Upper empirical percentile probability fixed before the calibration run.
+    #[must_use]
+    pub const fn coverage_percentile_upper_probability(&self) -> f64 {
+        0.975
+    }
 }
