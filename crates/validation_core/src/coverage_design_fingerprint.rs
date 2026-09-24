@@ -5,12 +5,13 @@ use sha2::{Digest, Sha256};
 use crate::{CoverageCalibrationDesign, ValidationError};
 
 const COVERAGE_CALIBRATION_DESIGN_FINGERPRINT_DOMAIN: &[u8] =
-    b"tepp.validation.coverage-calibration-design.v1\0";
+    b"tepp.validation.coverage-calibration-design.v2\0";
 
 /// Compute the canonical SHA-256 fingerprint of a prospective coverage-calibration design.
 ///
 /// The digest binds the versioned design identity, attempted independent-DGP count,
-/// nominal coverage, practical lower and upper coverage bounds, and maximum accepted
+/// nominal coverage, exact normal critical value used by the declared marginal
+/// interval rule, practical lower and upper coverage bounds, and maximum accepted
 /// Monte Carlo standard error. Floating-point criteria are encoded from their exact
 /// IEEE-754 binary64 bit patterns; integer/string lengths use explicit little-endian
 /// `u64` wire geometry. The domain tag prevents reuse as another TEPP evidence digest.
@@ -37,6 +38,7 @@ pub fn coverage_calibration_design_sha256(
     hasher.update(design_id);
     hasher.update(attempted_dgp_count.to_le_bytes());
     hasher.update(design.nominal_coverage().to_bits().to_le_bytes());
+    hasher.update(design.normal_critical_value().to_bits().to_le_bytes());
     hasher.update(design.practical_lower_coverage().to_bits().to_le_bytes());
     hasher.update(design.practical_upper_coverage().to_bits().to_le_bytes());
     hasher.update(
