@@ -40,6 +40,18 @@ impl CoverageCalibrationDesign {
         CoverageCalibrationEstimand::TrainingFitAlrMarginalEqualWindow
     }
 
+    /// Stable identity of the Monte Carlo standard-error estimator used for the coverage mean.
+    ///
+    /// The current validation owner computes the between-DGP sample standard deviation
+    /// with the `n - 1` denominator and divides it by `sqrt(n)`. Binding that rule keeps
+    /// the prospective `maximum_monte_carlo_standard_error` criterion from silently
+    /// changing meaning if a future implementation adopts a different finite-sample
+    /// variance or standard-error estimator.
+    #[must_use]
+    pub const fn coverage_monte_carlo_standard_error_method_id(&self) -> &'static str {
+        "tepp.coverage.mcse.sample_sd_n_minus_1_over_sqrt_n.v1"
+    }
+
     /// Stable identity of the empirical percentile estimator used in durable evidence.
     ///
     /// The current Monte Carlo owner uses the inclusive nearest-rank convention:
