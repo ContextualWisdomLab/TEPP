@@ -14,7 +14,7 @@ fn shard_record_binds_declared_validation_design_range_scenario_source_and_diges
     let record = execute_coverage_calibration_shard_record(design, 0, 1, SOURCE_HEAD)
         .expect("first declared shard must be structurally executable");
 
-    assert_eq!(record.schema_version(), 1);
+    assert_eq!(record.schema_version(), 2);
     assert_eq!(record.start_replication_index(), 0);
     assert_eq!(record.end_replication_index_exclusive(), 1);
     assert_eq!(record.source_head(), SOURCE_HEAD);
@@ -63,7 +63,7 @@ fn persisted_shard_rehydration_rejects_schema_source_fingerprint_range_and_ident
     let baseline: serde_json::Value = serde_json::from_str(&json).expect("valid owner JSON");
 
     let mut wrong_schema = baseline.clone();
-    wrong_schema["schema_version"] = serde_json::json!(2);
+    wrong_schema["schema_version"] = serde_json::json!(3);
     assert_eq!(
         CoverageCalibrationShardRecord::from_json(&wrong_schema.to_string()),
         Err(CoverageCalibrationStudyError::InvalidShardProvenance)
