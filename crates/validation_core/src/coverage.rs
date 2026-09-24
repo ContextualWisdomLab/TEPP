@@ -137,7 +137,10 @@ pub fn summarize_windowed_coverage_recovery_replications(
 ///
 /// This value records the design before the expensive DGP experiment is run. It
 /// intentionally separates a practical psychometric coverage band from Monte
-/// Carlo precision and from numerical-failure reporting. The design does not
+/// Carlo precision and from numerical-failure reporting. The design also owns the
+/// exact normal critical value used to construct the declared marginal intervals,
+/// so the persisted design identity covers the interval rule that generates the
+/// coverage estimand rather than only its nominal target. The design does not
 /// define an acceptable failure-rate threshold and therefore cannot by itself
 /// promote a full scientific or release claim.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -145,6 +148,7 @@ pub struct CoverageCalibrationDesign {
     design_id: &'static str,
     attempted_dgp_count: usize,
     nominal_coverage: f64,
+    normal_critical_value: f64,
     practical_lower_coverage: f64,
     practical_upper_coverage: f64,
     maximum_monte_carlo_standard_error: f64,
@@ -153,18 +157,21 @@ pub struct CoverageCalibrationDesign {
 impl CoverageCalibrationDesign {
     /// TEPP's prospectively declared nominal-95% coverage design, version 1.
     ///
-    /// The practical `[0.91, 0.98]` band follows the Muthén and Muthén (2002)
-    /// psychometric simulation convention. Ten thousand independent DGP
-    /// attempts are predeclared so a complete successful sample of bounded
-    /// `[0,1]` DGP-level coverage values has worst-case Monte Carlo standard
-    /// error at most `0.005`. The actual owner-reported standard error remains
-    /// authoritative when numerical failures reduce the successful sample.
+    /// Marginal normal intervals use the fixed two-sided 95% standard-normal
+    /// critical value `1.959963984540054`. The practical `[0.91, 0.98]` band
+    /// follows the Muthén and Muthén (2002) psychometric simulation convention.
+    /// Ten thousand independent DGP attempts are predeclared so a complete
+    /// successful sample of bounded `[0,1]` DGP-level coverage values has
+    /// worst-case Monte Carlo standard error at most `0.005`. The actual
+    /// owner-reported standard error remains authoritative when numerical
+    /// failures reduce the successful sample.
     #[must_use]
     pub const fn tepp_nominal_95_v1() -> Self {
         Self {
             design_id: "tepp.coverage.nominal95.v1",
             attempted_dgp_count: 10_000,
             nominal_coverage: 0.95,
+            normal_critical_value: 1.959_963_984_540_054,
             practical_lower_coverage: 0.91,
             practical_upper_coverage: 0.98,
             maximum_monte_carlo_standard_error: 0.005,
@@ -187,6 +194,12 @@ impl CoverageCalibrationDesign {
     #[must_use]
     pub const fn nominal_coverage(self) -> f64 {
         self.nominal_coverage
+    }
+
+    /// Exact standard-normal critical value used by the declared marginal interval rule.
+    #[must_use]
+    pub const fn normal_critical_value(self) -> f64 {
+        self.normal_critical_value
     }
 
     /// Lower practical coverage bound declared before execution.
