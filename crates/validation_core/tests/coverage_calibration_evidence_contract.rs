@@ -9,8 +9,6 @@ const SCENARIO_FINGERPRINT: &str =
     "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
 const ESTIMAND_ID: &str =
     "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1";
-const LOWER_PERCENTILE: f64 = 0.025;
-const UPPER_PERCENTILE: f64 = 0.975;
 
 fn outcomes(successful: usize) -> Vec<CoverageCalibrationReplicationOutcome> {
     (0..10_000)
@@ -46,8 +44,6 @@ fn evidence_from_outcomes(
     CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
         &CoverageCalibrationDesign::tepp_nominal_95_v1(),
         outcomes,
-        LOWER_PERCENTILE,
-        UPPER_PERCENTILE,
         SCENARIO_ID,
         SCENARIO_FINGERPRINT,
         SOURCE_HEAD,
@@ -56,6 +52,7 @@ fn evidence_from_outcomes(
 
 #[test]
 fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty() {
+    let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
     let record = evidence(9_998).expect("calibration evidence");
 
     assert_eq!(record.schema_version(), 6);
@@ -92,8 +89,14 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert_eq!(record.coverage_mean(), Some(0.95));
     assert_eq!(record.coverage_standard_deviation(), Some(0.0));
     assert_eq!(record.coverage_monte_carlo_standard_error(), Some(0.0));
-    assert_eq!(record.coverage_percentile_lower_probability(), LOWER_PERCENTILE);
-    assert_eq!(record.coverage_percentile_upper_probability(), UPPER_PERCENTILE);
+    assert_eq!(
+        record.coverage_percentile_lower_probability(),
+        design.coverage_percentile_lower_probability()
+    );
+    assert_eq!(
+        record.coverage_percentile_upper_probability(),
+        design.coverage_percentile_upper_probability()
+    );
     assert_eq!(record.coverage_percentile_lower(), Some(0.95));
     assert_eq!(record.coverage_percentile_upper(), Some(0.95));
     assert!(record.coverage_within_practical_band());
@@ -194,7 +197,7 @@ fn singleton_success_keeps_point_evidence_without_fabricating_dispersion() {
 }
 
 #[test]
-fn calibration_evidence_fails_closed_on_identity_digest_head_or_percentile_drift() {
+fn calibration_evidence_fails_closed_on_identity_digest_or_head_drift() {
     let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
     let valid_outcomes = outcomes(2);
 
@@ -218,8 +221,6 @@ fn calibration_evidence_fails_closed_on_identity_digest_head_or_percentile_drift
             CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
                 &design,
                 &valid_outcomes,
-                LOWER_PERCENTILE,
-                UPPER_PERCENTILE,
                 scenario_id,
                 fingerprint,
                 source_head,
@@ -227,17 +228,4 @@ fn calibration_evidence_fails_closed_on_identity_digest_head_or_percentile_drift
             Err(ValidationError::InvalidInput)
         );
     }
-
-    assert_eq!(
-        CoverageCalibrationEvidenceRecord::from_indexed_outcomes(
-            &design,
-            &valid_outcomes,
-            0.9,
-            0.1,
-            SCENARIO_ID,
-            SCENARIO_FINGERPRINT,
-            SOURCE_HEAD,
-        ),
-        Err(ValidationError::InvalidConfiguration)
-    );
 }
