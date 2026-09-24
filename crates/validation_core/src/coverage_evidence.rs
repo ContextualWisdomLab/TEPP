@@ -8,13 +8,13 @@ use crate::{
 };
 use serde::Serialize;
 
-const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 7;
+const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 8;
 
 /// Immutable evidence record for one prospective coverage-calibration experiment.
 ///
 /// The record keeps validation design/estimand identity separate from simulation
 /// scenario identity while binding the exact prospective criterion, reporting
-/// method, scenario, indexed outcomes, and source commit. It persists the complete
+/// methods, scenario, indexed outcomes, and source commit. It persists the complete
 /// canonical declared replication ledger, compact SHA-256 provenance bindings,
 /// the unconditional failure denominator, and Monte Carlo uncertainty alongside
 /// conditional interval-calibration metrics. It deliberately does not serialize
@@ -39,6 +39,7 @@ pub struct CoverageCalibrationEvidenceRecord {
     failure_rate_standard_error: f64,
     coverage_mean: Option<f64>,
     coverage_standard_deviation: Option<f64>,
+    coverage_monte_carlo_standard_error_method_id: String,
     coverage_monte_carlo_standard_error: Option<f64>,
     coverage_percentile_method_id: String,
     coverage_percentile_lower_probability: f64,
@@ -57,11 +58,11 @@ impl CoverageCalibrationEvidenceRecord {
     /// persistence-safe shape rather than importing simulation-domain source.
     /// The validation design persists its owner-issued design and estimand identities
     /// and is fingerprinted from those identities, attempted count, nominal coverage,
-    /// interval rule, practical band, Monte Carlo precision target, empirical
-    /// percentile estimator identity, and percentile reporting probabilities so a
-    /// stable design name cannot hide covered-population, aggregation, criterion, or
-    /// reporting-method drift. `source_head` must be an exact lowercase forty-hex Git
-    /// commit identity.
+    /// interval rule, practical band, Monte Carlo precision target and estimator,
+    /// empirical percentile estimator identity, and percentile reporting probabilities
+    /// so a stable design name cannot hide covered-population, aggregation, criterion,
+    /// or reporting-method drift. `source_head` must be an exact lowercase forty-hex
+    /// Git commit identity.
     ///
     /// The indexed aggregation boundary requires an exact permutation of the
     /// prospective design's replication identities before any summary can be
@@ -83,8 +84,8 @@ impl CoverageCalibrationEvidenceRecord {
     /// scenario identity, non-canonical SHA-256 scenario fingerprint or Git head,
     /// malformed coverage outcome, replication identity drift, or a design whose
     /// canonical wire geometry cannot be represented. The validation owner supplies
-    /// the percentile method identity and probabilities used by the Monte Carlo
-    /// summary.
+    /// the Monte Carlo standard-error and percentile method identities and percentile
+    /// probabilities used by the summary.
     pub fn from_indexed_outcomes(
         design: &CoverageCalibrationDesign,
         outcomes: &[CoverageCalibrationReplicationOutcome],
@@ -104,6 +105,8 @@ impl CoverageCalibrationEvidenceRecord {
         }
         parse_commit_head(source_head)?;
         let validation_design_fingerprint = coverage_calibration_design_sha256(design)?;
+        let monte_carlo_standard_error_method_id =
+            design.coverage_monte_carlo_standard_error_method_id();
         let percentile_method_id = design.coverage_percentile_method_id();
         let lower_percentile = design.coverage_percentile_lower_probability();
         let upper_percentile = design.coverage_percentile_upper_probability();
@@ -140,6 +143,8 @@ impl CoverageCalibrationEvidenceRecord {
             coverage_mean: assessment.coverage_mean(),
             coverage_standard_deviation: successful_metric_summary
                 .map(|metric| metric.standard_deviation),
+            coverage_monte_carlo_standard_error_method_id:
+                monte_carlo_standard_error_method_id.to_owned(),
             coverage_monte_carlo_standard_error: assessment
                 .coverage_monte_carlo_standard_error(),
             coverage_percentile_method_id: percentile_method_id.to_owned(),
@@ -248,6 +253,12 @@ impl CoverageCalibrationEvidenceRecord {
     #[must_use]
     pub const fn coverage_standard_deviation(&self) -> Option<f64> {
         self.coverage_standard_deviation
+    }
+
+    /// Versioned identity of the estimator used for coverage-mean Monte Carlo standard error.
+    #[must_use]
+    pub fn coverage_monte_carlo_standard_error_method_id(&self) -> &str {
+        &self.coverage_monte_carlo_standard_error_method_id
     }
 
     /// Between-DGP Monte Carlo standard error of conditional coverage when estimable.
