@@ -401,7 +401,7 @@ pub fn execute_coverage_calibration_shard_record(
 /// identities/fingerprints. Only after those application-level provenance checks pass
 /// are outcomes flattened into `validation_core`, which remains authoritative for the
 /// exact full permutation, denominator, coverage, Monte Carlo uncertainty,
-/// percentiles, and schema-v4 evidence arithmetic.
+/// percentiles, and schema-v6 evidence arithmetic.
 ///
 /// # Errors
 ///
@@ -676,7 +676,8 @@ mod tests {
         assert_eq!(evidence.source_head(), SOURCE_HEAD);
         assert_eq!(evidence.attempted_replication_count(), 10_000);
         assert_eq!(evidence.successful_replication_count(), 10_000);
-        assert!(evidence.supports_calibration_claim());
+        assert!(evidence.coverage_within_practical_band());
+        assert!(evidence.monte_carlo_precision_sufficient());
     }
 
     #[test]
