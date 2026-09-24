@@ -252,3 +252,36 @@ fn calibration_evidence_fails_closed_on_identity_digest_or_head_drift() {
         );
     }
 }
+
+#[test]
+fn persisted_evidence_rehydrates_only_when_owner_recomputation_matches_every_field() {
+    let record = evidence(9_998).expect("calibration evidence");
+    let json = record.to_json().expect("persisted evidence json");
+
+    assert_eq!(
+        CoverageCalibrationEvidenceRecord::from_json(&json).expect("owner rehydration"),
+        record
+    );
+
+    let tampered_mean = json.replacen("\"coverage_mean\":0.95", "\"coverage_mean\":0.94", 1);
+    assert_eq!(
+        CoverageCalibrationEvidenceRecord::from_json(&tampered_mean),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let unknown_top_level = json.replacen('{', "{\"unexpected\":true,", 1);
+    assert_eq!(
+        CoverageCalibrationEvidenceRecord::from_json(&unknown_top_level),
+        Err(ValidationError::InvalidInput)
+    );
+
+    let unknown_outcome = json.replacen(
+        "\"window_coverages\":[0.95]",
+        "\"window_coverages\":[0.95],\"unexpected\":true",
+        1,
+    );
+    assert_eq!(
+        CoverageCalibrationEvidenceRecord::from_json(&unknown_outcome),
+        Err(ValidationError::InvalidInput)
+    );
+}
