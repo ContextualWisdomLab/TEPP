@@ -243,6 +243,30 @@ impl CoverageCalibrationShardRecord {
         })
     }
 
+    /// Rehydrate one persisted shard and verify its expected owner digest.
+    ///
+    /// This composes the strict JSON parser with the shard's canonical SHA-256
+    /// arithmetic so callers do not have to recreate transfer-integrity checks at
+    /// each persistence/resume boundary. The digest remains an application-level
+    /// integrity binding; it does not authenticate external storage, runners, or builds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoverageCalibrationStudyError::InvalidShardProvenance`] when the
+    /// expected digest is not canonical lowercase SHA-256, JSON rehydration fails,
+    /// or the recomputed owner digest differs from the expected value.
+    pub fn from_json_with_sha256(
+        json: &str,
+        expected_sha256: &str,
+    ) -> Result<Self, CoverageCalibrationStudyError> {
+        require_canonical_sha256_fingerprint(expected_sha256)?;
+        let record = Self::from_json(json)?;
+        if record.sha256()? != expected_sha256 {
+            return Err(CoverageCalibrationStudyError::InvalidShardProvenance);
+        }
+        Ok(record)
+    }
+
     /// Return a domain-separated SHA-256 binding over exact shard provenance/outcomes.
     ///
     /// Coverage values enter as exact IEEE-754 binary64 bits. The digest therefore
