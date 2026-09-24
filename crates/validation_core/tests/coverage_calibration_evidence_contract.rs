@@ -9,6 +9,7 @@ const SCENARIO_FINGERPRINT: &str =
     "e5dd9280b1bb4d9255bfeb5c5c3bee01638cdbd1f495887c5f2e93349597735a";
 const ESTIMAND_ID: &str =
     "tepp.coverage.estimand.training_fit_alr_marginal_equal_window.v1";
+const PERCENTILE_METHOD_ID: &str = "tepp.coverage.percentile.inclusive_nearest_rank.v1";
 
 fn outcomes(successful: usize) -> Vec<CoverageCalibrationReplicationOutcome> {
     (0..10_000)
@@ -55,7 +56,7 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     let design = CoverageCalibrationDesign::tepp_nominal_95_v1();
     let record = evidence(9_998).expect("calibration evidence");
 
-    assert_eq!(record.schema_version(), 6);
+    assert_eq!(record.schema_version(), 7);
     assert_eq!(record.validation_design_id(), "tepp.coverage.nominal95.v1");
     assert_eq!(record.validation_estimand_id(), ESTIMAND_ID);
     assert_eq!(record.validation_design_fingerprint().len(), 64);
@@ -89,6 +90,7 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert_eq!(record.coverage_mean(), Some(0.95));
     assert_eq!(record.coverage_standard_deviation(), Some(0.0));
     assert_eq!(record.coverage_monte_carlo_standard_error(), Some(0.0));
+    assert_eq!(record.coverage_percentile_method_id(), PERCENTILE_METHOD_ID);
     assert_eq!(
         record.coverage_percentile_lower_probability(),
         design.coverage_percentile_lower_probability()
@@ -103,7 +105,7 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(record.monte_carlo_precision_sufficient());
 
     let json = record.to_json().expect("deterministic evidence json");
-    assert!(json.contains("\"schema_version\":6"));
+    assert!(json.contains("\"schema_version\":7"));
     assert!(json.contains("\"validation_estimand_id\":"));
     assert!(json.contains(ESTIMAND_ID));
     assert!(json.contains("\"validation_design_fingerprint\":"));
@@ -116,6 +118,8 @@ fn calibration_evidence_binds_design_scenario_source_denominator_and_uncertainty
     assert!(json.contains("\"successful_replication_count\":9998"));
     assert!(json.contains("\"failure_count\":2"));
     assert!(json.contains("\"failure_rate_standard_error\":"));
+    assert!(json.contains("\"coverage_percentile_method_id\":"));
+    assert!(json.contains(PERCENTILE_METHOD_ID));
     assert!(json.contains("\"coverage_percentile_lower_probability\":0.025"));
     assert!(json.contains("\"coverage_percentile_upper_probability\":0.975"));
     assert!(json.contains("\"coverage_percentile_lower\":0.95"));
