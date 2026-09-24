@@ -6,7 +6,7 @@ use crate::{FittedCandidateKConfig, ModelSelectionError};
 
 const COVERAGE_CALIBRATION_FIT_DESIGN_FINGERPRINT_DOMAIN: &[u8] =
     b"tepp.model-selection.coverage-calibration-fit-design.v1\0";
-const COVERAGE_CALIBRATION_FIT_SEEDS: [u64; 3] = [7, 11, 19];
+static COVERAGE_CALIBRATION_FIT_SEEDS: [u64; 3] = [7, 11, 19];
 const COVERAGE_CALIBRATION_MAXIMUM_ITERATIONS: usize = 2_000;
 const COVERAGE_CALIBRATION_TOLERANCE: f64 = 0.001;
 const COVERAGE_CALIBRATION_PRIOR_VARIANCE: f64 = 1.0;
@@ -46,7 +46,7 @@ impl CoverageCalibrationFitDesign {
 
     /// Deterministic estimator initialization seeds in declared order.
     #[must_use]
-    pub const fn seeds(self) -> &'static [u64] {
+    pub fn seeds(self) -> &'static [u64] {
         &COVERAGE_CALIBRATION_FIT_SEEDS
     }
 
