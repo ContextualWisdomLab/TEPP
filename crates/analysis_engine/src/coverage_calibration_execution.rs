@@ -31,14 +31,13 @@ use topic_measurement::{
 };
 use uuid::Uuid;
 use validation_core::{
-    CoverageCalibrationReplicationOutcome, align_topic_probability_rows, interval_coverage,
-    normal_marginal_interval_bounds, realign_additive_log_ratio,
+    CoverageCalibrationDesign, CoverageCalibrationReplicationOutcome, align_topic_probability_rows,
+    interval_coverage, normal_marginal_interval_bounds, realign_additive_log_ratio,
     realign_additive_log_ratio_covariance,
 };
 
 const FIRST_TRAINING_EVENT_INDEX: usize = 3;
 const EXPECTED_ROLLING_ORIGIN_WINDOW_COUNT: usize = 5;
-const NORMAL_95_PERCENT_CRITICAL_VALUE: f64 = 1.959_963_984_540_054;
 const RECOVERY_FIT_SEEDS: [u64; 3] = [7, 11, 19];
 const RECOVERY_MAXIMUM_ITERATIONS: usize = 2_000;
 const RECOVERY_TOLERANCE: f64 = 0.001;
@@ -409,6 +408,7 @@ fn truth_k_window_coverage(
         return Err(CoverageCalibrationExecutionError::InvalidPosteriorGeometry);
     }
 
+    let normal_critical_value = CoverageCalibrationDesign::tepp_nominal_95_v1().normal_critical_value();
     let mut truth = Vec::new();
     let mut lower = Vec::new();
     let mut upper = Vec::new();
@@ -430,7 +430,7 @@ fn truth_k_window_coverage(
         let bounds = normal_marginal_interval_bounds(
             &aligned_location,
             &aligned_covariance,
-            NORMAL_95_PERCENT_CRITICAL_VALUE,
+            normal_critical_value,
         )
         .map_err(|_| CoverageCalibrationExecutionError::InvalidPosteriorGeometry)?;
         let truth_state = truth_by_document
