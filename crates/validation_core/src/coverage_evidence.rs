@@ -8,7 +8,7 @@ use crate::{
 };
 use serde::Serialize;
 
-const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 8;
+const COVERAGE_CALIBRATION_EVIDENCE_SCHEMA_VERSION: u32 = 9;
 
 /// Immutable evidence record for one prospective coverage-calibration experiment.
 ///
@@ -36,6 +36,7 @@ pub struct CoverageCalibrationEvidenceRecord {
     successful_replication_count: usize,
     failure_count: usize,
     failure_rate: f64,
+    failure_rate_monte_carlo_standard_error_method_id: String,
     failure_rate_standard_error: f64,
     coverage_mean: Option<f64>,
     coverage_standard_deviation: Option<f64>,
@@ -58,11 +59,11 @@ impl CoverageCalibrationEvidenceRecord {
     /// persistence-safe shape rather than importing simulation-domain source.
     /// The validation design persists its owner-issued design and estimand identities
     /// and is fingerprinted from those identities, attempted count, nominal coverage,
-    /// interval rule, practical band, Monte Carlo precision target and estimator,
-    /// empirical percentile estimator identity, and percentile reporting probabilities
-    /// so a stable design name cannot hide covered-population, aggregation, criterion,
-    /// or reporting-method drift. `source_head` must be an exact lowercase forty-hex
-    /// Git commit identity.
+    /// interval rule, practical band, failure-rate Monte Carlo standard-error method,
+    /// coverage-mean Monte Carlo precision target and estimator, empirical percentile
+    /// estimator identity, and percentile reporting probabilities so a stable design
+    /// name cannot hide covered-population, aggregation, criterion, or reporting-method
+    /// drift. `source_head` must be an exact lowercase forty-hex Git commit identity.
     ///
     /// The indexed aggregation boundary requires an exact permutation of the
     /// prospective design's replication identities before any summary can be
@@ -84,8 +85,9 @@ impl CoverageCalibrationEvidenceRecord {
     /// scenario identity, non-canonical SHA-256 scenario fingerprint or Git head,
     /// malformed coverage outcome, replication identity drift, or a design whose
     /// canonical wire geometry cannot be represented. The validation owner supplies
-    /// the Monte Carlo standard-error and percentile method identities and percentile
-    /// probabilities used by the summary.
+    /// the failure-rate and coverage-mean Monte Carlo standard-error method identities,
+    /// empirical percentile method identity, and percentile probabilities used by the
+    /// summary.
     pub fn from_indexed_outcomes(
         design: &CoverageCalibrationDesign,
         outcomes: &[CoverageCalibrationReplicationOutcome],
@@ -105,6 +107,8 @@ impl CoverageCalibrationEvidenceRecord {
         }
         parse_commit_head(source_head)?;
         let validation_design_fingerprint = coverage_calibration_design_sha256(design)?;
+        let failure_rate_monte_carlo_standard_error_method_id =
+            design.failure_rate_monte_carlo_standard_error_method_id();
         let monte_carlo_standard_error_method_id =
             design.coverage_monte_carlo_standard_error_method_id();
         let percentile_method_id = design.coverage_percentile_method_id();
@@ -139,6 +143,8 @@ impl CoverageCalibrationEvidenceRecord {
             successful_replication_count: assessment.successful_replication_count(),
             failure_count: assessment.failure_count(),
             failure_rate: assessment.failure_rate(),
+            failure_rate_monte_carlo_standard_error_method_id:
+                failure_rate_monte_carlo_standard_error_method_id.to_owned(),
             failure_rate_standard_error: summary.failure_rate_standard_error(),
             coverage_mean: assessment.coverage_mean(),
             coverage_standard_deviation: successful_metric_summary
@@ -237,7 +243,13 @@ impl CoverageCalibrationEvidenceRecord {
         self.failure_rate
     }
 
-    /// Bernoulli Monte Carlo standard error of the unconditional failure proportion.
+    /// Versioned identity of the estimator used for failure-rate Monte Carlo standard error.
+    #[must_use]
+    pub fn failure_rate_monte_carlo_standard_error_method_id(&self) -> &str {
+        &self.failure_rate_monte_carlo_standard_error_method_id
+    }
+
+    /// Bernoulli plug-in Monte Carlo standard error of the unconditional failure proportion.
     #[must_use]
     pub const fn failure_rate_standard_error(&self) -> f64 {
         self.failure_rate_standard_error
