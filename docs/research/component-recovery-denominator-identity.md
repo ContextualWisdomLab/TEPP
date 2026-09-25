@@ -1,0 +1,44 @@
+# Component recovery denominator identity
+
+## Decision
+
+Known-truth component RMSE in the Longitudinal Modeling bounded context uses one contribution per admitted scientific component identity. A stable `Between` component is unit-level, not occasion-level: TEPP's decomposition emits exactly one such component per unit and encodes its non-temporal carrier with canonical `occasion_index = 0`. A `Within` component remains occasion-specific and is identified by `(unit_index, occasion_index, component_level)`. A `Between` row with a nonzero occasion index is therefore an invalid alias rather than a second target or an implicit weight.
+
+Duplicate identity multiplicity is invalid evidence and fails closed with `LongitudinalError::InvalidComponentPayload`; it is not an implicit observation weight. The order in which truth and recovered rows are serialized is also not part of scientific identity. Both slices are admitted as identity maps and residuals are accumulated in canonical identity order.
+
+This boundary matters in three distinct ways. Repeating an already-matched component changes the RMSE denominator and can improve or worsen the reported recovery metric without adding a new known-truth target. Giving a stable between-unit component different occasion numbers creates the same denominator distortion while disguising the duplicate as two tuple identities. Requiring pairwise row order can instead reject two scientifically identical recovery sets merely because an upstream repository, query, or transport emitted the same unique component identities in a different order. Even after identity lookup removes pairwise order coupling, iterating residuals in caller-provided truth order can still change the last bit of the scaled binary64 sum of squares. TEPP therefore treats bounded-context component identity as authoritative for admission, alignment, denominator membership, and deterministic accumulation.
+
+Curran and Bauer (2011) distinguish stable between-person information from occasion-specific within-person deviations in longitudinal decomposition, while Hamaker, Kuiper, and Grasman (2015) explicitly separate stable between-person differences from the within-person process. Those sources support the scientific level distinction; `occasion_index = 0` is TEPP's canonical storage/projection encoding for its one stable between component per unit, not a claim that the stable component occurs at substantive occasion zero. Morris, White, and Crowther (2019) frame simulation evaluation around explicitly defined estimands and performance measures. For TEPP's known-truth recovery contract, denominator membership and truth-to-recovery alignment therefore follow the identified longitudinal component rather than accidental row multiplicity, serialization order, or a synthetic occasion alias. The current published *Standards for Educational and Psychological Testing* remains the 2014 AERA/APA/NCME edition while a revision is in progress; TEPP treats reproducible evidence and clearly specified score/evidence interpretation as governing constraints rather than inferring validity from transport shape.
+
+## RED → repair trace
+
+- Duplicate-identity RED `698f12f5b2f7a3c194e9d1d3f00c5aeaf10591f8`: `crates/longitudinal_core/tests/component_rmse_duplicate_identity_contract.rs` supplies the same `(unit, occasion, level)` twice in both truth and decided series. The predecessor implementation accepted it and therefore allowed duplicate multiplicity to change the recovery denominator.
+- Duplicate-identity repair `2fae4cb2e7df2845270bd27192000ca370fb05ad`: `crates/longitudinal_core/src/component.rs` records admitted component identities before residual accumulation and rejects a duplicate.
+- Cross-slice row-order RED `8ad72ac91cbddd5ce6432fc70630bad6ce7072ce`: `crates/longitudinal_core/tests/component_rmse_permutation_identity_contract.rs` supplies the same three unique known-truth components and recovered values in a different recovered-row order. The predecessor pairwise `zip` path rejects the scientifically identical perfect recovery solely because serialization order differs.
+- Initial identity-alignment repair `2dd9537e04dd2048559ba707fecd2404db5a2a31`: recovered rows are indexed by `(unit, occasion, level)` so decided-row permutation no longer changes admission. Review of that repair found that residual accumulation still followed caller-provided truth order, leaving deterministic binary64 output order-sensitive.
+- Truth-order rounding RED `5fb93c40eddbd9e7920196ef09594457b8ac72d3`: `crates/longitudinal_core/tests/component_rmse_truth_permutation_contract.rs` uses residual magnitudes `1`, `1e-100`, `3`, and the representable value immediately below `1`. Two truth-row permutations contain exactly the same identity-value pairs but drive the scaled sum-of-squares through different rounding paths and produce different RMSE bit patterns on the predecessor identity-aligned implementation.
+- Causal deterministic repair `025dce7fd98cfb4f94ea790cacd555b744095377`: both truth and recovered slices are admitted into unique identity maps, truth identities are sorted by `(unit, occasion, level wire name)`, and residual accumulation follows that canonical order. Missing identities still fail closed. Existing overflow-safe residual scaling, nonzero-underflow refusal, and exact perfect-recovery zero remain unchanged.
+- Edge-coverage reinforcement `976ce7d710125717ff2f8daeb943d54278c4acde`: a truth-side duplicate with unique recovered identities exercises the independent truth uniqueness gate rather than relying only on a payload where both slices contain duplicates.
+- Stable-between alias RED `0a03041c5c1c2152fe90f86204edf2c957cebbfe`: `crates/longitudinal_core/tests/component_rmse_stable_between_identity_contract.rs` supplies two stable `Between` rows for one unit under different occasion indices. The predecessor identity tuple accepts both as separate targets and lets the alias change the recovery denominator.
+- Fixture correction `53563e975dd10e4f18218880cca2bb4cd79d0e73`: the earlier cross-slice permutation contract now keeps all stable `Between` fixtures at canonical occasion index `0`; transport-order coverage remains intact without encoding a scientifically invalid between-at-occasion fixture.
+- Stable-between identity repair `ec2c1219127e834d89051415f1de8e1cb48507aa`: `component_root_mean_square_error` validates the bounded-context identity before either map insertion. `Between` requires canonical occasion index `0`; `Within` retains its actual occasion. The repair changes admission only and leaves residual arithmetic, canonical accumulation order, nonzero-underflow refusal, and exact perfect-recovery zero unchanged.
+- Public API: `component_root_mean_square_error`.
+- Domain owner: `crates/longitudinal_core`; this is longitudinal Validation Evidence identity/admission policy, not reusable static psychometric arithmetic for `fast-mlsirm`.
+
+## Invariant
+
+For an admitted recovery vector of length `n`, there are exactly `n` unique scientific component identities in each slice and the two identity sets are equal. Each unit can contribute at most one stable `Between` target, encoded with `occasion_index = 0`; each `Within` target is identified by its actual unit and occasion. Any permutation of either slice that preserves those admitted identity-value pairs yields bit-identical deterministic CPU `f64` RMSE. A caller that needs weighted recovery must use a separately named, explicitly weighted contract with its own denominator and validation evidence; duplicate rows and between-component occasion aliases are not weights.
+
+## References
+
+American Educational Research Association, American Psychological Association, & National Council on Measurement in Education. (2014). *Standards for educational and psychological testing*. American Educational Research Association. https://www.testingstandards.net/open-access-files.html
+
+Curran, P. J., & Bauer, D. J. (2011). The disaggregation of within-person and between-person effects in longitudinal models of change. *Annual Review of Psychology, 62*, 583–619. https://doi.org/10.1146/annurev.psych.093008.100356
+
+Hamaker, E. L., Kuiper, R. M., & Grasman, R. P. P. P. (2015). A critique of the cross-lagged panel model. *Psychological Methods, 20*(1), 102–116. https://doi.org/10.1037/a0038889
+
+Morris, T. P., White, I. R., & Crowther, M. J. (2019). Using simulation studies to evaluate statistical methods. *Statistics in Medicine, 38*(11), 2074–2102. https://doi.org/10.1002/sim.8086
+
+### Standards currency note
+
+The joint AERA/APA/NCME site still distributes the 2014 edition as the current published edition. A joint revision process is active; this note should be revisited when the successor edition is formally published rather than treating revision activity as a released standard.

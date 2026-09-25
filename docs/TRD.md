@@ -1,7 +1,7 @@
 # TEPP Technical Requirements Document
 
 **Status:** Accepted technical baseline aligned to approved PRD v0.4  
-**Last reviewed:** 2026-08-16
+**Last reviewed:** 2026-09-12
 
 ## 1. Technical objective
 
@@ -46,6 +46,10 @@ Language support is a validation claim, not a feature flag: each language profil
 Shared-latent temporal/relational topic estimation provides posterior uncertainty and covariate effects. The product contract is TRSL-TM (ADR 0012); an STM-style logistic-normal family is the reference, not a shipped-backend claim (Blei & Lafferty, 2006; Roberts et al., 2014, 2019). Topic proportions are compositional (Aitchison, 1982); downstream correlation/ESEM uses logistic-normal coordinates or appropriate orthonormal log-ratio coordinates rather than naïve raw-proportion Pearson correlation.
 
 Longitudinal ESEM/DSEM (Asparouhov & Muthén, 2009; Asparouhov et al., 2018; Marsh et al., 2014) must distinguish stable between-unit differences from within-unit temporal change, test measurement invariance where comparisons require it (American Educational Research Association, American Psychological Association, & National Council on Measurement in Education, 2014), account for irregular intervals when necessary, and propagate topic-posterior uncertainty through plausible values or joint estimation. These psychometric targets remain accepted-target.
+
+Irregular-rate summaries must expose their weighting target as a versioned scientific contract rather than leaving contribution multiplicity implicit. `tepp.irregular_rate.lag_pair_average.v1` assigns equal weight to every admitted consecutive event-time pair and therefore permits a unit's total contribution to vary with admitted pair count. Its result evidence must carry candidate/contributing units and candidate/admitted/refused pairs, including refusal categories that alter the admitted population. `tepp.irregular_rate.unit_average.v1` is a separate equal-unit target that preserves unit identity through the within-unit summary before combining units. It remains fail closed until TEPP can consume an immutable released reusable finite-mean contract from fast-mlsirm; TEPP must not implement a second generic mean kernel to activate it. Occasion count, follow-up duration, missingness, or pair multiplicity must not be inferred as design or cross-classified/multiple-membership weights. Any future design-weighted target requires its own versioned contract.
+
+Scientific acceptance for irregular-rate weighting requires deterministic unequal-follow-up fixtures, permutation invariance, explicit refusal denominators, and leakage-safe known-truth simulation. Informative-missingness Monte Carlo evidence must report attempted/recovered/failed replicates, the truth corresponding to the actually admitted weighting population, bias, RMSE, interval coverage, convergence/replay evidence where applicable, and Monte Carlo uncertainty. The alternative weighting policy should be retained as a comparison or negative estimator when scientifically useful; numerical equality in one fixture does not collapse the estimand identities.
 
 ## 8. Compute requirements
 
