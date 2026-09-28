@@ -1095,8 +1095,8 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
             ),
             _workflow(
                 3,
-                ".github/workflows/hourly-pr-maintenance.yml",
-                name="Hourly PR Maintenance",
+                ".github/workflows/hourly-nim-product-development.yml",
+                name="Hourly Contextual Orchestrator Product Development",
             ),
             _workflow(
                 10,
@@ -1131,10 +1131,6 @@ class ActionsWorkflowFleetTests(unittest.TestCase):
                     "tree": [
                         {"path": ".github/workflows/ci.yml", "type": "blob"},
                         {"path": ".github/workflows/docs-quality.yml", "type": "blob"},
-                        {
-                            "path": ".github/workflows/hourly-pr-maintenance.yml",
-                            "type": "blob",
-                        },
                         {
                             "path": ".github/workflows/hourly-nim-product-development.yml",
                             "type": "blob",

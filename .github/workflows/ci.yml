@@ -35,8 +35,8 @@ permissions:
   contents: read
 
 concurrency:
-  group: tepp-rust-foundation-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: tepp-rust-foundation-${{ github.repository }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -96,20 +96,17 @@ jobs:
             ~/.cargo/bin/cargo-nextest
             ~/.cargo/bin/cargo-deny
           key: ${{ runner.os }}-${{ runner.arch }}-tepp-rust-tools-nextest-${{ env.CARGO_NEXTEST_VERSION }}-deny-${{ env.CARGO_DENY_VERSION }}
-      - name: Install cargo-nextest
+      - name: Install pinned Rust quality tools
         if: steps.rust-tools-cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-nextest --locked --version "$CARGO_NEXTEST_VERSION"
-      - name: Install cargo-deny
-        if: steps.rust-tools-cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-deny --locked --version "$CARGO_DENY_VERSION"
+        run: |
+          cargo install cargo-nextest --locked --version "$CARGO_NEXTEST_VERSION"
+          cargo install cargo-deny --locked --version "$CARGO_DENY_VERSION"
       - name: Verify pinned Rust quality tool versions
         run: |
           cargo nextest --version | grep -F "$CARGO_NEXTEST_VERSION"
           cargo deny --version | grep -F "$CARGO_DENY_VERSION"
       - name: Check formatting
         run: cargo fmt --all -- --check
-      - name: Compile all targets
-        run: cargo check --workspace --all-targets --all-features
       - name: Run Clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - name: Run test suite without retries
@@ -121,10 +118,10 @@ jobs:
       - name: Enforce dependency, license, advisory, and source policy
         run: cargo deny check
 
-  line-coverage:
-    name: Production line coverage
+  production-coverage:
+    name: Production line and branch coverage
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - name: Checkout exact head
         uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
@@ -132,6 +129,8 @@ jobs:
           persist-credentials: false
       - name: Install pinned Rust toolchain with LLVM tools
         run: rustup toolchain install 1.98.0 --profile minimal --component llvm-tools-preview
+      - name: Install pinned nightly with LLVM tools
+        run: rustup toolchain install nightly-2026-08-21 --profile minimal --component llvm-tools-preview
       - name: Restore pinned cargo-llvm-cov
         id: llvm-cov-cache
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -216,33 +215,12 @@ jobs:
             coverage.lcov
           if-no-files-found: error
           retention-days: 1
-
-  branch-coverage:
-    name: Production branch coverage on pinned nightly
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - name: Checkout exact head
-        uses: actions/checkout@631c942040754b6e095e929c1677c07e10ed4f87
-        with:
-          persist-credentials: false
-      - name: Install pinned nightly with LLVM tools
-        run: rustup toolchain install nightly-2026-08-21 --profile minimal --component llvm-tools-preview
-      - name: Restore pinned cargo-llvm-cov
-        id: llvm-cov-cache
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: ~/.cargo/bin/cargo-llvm-cov
-          key: ${{ runner.os }}-${{ runner.arch }}-tepp-cargo-llvm-cov-${{ env.CARGO_LLVM_COV_VERSION }}
-      - name: Install cargo-llvm-cov
-        if: steps.llvm-cov-cache.outputs.cache-hit != 'true'
-        run: cargo install cargo-llvm-cov --locked --version "$CARGO_LLVM_COV_VERSION"
-      - name: Verify pinned cargo-llvm-cov version
-        run: cargo llvm-cov --version | grep -F "$CARGO_LLVM_COV_VERSION"
       - name: Generate exact branch coverage
         id: branch-report
+        if: ${{ !cancelled() }}
         run: cargo +nightly-2026-08-21 llvm-cov --branch --workspace --all-features --json --output-path coverage-branches.json --ignore-filename-regex 'sqlx_live\.rs|mlx_native_receipt'
       - name: Enforce complete branch coverage
+        if: ${{ !cancelled() && steps.branch-report.outcome == 'success' }}
         run: python3 scripts/check_coverage.py coverage-branches.json --kind branches
       - name: Show exact missing branch diagnostics
         if: ${{ failure() && steps.branch-report.outcome == 'success' }}
