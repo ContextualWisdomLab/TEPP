@@ -34,7 +34,9 @@ concurrency:
 jobs:
   validate:
     name: Validate planning and governance contracts
-    runs-on: ubuntu-latest
+    runs-on:
+      group: CWL CI isolated
+      labels: [self-hosted, linux, x64, cwlab-ci-isolated]
     timeout-minutes: 10
     steps:
       - name: Checkout exact head
