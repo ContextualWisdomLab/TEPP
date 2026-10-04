@@ -227,6 +227,22 @@ class StructuralCommentBoundaryTests(unittest.TestCase):
                                 (total, covered),
                             )
 
+    def test_lexical_separator_and_continuation_edges_are_observable(self) -> None:
+        """Cover token separation, escaped continuation and invalid line requests."""
+        self.assertEqual(
+            coverage_contract._rust_code_before_line_comment("if/* note */ready {"),
+            "if ready {",
+        )
+        self.assertEqual(
+            coverage_contract._rust_lexical_lines(['let text = "first', r'tail\"still"; do_work();'])[1],
+            ("; do_work();", False, False),
+        )
+        for lines, number in (([], 1), (["code"], 0), (["code"], 2)):
+            with self.subTest(lines=lines, number=number):
+                self.assertFalse(
+                    coverage_contract._line_in_multiline_string_literal(lines, number)
+                )
+
     def test_plain_closer_still_stops_sibling_execution_proof(self) -> None:
         """The comment repair retains the ordinary structural-boundary guard."""
         self.assertEqual(
