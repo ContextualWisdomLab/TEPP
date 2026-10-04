@@ -218,29 +218,15 @@ def is_executable_source_line(
         return False
     if _line_in_cfg_not_feature_block(lines, line_number):
         return False
-    if _line_in_multiline_string_literal(lines, line_number):
+    code, continuation_only, standalone_open_literal = _rust_lexical_lines(
+        lines[:line_number]
+    )[-1]
+    if continuation_only:
         return False
-    if _line_in_multiline_string(lines, line_number):
+    if standalone_open_literal and not _is_match_arm_body(lines, line_number):
         return False
-    text = lines[line_number - 1].strip()
-    if "*/" in text:
-        suffix = text.rsplit("*/", 1)[1].strip()
-        if suffix in {
-            "{",
-            "}",
-            "(",
-            ")",
-            "},",
-            ");",
-            "];",
-            "();",
-            "};",
-            "});",
-        }:
-            text = suffix
+    text = code.strip()
     if not text:
-        return False
-    if text.startswith("//"):
         return False
     if text.startswith("#[") or text.startswith("#!["):
         return False
@@ -367,115 +353,117 @@ def _is_structural_comma_continuation(
     return declaration_depth > 0 or function_parenthesis_depth > 0
 
 
-def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
-    """Return whether a source line is only a continuation of a string or comment.
+def _rust_lexical_lines(lines: list[str]) -> list[tuple[str, bool, bool]]:
+    """Return code, literal-continuation-only and standalone-open-literal per line.
 
-    LLVM can emit zero-count rows for multi-line string and block-comment
-    continuations. The target remains trivia only when a block comment occupies
-    the whole target line; executable source after a closing ``*/`` keeps that
-    line in the authored denominator.
+    This is the common lexical authority for comment removal, continuation
+    classification, block openers and reverse arm lookup. Literal bytes opened
+    on a line remain intact. A literal inherited from an earlier physical line
+    contributes no code until its delimiter closes; subsequent code is retained.
+    Nested comments act as whitespace rather than joining adjacent tokens.
     """
 
+    result: list[tuple[str, bool, bool]] = []
     in_string = False
-    block_comment_depth = 0
     raw_hashes: int | None = None
-    for index, line in enumerate(lines, start=1):
-        target_started_in_block_comment = index == line_number and block_comment_depth > 0
-        if index == line_number and in_string:
-            return True
-        target_has_code_after_comment = False
-        stripped = line.strip()
-        started_literal = False
-        escaped = False
-        position = 0
-        while position < len(line):
-            if raw_hashes is not None:
-                if line[position] == '"' and line[position + 1 :].startswith(
-                    "#" * raw_hashes
-                ):
-                    position += raw_hashes + 1
-                    raw_hashes = None
-                    in_string = False
+    block_comment_depth = 0
+    for line in lines:
+        inherited_literal = in_string or raw_hashes is not None
+        retain_literal = not inherited_literal
+        code: list[str] = []
+        cursor = 0
+        while cursor < len(line):
+            if block_comment_depth:
+                if line.startswith("/*", cursor):
+                    block_comment_depth += 1
+                    cursor += 2
+                elif line.startswith("*/", cursor):
+                    block_comment_depth -= 1
+                    cursor += 2
+                    if (
+                        block_comment_depth == 0
+                        and code
+                        and not code[-1][-1].isspace()
+                        and cursor < len(line)
+                        and not line[cursor].isspace()
+                    ):
+                        code.append(" ")
                 else:
-                    position += 1
+                    cursor += 1
+                continue
+            if raw_hashes is not None:
+                delimiter = '"' + ("#" * raw_hashes)
+                closing = line.find(delimiter, cursor)
+                if closing == -1:
+                    if retain_literal:
+                        code.append(line[cursor:])
+                    break
+                if retain_literal:
+                    code.append(line[cursor : closing + len(delimiter)])
+                cursor = closing + len(delimiter)
+                raw_hashes = None
+                retain_literal = True
                 continue
             if in_string:
-                character = line[position]
-                if character == '"' and not escaped:
+                character = line[cursor]
+                if retain_literal:
+                    code.append(character)
+                if character == "\\" and cursor + 1 < len(line):
+                    cursor += 1
+                    if retain_literal:
+                        code.append(line[cursor])
+                elif character == '"':
                     in_string = False
-                elif character == "\\" and not escaped:
-                    escaped = True
-                else:
-                    escaped = False
-                position += 1
+                    retain_literal = True
+                cursor += 1
                 continue
-            if block_comment_depth:
-                if line.startswith("/*", position):
-                    block_comment_depth += 1
-                    position += 2
-                elif line.startswith("*/", position):
-                    block_comment_depth -= 1
-                    position += 2
-                else:
-                    position += 1
-                continue
-            if line.startswith("/*", position):
-                block_comment_depth = 1
-                position += 2
-                continue
-            if line.startswith("//", position):
+            if line.startswith("//", cursor):
                 break
-            if target_started_in_block_comment and not line[position].isspace():
-                target_has_code_after_comment = True
-            if line[position] == "'":
-                char_start = position
-                position += 1
-                char_escaped = False
-                closed_char = False
-                while position < len(line):
-                    character = line[position]
-                    position += 1
-                    if character == "'" and not char_escaped:
-                        closed_char = True
-                        break
-                    char_escaped = character == "\\" and not char_escaped
-                    if character != "\\":
-                        char_escaped = False
-                if not closed_char:
-                    position = char_start + 1
+            if line.startswith("/*", cursor):
+                block_comment_depth = 1
+                cursor += 2
                 continue
-            raw_prefix = None
-            for prefix in ("br", "r"):
-                if line.startswith(prefix, position):
-                    cursor = position + len(prefix)
-                    while cursor < len(line) and line[cursor] == "#":
-                        cursor += 1
-                    if cursor < len(line) and line[cursor] == '"':
-                        raw_prefix = (len(prefix), cursor - position - len(prefix))
-                        break
-            if raw_prefix is not None:
-                prefix_length, hash_count = raw_prefix
-                raw_hashes = hash_count
-                in_string = True
-                started_literal = True
-                position += prefix_length + hash_count + 1
+            raw_start = _raw_string_start(line, cursor)
+            if raw_start is not None:
+                raw_hashes, next_cursor = raw_start
+                code.append(line[cursor:next_cursor])
+                cursor = next_cursor
+                retain_literal = True
                 continue
-            if line[position] == '"':
+            if line[cursor] == '"':
                 in_string = True
-                started_literal = True
-            position += 1
-        if index == line_number:
-            if target_started_in_block_comment and not target_has_code_after_comment:
-                return True
-            if block_comment_depth > 0 or (
-                stripped.startswith("/*")
-                and not _rust_code_before_line_comment(line).strip()
-            ):
-                return True
-            return in_string and started_literal and stripped.startswith(
-                ('"', "r\"", "r#", "br\"", "br#")
-            )
-    return False
+                retain_literal = True
+                code.append(line[cursor])
+                cursor += 1
+                continue
+            if line[cursor] == "'":
+                character_end = _character_literal_end(line, cursor)
+                if character_end is not None:
+                    code.append(line[cursor:character_end])
+                    cursor = character_end
+                    continue
+            code.append(line[cursor])
+            cursor += 1
+        text = "".join(code)
+        continuation_only = inherited_literal and all(
+            character.isspace() or character in ",;)]}" for character in text
+        )
+        standalone_open_literal = (
+            (in_string or raw_hashes is not None)
+            and text.strip().startswith(('"', 'b"', 'r"', 'r#', 'br"', 'br#'))
+        )
+        result.append((text, continuation_only, standalone_open_literal))
+    return result
+
+
+def _line_in_multiline_string(lines: list[str], line_number: int) -> bool:
+    """Identify comment-only or literal-only lines using the common lexical view."""
+    if line_number <= 0 or line_number > len(lines):
+        return False
+    code, continuation_only, standalone_open_literal = _rust_lexical_lines(
+        lines[:line_number]
+    )[-1]
+    return continuation_only or standalone_open_literal or not code.strip()
 
 
 def _is_multiline_match_guard(lines: list[str], line_number: int) -> bool:
@@ -590,88 +578,10 @@ def _line_in_cfg_not_feature_block(lines: list[str], line_number: int) -> bool:
 
 
 def _line_in_multiline_string_literal(lines: list[str], line_number: int) -> bool:
-    """Return whether a line is inside a Rust string continuation.
-
-    The scanner tracks normal strings, raw strings, block comments, and character
-    literals so quotes in comments or literal contents cannot change the state of
-    a later source line.
-    """
-
-    in_string = False
-    raw_hashes: int | None = None
-    block_comment_depth = 0
-    for index, raw in enumerate(lines, start=1):
-        target_continuation = (in_string or raw_hashes is not None) and index == line_number
-        target_closing_cursor: int | None = None
-        target_has_executable_suffix = False
-        cursor = 0
-        while cursor < len(raw):
-            if block_comment_depth > 0:
-                if raw.startswith("/*", cursor):
-                    block_comment_depth += 1
-                    cursor += 2
-                elif raw.startswith("*/", cursor):
-                    block_comment_depth -= 1
-                    cursor += 2
-                else:
-                    cursor += 1
-                continue
-            if raw_hashes is not None:
-                delimiter = '"' + ("#" * raw_hashes)
-                closing = raw.find(delimiter, cursor)
-                if closing == -1:
-                    cursor = len(raw)
-                else:
-                    raw_hashes = None
-                    cursor = closing + len(delimiter)
-                    if target_continuation and target_closing_cursor is None:
-                        target_closing_cursor = cursor
-                continue
-            if in_string:
-                character = raw[cursor]
-                if character == "\\":
-                    cursor += 2
-                elif character == '"':
-                    in_string = False
-                    cursor += 1
-                    if target_continuation and target_closing_cursor is None:
-                        target_closing_cursor = cursor
-                else:
-                    cursor += 1
-                continue
-            if raw[cursor].isspace():
-                cursor += 1
-                continue
-            if raw.startswith("//", cursor):
-                break
-            if raw.startswith("/*", cursor):
-                block_comment_depth += 1
-                cursor += 2
-                continue
-            if target_continuation and target_closing_cursor is not None:
-                if raw[cursor] in ",;)]}":
-                    cursor += 1
-                    continue
-                target_has_executable_suffix = True
-            raw_start = _raw_string_start(raw, cursor)
-            if raw_start is not None:
-                raw_hashes, cursor = raw_start
-                continue
-            if raw[cursor] == '"':
-                in_string = True
-                cursor += 1
-                continue
-            if raw[cursor] == "'":
-                character_end = _character_literal_end(raw, cursor)
-                if character_end is not None:
-                    cursor = character_end
-                    continue
-            cursor += 1
-        if target_continuation:
-            if target_closing_cursor is None:
-                return True
-            return not target_has_executable_suffix
-    return False
+    """Identify inherited literal-only lines through the common lexical view."""
+    if line_number <= 0 or line_number > len(lines):
+        return False
+    return _rust_lexical_lines(lines[:line_number])[-1][1]
 
 
 def _raw_string_start(line: str, cursor: int) -> tuple[int, int] | None:
@@ -707,48 +617,16 @@ def _character_literal_end(line: str, cursor: int) -> int | None:
 
 
 def _is_match_arm_body(lines: list[str], line_number: int) -> bool:
-    """Return whether *line_number* is the whole body of a ``match`` arm.
+    """Locate the preceding arm label through the shared forward lexical view.
 
-    A match arm whose body is one string literal is executable production
-    behavior: a zero count means the arm was never taken. Comments between the
-    arm label and its literal body are not executable code and must not hide it
-    from the authored-line denominator.
+    Only the closest meaningful code line can establish an arm body. Comment
+    text and inherited literal payload cannot supply an arrow or erase a label.
     """
-
-    block_comment_depth = 0
-    for index in range(line_number - 2, -1, -1):
-        previous = lines[index].strip()
-        if not previous:
+    view = _rust_lexical_lines(lines[: line_number - 1])
+    for code, continuation_only, standalone_open_literal in reversed(view):
+        if continuation_only or standalone_open_literal or not code.strip():
             continue
-        if block_comment_depth:
-            block_comment_depth += previous.count("*/") - previous.count("/*")
-            if block_comment_depth > 0:
-                continue
-            block_comment_depth = 0
-            previous = previous.rsplit("/*", 1)[0].strip()
-            if not previous:
-                continue
-        if previous.startswith("//"):
-            continue
-        if previous.startswith("/*"):
-            if "*/" not in previous:
-                continue
-            previous = previous.split("*/", 1)[1].strip()
-            if not previous:
-                continue
-        if previous.endswith("*/") and "/*" not in previous:
-            block_comment_depth = previous.count("*/")
-            continue
-        if "/*" in previous and previous.endswith("*/"):
-            # A leading complete block comment may have been stripped above;
-            # any opener left here follows executable code on the same line.
-            previous = previous.split("/*", 1)[0].strip()
-        code = _rust_code_before_line_comment(previous).rstrip()
-        if not code:
-            continue
-        if code.endswith(("=>", "=> {")):
-            return True
-        return False
+        return code.rstrip().endswith(("=>", "=> {"))
     return False
 
 
@@ -767,71 +645,11 @@ def _is_standalone_string_literal(text: str) -> bool:
     return False
 
 
-def _rust_code_before_line_comment(line: str) -> str:
-    """Return one Rust source line with comments removed outside literals."""
-
-    code: list[str] = []
-    in_string = False
-    raw_hashes: int | None = None
-    block_comment_depth = 0
-    cursor = 0
-    while cursor < len(line):
-        if block_comment_depth:
-            if line.startswith("/*", cursor):
-                block_comment_depth += 1
-                cursor += 2
-            elif line.startswith("*/", cursor):
-                block_comment_depth -= 1
-                cursor += 2
-            else:
-                cursor += 1
-            continue
-        if raw_hashes is not None:
-            delimiter = '"' + ("#" * raw_hashes)
-            closing = line.find(delimiter, cursor)
-            if closing == -1:
-                code.append(line[cursor:])
-                break
-            code.append(line[cursor : closing + len(delimiter)])
-            cursor = closing + len(delimiter)
-            raw_hashes = None
-            continue
-        if in_string:
-            character = line[cursor]
-            code.append(character)
-            if character == "\\" and cursor + 1 < len(line):
-                cursor += 1
-                code.append(line[cursor])
-            elif character == '"':
-                in_string = False
-            cursor += 1
-            continue
-        if line.startswith("//", cursor):
-            break
-        if line.startswith("/*", cursor):
-            block_comment_depth = 1
-            cursor += 2
-            continue
-        raw_start = _raw_string_start(line, cursor)
-        if raw_start is not None:
-            raw_hashes, next_cursor = raw_start
-            code.append(line[cursor:next_cursor])
-            cursor = next_cursor
-            continue
-        if line[cursor] == '"':
-            in_string = True
-            code.append(line[cursor])
-            cursor += 1
-            continue
-        if line[cursor] == "'":
-            character_end = _character_literal_end(line, cursor)
-            if character_end is not None:
-                code.append(line[cursor:character_end])
-                cursor = character_end
-                continue
-        code.append(line[cursor])
-        cursor += 1
-    return "".join(code)
+def _rust_code_before_line_comment(
+    line: str, preceding_lines: list[str] | None = None
+) -> str:
+    """Return the requested line's code from the shared Rust lexical authority."""
+    return _rust_lexical_lines([*(preceding_lines or []), line])[-1][0]
 
 
 def opens_a_block(source_path: str, line_number: int, repository_root: Path | None) -> bool:
@@ -848,7 +666,9 @@ def opens_a_block(source_path: str, line_number: int, repository_root: Path | No
         return False
     if line_number <= 0 or line_number > len(lines):
         return False
-    code = _rust_code_before_line_comment(lines[line_number - 1])
+    code = _rust_code_before_line_comment(
+        lines[line_number - 1], lines[: line_number - 1]
+    )
     return code.rstrip().endswith("{")
 
 
@@ -868,7 +688,7 @@ def _first_meaningful_source_line_after(
         return None
     for candidate_number in range(line_number + 1, len(lines) + 1):
         stripped = lines[candidate_number - 1].strip()
-        if not stripped or stripped.startswith("//"):
+        if not stripped:
             continue
         if _line_in_multiline_string(lines, candidate_number):
             continue
