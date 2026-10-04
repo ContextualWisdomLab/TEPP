@@ -672,7 +672,7 @@ class CoverageContractTests(unittest.TestCase):
                 "    });",  # 68 closure call close
                 "(",  # 69 structural call opener
                 ")",  # 70 structural call close
-                "    Ok(())",  # 71 structural unit result
+                "    Ok(())",  # 71 success return, executable
                 "    NaruonLiveResponse {",  # 72 structural struct literal
                 "pub(crate) fn crate_visible() {",  # 73 visibility-qualified fn
                 "State::Accepted => {",  # 74 match-arm structure
@@ -691,7 +691,7 @@ class CoverageContractTests(unittest.TestCase):
                 coverage_contract.is_executable_source_line(path, len(source_lines) + 5)
             )
 
-            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 75}
+            expected_executable = {13, 40, 41, 42, 48, 61, 62, 65, 71, 75}
             for line_number in range(1, len(source_lines) + 1):
                 is_exec = coverage_contract.is_executable_source_line(path, line_number)
                 if line_number in expected_executable:
@@ -792,6 +792,61 @@ class CoverageContractTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertTrue(coverage_contract.is_executable_source_line(str(source), 2))
+
+    def test_match_arm_string_body_is_executable(self) -> None:
+        """A match arm whose body is one literal is production behavior."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "arm_bodies.rs"
+            source.write_text(
+                'let message = match self {\n'
+                '    Self::Braced => {\n'
+                '        "braced arm body"\n'
+                '    }\n'
+                '    Self::Bare =>\n'
+                '        "bare arm body",\n'
+                '    Self::Commented => {\n'
+                '        // why this arm exists\n'
+                '        "arm body after a comment"\n'
+                '    }\n'
+                '};\n'
+                'let plain =\n'
+                '    "not an arm body";\n',
+                encoding="utf-8",
+            )
+
+            for line_number in (3, 6, 9):
+                with self.subTest(line=line_number):
+                    self.assertTrue(
+                        coverage_contract.is_executable_source_line(str(source), line_number)
+                    )
+            # A literal that continues an ordinary binding stays excluded.
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 13))
+
+    def test_success_return_is_executable(self) -> None:
+        """``Ok(())`` is a function's success path, not structural punctuation."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "success_return.rs"
+            source.write_text(
+                "fn run() -> Result<(), Error> {\n"
+                "    check()?;\n"
+                "    Ok(())\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertTrue(coverage_contract.is_executable_source_line(str(source), 3))
+            # The closing brace stays structural.
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 4))
+
+    def test_match_arm_body_detection_needs_a_preceding_line(self) -> None:
+        """A literal on the first line has no arm to belong to."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "leading_literal.rs"
+            source.write_text('"leading literal",\n', encoding="utf-8")
+            self.assertFalse(coverage_contract.is_executable_source_line(str(source), 1))
 
     def test_guard_after_brace_closing_pattern_is_executable(self) -> None:
         """Count a guard after a destructuring pattern that closes with a brace."""
