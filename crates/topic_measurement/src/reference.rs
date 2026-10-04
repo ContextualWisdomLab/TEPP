@@ -1,5 +1,9 @@
 //! Bounded CPU `f64` reference estimator for TRSL-TM prevalence and lineage.
 
+#[cfg(test)]
+#[path = "../tests/support/expectation_finite.rs"]
+mod expectation_finite_tests;
+
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use corpus_split::CorpusSnapshot;
@@ -781,6 +785,10 @@ fn topic_proportions(eta: &[Vec<f64>]) -> Result<Vec<Vec<f64>>, TopicMeasurement
 
 type ExpectationOutput = (Vec<Vec<f64>>, Vec<Vec<f64>>, f64);
 
+/// Compute responsibilities without returning non-finite sufficient statistics.
+///
+/// Check each accumulated document/topic count after its write; a finite
+/// likelihood alone does not establish that these `f64` sums are representable.
 fn expectation(
     input: &ReferenceTopicInput,
     theta: &[Vec<f64>],
@@ -801,7 +809,9 @@ fn expectation(
             for topic in 0..topic_count {
                 let expected = count * theta[document][topic] * beta[topic][term] / probability;
                 document_topic_counts[document][topic] += expected;
+                require_finite(document_topic_counts[document][topic])?;
                 beta_counts[topic][term] += expected;
+                require_finite(beta_counts[topic][term])?;
             }
         }
     }
