@@ -12,7 +12,7 @@ use std::net::{SocketAddr, TcpListener};
 
 use crate::lineageweave_http::{LINEAGEWEAVE_CONSUMER_CODE, consumer_is_supported};
 use crate::live_http::{
-    header_value, map_io_error, parse_headers, parse_request_line, read_http_request_with_limit,
+    header_value, map_io_error, parse_headers, parse_request_line, read_socket_request_with_limit,
     split_request_with_limit, validate_common_headers,
 };
 use crate::naruon_http::NARUON_ANALYSIS_RUN_PATH;
@@ -113,16 +113,13 @@ impl AnalysisRunLiveService {
         let listener = self.listener.as_ref().ok_or(ApiError::InvalidWirePayload)?;
         let (mut stream, _) = listener.accept().map_err(|error| map_io_error(&error))?;
         stream
-            .set_read_timeout(Some(NARUON_LIVE_IO_TIMEOUT))
-            .map_err(|error| map_io_error(&error))?;
-        stream
             .set_write_timeout(Some(NARUON_LIVE_IO_TIMEOUT))
             .map_err(|error| map_io_error(&error))?;
-        let response = match read_http_request_with_limit(&mut stream, MAX_LIVE_REQUEST_BODY_BYTES)
-        {
-            Ok(request) => self.handle_http_request(&request),
-            Err(error) => self.response_from_error(error),
-        };
+        let response =
+            match read_socket_request_with_limit(&mut stream, MAX_LIVE_REQUEST_BODY_BYTES) {
+                Ok(request) => self.handle_http_request(&request),
+                Err(error) => self.response_from_error(error),
+            };
         stream
             .write_all(&response.to_http_bytes())
             .map_err(|error| map_io_error(&error))?;
