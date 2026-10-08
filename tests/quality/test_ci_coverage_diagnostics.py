@@ -10,7 +10,16 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
 RUST_TOOLCHAIN = REPOSITORY_ROOT / "rust-toolchain.toml"
-DEPENDABOT = REPOSITORY_ROOT / ".github" / "dependabot.yml"
+
+
+def _assert_dependabot_version_updates_stopped(root: Path = REPOSITORY_ROOT) -> None:
+    """Repository-managed Dependabot version updates stay intentionally absent."""
+    for relative in (Path(".github/dependabot.yml"), Path(".github/dependabot.yaml")):
+        candidate = root / relative
+        if candidate.exists() or candidate.is_symlink():
+            raise AssertionError(
+                f"Dependabot version updates must remain stopped; remove {relative}"
+            )
 
 
 class CoverageDiagnosticsContractTests(unittest.TestCase):
@@ -98,10 +107,41 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         self.assertEqual(workflow.count("nightly-2026-08-21"), 3)
         self.assertNotIn("nightly-2026-08-01", workflow)
 
-        dependabot = DEPENDABOT.read_text(encoding="utf-8")
-        self.assertIn('package-ecosystem: "rust-toolchain"', dependabot)
-        self.assertIn('interval: "weekly"', dependabot)
+        _assert_dependabot_version_updates_stopped()
 
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
+
+
+def test_dependabot_stop_policy_accepts_absence_and_rejects_reappearance():
+    """Both recognized config extensions must reject even empty/comment files."""
+    from tempfile import TemporaryDirectory
+
+    with TemporaryDirectory() as directory:
+        root = Path(directory)
+        _assert_dependabot_version_updates_stopped(root)
+        (root / ".github").mkdir()
+        _assert_dependabot_version_updates_stopped(root)
+        for extension in ("yml", "yaml"):
+            config = root / ".github" / f"dependabot.{extension}"
+            for content in ("", "# stopped version updates\n", "version: 2\nupdates: []\n"):
+                config.write_text(content, encoding="utf-8")
+                try:
+                    _assert_dependabot_version_updates_stopped(root)
+                except AssertionError as error:
+                    assert "Dependabot version updates must remain stopped" in str(error)
+                else:
+                    raise AssertionError(f"restored {config.name} was accepted")
+                finally:
+                    config.unlink()
+            config.symlink_to(root / "missing-target")
+            try:
+                _assert_dependabot_version_updates_stopped(root)
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError("dangling config symlink was accepted")
+            finally:
+                config.unlink()
+        _assert_dependabot_version_updates_stopped(root)
