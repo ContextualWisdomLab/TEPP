@@ -1,3 +1,3 @@
 # This raw signed Git object is immutable binary evidence, not editable text.
 # Its exact bytes (including signature whitespace) are authenticated by Git OID.
-tests/fixtures/central-ci/9dab3c2a607ddef69b5ff8cb0f761e90f6bc28de/commit.object binary
+tests/fixtures/central-ci/af81ef49683809ce8b302e078455e3960cf0acd1/commit.object binary

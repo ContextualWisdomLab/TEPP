@@ -152,9 +152,14 @@ general filesystem I/O deadline. See
 
 `.github/workflows/ci.yml` dispatches the reviewed central workflow
 `ContextualWisdomLab/.github/.github/workflows/tepp-rust-foundation-ci.yml`
-at `9dab3c2a607ddef69b5ff8cb0f761e90f6bc28de`. Executable jobs remain owned by
-that supplier; frozen files under `tests/fixtures/central-ci/` are evidence only,
-not workflows installed in `.github/workflows/`.
+at `af81ef49683809ce8b302e078455e3960cf0acd1`. The documentation caller
+`.github/workflows/docs-quality.yml` uses the same pin for
+`tepp-documentation-quality.yml`. These suppliers provision private Python
+environments across all five jobs and hash-verify official Rustup 1.29.1 in the
+three Rust jobs. Executable jobs remain supplier-owned; frozen files under
+`tests/fixtures/central-ci/` are evidence only, not installed workflows.
+Local source-custody tests do not establish native runner bootstrap, hosted
+execution, or GitHub App approval.
 
 `scripts/effective_ci_source.py` resolves the caller and supplier offline for the
 workspace, coverage diagnostics, and shared-runner contract checks. It verifies

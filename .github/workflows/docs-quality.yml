@@ -34,6 +34,6 @@ concurrency:
 jobs:
   documentation:
     name: TEPP Documentation supplier
-    uses: ContextualWisdomLab/.github/.github/workflows/tepp-documentation-quality.yml@9dab3c2a607ddef69b5ff8cb0f761e90f6bc28de
+    uses: ContextualWisdomLab/.github/.github/workflows/tepp-documentation-quality.yml@af81ef49683809ce8b302e078455e3960cf0acd1
     permissions:
       contents: read

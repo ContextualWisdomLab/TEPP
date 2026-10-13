@@ -8,7 +8,7 @@ from scripts.effective_ci_source import effective_ci_source
 
 
 ROOT = Path(__file__).parents[2]
-EXPECTED_SHA = "9dab3c2a607ddef69b5ff8cb0f761e90f6bc28de"
+EXPECTED_SHA = "af81ef49683809ce8b302e078455e3960cf0acd1"
 EXPECTED_CALLERS = {
     ".github/workflows/ci.yml": {
         "job": "foundation",
