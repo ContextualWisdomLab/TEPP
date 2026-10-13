@@ -399,7 +399,9 @@ pub struct TopicSequenceEdge {
     pub successor_document_id: Uuid,
     /// Artifact-local global topic index.
     pub topic_index: usize,
-    /// Minimum dominant-topic posterior mean across the two documents.
+    /// Minimum dominant-topic MAP-fitted proportion across the two documents.
+    /// This point-estimate association is not a posterior mean, credible
+    /// interval, or probability that the edge exists.
     pub association_strength: f64,
 }
 
@@ -466,7 +468,9 @@ pub struct ReferenceTopicModel {
     pub objective: f64,
     /// Global topic-by-term probability matrix.
     pub topic_term_probabilities: Vec<Vec<f64>>,
-    /// Document-by-topic posterior mean proportions.
+    /// Document-by-topic MAP-fitted proportions: `softmax([eta_MAP, 0])`.
+    /// These point estimates are not posterior mean proportions; the nonlinear
+    /// transform of the MAP coordinates does not integrate over uncertainty.
     pub document_topic_proportions: Vec<Vec<f64>>,
     /// Diagonal Laplace variance for each document ALR coordinate.
     pub document_coordinate_variances: Vec<Vec<f64>>,
@@ -1246,6 +1250,44 @@ mod tests {
             connected_post_count: 0,
             lineage_count: 0,
         }
+    }
+
+    #[test]
+    fn fitted_proportions_and_edge_strength_use_map_coordinates() {
+        let input = scoring_input(vec![vec![(0, 1.0)], vec![(1, 2.0)]], 2);
+        let config = ReferenceTopicModelConfig::new(2, vec![1], 10, 1e-6).expect("config");
+        let result = build_result(
+            &input,
+            &config,
+            FitState {
+                seed: 1,
+                iterations: 4,
+                objective: -1.0,
+                beta: vec![vec![0.9, 0.1], vec![0.1, 0.9]],
+                eta: vec![vec![2.0], vec![1.0]],
+                coefficients: vec![vec![0.0]],
+            },
+        )
+        .expect("MAP result");
+        for (row, eta) in result.document_topic_proportions.iter().zip([2.0_f64, 1.0]) {
+            let fitted = 1.0 / (1.0 + (-eta).exp());
+            assert!((row[0] - fitted).abs() < 1e-15);
+            assert!((row[1] - (1.0 - fitted)).abs() < 1e-15);
+        }
+        assert_eq!(result.sequence_edges.len(), 1);
+        assert!(
+            (result.sequence_edges[0].association_strength
+                - result.document_topic_proportions[1][0])
+                .abs()
+                < f64::EPSILON
+        );
+        // Uncertainty is retained separately, not integrated into theta_MAP.
+        assert!(
+            result
+                .document_coordinate_variances
+                .iter()
+                .all(|row| row[0] > 0.0)
+        );
     }
 
     #[test]

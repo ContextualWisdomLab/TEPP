@@ -83,6 +83,15 @@ transition, or exhausted iteration budget returns a typed failure; it never
 emits a partial topic artifact. Recovery gates remain caller-owned promotion
 criteria over completed validation evidence.
 
+The returned `document_topic_proportions` are MAP-fitted point estimates
+`softmax([eta_MAP, 0])`, not posterior mean proportions. The sequence-edge
+`association_strength` is the minimum of the two linked documents' fitted
+proportions for their shared dominant topic; it is not an edge-existence
+probability or uncertainty interval. Laplace curvature/precision and any
+separately admitted posterior plausible values retain their own contracts.
+This labeling clarification does not change the estimand, numeric algorithm,
+public field names, or the PRD's posterior-aware downstream measurement target.
+
 ## Non-goals
 
 This ADR does not select one neural architecture forever, claim a unique true topic count for every corpus, or authorize topic labels as causal constructs. It does not allow a fitted backend to redefine TEPP's temporal/event/membership or evidence semantics.

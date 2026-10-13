@@ -14,6 +14,7 @@ mod case_deletion_refit;
 mod lineage_criterion;
 mod topic_context_posterior;
 mod topic_lineage_artifact;
+mod topic_lineage_cli;
 
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -57,6 +58,15 @@ pub use topic_lineage_artifact::{
     TOPIC_LINEAGE_ARTIFACT_BYTE_LIMIT, TOPIC_LINEAGE_ARTIFACT_SCHEMA_VERSION,
     TOPIC_LINEAGE_MODEL_CONTRACT_VERSION, TOPIC_LINEAGE_OUTPUT_PROFILE, TopicLineageArtifact,
     TopicLineageArtifactEdge, TopicLineageExecution, execute_topic_lineage_run,
+};
+/// Offline, file-driven topic-lineage execution contracts and bounds.
+pub use topic_lineage_cli::{
+    TOPIC_LINEAGE_CLI_DOCUMENT_LIMIT, TOPIC_LINEAGE_CLI_EDGE_LIMIT,
+    TOPIC_LINEAGE_CLI_INPUT_BYTE_LIMIT, TOPIC_LINEAGE_CLI_INPUT_SCHEMA_VERSION,
+    TOPIC_LINEAGE_CLI_ITERATION_LIMIT, TOPIC_LINEAGE_CLI_NONZERO_LIMIT,
+    TOPIC_LINEAGE_CLI_OUTPUT_SCHEMA_VERSION, TOPIC_LINEAGE_CLI_SEED_LIMIT,
+    TOPIC_LINEAGE_CLI_VOCABULARY_LIMIT, TOPIC_LINEAGE_CLI_WORK_LIMIT, TopicLineageCliError,
+    TopicLineageCliOutput, run_topic_lineage, run_topic_lineage_cli,
 };
 
 /// Versioned artifact schema emitted by this engine.

@@ -35,7 +35,8 @@ pub struct TopicLineageArtifactEdge {
     pub successor_document_id: String,
     /// Artifact-local global topic index.
     pub topic_index: u64,
-    /// Minimum dominant-topic posterior mean across the linked documents.
+    /// Minimum dominant-topic MAP-fitted proportion across the linked documents.
+    /// Not a posterior mean, uncertainty probability, or causal effect.
     pub association_strength: f64,
 }
 

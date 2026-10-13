@@ -127,6 +127,27 @@ an unstable compiler capability. A zero denominator is reported explicitly for
 any crate whose lane still ships no executable behavior; it must never conceal
 uncovered production behavior.
 
+## Offline topic-lineage CLI
+
+```bash
+cargo run -p analysis_engine --bin tepp-topic-lineage -- examples/topic_lineage_cli_input_v1.json
+```
+
+The binary reads one bounded `tepp.topic_lineage_cli_input.v1` file, excludes
+documents, memberships, and relations that were not available at the request
+knowledge cutoff, refuses `causes`/`intervenes_on` relations, runs the CPU
+`f64` reference topic-lineage estimator with the supplied topic count and
+seeds, and prints one `tepp.topic_lineage_cli_output.v1` JSON line. The output
+is fitted topic association, not causation. Its association strength is a
+MAP-fitted proportion, not a posterior mean or uncertainty probability. It is
+not a durable analysis run, calibrated recovery evidence, or GPU parity evidence.
+Input must resolve to a regular file (regular-file symlinks are allowed).
+Directories, FIFOs, devices, and sockets return redacted `io` diagnostics with
+exit `5`; Unix opens are nonblocking and recheck the opened file type to reject
+FIFO replacement races without waiting for a writer. These checks are not a
+general filesystem I/O deadline. See
+`docs/API_CONTRACT.md` for the field and exit-status contract.
+
 ## Normative documents
 
 - `AGENTS.md`
