@@ -12,6 +12,11 @@ import tomllib
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+if __package__:
+    from .effective_ci_source import effective_ci_source
+else:  # pragma: no cover - direct CLI entry point
+    from effective_ci_source import effective_ci_source
+
 EXPECTED_CRATES: tuple[str, ...] = (
     "evidence_core",
     "semantic_core",
@@ -234,6 +239,10 @@ def _validate_ci_contract(root: Path) -> list[str]:
         return [".github/workflows/ci.yml is missing"]
 
     ci_text = ci_path.read_text(encoding="utf-8")
+    try:
+        ci_text = effective_ci_source(root)
+    except (OSError, ValueError) as error:
+        errors.append(f"CI supplier source validation failed: {error}")
     for snippet in REQUIRED_CI_SNIPPETS:
         if snippet not in ci_text:
             errors.append(f"CI workflow is missing required command: {snippet}")
