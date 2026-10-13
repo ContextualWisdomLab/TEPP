@@ -89,10 +89,12 @@ REQUIRED_CI_SNIPPETS: tuple[str, ...] = (
     "cargo llvm-cov --workspace --all-features",
     "python3 scripts/check_docstrings.py",
     "python3 scripts/check_coverage.py",
-    "Restore pinned Rust quality tools",
+    'cargo install cargo-nextest --root "$CARGO_HOME" --locked --version "$CARGO_NEXTEST_VERSION"',
+    'cargo install cargo-deny --root "$CARGO_HOME" --locked --version "$CARGO_DENY_VERSION"',
     "Verify pinned Rust quality tool versions",
-    "Restore pinned cargo-llvm-cov",
+    'cargo install cargo-llvm-cov --root "$CARGO_HOME" --locked --version "$CARGO_LLVM_COV_VERSION"',
     "Verify pinned cargo-llvm-cov version",
+    '"$CARGO_HOME/bin/cargo-llvm-cov" llvm-cov --version',
 )
 
 ACTION_PATTERN = re.compile(r"^\s*uses:\s*([^\s#]+)@([^\s#]+)", re.MULTILINE)

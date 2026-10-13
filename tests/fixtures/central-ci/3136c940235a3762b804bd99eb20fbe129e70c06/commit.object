@@ -1,0 +1,29 @@
+tree 9b67a4452f464716bab8c0008e4ba370538d17e5
+parent 6597e37ff677d12960fa0210c9fbf604728ffa92
+author Seongho Bae <me@seonghobae.me> 1791910983 +0900
+committer GitHub <noreply@github.com> 1791910983 +0900
+gpgsig -----BEGIN PGP SIGNATURE-----
+ 
+ wsFcBAABCAAQBQJqzmRHCRC1aQ7uu5UhlAAAV0AQAF2i+mQUNqh8wvcjGJI+R9dh
+ VQDRIfXDEDFAi5zNWqhEwC9sibKcon6PaUB43QPkB+kCU4d9SizIlgbGq/RGiFx+
+ UtChXueMh8pMBDaCqqV4aXk2qzE7gtdsgSD4FesvyOnaHtyjyIjVifgsJ0ScnPjH
+ wxUovsYr2aP4XgN8dRRpt0BGmVJKLRSeuLIfjZ3kPDhuAf1zZoALkOWGfhGNwk/r
+ f6JdwrB1NWrChzg1sA6rzrl7rEyg7d/W2qG7/zgbPkh2xCY1rSdHbRqZ5xO3CGEZ
+ in3Y0VveJP+Pp/3nleqCA4yzldy4QMa+iLw/9LcCGtzOJj2dkqAdYJv2D1Xv3Nux
+ d+dIhxNqX96LbchTs4gjTUXk7dP3E1SjLZsriYLbsWohdHpV2T/ISWQtJ9d3fWJT
+ K0fENXRXiV1cQ3RDFcBlFIavr0e4GQ/rax7pp96XWikIFgNE8nX0xhiDU/EfI1HB
+ 7iaa4PQ/Qxpjmlivo0IY5KoyzhQC4mwlKwTWX2+lAmPcTmIsfFnmenvVYfG8X2fs
+ ODoZUbP+TCt/YDz69MkTCnevC3fVw2zVEq3g4mbCPxj/S3B4DT1TZ9emiLrCkCl3
+ FY2R2dfZ5Rz2mfbMQIiMsQYtD9QhJ7eEGRu+Ly7s+3GKknV8kymlQeMesJuuSiYm
+ 4U+GjyQXm4d5YmMopT8o
+ =o03p
+ -----END PGP SIGNATURE-----
+ 
+
+fix(tepp): isolate Rust tool state per job and verify plugin consumers (#2644)
+
+* fix(tepp): isolate supplier Rust homes from persistent runner state
+
+* fix(tepp): invoke llvm-cov plugin with its required subcommand
+
+* fix(tepp): remove unauthenticated executable cache restoration

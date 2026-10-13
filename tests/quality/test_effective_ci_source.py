@@ -71,6 +71,7 @@ class EffectiveCiSourceTests(unittest.TestCase):
             original = path.read_text(encoding="utf-8")
             variants = (
                 original.replace(source.SUPPLIER_PIN, "a" * 40),
+                original.replace(source.SUPPLIER_PIN, "af81ef49683809ce8b302e078455e3960cf0acd1"),
                 original.replace("  foundation:", "  foundation:\n    if: false"),
                 original.replace("contents: read", "contents: write"),
                 original.replace("cancel-in-progress:", "removed-concurrency:"),
@@ -98,6 +99,22 @@ class EffectiveCiSourceTests(unittest.TestCase):
             ("cwlab-ci-isolated", "privileged"),
             ("x64,", ""),
         )
+        install_controls = tuple(
+            (command, command.replace(before, after))
+            for command in workspace.REQUIRED_CI_SNIPPETS
+            if command.startswith("cargo install ")
+            for before, after in (
+                ('--root "$CARGO_HOME"', '--root "$HOME/.cargo"'),
+                ("--locked", "--force"),
+                ('--version "$CARGO_', '--version "OTHER_'),
+                (command.split()[2], "unreviewed-tool"),
+            )
+        )
+        plugin_control = (
+            '"$CARGO_HOME/bin/cargo-llvm-cov" llvm-cov --version',
+            '"$CARGO_HOME/bin/cargo-llvm-cov" --version',
+        )
+        changes += install_controls + (plugin_control,)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             fixture = self.copy_evidence(root)
@@ -109,6 +126,12 @@ class EffectiveCiSourceTests(unittest.TestCase):
                     path.write_text(original.replace(before, after), encoding="utf-8")
                     with self.assertRaisesRegex(ValueError, "blob Git object mismatch"):
                         source.effective_ci_source(root)
+                    if (before, after) in install_controls + (plugin_control,):
+                        with mock.patch.object(workspace, "effective_ci_source", return_value=original.replace(before, after)):
+                            self.assertIn(
+                                f"CI workflow is missing required command: {before}",
+                                workspace._validate_ci_contract(ROOT),
+                            )
             path.write_text(original, encoding="utf-8")
             self.assertEqual(workspace._validate_ci_contract(root), ["rust-toolchain.toml is missing", "deny.toml is missing"])
 
@@ -158,6 +181,7 @@ class EffectiveCiSourceTests(unittest.TestCase):
             original = path.read_text(encoding="utf-8")
             for text in (
                 original.replace(source.SUPPLIER_PIN, "a" * 40),
+                original.replace(source.SUPPLIER_PIN, "af81ef49683809ce8b302e078455e3960cf0acd1"),
                 original.replace("  documentation:", "  documentation:\n    if: false"),
                 original.replace("contents: read", "contents: write"),
                 original + "\n  extra-job:\n    runs-on: ubuntu-latest\n",

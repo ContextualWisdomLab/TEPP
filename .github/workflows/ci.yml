@@ -41,6 +41,6 @@ concurrency:
 jobs:
   foundation:
     name: TEPP Rust Foundation supplier
-    uses: ContextualWisdomLab/.github/.github/workflows/tepp-rust-foundation-ci.yml@9dab3c2a607ddef69b5ff8cb0f761e90f6bc28de
+    uses: ContextualWisdomLab/.github/.github/workflows/tepp-rust-foundation-ci.yml@3136c940235a3762b804bd99eb20fbe129e70c06
     permissions:
       contents: read
