@@ -20,6 +20,7 @@ Current protected main exposes Rust library/domain contracts. The active stack a
 | event/relation/membership API | future TEPP crates/services | naruon, analytics, UI | accepted-target |
 | semantic/topic measurement API | future TEPP measurement service | naruon, batch jobs, visual analytics | accepted-target |
 | topic-context posterior plausible values | `analysis_engine` `tepp.topic_context_posterior.v1` | fast-mlsirm, LineageWeave | contract-only active-PR |
+| offline topic-lineage CLI input/output | `analysis_engine` `tepp-topic-lineage` (`tepp.topic_lineage_cli_input.v1` / `tepp.topic_lineage_cli_output.v1`) | standalone operators, batch jobs | active-PR |
 | LLM interpretation provider port | `orchestrator_live` loopback `POST /v1/interpretation-runs` | contextual-orchestrator | partial |
 | LLM interpretation provider port | `tepp_api` orchestration router + future HTTP gateway | contextual-orchestrator | partial |
 | model/artifact/export API | `tepp_api` export envelopes + future HTTP service | standalone UI/CWL consumers | partial |
@@ -54,6 +55,64 @@ rejected criterion-validity outcome bound to one fast-mlsirm estimation run,
 snapshot, cutoff, and validated pair count. The contract does not authorize a
 consumer to self-assert validity; no weight vector activates until TEPP's
 registered implementation returns the digest-bound artifact.
+
+The offline `tepp-topic-lineage` binary (`analysis_engine`) reads one
+`tepp.topic_lineage_cli_input.v1` JSON file named as its only argument and
+prints one `tepp.topic_lineage_cli_output.v1` JSON line. It has no network,
+database, or accelerator side effects. The committed example is
+`examples/topic_lineage_cli_input_v1.json`.
+
+- Input fields: `schema_version`, `request` (the v1 `AnalysisRunRequest` with
+  model contract `trsl_tm_cpu_f64_v1` and output profile
+  `trsl_topic_lineage_v1`), `run_id`, `completed_at`, `vocabulary_size`,
+  `documents` (`document_id`, `event_time`, `available_time`, sorted
+  `term_indices`, `term_counts`), `memberships` (`document_id`, `group_id`,
+  closed `role`, `weight`, `valid_from`, `valid_to`, `available_time`),
+  `relations` (endpoint document identities, closed `kind`,
+  `evidence_status`, source/target event intervals, `available_time`), and
+  `model` (topic count, seeds, iteration budget, tolerance, and the five
+  reference hyperparameters). Every object rejects unknown fields.
+- Bounds: 16 MiB input, 10,000 documents, 100,000 vocabulary columns,
+  1,000,000 term entries, 100,000 memberships, 100,000 relations, 32 seeds,
+  100,000 iterations, and a declared-work product bound. Before reference
+  construction/allocation, dense design payload is capped at 16 MiB and the
+  conservative dense fitting-state envelope at 128 MiB:
+  `8 * (3*K*V + 6*D*K + 2*F*(K-1) + D*F + K)`, with checked arithmetic.
+  These are payload admission caps, not RSS or elapsed-time guarantees; see
+  [the allocation trace](research/topic-lineage-cli-admission.md).
+  Shared `ReferenceTopicInput::new` also checks the 16 MiB design cap before
+  feature/design allocation, including populated sparse covariate expansion;
+  shared `fit_reference_topic_model` checks the 128 MiB envelope with actual
+  feature count before the first seed. Overflow/overbudget returns
+  `TopicMeasurementError::ResourceLimitExceeded`; direct executor preserves
+  that typed error, candidate-K selection skips refused fits (none successful
+  means `NoSuccessfulFit`), and CLI admission preserves exit 3/redacted refusal.
+  Optional joint precision retains its independent 4096-coordinate cap.
+  Non-finite JSON numbers fail at parse.
+- Admission: a document, membership, or relation with
+  `available_time > knowledge_cutoff` is excluded and counted; memberships and
+  relations that touch an excluded document are excluded too. A reference to
+  an identity absent from the input, a relation interval that does not contain
+  its document's event time, a duplicate, a reverse or cyclic transition, and
+  the kinds `causes`/`intervenes_on` are refused. Both evidence statuses retain
+  those validation gates, but only admitted `observed` transitions affect the
+  reference objective or emitted lineage. Inferred proposals are not observed
+  evidence; an inferred-only admitted graph is refused with
+  `analysis_engine_rejected` and exit `3`, without a partial artifact.
+- Output fields: `schema_version`, `input_sha256`,
+  `admitted_document_count`, `excluded_document_count`,
+  `excluded_membership_count`, `excluded_relation_count`, `artifact`, and
+  `terminal_result`, whose `result_sha256` equals the artifact digest.
+- Failure writes nothing to standard output and one redacted
+  `{"error_code","message"}` line to standard error. Exit status is `2` for
+  usage, `3` for invalid input, `4` for estimator non-convergence or a
+  non-finite estimate, and `5` for I/O.
+- The accepted receipt is minted locally from `run_id`; the output is an
+  offline result, not a durable or service-registered run. It carries
+  `fitted_topic_association_not_causation` and makes no `K`-selection, GPU
+  parity, calibrated-weight, owner-issued snapshot-provenance, or
+  production-service claim. A new engine artifact schema version requires a
+  new CLI output version.
 
 ## 4. Target HTTP resource model
 
@@ -106,8 +165,20 @@ counts, and emits a digest-bound terminal result or a redacted failure. For the
 `trsl_topic_lineage_v1` profile it invokes the ADR-0012 `topic_measurement`
 reference estimator and publishes validated fitted associations and counts in
 `tepp.trsl_topic_lineage.v1`; it does not infer causality or replace production
-`K` selection. This remains active product-branch evidence until its exact-head
+`K` selection. Each edge's `association_strength` is the minimum shared
+dominant-topic MAP-fitted proportion of its two documents,
+`min(theta_MAP[source][topic], theta_MAP[target][topic])`; it is
+not a posterior mean or an uncertainty probability. The CLI does not export
+credible intervals, posterior draws, or calibrated edge-existence probabilities.
+The separate posterior-context contract below remains the uncertainty handoff.
+This remains active product-branch evidence until its exact-head
 checks and protected merge pass.
+
+The standalone offline CLI accepts only input resolving to a regular file,
+including regular-file symlinks. Nonregular paths fail with redacted `io`
+diagnostics and exit `5`. Unix uses a nonblocking open and validates the opened
+file type too, preventing FIFO replacement from blocking on a writer. This is
+not a general filesystem I/O deadline.
 
 The separate `tepp.topic_context_posterior.v1` artifact carries per-post
 posterior logistic-normal plausible values, a declared event clock, opaque

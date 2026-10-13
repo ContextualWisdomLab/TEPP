@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use corpus_split::CorpusSnapshot;
 use membership_core::{GroupId, MemberId, MembershipNetwork, MembershipRole};
-use relation_graph::RelationGraph;
+use relation_graph::{RelationEvidenceStatus, RelationGraph};
 use temporal_core::EventTime;
 use uuid::Uuid;
 
@@ -18,6 +18,82 @@ const DEFAULT_STEP_SIZE: f64 = 0.2;
 // ponytail: dense CPU reference is bounded; use a sparse block precision after
 // CPU parity establishes the exact storage contract.
 const MAX_JOINT_COORDINATES: usize = 4_096;
+
+/// Maximum admitted dense prevalence-design `f64` payload (16 MiB).
+/// Row headers, feature metadata, sparse input, and allocator overhead are excluded.
+pub const REFERENCE_DESIGN_BYTE_LIMIT: u128 = 16 * 1024 * 1024;
+/// Maximum conservative simultaneous dense fitting `f64` payload (128 MiB).
+/// This is not an RSS, available-memory, or universal OOM guarantee. Input,
+/// graph, row headers, allocator overhead, serialization, and optional joint
+/// precision (independently capped at 4096 coordinates) are excluded.
+pub const REFERENCE_FIT_BYTE_LIMIT: u128 = 128 * 1024 * 1024;
+
+/// Check dense design dimensions without constructing any dense storage.
+///
+/// # Errors
+///
+/// Returns [`TopicMeasurementError::ResourceLimitExceeded`] when `8*D*F`
+/// exceeds 16 MiB or checked dimensional arithmetic overflows. Equality is
+/// admitted. Scientific input validation remains the constructor's authority.
+pub fn check_reference_design_limits(
+    document_count: usize,
+    feature_count: usize,
+) -> Result<(), TopicMeasurementError> {
+    let bytes = document_count
+        .checked_mul(feature_count)
+        .and_then(|n| n.checked_mul(size_of::<f64>()))
+        .ok_or(TopicMeasurementError::ResourceLimitExceeded)?;
+    if bytes as u128 > REFERENCE_DESIGN_BYTE_LIMIT {
+        Err(TopicMeasurementError::ResourceLimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
+/// Check conservative simultaneous fit payload without allocating matrices.
+///
+/// Charges `8*(3*K*V + 6*D*K + 2*F*(K-1) + D*F + K)`: incumbent/current
+/// beta and expectation counts; incumbent/current ALR state, theta, counts,
+/// means and gradient (six D*K dominate K-1 state and result variance);
+/// incumbent/current coefficients, design, and one edge delta. Seeds run
+/// serially; the incumbent is charged even for a single seed. `F=0` supports
+/// an early CLI partial check; the fit boundary always supplies actual features.
+/// This planner does not replace design admission or scientific validation.
+///
+/// # Errors
+///
+/// Returns [`TopicMeasurementError::ResourceLimitExceeded`] above 128 MiB or
+/// on checked arithmetic overflow. Equality is admitted. See
+/// [`REFERENCE_FIT_BYTE_LIMIT`] for exclusions.
+pub fn check_reference_fit_limits(
+    document_count: usize,
+    vocabulary_size: usize,
+    topic_count: usize,
+    feature_count: usize,
+) -> Result<(), TopicMeasurementError> {
+    let d = document_count as u128;
+    let v = vocabulary_size as u128;
+    let k = topic_count as u128;
+    let f = feature_count as u128;
+    let bytes = k
+        .checked_mul(v)
+        .and_then(|n| n.checked_mul(3))
+        .and_then(|n| d.checked_mul(k)?.checked_mul(6)?.checked_add(n))
+        .and_then(|n| {
+            f.checked_mul(k.saturating_sub(1))?
+                .checked_mul(2)?
+                .checked_add(n)
+        })
+        .and_then(|n| d.checked_mul(f)?.checked_add(n))
+        .and_then(|n| n.checked_add(k))
+        .and_then(|n| n.checked_mul(size_of::<f64>() as u128))
+        .ok_or(TopicMeasurementError::ResourceLimitExceeded)?;
+    if bytes > REFERENCE_FIT_BYTE_LIMIT {
+        Err(TopicMeasurementError::ResourceLimitExceeded)
+    } else {
+        Ok(())
+    }
+}
 
 /// One column in the structural prevalence mean.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -55,14 +131,20 @@ impl ReferenceTopicInput {
     /// `document_term` may be CSR or CSC. `covariates`, when present, may also
     /// use either orientation. Every document must occur in `snapshot`, have a
     /// nonempty nonnegative term row, span at least two event times, and have at
-    /// least one active membership across the modeled corpus. Only validated
-    /// forward transition edges with both endpoints in the corpus affect the
-    /// relational objective; all other relation kinds remain provenance only.
+    /// least one active membership across the modeled corpus. Only validated,
+    /// observed forward transition edges with both endpoints in the corpus
+    /// affect the relational objective and emitted lineage. Inferred proposals
+    /// and other relation kinds remain provenance only. At least one observed
+    /// transition pair is required.
     ///
     /// # Errors
     ///
     /// Returns [`TopicMeasurementError::InvalidModelInput`] when any dimension,
     /// cutoff, count, time, membership, covariate, or transition invariant fails.
+    /// Returns [`TopicMeasurementError::ResourceLimitExceeded`] before feature
+    /// expansion or dense design allocation when `8*D*F > 16 MiB` or feature
+    /// arithmetic overflows. F includes intercept, time, every sparse covariate
+    /// column through the highest populated index, and active role/group contexts.
     pub fn new(
         snapshot: &CorpusSnapshot,
         document_ids: Vec<Uuid>,
@@ -224,13 +306,14 @@ fn build_design(
         Some(_) => return Err(TopicMeasurementError::InvalidModelInput),
         None => None,
     };
-    let covariate_count = covariate_rows.as_ref().map_or(0, |rows| {
-        rows.iter()
-            .flatten()
-            .map(|(column, _)| *column)
-            .max()
-            .map_or(0, |value| value + 1)
-    });
+    let covariate_count = covariate_rows
+        .as_ref()
+        .and_then(|rows| rows.iter().flatten().map(|(column, _)| *column).max())
+        .map_or(Ok(0), |column| {
+            column
+                .checked_add(1)
+                .ok_or(TopicMeasurementError::ResourceLimitExceeded)
+        })?;
 
     let active: Vec<_> = document_ids
         .iter()
@@ -252,6 +335,12 @@ fn build_design(
         .map(|(index, key)| (key, index))
         .collect();
 
+    let feature_count = 2_usize
+        .checked_add(covariate_count)
+        .and_then(|n| n.checked_add(membership_keys.len()))
+        .ok_or(TopicMeasurementError::ResourceLimitExceeded)?;
+    check_reference_design_limits(document_count, feature_count)?;
+    // Admission precedes both covariate feature expansion and dense design.
     let mut features = vec![PrevalenceFeature::Intercept, PrevalenceFeature::EventTime];
     features.extend((0..covariate_count).map(PrevalenceFeature::Covariate));
     features.extend(
@@ -284,7 +373,9 @@ fn collect_transition_pairs(
     relations: &RelationGraph,
 ) -> Result<Vec<(usize, usize)>, TopicMeasurementError> {
     let mut transition_pairs = BTreeSet::new();
-    for edge in relations.edges().filter(|edge| edge.is_transition_edge()) {
+    for edge in relations.edges().filter(|edge| {
+        edge.is_transition_edge() && edge.evidence_status() == RelationEvidenceStatus::Observed
+    }) {
         let Some(&source) = index_by_id.get(&edge.source().as_uuid()) else {
             continue;
         };
@@ -399,7 +490,9 @@ pub struct TopicSequenceEdge {
     pub successor_document_id: Uuid,
     /// Artifact-local global topic index.
     pub topic_index: usize,
-    /// Minimum dominant-topic posterior mean across the two documents.
+    /// Minimum dominant-topic MAP-fitted proportion across the two documents.
+    /// This point-estimate association is not a posterior mean, credible
+    /// interval, or probability that the edge exists.
     pub association_strength: f64,
 }
 
@@ -466,7 +559,9 @@ pub struct ReferenceTopicModel {
     pub objective: f64,
     /// Global topic-by-term probability matrix.
     pub topic_term_probabilities: Vec<Vec<f64>>,
-    /// Document-by-topic posterior mean proportions.
+    /// Document-by-topic MAP-fitted proportions: `softmax([eta_MAP, 0])`.
+    /// These point estimates are not posterior mean proportions; the nonlinear
+    /// transform of the MAP coordinates does not integrate over uncertainty.
     pub document_topic_proportions: Vec<Vec<f64>>,
     /// Diagonal Laplace variance for each document ALR coordinate.
     pub document_coordinate_variances: Vec<Vec<f64>>,
@@ -695,8 +790,12 @@ struct FitState {
 ///
 /// # Errors
 ///
-/// Returns a typed invalid-input, non-finite, or convergence failure. The
-/// function never returns a partial fit.
+/// Returns a typed invalid-input, resource-limit, non-finite, or convergence
+/// failure. After scientific/configuration validation and before the first
+/// seed, the shared checked planner admits at most 128 MiB of conservative
+/// simultaneous dense `f64` payload, including actual design/features and
+/// incumbent state. See [`check_reference_fit_limits`] for charges/exclusions.
+/// The function never returns a partial fit.
 pub fn fit_reference_topic_model(
     input: &ReferenceTopicInput,
     config: &ReferenceTopicModelConfig,
@@ -705,6 +804,12 @@ pub fn fit_reference_topic_model(
     if config.topic_count > input.vocabulary_size {
         return Err(TopicMeasurementError::InvalidModelInput);
     }
+    check_reference_fit_limits(
+        input.document_count(),
+        input.vocabulary_size,
+        config.topic_count,
+        input.features.len(),
+    )?;
     let mut best = None;
     for &seed in &config.seeds {
         match fit_seed(input, config, seed) {
@@ -1246,6 +1351,44 @@ mod tests {
             connected_post_count: 0,
             lineage_count: 0,
         }
+    }
+
+    #[test]
+    fn fitted_proportions_and_edge_strength_use_map_coordinates() {
+        let input = scoring_input(vec![vec![(0, 1.0)], vec![(1, 2.0)]], 2);
+        let config = ReferenceTopicModelConfig::new(2, vec![1], 10, 1e-6).expect("config");
+        let result = build_result(
+            &input,
+            &config,
+            FitState {
+                seed: 1,
+                iterations: 4,
+                objective: -1.0,
+                beta: vec![vec![0.9, 0.1], vec![0.1, 0.9]],
+                eta: vec![vec![2.0], vec![1.0]],
+                coefficients: vec![vec![0.0]],
+            },
+        )
+        .expect("MAP result");
+        for (row, eta) in result.document_topic_proportions.iter().zip([2.0_f64, 1.0]) {
+            let fitted = 1.0 / (1.0 + (-eta).exp());
+            assert!((row[0] - fitted).abs() < 1e-15);
+            assert!((row[1] - (1.0 - fitted)).abs() < 1e-15);
+        }
+        assert_eq!(result.sequence_edges.len(), 1);
+        assert!(
+            (result.sequence_edges[0].association_strength
+                - result.document_topic_proportions[1][0])
+                .abs()
+                < f64::EPSILON
+        );
+        // Uncertainty is retained separately, not integrated into theta_MAP.
+        assert!(
+            result
+                .document_coordinate_variances
+                .iter()
+                .all(|row| row[0] > 0.0)
+        );
     }
 
     #[test]

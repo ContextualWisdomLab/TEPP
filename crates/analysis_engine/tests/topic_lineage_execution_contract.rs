@@ -96,6 +96,48 @@ fn request() -> AnalysisRunRequest {
 }
 
 #[test]
+fn executor_preserves_shared_resource_refusal_without_an_artifact() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let counts = SparseMatrix::from_csr(
+        4,
+        100_000,
+        vec![0, 1, 2, 3, 4],
+        vec![0, 0, 1, 1],
+        vec![1.0; 4],
+    )
+    .expect("small sparse counts");
+    let input = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("admitted small design");
+    let config = ReferenceTopicModelConfig::new(20_000, vec![7], 2, 1e-5).expect("config");
+    let request = request();
+    let accepted =
+        AnalysisRunAccepted::new("run-topic-lineage", "accepted", &request.idempotency_key)
+            .expect("accepted");
+    assert_eq!(
+        execute_topic_lineage_run(
+            &request,
+            &accepted,
+            "snapshot-topic-lineage",
+            KnowledgeCutoff::parse_rfc3339("2026-08-01T00:00:00Z").expect("cutoff"),
+            &input,
+            &config,
+            "2026-08-02T00:00:00Z"
+        ),
+        Err(AnalysisEngineError::TopicMeasurement(
+            topic_measurement::TopicMeasurementError::ResourceLimitExceeded
+        ))
+    );
+}
+
+#[test]
 fn fitted_topics_emit_digest_bound_predecessor_successor_counts() {
     let (snapshot, ids, times, memberships, relations) = fixture();
     let counts = SparseMatrix::from_csr(

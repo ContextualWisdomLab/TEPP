@@ -183,8 +183,9 @@ pub fn statistical_candidate_from_fit(
 /// Fit each candidate `K` and select the admissible statistical topic count.
 ///
 /// Each candidate is fitted with [`fit_reference_topic_model`]. A typed
-/// `DidNotConverge`, `NonFiniteEstimate`, or `InvalidModelInput` is a failed
-/// candidate, not a fabricated diagnostic. LLM-vote-only values may be
+/// `DidNotConverge`, `NonFiniteEstimate`, `InvalidModelInput`, or shared
+/// `ResourceLimitExceeded` is a failed candidate, not a fabricated diagnostic.
+/// Shared fit admission runs before dense seed allocation for each K. LLM-vote-only values may be
 /// supplied as recommenders; they cannot win without a successful statistical
 /// fit. TF-IDF, BM25, stopword-deletion, and LLM labels are refused as
 /// inferential coordinates.
