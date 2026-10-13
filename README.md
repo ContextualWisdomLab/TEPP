@@ -152,11 +152,15 @@ general filesystem I/O deadline. See
 
 `.github/workflows/ci.yml` dispatches the reviewed central workflow
 `ContextualWisdomLab/.github/.github/workflows/tepp-rust-foundation-ci.yml`
-at `af81ef49683809ce8b302e078455e3960cf0acd1`. The documentation caller
+at `3136c940235a3762b804bd99eb20fbe129e70c06`. The documentation caller
 `.github/workflows/docs-quality.yml` uses the same pin for
 `tepp-documentation-quality.yml`. These suppliers provision private Python
 environments across all five jobs and hash-verify official Rustup 1.29.1 in the
-three Rust jobs. Executable jobs remain supplier-owned; frozen files under
+three Rust jobs. Each Rust job owns fresh Cargo/Rustup namespaces; quality tools
+are installed with explicit private roots and locked version pins, never restored
+from cached executable archives or skipped on cache hits. The LLVM plugin version
+probe includes its required `llvm-cov` argv. Executable jobs remain supplier-owned;
+frozen files under
 `tests/fixtures/central-ci/` are evidence only, not installed workflows.
 Local source-custody tests do not establish native runner bootstrap, hosted
 execution, or GitHub App approval.
