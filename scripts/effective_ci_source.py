@@ -12,6 +12,8 @@ from pathlib import Path
 SUPPLIER_PIN = "9dab3c2a607ddef69b5ff8cb0f761e90f6bc28de"
 CALLER_SHA256 = "4cdbacc6c531bba1fcb0632e9a4ea88ec9814820bb4e8c45447d57bc046201e3"
 SUPPLIER_SHA256 = "0baf1384a6f66b357bba6cf74b384ecae447767f512eb2c90bb50849c74a7160"
+DOCUMENTATION_CALLER_SHA256 = "99ed24d9ce64a4232dcb29e05ddcdedac659c37f5c8b4230386f57435b3bd1f2"
+DOCUMENTATION_SUPPLIER_SHA256 = "76d5f64f05fbf953c8c96b6bf8129880a904498b1bbce355567108975bfb00aa"
 FIXTURE_PATH = Path("tests/fixtures/central-ci") / SUPPLIER_PIN
 
 
@@ -29,7 +31,7 @@ def _tree_child(data: bytes, mode: str, name: str) -> str:
     return data[start:start + 20].hex()
 
 
-def effective_ci_source(root: Path) -> str:
+def effective_ci_source(root: Path, supplier_name: str = "tepp-rust-foundation-ci.yml") -> str:
     """Return verified caller plus pinned supplier for static contract checks.
 
     Exact caller bytes bind dispatch, read-only permissions, concurrency, pin,
@@ -37,9 +39,20 @@ def effective_ci_source(root: Path) -> str:
     from the caller's reviewed commit through the original tree path to blob;
     SHA-256 additionally binds the workflow bytes. Missing or changed evidence
     fails closed. No Git installation, repository metadata, or network is needed.
+    Only the foundation (default) and documentation supplier names are allowed;
+    each is bound to its own exact caller and digest at the same reviewed pin.
     """
-    caller = (root / ".github/workflows/ci.yml").read_bytes()
-    if hashlib.sha256(caller).hexdigest() != CALLER_SHA256:
+    contracts = {
+        "tepp-rust-foundation-ci.yml": ("ci.yml", CALLER_SHA256, SUPPLIER_SHA256),
+        "tepp-documentation-quality.yml": (
+            "docs-quality.yml", DOCUMENTATION_CALLER_SHA256, DOCUMENTATION_SUPPLIER_SHA256,
+        ),
+    }
+    if supplier_name not in contracts:
+        raise ValueError("CI supplier name is not allowlisted")
+    caller_name, caller_sha256, supplier_sha256 = contracts[supplier_name]
+    caller = (root / ".github/workflows" / caller_name).read_bytes()
+    if hashlib.sha256(caller).hexdigest() != caller_sha256:
         raise ValueError("CI caller differs from reviewed immutable supplier contract")
     fixture = root / FIXTURE_PATH
     commit = (fixture / "commit.object").read_bytes()
@@ -51,9 +64,9 @@ def effective_ci_source(root: Path) -> str:
         expected_tree = _tree_child(tree, "40000", child)
     tree = (fixture / "workflows.tree").read_bytes()
     _verify_object("tree", tree, expected_tree)
-    expected_blob = _tree_child(tree, "100644", "tepp-rust-foundation-ci.yml")
-    supplier = (fixture / "tepp-rust-foundation-ci.yml").read_bytes()
+    expected_blob = _tree_child(tree, "100644", supplier_name)
+    supplier = (fixture / supplier_name).read_bytes()
     _verify_object("blob", supplier, expected_blob)
-    if hashlib.sha256(supplier).hexdigest() != SUPPLIER_SHA256:
+    if hashlib.sha256(supplier).hexdigest() != supplier_sha256:
         raise ValueError("CI supplier SHA-256 mismatch")
     return caller.decode("utf-8") + "\n" + supplier.decode("utf-8")

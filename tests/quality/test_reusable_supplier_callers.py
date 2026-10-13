@@ -4,6 +4,8 @@ from pathlib import Path
 import re
 import unittest
 
+from scripts.effective_ci_source import effective_ci_source
+
 
 ROOT = Path(__file__).parents[2]
 EXPECTED_SHA = "9dab3c2a607ddef69b5ff8cb0f761e90f6bc28de"
@@ -72,11 +74,14 @@ def test_callers_pin_one_supplier_without_nested_execution() -> None:
 
 def test_five_supplier_gates_are_coordinated_by_two_callers() -> None:
     """The foundation and documentation suppliers account for five unique gates."""
-    gate_ids = [
-        gate_id
-        for expected in EXPECTED_CALLERS.values()
-        for gate_id in expected["gate_ids"]
-    ]
+    gate_ids = []
+    for expected in EXPECTED_CALLERS.values():
+        verified = effective_ci_source(ROOT, expected["supplier"])
+        supplier_jobs = verified.rsplit("\njobs:\n", 1)[1]
+        actual_ids = re.findall(r"^  ([A-Za-z0-9_-]+):$", supplier_jobs, re.MULTILINE)
+        assert set(actual_ids) == set(expected["gate_ids"])
+        assert len(actual_ids) == len(expected["gate_ids"])
+        gate_ids.extend(actual_ids)
     assert len(gate_ids) == 5
     assert len(set(gate_ids)) == 5
     assert set(gate_ids) == {

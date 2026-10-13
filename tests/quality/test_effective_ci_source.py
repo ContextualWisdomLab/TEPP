@@ -12,6 +12,7 @@ from scripts import effective_ci_source as source
 from scripts import check_workspace_contract as workspace
 import test_ci_coverage_diagnostics as diagnostics
 import test_workflow_queue_hygiene as queue
+import test_reusable_supplier_callers as callers
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -22,7 +23,8 @@ class EffectiveCiSourceTests(unittest.TestCase):
     def copy_evidence(self, root: Path) -> Path:
         """Create an offline checkout containing only caller and frozen evidence."""
         (root / ".github/workflows").mkdir(parents=True)
-        shutil.copyfile(ROOT / ".github/workflows/ci.yml", root / ".github/workflows/ci.yml")
+        for caller_name in ("ci.yml", "docs-quality.yml"):
+            shutil.copyfile(ROOT / ".github/workflows" / caller_name, root / ".github/workflows" / caller_name)
         fixture = root / source.FIXTURE_PATH
         shutil.copytree(ROOT / source.FIXTURE_PATH, fixture)
         return fixture
@@ -133,6 +135,74 @@ class EffectiveCiSourceTests(unittest.TestCase):
                 self.assertIn(command, original)
                 with mock.patch.object(workspace, "effective_ci_source", return_value=original.replace(command, "REMOVED")):
                     self.assertIn(f"CI workflow is missing required command: {command}", workspace._validate_ci_contract(ROOT))
+
+    def test_documentation_evidence_and_caller_controls(self) -> None:
+        """Authenticate documentation through the shared commit and reject drift."""
+        name = "tepp-documentation-quality.yml"
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = self.copy_evidence(root)
+            self.assertEqual(source.effective_ci_source(root, name), source.effective_ci_source(ROOT, name))
+            for filename in ("commit.object", "root.tree", ".github.tree", "workflows.tree", name):
+                with self.subTest(filename=filename):
+                    path = fixture / filename
+                    original = path.read_bytes()
+                    path.write_bytes(original + b"corrupt")
+                    with self.assertRaisesRegex(ValueError, "Git object mismatch"):
+                        source.effective_ci_source(root, name)
+                    path.unlink()
+                    with self.assertRaises(OSError):
+                        source.effective_ci_source(root, name)
+                    path.write_bytes(original)
+            path = root / ".github/workflows/docs-quality.yml"
+            original = path.read_text(encoding="utf-8")
+            for text in (
+                original.replace(source.SUPPLIER_PIN, "a" * 40),
+                original.replace("  documentation:", "  documentation:\n    if: false"),
+                original.replace("contents: read", "contents: write"),
+                original + "\n  extra-job:\n    runs-on: ubuntu-latest\n",
+            ):
+                with self.subTest(caller=text):
+                    path.write_text(text, encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "caller differs"):
+                        source.effective_ci_source(root, name)
+            path.write_text(original, encoding="utf-8")
+            with mock.patch.object(source, "DOCUMENTATION_SUPPLIER_SHA256", "0" * 64):
+                with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
+                    source.effective_ci_source(root, name)
+        for name in ("../tepp-documentation-quality.yml", "other.yml", "", "tepp-rust-foundation-ci.yaml"):
+            with self.subTest(name=name):
+                with self.assertRaisesRegex(ValueError, "not allowlisted"):
+                    source.effective_ci_source(ROOT, name)
+
+    def test_actual_five_job_ids_reject_alteration_and_omission(self) -> None:
+        """Each real gate is checked by custody and independently by the ID oracle."""
+        verified = {
+            expected["supplier"]: source.effective_ci_source(ROOT, expected["supplier"])
+            for expected in callers.EXPECTED_CALLERS.values()
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            fixture = self.copy_evidence(root)
+            for expected in callers.EXPECTED_CALLERS.values():
+                name = expected["supplier"]
+                path = fixture / name
+                original = path.read_text(encoding="utf-8")
+                for gate_id in expected["gate_ids"]:
+                    marker = f"  {gate_id}:\n"
+                    self.assertEqual(original.count(marker), 1)
+                    for replacement in ("  altered-job:\n", ""):
+                        with self.subTest(supplier=name, gate=gate_id, replacement=replacement):
+                            path.write_text(original.replace(marker, replacement), encoding="utf-8")
+                            with self.assertRaisesRegex(ValueError, "blob Git object mismatch"):
+                                source.effective_ci_source(root, name)
+                            altered = dict(verified)
+                            altered[name] = verified[name].replace(marker, replacement)
+                            with mock.patch.object(callers, "effective_ci_source", side_effect=lambda root, supplier: altered[supplier]):
+                                with self.assertRaises(AssertionError):
+                                    callers.test_five_supplier_gates_are_coordinated_by_two_callers()
+                path.write_text(original, encoding="utf-8")
+        callers.test_five_supplier_gates_are_coordinated_by_two_callers()
 
     def test_independent_sha256_and_tree_path_checks(self) -> None:
         """SHA-256 is independently enforced and tree lookup requires exact names."""
