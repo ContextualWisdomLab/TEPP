@@ -135,6 +135,54 @@ fn separated_counts() -> SparseMatrix {
 }
 
 #[test]
+fn reference_input_requires_observed_not_proposed_transitions() {
+    let (snapshot, ids, times, memberships, observed) = fixture();
+    let counts = separated_counts();
+    let mut inferred = RelationGraph::new();
+    for edge in observed.edges() {
+        inferred
+            .insert(
+                RelationEdge::new(
+                    edge.kind(),
+                    edge.source(),
+                    edge.target(),
+                    RelationEvidenceStatus::Inferred,
+                    edge.source_event_time(),
+                    edge.target_event_time(),
+                )
+                .expect("valid proposal"),
+            )
+            .expect("insert proposal");
+    }
+    let build = |graph: &RelationGraph| {
+        ReferenceTopicInput::new(
+            &snapshot,
+            ids.clone(),
+            &counts,
+            &times,
+            None,
+            &memberships,
+            graph,
+        )
+    };
+    assert!(matches!(
+        build(&inferred),
+        Err(TopicMeasurementError::InvalidModelInput)
+    ));
+    assert!(build(&observed).is_ok());
+    let mut mixed = observed.clone();
+    for edge in inferred.edges() {
+        mixed.insert(*edge).expect("distinct status");
+    }
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 2_000, 1e-5).expect("config");
+    let baseline = fit_reference_topic_model(&build(&observed).expect("observed"), &config)
+        .expect("observed fit");
+    let candidate =
+        fit_reference_topic_model(&build(&mixed).expect("mixed"), &config).expect("mixed fit");
+    assert_eq!(candidate, baseline);
+}
+
+#[test]
 fn separated_topics_recover_and_emit_predecessor_successor_counts() {
     let (snapshot, document_ids, times, memberships, relations) = fixture();
     let counts = separated_counts();

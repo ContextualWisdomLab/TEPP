@@ -72,6 +72,9 @@ pub const TOPIC_LINEAGE_CLI_DESIGN_WORK_LIMIT: u128 = 10_000_000_000;
 /// Maximum dense prevalence-design `f64` payload bytes, excluding row headers
 /// and other estimator state; this is not a process RSS guarantee.
 pub const TOPIC_LINEAGE_CLI_DESIGN_BYTE_LIMIT: u128 = 16 * 1024 * 1024;
+/// Conservative dense fitting-state `f64` payload cap, not process RSS.
+/// Covers incumbent plus current seed state and iteration scratch arrays.
+const DENSE_FIT_BYTE_LIMIT: u128 = 128 * 1024 * 1024;
 
 /// Complete offline input document.
 #[derive(Debug, Deserialize)]
@@ -369,9 +372,8 @@ pub fn run_topic_lineage(input: &[u8]) -> Result<TopicLineageCliOutput, TopicLin
         &corpus.ids,
         &corpus.event_times,
         &memberships,
-        parsed.model.topic_count,
-        parsed.model.seeds.len(),
-        parsed.model.maximum_iterations,
+        parsed.vocabulary_size,
+        &parsed.model,
     )?;
     let model_input = ReferenceTopicInput::new(
         &corpus.snapshot,
@@ -509,6 +511,12 @@ fn check_limits(input: &CliInput) -> Result<(), TopicLineageCliError> {
     if !within_bounds {
         return Err(TopicLineageCliError::LimitExceeded);
     }
+    check_topic_state_limits(
+        input.documents.len(),
+        input.vocabulary_size,
+        model.topic_count,
+        0,
+    )?;
     // Every factor is bounded above, so this `u128` product cannot overflow.
     let declared_work = (nonzeros as u128 + input.vocabulary_size as u128)
         * model.topic_count as u128
@@ -521,14 +529,49 @@ fn check_limits(input: &CliInput) -> Result<(), TopicLineageCliError> {
     }
 }
 
+/// Refuse dense fitting payload before any topic matrix allocation.
+/// `F=0` is the early offered-document check; the admitted-context check
+/// includes design and coefficients. Checked arithmetic also rejects overflow.
+fn check_topic_state_limits(
+    document_count: usize,
+    vocabulary_size: usize,
+    topic_count: usize,
+    feature_count: usize,
+) -> Result<(), TopicLineageCliError> {
+    let d = document_count as u128;
+    let v = vocabulary_size as u128;
+    let k = topic_count as u128;
+    let f = feature_count as u128;
+    // Three K*V: retained best beta, current beta, expectation beta_counts.
+    // Six D*K dominate best/current eta, theta, counts, means, gradient.
+    // Two F*(K-1) coefficients (best/current), plus the D*F design.
+    let bytes = k
+        .checked_mul(v)
+        .and_then(|n| n.checked_mul(3))
+        .and_then(|n| d.checked_mul(k)?.checked_mul(6)?.checked_add(n))
+        .and_then(|n| {
+            f.checked_mul(k.saturating_sub(1))?
+                .checked_mul(2)?
+                .checked_add(n)
+        })
+        .and_then(|n| d.checked_mul(f)?.checked_add(n))
+        .and_then(|n| n.checked_add(k)) // One edge delta in update_eta.
+        .and_then(|n| n.checked_mul(8))
+        .ok_or(TopicLineageCliError::LimitExceeded)?;
+    if bytes > DENSE_FIT_BYTE_LIMIT {
+        Err(TopicLineageCliError::LimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
 fn check_dense_design_limits(
     document_count: usize,
     document_ids: &[Uuid],
     event_times: &[EventTime],
     memberships: &MembershipNetwork,
-    topic_count: usize,
-    seed_count: usize,
-    iteration_count: usize,
+    vocabulary_size: usize,
+    model: &CliModel,
 ) -> Result<(), TopicLineageCliError> {
     let document_times: BTreeMap<_, _> = document_ids
         .iter()
@@ -547,9 +590,19 @@ fn check_dense_design_limits(
     check_design_limits(
         document_count,
         membership_keys.len(),
-        topic_count,
-        seed_count,
-        iteration_count,
+        model.topic_count,
+        model.seeds.len(),
+        model.maximum_iterations,
+    )?;
+    let feature_count = membership_keys
+        .len()
+        .checked_add(2)
+        .ok_or(TopicLineageCliError::LimitExceeded)?;
+    check_topic_state_limits(
+        document_count,
+        vocabulary_size,
+        model.topic_count,
+        feature_count,
     )
 }
 
@@ -750,7 +803,7 @@ mod tests {
         TOPIC_LINEAGE_CLI_EDGE_LIMIT, TOPIC_LINEAGE_CLI_ITERATION_LIMIT,
         TOPIC_LINEAGE_CLI_NONZERO_LIMIT, TOPIC_LINEAGE_CLI_SEED_LIMIT,
         TOPIC_LINEAGE_CLI_VOCABULARY_LIMIT, TopicLineageCliError, check_design_limits,
-        check_limits,
+        check_limits, check_topic_state_limits,
     };
     use tepp_api::AnalysisRunRequest;
     use uuid::Uuid;
@@ -795,6 +848,38 @@ mod tests {
                 step_size: 0.2,
             },
         }
+    }
+
+    #[test]
+    fn dense_topic_payload_boundary_and_overflow_are_dimension_only() {
+        // 8 * (3*64*87375 + 6*2*64 + 2*3*63 + 2*3 + 64) = 128 MiB.
+        assert_eq!(check_topic_state_limits(2, 87_375, 64, 3), Ok(()));
+        for dimensions in [
+            (2, 87_376, 64, 3),
+            (3, 87_375, 64, 3),
+            (2, 87_375, 65, 3),
+            (2, 87_375, 64, 4),
+            (usize::MAX, usize::MAX, usize::MAX, usize::MAX),
+        ] {
+            assert_eq!(
+                check_topic_state_limits(dimensions.0, dimensions.1, dimensions.2, dimensions.3),
+                Err(TopicLineageCliError::LimitExceeded)
+            );
+        }
+        assert_eq!(check_topic_state_limits(4, 4, 2, 3), Ok(()));
+    }
+
+    #[test]
+    fn dense_topic_vocabulary_is_refused_without_allocating_matrices() {
+        let mut value = input();
+        value.vocabulary_size = 100_000;
+        value.model.topic_count = 49_998;
+        value.model.seeds = vec![1];
+        value.model.maximum_iterations = 2;
+        assert_eq!(
+            check_limits(&value),
+            Err(TopicLineageCliError::LimitExceeded)
+        );
     }
 
     #[test]

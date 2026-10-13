@@ -33,6 +33,16 @@ fn expanded_input(documents: usize, groups_per_document: usize) -> serde_json::V
 }
 
 #[test]
+fn dense_coefficients_are_refused_before_reference_construction() {
+    let mut value = expanded_input(2, 10_000);
+    value["vocabulary_size"] = serde_json::json!(500);
+    value["model"]["topic_count"] = serde_json::json!(500);
+    value["model"]["seeds"] = serde_json::json!([1]);
+    value["model"]["maximum_iterations"] = serde_json::json!(2);
+    assert_eq!(preflight(value), Err(TopicLineageCliError::LimitExceeded));
+}
+
+#[test]
 fn dense_expansion_is_refused_before_reference_allocation() {
     let bytes = serde_json::to_vec(&expanded_input(512, 8)).unwrap();
     assert!(bytes.len() < TOPIC_LINEAGE_CLI_INPUT_BYTE_LIMIT);
@@ -53,9 +63,8 @@ fn preflight(value: serde_json::Value) -> Result<(), TopicLineageCliError> {
         &corpus.ids,
         &corpus.event_times,
         &network,
-        input.model.topic_count,
-        input.model.seeds.len(),
-        input.model.maximum_iterations,
+        input.vocabulary_size,
+        &input.model,
     )
 }
 

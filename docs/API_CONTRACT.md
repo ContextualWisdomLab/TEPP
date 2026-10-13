@@ -74,14 +74,23 @@ database, or accelerator side effects. The committed example is
   reference hyperparameters). Every object rejects unknown fields.
 - Bounds: 16 MiB input, 10,000 documents, 100,000 vocabulary columns,
   1,000,000 term entries, 100,000 memberships, 100,000 relations, 32 seeds,
-  100,000 iterations, and a declared-work product bound. Non-finite JSON
-  numbers fail at parse.
+  100,000 iterations, and a declared-work product bound. Before reference
+  construction/allocation, dense design payload is capped at 16 MiB and the
+  conservative dense fitting-state envelope at 128 MiB:
+  `8 * (3*K*V + 6*D*K + 2*F*(K-1) + D*F + K)`, with checked arithmetic.
+  These are payload admission caps, not RSS or elapsed-time guarantees; see
+  [the allocation trace](research/topic-lineage-cli-admission.md).
+  Non-finite JSON numbers fail at parse.
 - Admission: a document, membership, or relation with
   `available_time > knowledge_cutoff` is excluded and counted; memberships and
   relations that touch an excluded document are excluded too. A reference to
   an identity absent from the input, a relation interval that does not contain
   its document's event time, a duplicate, a reverse or cyclic transition, and
-  the kinds `causes`/`intervenes_on` are refused.
+  the kinds `causes`/`intervenes_on` are refused. Both evidence statuses retain
+  those validation gates, but only admitted `observed` transitions affect the
+  reference objective or emitted lineage. Inferred proposals are not observed
+  evidence; an inferred-only admitted graph is refused with
+  `analysis_engine_rejected` and exit `3`, without a partial artifact.
 - Output fields: `schema_version`, `input_sha256`,
   `admitted_document_count`, `excluded_document_count`,
   `excluded_membership_count`, `excluded_relation_count`, `artifact`, and

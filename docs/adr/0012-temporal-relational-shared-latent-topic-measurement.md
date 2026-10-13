@@ -50,8 +50,11 @@ cross-classified/multiple-membership assignment. This is the logistic-normal
 prevalence boundary of correlated/structural topic models, not a raw-simplex
 regression (Blei & Lafferty, 2007; Roberts et al., 2019).
 
-For explicit observed predecessor/successor relations only, the reference
-objective adds the harmonic network penalty
+For explicit **observed** predecessor/successor relations only, the reference
+objective adds the harmonic network penalty. Inferred transition proposals are
+retained as provenance but are not admitted into the objective, transition
+pairs, degrees, or emitted lineage; an inferred-only graph therefore fails the
+reference input gate rather than becoming observed by consumption. The penalty is
 
 \[
 R(\Theta,G)=\frac{1}{2}\sum_{(d,e)\in E}a_{de}
@@ -91,6 +94,12 @@ probability or uncertainty interval. Laplace curvature/precision and any
 separately admitted posterior plausible values retain their own contracts.
 This labeling clarification does not change the estimand, numeric algorithm,
 public field names, or the PRD's posterior-aware downstream measurement target.
+The observed-status admission correction likewise restores this ADR's existing
+scientific contract; it does not revise the PRD v0.4 target, perform relation
+promotion, or establish posterior calibration. The offline CLI also refuses
+dense fitting-state payload above its local 128 MiB envelope before allocation;
+this is an execution-admission policy, not a new estimator or an RSS guarantee.
+See [the source trace and refusal scope](../research/topic-lineage-cli-admission.md).
 
 ## Non-goals
 

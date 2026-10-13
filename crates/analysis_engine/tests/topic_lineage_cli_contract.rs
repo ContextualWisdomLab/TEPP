@@ -48,6 +48,77 @@ fn document_id(index: usize) -> String {
 }
 
 #[test]
+fn inferred_only_transitions_cannot_supply_observed_lineage() {
+    let value = mutated(|value| {
+        for edge in value["relations"].as_array_mut().expect("relations") {
+            edge["evidence_status"] = json!("inferred");
+        }
+    });
+    assert_eq!(
+        rejected(&value),
+        TopicLineageCliError::Engine(AnalysisEngineError::TopicMeasurement(
+            TopicMeasurementError::InvalidModelInput
+        ))
+    );
+}
+
+#[test]
+fn mixed_proposals_are_equivalent_to_removing_inferred_transitions() {
+    let mut mixed = example();
+    mixed["relations"][1]["evidence_status"] = json!("inferred");
+    let mut observed_only = mixed.clone();
+    observed_only["relations"].as_array_mut().unwrap().remove(1);
+    let expected = run(&observed_only).expect("observed positive");
+    assert!(!expected.artifact.sequence_edges.is_empty());
+    let actual = run(&mixed).expect("mixed positive");
+    assert_eq!(actual.artifact, expected.artifact);
+    assert_eq!(actual.terminal_result, expected.terminal_result);
+
+    // A parallel proposal must neither replace nor double-weight observed data.
+    let mut duplicate = observed_only.clone();
+    let mut proposal = duplicate["relations"][0].clone();
+    proposal["evidence_status"] = json!("inferred");
+    duplicate["relations"]
+        .as_array_mut()
+        .unwrap()
+        .push(proposal);
+    assert_eq!(
+        run(&duplicate).expect("parallel status").artifact,
+        expected.artifact
+    );
+}
+
+#[test]
+fn late_observed_transition_cannot_rescue_inferred_only_admitted_graph() {
+    let value = mutated(|value| {
+        for edge in value["relations"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .take(3)
+        {
+            edge["evidence_status"] = json!("inferred");
+        }
+    });
+    assert_eq!(
+        rejected(&value),
+        TopicLineageCliError::Engine(AnalysisEngineError::TopicMeasurement(
+            TopicMeasurementError::InvalidModelInput
+        ))
+    );
+}
+
+#[test]
+fn inferred_status_does_not_bypass_relation_temporal_validation() {
+    let value = mutated(|value| {
+        value["relations"][0]["evidence_status"] = json!("inferred");
+        value["relations"][0]["source_document_id"] = json!(document_id(1));
+        value["relations"][0]["target_document_id"] = json!(document_id(0));
+    });
+    assert_eq!(rejected(&value), TopicLineageCliError::InvalidRelation);
+}
+
+#[test]
 fn committed_example_excludes_late_evidence_and_emits_a_digest_bound_artifact() {
     let output = run(&example()).expect("example run");
     assert_eq!(
