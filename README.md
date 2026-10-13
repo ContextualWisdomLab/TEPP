@@ -127,6 +127,32 @@ an unstable compiler capability. A zero denominator is reported explicitly for
 any crate whose lane still ships no executable behavior; it must never conceal
 uncovered production behavior.
 
+## Centralized CI contract source
+
+`.github/workflows/ci.yml` dispatches the reviewed central workflow
+`ContextualWisdomLab/.github/.github/workflows/tepp-rust-foundation-ci.yml`
+at `9dab3c2a607ddef69b5ff8cb0f761e90f6bc28de`. Executable jobs remain owned by
+that supplier; frozen files under `tests/fixtures/central-ci/` are evidence only,
+not workflows installed in `.github/workflows/`.
+
+`scripts/effective_ci_source.py` resolves the caller and supplier offline for the
+workspace, coverage diagnostics, and shared-runner contract checks. It verifies
+the exact reviewed caller SHA-256, the original Git commit object and each tree
+on the supplier path, the workflow blob identity, and its independent SHA-256.
+Missing evidence, changed pins, disabled dispatch, extra caller jobs, or modified
+supplier bytes fail closed. It needs neither Git metadata nor network access.
+The original coverage, reproducible toolchain, PostgreSQL service/test, and
+runner-isolation contracts remain enforced; tooling coverage includes the
+resolver at the unchanged 100% statement/branch threshold.
+
+To update the supplier, review the new immutable central commit and executable
+body, export its original commit/tree/blob objects, and update the reviewed pin
+and digest constants together with positive and negative contract controls.
+Never hand-author supplier fixtures, substitute a moving branch, or resolve from
+live CI during static tests. These local source checks do not prove hosted jobs
+ran successfully. The inherited hourly schedule contract is separate and is not
+waived by this resolver.
+
 ## Normative documents
 
 - `AGENTS.md`

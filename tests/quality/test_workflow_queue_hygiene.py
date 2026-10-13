@@ -3,6 +3,8 @@
 from pathlib import Path
 import unittest
 
+from scripts.effective_ci_source import effective_ci_source
+
 
 WORKFLOW_DIRECTORY = Path(".github/workflows")
 
@@ -47,7 +49,7 @@ class WorkflowQueueHygieneTests(unittest.TestCase):
     def test_rust_ci_reuses_one_runner_for_both_coverage_reports(self) -> None:
         """Coverage keeps both gates while avoiding a second runner boot."""
 
-        workflow = (WORKFLOW_DIRECTORY / "ci.yml").read_text(encoding="utf-8")
+        workflow = effective_ci_source(Path(__file__).resolve().parents[2])
         self.assertIn("  production-coverage:\n", workflow)
         self.assertNotIn("  line-coverage:\n", workflow)
         self.assertNotIn("  branch-coverage:\n", workflow)

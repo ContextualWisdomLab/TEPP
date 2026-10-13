@@ -6,6 +6,8 @@ import tomllib
 import unittest
 from pathlib import Path
 
+from scripts.effective_ci_source import effective_ci_source
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CI_WORKFLOW = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
@@ -28,7 +30,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
     def test_line_and_branch_failures_print_exact_missing_locations(self) -> None:
         """Both LLVM coverage lanes retain same-run missing-location reports."""
 
-        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        workflow = effective_ci_source(REPOSITORY_ROOT)
 
         self.assertIn("id: line-report", workflow)
         self.assertIn("cargo llvm-cov report --text --show-missing-lines", workflow)
@@ -56,7 +58,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
     def test_line_gate_uses_lcov_authored_lines_and_keeps_region_evidence(self) -> None:
         """Authored lines gate on LCOV while full JSON retains hidden-region evidence."""
 
-        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        workflow = effective_ci_source(REPOSITORY_ROOT)
 
         self.assertIn(
             "cargo llvm-cov --workspace --all-features --json --output-path coverage.json",
@@ -84,7 +86,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
     def test_live_postgres_job_is_gated_and_service_backed(self) -> None:
         """Live SQLx evidence requires a Postgres service and explicit env gate."""
 
-        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        workflow = effective_ci_source(REPOSITORY_ROOT)
 
         self.assertIn("live-postgres:", workflow)
         self.assertIn("name: Live PostgreSQL integration", workflow)
@@ -103,7 +105,7 @@ class CoverageDiagnosticsContractTests(unittest.TestCase):
         manifest = tomllib.loads(RUST_TOOLCHAIN.read_text(encoding="utf-8"))
         self.assertEqual(manifest["toolchain"]["channel"], "1.98.0")
 
-        workflow = CI_WORKFLOW.read_text(encoding="utf-8")
+        workflow = effective_ci_source(REPOSITORY_ROOT)
         self.assertEqual(workflow.count("nightly-2026-08-21"), 3)
         self.assertNotIn("nightly-2026-08-01", workflow)
 
