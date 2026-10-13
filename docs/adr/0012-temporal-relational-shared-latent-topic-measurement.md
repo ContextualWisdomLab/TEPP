@@ -96,9 +96,16 @@ This labeling clarification does not change the estimand, numeric algorithm,
 public field names, or the PRD's posterior-aware downstream measurement target.
 The observed-status admission correction likewise restores this ADR's existing
 scientific contract; it does not revise the PRD v0.4 target, perform relation
-promotion, or establish posterior calibration. The offline CLI also refuses
-dense fitting-state payload above its local 128 MiB envelope before allocation;
-this is an execution-admission policy, not a new estimator or an RSS guarantee.
+promotion, or establish posterior calibration. Shared reference input admission
+now checks a 16 MiB dense design cap (including populated sparse covariate
+expansion) before feature/design allocation, and shared fit admission checks
+the conservative 128 MiB simultaneous numeric payload before any seed.
+The CLI reuses this policy and retains its stricter operator count/work caps.
+This supersedes CLI-only resource authority: direct library/executor and
+candidate-K consumers are protected by the same checked admission. These are
+execution-admission policies, not a new estimator, changed latent meaning,
+RSS guarantee, or approved product/measurement-target change; PRD v0.4 and
+wire/model contract versions therefore remain unchanged.
 See [the source trace and refusal scope](../research/topic-lineage-cli-admission.md).
 
 ## Non-goals

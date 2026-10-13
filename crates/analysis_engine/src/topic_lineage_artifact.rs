@@ -178,7 +178,8 @@ pub struct TopicLineageExecution {
 ///
 /// # Errors
 ///
-/// Returns a request/receipt/snapshot/cutoff/profile error, estimator failure,
+/// Returns a request/receipt/snapshot/cutoff/profile error, estimator failure
+/// (including shared typed resource refusal before dense seed allocation),
 /// arithmetic error, or invalid/oversized artifact error.
 pub fn execute_topic_lineage_run(
     request: &AnalysisRunRequest,

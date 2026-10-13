@@ -71,10 +71,8 @@ pub const TOPIC_LINEAGE_CLI_DESIGN_CELL_LIMIT: usize = 25_000_000;
 pub const TOPIC_LINEAGE_CLI_DESIGN_WORK_LIMIT: u128 = 10_000_000_000;
 /// Maximum dense prevalence-design `f64` payload bytes, excluding row headers
 /// and other estimator state; this is not a process RSS guarantee.
-pub const TOPIC_LINEAGE_CLI_DESIGN_BYTE_LIMIT: u128 = 16 * 1024 * 1024;
-/// Conservative dense fitting-state `f64` payload cap, not process RSS.
-/// Covers incumbent plus current seed state and iteration scratch arrays.
-const DENSE_FIT_BYTE_LIMIT: u128 = 128 * 1024 * 1024;
+pub const TOPIC_LINEAGE_CLI_DESIGN_BYTE_LIMIT: u128 =
+    topic_measurement::REFERENCE_DESIGN_BYTE_LIMIT;
 
 /// Complete offline input document.
 #[derive(Debug, Deserialize)]
@@ -538,31 +536,13 @@ fn check_topic_state_limits(
     topic_count: usize,
     feature_count: usize,
 ) -> Result<(), TopicLineageCliError> {
-    let d = document_count as u128;
-    let v = vocabulary_size as u128;
-    let k = topic_count as u128;
-    let f = feature_count as u128;
-    // Three K*V: retained best beta, current beta, expectation beta_counts.
-    // Six D*K dominate best/current eta, theta, counts, means, gradient.
-    // Two F*(K-1) coefficients (best/current), plus the D*F design.
-    let bytes = k
-        .checked_mul(v)
-        .and_then(|n| n.checked_mul(3))
-        .and_then(|n| d.checked_mul(k)?.checked_mul(6)?.checked_add(n))
-        .and_then(|n| {
-            f.checked_mul(k.saturating_sub(1))?
-                .checked_mul(2)?
-                .checked_add(n)
-        })
-        .and_then(|n| d.checked_mul(f)?.checked_add(n))
-        .and_then(|n| n.checked_add(k)) // One edge delta in update_eta.
-        .and_then(|n| n.checked_mul(8))
-        .ok_or(TopicLineageCliError::LimitExceeded)?;
-    if bytes > DENSE_FIT_BYTE_LIMIT {
-        Err(TopicLineageCliError::LimitExceeded)
-    } else {
-        Ok(())
-    }
+    topic_measurement::check_reference_fit_limits(
+        document_count,
+        vocabulary_size,
+        topic_count,
+        feature_count,
+    )
+    .map_err(|_| TopicLineageCliError::LimitExceeded)
 }
 
 fn check_dense_design_limits(
@@ -619,11 +599,10 @@ fn check_design_limits(
     let design_cells = document_count
         .checked_mul(feature_count)
         .ok_or(TopicLineageCliError::LimitExceeded)?;
-    let design_bytes = (design_cells as u128)
-        .checked_mul(8)
-        .ok_or(TopicLineageCliError::LimitExceeded)?;
+    topic_measurement::check_reference_design_limits(document_count, feature_count)
+        .map_err(|_| TopicLineageCliError::LimitExceeded)?;
     if design_cells > TOPIC_LINEAGE_CLI_DESIGN_CELL_LIMIT
-        || design_bytes > TOPIC_LINEAGE_CLI_DESIGN_BYTE_LIMIT
+        || (design_cells as u128) * 8 > TOPIC_LINEAGE_CLI_DESIGN_BYTE_LIMIT
     {
         return Err(TopicLineageCliError::LimitExceeded);
     }

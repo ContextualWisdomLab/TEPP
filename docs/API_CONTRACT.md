@@ -80,6 +80,14 @@ database, or accelerator side effects. The committed example is
   `8 * (3*K*V + 6*D*K + 2*F*(K-1) + D*F + K)`, with checked arithmetic.
   These are payload admission caps, not RSS or elapsed-time guarantees; see
   [the allocation trace](research/topic-lineage-cli-admission.md).
+  Shared `ReferenceTopicInput::new` also checks the 16 MiB design cap before
+  feature/design allocation, including populated sparse covariate expansion;
+  shared `fit_reference_topic_model` checks the 128 MiB envelope with actual
+  feature count before the first seed. Overflow/overbudget returns
+  `TopicMeasurementError::ResourceLimitExceeded`; direct executor preserves
+  that typed error, candidate-K selection skips refused fits (none successful
+  means `NoSuccessfulFit`), and CLI admission preserves exit 3/redacted refusal.
+  Optional joint precision retains its independent 4096-coordinate cap.
   Non-finite JSON numbers fail at parse.
 - Admission: a document, membership, or relation with
   `available_time > knowledge_cutoff` is excluded and counted; memberships and

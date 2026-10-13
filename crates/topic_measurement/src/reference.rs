@@ -19,6 +19,82 @@ const DEFAULT_STEP_SIZE: f64 = 0.2;
 // CPU parity establishes the exact storage contract.
 const MAX_JOINT_COORDINATES: usize = 4_096;
 
+/// Maximum admitted dense prevalence-design `f64` payload (16 MiB).
+/// Row headers, feature metadata, sparse input, and allocator overhead are excluded.
+pub const REFERENCE_DESIGN_BYTE_LIMIT: u128 = 16 * 1024 * 1024;
+/// Maximum conservative simultaneous dense fitting `f64` payload (128 MiB).
+/// This is not an RSS, available-memory, or universal OOM guarantee. Input,
+/// graph, row headers, allocator overhead, serialization, and optional joint
+/// precision (independently capped at 4096 coordinates) are excluded.
+pub const REFERENCE_FIT_BYTE_LIMIT: u128 = 128 * 1024 * 1024;
+
+/// Check dense design dimensions without constructing any dense storage.
+///
+/// # Errors
+///
+/// Returns [`TopicMeasurementError::ResourceLimitExceeded`] when `8*D*F`
+/// exceeds 16 MiB or checked dimensional arithmetic overflows. Equality is
+/// admitted. Scientific input validation remains the constructor's authority.
+pub fn check_reference_design_limits(
+    document_count: usize,
+    feature_count: usize,
+) -> Result<(), TopicMeasurementError> {
+    let bytes = document_count
+        .checked_mul(feature_count)
+        .and_then(|n| n.checked_mul(size_of::<f64>()))
+        .ok_or(TopicMeasurementError::ResourceLimitExceeded)?;
+    if bytes as u128 > REFERENCE_DESIGN_BYTE_LIMIT {
+        Err(TopicMeasurementError::ResourceLimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
+/// Check conservative simultaneous fit payload without allocating matrices.
+///
+/// Charges `8*(3*K*V + 6*D*K + 2*F*(K-1) + D*F + K)`: incumbent/current
+/// beta and expectation counts; incumbent/current ALR state, theta, counts,
+/// means and gradient (six D*K dominate K-1 state and result variance);
+/// incumbent/current coefficients, design, and one edge delta. Seeds run
+/// serially; the incumbent is charged even for a single seed. `F=0` supports
+/// an early CLI partial check; the fit boundary always supplies actual features.
+/// This planner does not replace design admission or scientific validation.
+///
+/// # Errors
+///
+/// Returns [`TopicMeasurementError::ResourceLimitExceeded`] above 128 MiB or
+/// on checked arithmetic overflow. Equality is admitted. See
+/// [`REFERENCE_FIT_BYTE_LIMIT`] for exclusions.
+pub fn check_reference_fit_limits(
+    document_count: usize,
+    vocabulary_size: usize,
+    topic_count: usize,
+    feature_count: usize,
+) -> Result<(), TopicMeasurementError> {
+    let d = document_count as u128;
+    let v = vocabulary_size as u128;
+    let k = topic_count as u128;
+    let f = feature_count as u128;
+    let bytes = k
+        .checked_mul(v)
+        .and_then(|n| n.checked_mul(3))
+        .and_then(|n| d.checked_mul(k)?.checked_mul(6)?.checked_add(n))
+        .and_then(|n| {
+            f.checked_mul(k.saturating_sub(1))?
+                .checked_mul(2)?
+                .checked_add(n)
+        })
+        .and_then(|n| d.checked_mul(f)?.checked_add(n))
+        .and_then(|n| n.checked_add(k))
+        .and_then(|n| n.checked_mul(size_of::<f64>() as u128))
+        .ok_or(TopicMeasurementError::ResourceLimitExceeded)?;
+    if bytes > REFERENCE_FIT_BYTE_LIMIT {
+        Err(TopicMeasurementError::ResourceLimitExceeded)
+    } else {
+        Ok(())
+    }
+}
+
 /// One column in the structural prevalence mean.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PrevalenceFeature {
@@ -65,6 +141,10 @@ impl ReferenceTopicInput {
     ///
     /// Returns [`TopicMeasurementError::InvalidModelInput`] when any dimension,
     /// cutoff, count, time, membership, covariate, or transition invariant fails.
+    /// Returns [`TopicMeasurementError::ResourceLimitExceeded`] before feature
+    /// expansion or dense design allocation when `8*D*F > 16 MiB` or feature
+    /// arithmetic overflows. F includes intercept, time, every sparse covariate
+    /// column through the highest populated index, and active role/group contexts.
     pub fn new(
         snapshot: &CorpusSnapshot,
         document_ids: Vec<Uuid>,
@@ -226,13 +306,14 @@ fn build_design(
         Some(_) => return Err(TopicMeasurementError::InvalidModelInput),
         None => None,
     };
-    let covariate_count = covariate_rows.as_ref().map_or(0, |rows| {
-        rows.iter()
-            .flatten()
-            .map(|(column, _)| *column)
-            .max()
-            .map_or(0, |value| value + 1)
-    });
+    let covariate_count = covariate_rows
+        .as_ref()
+        .and_then(|rows| rows.iter().flatten().map(|(column, _)| *column).max())
+        .map_or(Ok(0), |column| {
+            column
+                .checked_add(1)
+                .ok_or(TopicMeasurementError::ResourceLimitExceeded)
+        })?;
 
     let active: Vec<_> = document_ids
         .iter()
@@ -254,6 +335,12 @@ fn build_design(
         .map(|(index, key)| (key, index))
         .collect();
 
+    let feature_count = 2_usize
+        .checked_add(covariate_count)
+        .and_then(|n| n.checked_add(membership_keys.len()))
+        .ok_or(TopicMeasurementError::ResourceLimitExceeded)?;
+    check_reference_design_limits(document_count, feature_count)?;
+    // Admission precedes both covariate feature expansion and dense design.
     let mut features = vec![PrevalenceFeature::Intercept, PrevalenceFeature::EventTime];
     features.extend((0..covariate_count).map(PrevalenceFeature::Covariate));
     features.extend(
@@ -703,8 +790,12 @@ struct FitState {
 ///
 /// # Errors
 ///
-/// Returns a typed invalid-input, non-finite, or convergence failure. The
-/// function never returns a partial fit.
+/// Returns a typed invalid-input, resource-limit, non-finite, or convergence
+/// failure. After scientific/configuration validation and before the first
+/// seed, the shared checked planner admits at most 128 MiB of conservative
+/// simultaneous dense `f64` payload, including actual design/features and
+/// incumbent state. See [`check_reference_fit_limits`] for charges/exclusions.
+/// The function never returns a partial fit.
 pub fn fit_reference_topic_model(
     input: &ReferenceTopicInput,
     config: &ReferenceTopicModelConfig,
@@ -713,6 +804,12 @@ pub fn fit_reference_topic_model(
     if config.topic_count > input.vocabulary_size {
         return Err(TopicMeasurementError::InvalidModelInput);
     }
+    check_reference_fit_limits(
+        input.document_count(),
+        input.vocabulary_size,
+        config.topic_count,
+        input.features.len(),
+    )?;
     let mut best = None;
     for &seed in &config.seeds {
         match fit_seed(input, config, seed) {

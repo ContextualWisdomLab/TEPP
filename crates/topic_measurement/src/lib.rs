@@ -43,6 +43,10 @@ pub use reference::JointCoordinatePrecision;
 pub use reference::PosteriorApproximation;
 /// One admitted structural prevalence feature.
 pub use reference::PrevalenceFeature;
+/// Fixed dense design payload admission limit.
+pub use reference::REFERENCE_DESIGN_BYTE_LIMIT;
+/// Fixed conservative simultaneous fit payload admission limit.
+pub use reference::REFERENCE_FIT_BYTE_LIMIT;
 /// Validated input for the CPU `f64` reference estimator.
 pub use reference::ReferenceTopicInput;
 /// A converged topic-model result with uncertainty and lineage counts.
@@ -51,6 +55,10 @@ pub use reference::ReferenceTopicModel;
 pub use reference::ReferenceTopicModelConfig;
 /// One inferred predecessor/successor association within a fitted topic.
 pub use reference::TopicSequenceEdge;
+/// Dimension-only checked dense design admission.
+pub use reference::check_reference_design_limits;
+/// Dimension-only checked conservative fit payload admission.
+pub use reference::check_reference_fit_limits;
 /// Fit the bounded deterministic CPU `f64` TRSL-TM reference estimator.
 pub use reference::fit_reference_topic_model;
 /// Validated compressed sparse numeric matrix.

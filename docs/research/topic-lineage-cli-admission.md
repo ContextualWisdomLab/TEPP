@@ -60,19 +60,31 @@ gradient. Coefficients reserve both best/current; design and edge delta are
 separate. Seed execution is serial: do not multiply retained matrices by seed
 count. Existing seed/iteration work caps still apply.
 
-`check_limits` checks the F=0 envelope on offered D before admission/reference
-construction. After cutoff/membership admission, `check_dense_design_limits`
-checks the full envelope on admitted D and active F, still before dense design
-or topic allocation. The early check is deliberately conservative for late
-rows. Existing 16 MiB design and dense fitting-work checks remain independent.
-All products/sums use checked u128 arithmetic and overflow fails closed.
+`ReferenceTopicInput::new`/`build_design` checks `8*D*F <= 16 MiB`
+with checked arithmetic before feature expansion and dense design allocation.
+F includes intercept, time, sparse covariate columns through the highest
+populated index, and active `(role, group_id)` contexts; empty declared columns
+are not newly activated. Feature sums and high sparse indices fail closed on
+overflow. `fit_reference_topic_model` checks the full shared 128 MiB envelope
+with actual D,V,K,F before entering `fit_seed`. It returns the typed
+`TopicMeasurementError::ResourceLimitExceeded`, never a partial fit.
 
-128 MiB is a local CLI payload admission policy, not a published scientific
+The CLI reuses these shared planners. `check_limits` retains its conservative
+F=0 check on offered D before admission, then `check_dense_design_limits`
+checks admitted D and active F. Existing stricter count/work caps and the
+16 MiB operator design cap remain unchanged. All products/sums are checked;
+arithmetic overflow fails closed.
+
+128 MiB is a shared payload admission policy, not a published scientific
 threshold, available-memory detector, hard RSS limit, or OOM recovery guarantee.
-It excludes Vec headers, allocator overhead, input/JSON/sparse/graph structures,
-artifact serialization and the separately bounded joint precision/Cholesky
-path. Standalone library callers retain their own resource authority. No
-elapsed-time or deadline guarantee follows from a work or payload cap.
+It excludes Vec headers, feature metadata, allocator overhead,
+input/JSON/sparse/graph structures, artifact serialization and the separately
+bounded joint precision/Cholesky path (4096-coordinate cap unchanged).
+The previous CLI-only statement that standalone callers own dense admission
+is superseded: direct library and executor consumers receive the shared typed
+refusal; model-selection treats resource-refused candidates as failed fits,
+returning `NoSuccessfulFit` if none succeed. No elapsed-time or deadline
+guarantee follows from a work or payload cap.
 
 ## Verification scope
 
@@ -84,7 +96,18 @@ CLI tests cover inferred-only and late-observed-only failure, mixed-edge
 artifact/terminal equivalence to deleting proposals, observed positives and
 invalid inferred temporal edges. The native reference test compares complete
 observed-only and observed-plus-proposals fits exactly. These regressions
-establish admission semantics, not new scientific recovery acceptance.
+establish admission semantics, not new scientific recovery
+acceptance. Shared dimension-only tests add exact 16 MiB design, one-column
+excess, actual high sparse covariate indices, feature-count overflow, independent
+beta/document/coefficient state witnesses and actual direct fit refusal. Direct
+executor tests require the nested resource error and no artifact. Actual
+candidate-K tests require all-refused `NoSuccessfulFit` and a mixed candidate
+set where the admissible statistical fit wins despite an oversized LLM vote.
+Direct sparse positives preserve unused declared covariate columns and existing
+known-truth recovery, observed/mixed graph equivalence and precision tests.
+The successor native gate scope explicitly includes `model_selection` as well
+as `analysis_engine`, `topic_measurement`, and `tepp_api`; earlier three-package
+results did not include model-selection. No oversized dense witness is allocated.
 
 ## Reference
 

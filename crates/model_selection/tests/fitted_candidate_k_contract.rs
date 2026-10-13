@@ -46,6 +46,10 @@ fn relation(source: Uuid, target: Uuid, source_day: u8, target_day: u8) -> Relat
 }
 
 fn separated_topic_input() -> ReferenceTopicInput {
+    separated_topic_input_with_vocabulary(4)
+}
+
+fn separated_topic_input_with_vocabulary(vocabulary: usize) -> ReferenceTopicInput {
     let document_ids: Vec<_> = (1_u128..=6).map(Uuid::from_u128).collect();
     let times: Vec<_> = (1_u8..=6).map(event_time).collect();
     let available = AvailableTime::parse_rfc3339("2026-01-10T00:00:00Z").expect("available");
@@ -115,7 +119,7 @@ fn separated_topic_input() -> ReferenceTopicInput {
 
     let counts = SparseMatrix::from_csr(
         6,
-        4,
+        vocabulary,
         vec![0, 2, 4, 6, 8, 10, 12],
         vec![0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3],
         vec![
@@ -197,6 +201,23 @@ fn recovery_config(seeds: Vec<u64>) -> FittedCandidateKConfig {
         .expect("candidate configuration")
         .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
         .expect("hyperparameters")
+}
+
+#[test]
+fn resource_refused_candidates_cannot_win_but_an_admitted_fit_can() {
+    let input = separated_topic_input_with_vocabulary(100_000);
+    let oversized = FittedCandidateKConfig::new(vec![20_000], vec![7], 4, 1e30)
+        .expect("dimensionally valid oversized candidate");
+    assert_eq!(
+        select_fitted_candidate_k(&input, &oversized, "trsl_tm_reference", &[]),
+        Err(ModelSelectionError::NoSuccessfulFit)
+    );
+    let mixed =
+        FittedCandidateKConfig::new(vec![20_000, 2], vec![7], 4, 1e30).expect("mixed candidates");
+    assert_eq!(
+        select_fitted_candidate_k(&input, &mixed, "trsl_tm_reference", &[20_000]),
+        Ok(2)
+    );
 }
 
 #[test]
