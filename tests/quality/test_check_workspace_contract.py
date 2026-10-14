@@ -29,7 +29,7 @@ class WorkspaceContractTests(unittest.TestCase):
             REPOSITORY_ROOT,
             destination,
             ignore=shutil.ignore_patterns(
-                "target", ".git", ".coverage", "__pycache__", "*.pyc"
+                "target", ".git", ".codegraph", ".coverage", "__pycache__", "*.pyc"
             ),
         )
         return temporary, destination

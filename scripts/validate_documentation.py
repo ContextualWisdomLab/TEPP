@@ -72,6 +72,11 @@ PROTECTED_MAIN_SHA = re.compile(
 SNAPSHOT_STAMP = re.compile(
     r"\*\*Snapshot:\*\*\s*(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)"
 )
+SNAPSHOT_FETCH_STAMP = re.compile(
+    r"^Facts fetched live (?:from GitHub )?at\s+"
+    r"(?P<stamp>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)\.\s*$",
+    re.MULTILINE,
+)
 INVENTORY_ROW = re.compile(
     r"^\|\s*#(?P<number>\d+)\s*\|\s*`(?P<sha>[0-9a-f]{40})`\s*\|\s*"
     r"(?P<draft>true|false)\s*\|",
@@ -389,14 +394,24 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
         )
     text = path.read_text(encoding="utf-8")
     failures: list[str] = []
-    if SNAPSHOT_STAMP.search(text) is None:
+    snapshot_match = SNAPSHOT_STAMP.search(text)
+    if snapshot_match is None:
         failures.append("gap baseline lacks a dated UTC snapshot stamp")
+    else:
+        fetch_stamps = list(SNAPSHOT_FETCH_STAMP.finditer(text))
+        if not fetch_stamps:
+            failures.append("gap baseline lacks fetched-live snapshot evidence")
+        elif any(
+            match.group("stamp") != snapshot_match.group("stamp")
+            for match in fetch_stamps
+        ):
+            failures.append("gap baseline snapshot stamp does not match fetched-live evidence")
     if PROTECTED_MAIN_SHA.search(text) is None:
         failures.append("gap baseline lacks a 40-character protected-main SHA")
     if "Closure evidence" not in text:
         failures.append("gap baseline lacks operator-gap closure evidence")
-    if "Exact current head" not in text:
-        failures.append("gap baseline lacks an exact-head open-PR inventory")
+    if "Snapshot head evidence" not in text:
+        failures.append("gap baseline lacks a snapshot-head open-PR inventory")
     if any(
         not _promotion_is_denied(text, match)
         for match in QUEUED_CHECKS_AS_SHIPPED.finditer(text)
@@ -404,7 +419,7 @@ def validate_product_technical_gap_baseline(root: Path = ROOT) -> None:
         failures.append("gap baseline treats queued Checks as implemented-main")
     inventory = list(INVENTORY_ROW.finditer(text))
     if not inventory:
-        failures.append("gap baseline open-PR inventory has no exact-head rows")
+        failures.append("gap baseline open-PR inventory has no snapshot-head rows")
     count_match = OPEN_PR_COUNT.search(text)
     if count_match is None:
         failures.append("gap baseline lacks an open pull-request count")
