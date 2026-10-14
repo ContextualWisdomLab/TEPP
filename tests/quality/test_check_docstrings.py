@@ -78,6 +78,32 @@ class DocstringContractTests(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("public item lacks", errors[0])
 
+    def test_multi_line_attributes_do_not_detach_rustdoc(self) -> None:
+        """Continuation lines of a multi-line attribute stay transparent."""
+
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / "lib.rs"
+            source.write_text(
+                "//! Module docs.\n"
+                "\n"
+                "/// Documented behind a multi-line attribute.\n"
+                "#[expect(\n"
+                "    clippy::missing_panics_doc,\n"
+                "    reason = \"bounded constants cannot fail\"\n"
+                ")]\n"
+                "pub fn documented() {}\n"
+                "\n"
+                "#[cfg_attr(\n"
+                "    feature = \"serde\",\n"
+                "    derive(serde::Serialize)\n"
+                ")]\n"
+                "pub struct Undocumented;\n",
+                encoding="utf-8",
+            )
+            errors = docstrings.validate_source(source)
+        self.assertEqual(len(errors), 1)
+        self.assertIn(":14: public item lacks", errors[0])
+
     def test_missing_module_docs_are_reported(self) -> None:
         """Crate or module documentation is mandatory."""
 
