@@ -138,7 +138,7 @@ fn cross_classified_and_multiple_membership_refuse_nested_icc() {
                 member,
                 project,
                 MembershipRole::Project,
-                MembershipWeight::new(0.5).expect("partial"),
+                MembershipWeight::full().expect("full project membership"),
                 start,
                 end,
             )

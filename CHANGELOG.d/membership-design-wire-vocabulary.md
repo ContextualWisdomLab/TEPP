@@ -1,0 +1,1 @@
+- `membership_core::MembershipDesign` now owns a versioned, closed wire vocabulary (`tepp.membership_design.v1`) with exact snake_case names and fail-closed parsing. Longitudinal consumers can bind the owner-derived design without reimplementing Membership semantics or accepting caller-asserted design labels.

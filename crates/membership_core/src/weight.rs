@@ -3,12 +3,15 @@
 use crate::MembershipError;
 use serde::{Deserialize, Serialize};
 
-/// A finite, non-negative membership weight.
+/// A finite, strictly positive membership share in `(0, 1]`.
 ///
 /// Weights of `1.0` represent full affiliation. Values in `(0, 1)` represent
 /// partial multiple membership and must be preserved rather than rounded away
-/// before multilevel estimation.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, PartialOrd, Serialize)]
+/// before multilevel estimation. Zero is not an active affiliation: admitting a
+/// zero-share edge would create structural group/role membership without any
+/// membership mass. Values above `1.0` are not affiliation shares and fail
+/// closed rather than being normalized or clamped.
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
 pub struct MembershipWeight(f64);
 
@@ -18,9 +21,9 @@ impl MembershipWeight {
     /// # Errors
     ///
     /// Returns [`MembershipError::InvalidMembershipWeight`] when `value` is
-    /// negative, infinite, or not a number.
+    /// outside `(0, 1]`, infinite, or not a number.
     pub fn new(value: f64) -> Result<Self, MembershipError> {
-        if value.is_finite() && value >= 0.0 {
+        if value.is_finite() && value > 0.0 && value <= 1.0 {
             Ok(Self(value))
         } else {
             Err(MembershipError::InvalidMembershipWeight)
@@ -43,20 +46,57 @@ impl MembershipWeight {
     }
 }
 
+impl<'de> Deserialize<'de> for MembershipWeight {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = f64::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::MembershipWeight;
     use crate::MembershipError;
 
     #[test]
-    fn weight_constructors_accept_finite_non_negative_values() {
-        let zero = MembershipWeight::new(0.0).expect("zero").value();
+    fn weight_constructors_accept_only_positive_bounded_affiliation_shares() {
+        let minimum_positive = MembershipWeight::new(f64::from_bits(1))
+            .expect("minimum positive binary64 share")
+            .value();
+        let partial = MembershipWeight::new(0.5).expect("partial").value();
         let full = MembershipWeight::full().expect("full").value();
-        assert!((zero - 0.0).abs() < f64::EPSILON);
-        assert!((full - 1.0).abs() < f64::EPSILON);
-        assert_eq!(
-            MembershipWeight::new(f64::INFINITY),
-            Err(MembershipError::InvalidMembershipWeight)
-        );
+        assert_eq!(minimum_positive.to_bits(), 1);
+        assert_eq!(partial.to_bits(), 0.5_f64.to_bits());
+        assert_eq!(full.to_bits(), 1.0_f64.to_bits());
+
+        for invalid in [
+            0.0,
+            -0.0,
+            1.0 + f64::EPSILON,
+            -f64::EPSILON,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ] {
+            assert_eq!(
+                MembershipWeight::new(invalid),
+                Err(MembershipError::InvalidMembershipWeight)
+            );
+        }
+    }
+
+    #[test]
+    fn serde_deserialization_cannot_bypass_weight_validation() {
+        let partial: MembershipWeight =
+            serde_json::from_str("0.5").expect("valid partial wire weight");
+        assert_eq!(partial.value().to_bits(), 0.5_f64.to_bits());
+
+        assert!(serde_json::from_str::<MembershipWeight>("0.0").is_err());
+        assert!(serde_json::from_str::<MembershipWeight>("-0.0").is_err());
+        assert!(serde_json::from_str::<MembershipWeight>("1.25").is_err());
+        assert!(serde_json::from_str::<MembershipWeight>("-0.25").is_err());
     }
 }
