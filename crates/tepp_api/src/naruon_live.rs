@@ -11,7 +11,7 @@ use crate::authorization::{
 use crate::lineageweave_http::NARUON_CONSUMER_CODE;
 use crate::live_http::{
     header_value, map_io_error, parse_headers, parse_request_line, read_http_request,
-    split_request, validate_common_headers,
+    read_socket_request_with_limit, split_request, validate_common_headers,
 };
 use crate::naruon_http::{NARUON_ANALYSIS_RUN_PATH, NARUON_EXPORT_PATH};
 use crate::wire::{from_json, to_json};
@@ -20,7 +20,6 @@ use crate::{
     requests_are_idempotent_matches,
 };
 
-#[cfg(test)]
 use crate::DEFAULT_ANALYSIS_RUN_BYTE_LIMIT;
 #[cfg(test)]
 use crate::live_http::{
@@ -32,7 +31,7 @@ pub use crate::live_http::NARUON_LIVE_HEADER_BYTE_LIMIT;
 /// Maximum live HTTP header count.
 pub use crate::live_http::NARUON_LIVE_HEADER_COUNT_LIMIT;
 
-/// Read and write deadline installed on every accepted stream.
+/// Whole-request receive budget and per-operation response-write timeout.
 pub const NARUON_LIVE_IO_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// HTTP/1.1 response produced by the naruon live listener.
@@ -145,15 +144,13 @@ impl NaruonLiveService {
     ) -> Result<NaruonLiveResponse, ApiError> {
         let mut stream = accepted.map_err(|error| map_io_error(&error))?;
         stream
-            .set_read_timeout(Some(NARUON_LIVE_IO_TIMEOUT))
-            .map_err(|error| map_io_error(&error))?;
-        stream
             .set_write_timeout(Some(NARUON_LIVE_IO_TIMEOUT))
             .map_err(|error| map_io_error(&error))?;
-        let response = match Self::read_http_request(&mut stream) {
-            Ok(request) => self.handle_http_request(&request),
-            Err(error) => self.response_from_error(error),
-        };
+        let response =
+            match read_socket_request_with_limit(&mut stream, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT) {
+                Ok(request) => self.handle_http_request(&request),
+                Err(error) => self.response_from_error(error),
+            };
         Self::write_response(&mut stream, &response)?;
         Ok(response)
     }
