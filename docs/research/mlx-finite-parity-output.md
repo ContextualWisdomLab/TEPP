@@ -1,0 +1,19 @@
+# macOS MLX probe finite parity output
+
+## Contract and finding
+
+PRD v0.4 §13 requires measured compute parity and §17 treats numerical divergence as scientific-integrity failure. This correction enforces the existing native MLX CPU matrix-probe contract; it does not change an estimator target, introduce a new GPU backend, or establish scientific GPU parity. ADR 0025 remains authoritative.
+
+The existing probe reduced absolute differences with `fold(0.0_f64, f64::max)`. Rust documents `f64::max` as ignoring a single NaN operand (Rust Project Developers, n.d.). Consequently, a synthetic backend output `[NaN]` produced `observed_maximum_difference = 0.0` and an accepted receipt. The exact expression was executed with pinned Rust1.98.0, and the extracted production receipt path then failed the permanent rejection assertion. `zip` also truncates unequal lengths: empty/extra output could pass the parity reduction. A separate permanent shape rejection test failed before the guard was added.
+
+## Repair and verification boundaries
+
+The real MLX runner now delegates receipt construction to one private `receipt_from_output` boundary. It requires the complete expected scalar output and finite backend values before computing parity or digests. The unchanged finite exact result11 retains its objective/output digests and zero difference; finite mismatch12 fails. Tests cover NaN, positive/negative infinity, empty/extra output, exact finite success, mismatch, and actual native MLX execution. These injected outputs are deterministic boundary fixtures, not observations of the real MLX backend emitting NaN.
+
+The FFI status/control flow and matching native constructors/frees are preserved through a private call table; production fills it only with the pinned native MLX functions. Test-only call substitutions exercise device-selection, multiplication, evaluation and null-data failure paths against real allocated native handles. Recording wrappers delegate actual frees and assert the expected array/stream/device settlement counts and that evaluation/data calls do not occur after an earlier failure. These synthetic return-code controls cover runner behavior, not an observed native OOM or hardware failure. The ordinary native probe and packaged binary still execute unmodified native function targets. A full workspace run of the initial call-table candidate terminated with SIGTRAP while two native test threads were concurrently creating streams. The retained macOS crash frames identify simultaneous `Scheduler::new_stream` calls; the pinned scheduler implementation mutates its stream/thread vectors without a lock. Four unchanged-source serial/parallel replay processes later passed, so those retries are not credited as a causal repair. A test-only mutex now serializes every native test journey while leaving ordinary Rust tests parallel and production dispatch unchanged. The call-table refactor, cleanup controls and test serialization require a new whole-candidate review rather than reuse of the earlier finite-output-only verdict. The probe is not an Event Lineage estimator, full CPUf64 estimator parity study, Metal/GPU execution receipt, or release evidence. Earlier full-workspace passes precede this source change and must be reacquired. Protected-main adoption and independent exact-head review remain pending.
+
+## References (APA 7)
+
+Rust Project Developers. (n.d.). *f64: max*. Rust standard library documentation. Retrieved October 3, 2026, from https://doc.rust-lang.org/std/primitive.f64.html#method.max
+
+Actual primary-source retrieval: parent `web.run` opened the official documentation and located the `max` section. Its documented NaN behavior is also independently reproduced with the repository's pinned Rust1.98.0 toolchain. Published documentation currently renders standard library1.99.0; it is supporting semantics, not proof of installed compiler identity.
