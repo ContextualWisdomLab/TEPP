@@ -24,7 +24,9 @@
 //! `-q / (2 a)`. Section 4.3 (p. 9) then adds a stable trait process
 //! with `DRIFT` and `DIFFUSION` fixed to zero. That `TRAITVAR` is
 //! time-invariant between-subject variance; it is not process noise
-//! and not `asymDIFFUSION`. Equation 1 (p. 4) is the latent SDE.
+//! and not `asymDIFFUSION`. The 2017-era `T0TRAITEFFECT` path into
+//! `T0MEANS` is already in `η(t0)` and therefore appears at `t` as
+//! the Eq. 3 first-summand carry `e^{A Δt} t0_trait · trait`. Equation 1 (p. 4) is the latent SDE.
 //! Equation 5 (p. 5) writes `y_i(t) = τ_i + Λ η_i(t) + ε_i(t)` with
 //! `ε ~ N(0, Θ)` and `τ_i ~ N(μ_τ, Ψ_τ)`. Table 2 (p. 12) names
 //! `Θ` `MANIFESTVAR` and `Ψ_τ` `MANIFESTTRAITVAR`. The JSS summary
@@ -5947,6 +5949,160 @@ pub fn recover_initial_time_dependent_predictor_carry(
     require_finite(initial_shift.signum() * (initial_shift.abs().ln() + drift_interval).exp())
 }
 
+/// Exact scalar Eq. 3 first-summand carry of 2017-era `T0TRAITEFFECT`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; §4.3, pp. 9–10;
+/// §7.1, pp. 18–19; 2017-era ctsem `ctModel.R` / `ctFit.R` /
+/// `ctGenerate.R`; JSS PDF re-opened 2026-08-31T01:40Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write the first summand as `e^{A(t−t0)} η_i(t0)`. The 2017-era
+/// `ctFit.R` places `T0TRAITEFFECT` in the `OpenMx` `A` regression
+/// block from trait latents to process latents at `T0`. The 2017-era
+/// `ctGenerate.R` writes `T0MEANS = T0MEANS + T0TRAITEFFECT %*%
+/// traits` and then integrates the SDE, so that first-occasion
+/// product is already in `η(t0)`. A 2017-era `T0TRAITEFFECT` shift
+/// that is already in `η(t0)` therefore appears at `t` as
+/// `e^{A Δt} t0_trait · trait`. Form `t0_trait` first, then multiply
+/// by the trait score, then `e^{a Δt}` of that product. A zero
+/// coefficient or zero trait is exactly zero. A signed trait is a
+/// signed carry. A zero drift is `t0_trait · trait` with no
+/// dissipation of the first-occasion shift. Binary64 underflow of
+/// `e^{a Δt}` to `+0` is a vanishing carry of that shift and is
+/// kept. This carry is not the first-occasion shift, not
+/// `e^{A Δt} t0_b z` (`T0TIPREDEFFECT`), not `e^{A Δt} t0_m x0`
+/// (`T0TDPREDEFFECT`), and not `A^{-1}[e^{A Δt} − I] B z`
+/// (`TIPREDEFFECT`). Table 2 / Table 3 do not print
+/// `T0TRAITEFFECT`; this crate recovers the 2017-era named matrix's
+/// Eq. 3 first-summand carry, not a new std map. This crate does
+/// not invent `T0TRAITVAR`. When `exp` overflows at a finite
+/// `a Δt`, rewrite as `sign(t0_trait · trait) exp(ln|t0_trait ·
+/// trait| + a Δt)`. An overflowing rewrite fails closed. `T0` is
+/// an event-time occasion, so a non-event clock fails closed. Free
+/// `T0TRAITEFFECT` does not require stable `a < 0`. This is not a
+/// Kalman filter, not a matrix `expm`, not DSEM, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock, [`PsychometricError::NonPositiveInterval`] when
+/// `event_delta` is not strictly positive, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite or the mapped carry overflows.
+pub fn recover_initial_trait_effect_carry(
+    initial_trait_effect: f64,
+    trait_score: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !initial_trait_effect.is_finite() || !trait_score.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_trait_effect == 0.0 || trait_score == 0.0 {
+        return Ok(0.0);
+    }
+    let initial_shift = require_finite(initial_trait_effect * trait_score)?;
+    if initial_shift == 0.0 {
+        return Ok(0.0);
+    }
+    let drift_interval = log_rate * event_delta;
+    let auto_effect = drift_interval.exp();
+    if auto_effect.is_finite() {
+        // +0 underflow is a vanishing carry of the T0 trait shift.
+        return require_finite(auto_effect * initial_shift);
+    }
+    // Overflow of a finite `a Δt` is the log-space rewrite.
+    // A non-finite argument also fails closed through `require_finite`.
+    // e^{a Δt} t0_trait · trait = sign(shift) exp(ln|shift| + a Δt).
+    require_finite(initial_shift.signum() * (initial_shift.abs().ln() + drift_interval).exp())
+}
+
+/// Refuse treating 2017-era `T0TRAITEFFECT` as its Eq. 3 carry.
+///
+/// `t0_trait · trait` is the first-occasion shift. `e^{A Δt}
+/// t0_trait · trait` is the first summand at `t`. Equal numbers
+/// when `a = 0` remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTraitEffectIsNotInitialTraitCarry`].
+pub fn refuse_initial_trait_effect_as_initial_trait_carry(
+    initial_trait_effect: f64,
+    initial_trait_carry: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_trait_effect, initial_trait_carry);
+    Err(PsychometricError::InitialTraitEffectIsNotInitialTraitCarry)
+}
+
+/// Refuse treating Table 3 `T0TIPREDEFFECT` carry as 2017-era
+/// `T0TRAITEFFECT` carry.
+///
+/// `e^{A Δt} t0_b z` is the first-occasion TI predictor carry.
+/// `e^{A Δt} t0_trait · trait` is the trait path into `T0MEANS`
+/// after Eq. 3. Equal numbers remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentCarryIsNotInitialTraitCarry`].
+pub fn refuse_initial_time_independent_carry_as_initial_trait_carry(
+    initial_time_independent_carry: f64,
+    initial_trait_carry: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_time_independent_carry, initial_trait_carry);
+    Err(PsychometricError::InitialTimeIndependentCarryIsNotInitialTraitCarry)
+}
+
+/// Refuse treating Table 3 `T0TDPREDEFFECT` carry as 2017-era
+/// `T0TRAITEFFECT` carry.
+///
+/// `e^{A Δt} t0_m x0` is the first-occasion TD predictor carry.
+/// `e^{A Δt} t0_trait · trait` is the trait path into `T0MEANS`
+/// after Eq. 3. Equal numbers remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeDependentCarryIsNotInitialTraitCarry`].
+pub fn refuse_initial_time_dependent_carry_as_initial_trait_carry(
+    initial_time_dependent_carry: f64,
+    initial_trait_carry: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_time_dependent_carry, initial_trait_carry);
+    Err(PsychometricError::InitialTimeDependentCarryIsNotInitialTraitCarry)
+}
+
+/// Refuse treating Table 2 `TIPREDEFFECT` as 2017-era
+/// `T0TRAITEFFECT` carry.
+///
+/// `A^{-1}[e^{A Δt} − I] B z` is the Eq. 3 second-summand process
+/// increment. `e^{A Δt} t0_trait · trait` is the first-summand
+/// carry of the trait path into `T0MEANS`. Equal numbers remain
+/// distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TimeIndependentIncrementIsNotInitialTraitCarry`].
+pub fn refuse_time_independent_increment_as_initial_trait_carry(
+    time_independent_increment: f64,
+    initial_trait_carry: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (time_independent_increment, initial_trait_carry);
+    Err(PsychometricError::TimeIndependentIncrementIsNotInitialTraitCarry)
+}
+
 /// Exact scalar evolved latent mean plus a first-occasion TD predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; Table 3, p. 13) write
@@ -6880,7 +7036,7 @@ mod tests {
         recover_initial_time_dependent_predictor_carry,
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_predictor_carry,
-        recover_initial_time_independent_predictor_effect,
+        recover_initial_time_independent_predictor_effect, recover_initial_trait_effect_carry,
         recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
         recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
@@ -6948,18 +7104,21 @@ mod tests {
         refuse_initial_observed_variance_as_stationary_initial_observed_variance,
         refuse_initial_time_dependent_carry_as_impulse_carry,
         refuse_initial_time_dependent_carry_as_initial_effect,
+        refuse_initial_time_dependent_carry_as_initial_trait_carry,
         refuse_initial_time_dependent_coefficient_as_initial_effect,
         refuse_initial_time_dependent_effect_as_contemporaneous_impulse,
         refuse_initial_time_dependent_effect_as_continuous_intercept,
         refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
         refuse_initial_time_dependent_effect_as_process_increment,
         refuse_initial_time_independent_carry_as_initial_effect,
+        refuse_initial_time_independent_carry_as_initial_trait_carry,
         refuse_initial_time_independent_coefficient_as_initial_effect,
         refuse_initial_time_independent_effect_as_continuous_intercept,
         refuse_initial_time_independent_effect_as_process_increment,
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_initial_time_independent_variance_as_standardised_trait_variance,
+        refuse_initial_trait_effect_as_initial_trait_carry,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
         refuse_level_change_extra_process_as_impulse,
@@ -7024,6 +7183,7 @@ mod tests {
         refuse_time_independent_effect_as_continuous_intercept,
         refuse_time_independent_effect_as_time_dependent_impulse,
         refuse_time_independent_effect_as_time_varying_discrete_effect,
+        refuse_time_independent_increment_as_initial_trait_carry,
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
@@ -16351,6 +16511,152 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn initial_trait_effect_carry_recovers_driver_generate_product() {
+        let coefficient = 0.5_f64;
+        let trait_score = 1.6_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let event = LagClock::EventTime;
+        let shift = coefficient * trait_score;
+        let carry =
+            recover_initial_trait_effect_carry(coefficient, trait_score, drift, delta, event)
+                .expect("T0TRAITEFFECT carry");
+        let expected = shift * (drift * delta).exp();
+        assert!((carry - expected).abs() < 1e-15);
+        let zero_drift =
+            recover_initial_trait_effect_carry(coefficient, trait_score, 0.0, delta, event)
+                .expect("zero-drift");
+        assert!((zero_drift - shift).abs() < 1e-15);
+        let vanished =
+            recover_initial_trait_effect_carry(coefficient, trait_score, -800.0, 1.0, event)
+                .expect("underflow");
+        assert_eq!(vanished.to_bits(), 0.0_f64.to_bits());
+        assert_eq!(
+            recover_initial_trait_effect_carry(0.0, trait_score, drift, delta, event),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_initial_trait_effect_carry(coefficient, 0.0, drift, delta, event),
+            Ok(0.0)
+        );
+        let identity = recover_initial_trait_effect_carry(1.0, trait_score, 0.0, delta, event)
+            .expect("stationary identity at a=0");
+        assert!((identity - trait_score).abs() < 1e-15);
+        let signed =
+            recover_initial_trait_effect_carry(coefficient, -trait_score, drift, delta, event)
+                .expect("signed trait");
+        assert!((signed + expected).abs() < 1e-15);
+    }
+
+    #[test]
+    fn initial_trait_effect_carry_refuses_shift_ti_td_and_increment() {
+        let coefficient = 0.5_f64;
+        let trait_score = 1.6_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let event = LagClock::EventTime;
+        let shift = coefficient * trait_score;
+        let carry =
+            recover_initial_trait_effect_carry(coefficient, trait_score, drift, delta, event)
+                .expect("T0TRAITEFFECT carry");
+        let time_independent_carry = recover_initial_time_independent_predictor_carry(
+            coefficient,
+            trait_score,
+            drift,
+            delta,
+            event,
+        )
+        .expect("T0TIPREDEFFECT carry");
+        let time_dependent_carry = recover_initial_time_dependent_predictor_carry(
+            coefficient,
+            trait_score,
+            drift,
+            delta,
+            event,
+        )
+        .expect("T0TDPREDEFFECT carry");
+        let increment = recover_discrete_time_independent_predictor_effect(
+            coefficient,
+            trait_score,
+            drift,
+            delta,
+            event,
+        )
+        .expect("TIPREDEFFECT");
+        assert!((time_independent_carry - carry).abs() < 1e-15);
+        assert!((time_dependent_carry - carry).abs() < 1e-15);
+        assert!((shift - carry).abs() > 1e-3);
+        assert!((increment - carry).abs() > 1e-3);
+        assert_eq!(
+            refuse_initial_trait_effect_as_initial_trait_carry(shift, carry),
+            Err(PsychometricError::InitialTraitEffectIsNotInitialTraitCarry)
+        );
+        assert_eq!(
+            refuse_initial_time_independent_carry_as_initial_trait_carry(
+                time_independent_carry,
+                carry
+            ),
+            Err(PsychometricError::InitialTimeIndependentCarryIsNotInitialTraitCarry)
+        );
+        assert_eq!(
+            refuse_initial_time_dependent_carry_as_initial_trait_carry(time_dependent_carry, carry),
+            Err(PsychometricError::InitialTimeDependentCarryIsNotInitialTraitCarry)
+        );
+        assert_eq!(
+            refuse_time_independent_increment_as_initial_trait_carry(increment, carry),
+            Err(PsychometricError::TimeIndependentIncrementIsNotInitialTraitCarry)
+        );
+    }
+
+    #[test]
+    fn initial_trait_effect_carry_fails_closed_on_non_event_clock_and_overflow() {
+        assert_eq!(
+            recover_initial_trait_effect_carry(0.5, 1.6, -0.5, 2.0, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_trait_effect_carry(0.5, 1.6, -0.5, 2.0, LagClock::AssertionTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_trait_effect_carry(0.5, 1.6, -0.5, 0.0, LagClock::EventTime),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_initial_trait_effect_carry(f64::NAN, 1.6, -0.5, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_trait_effect_carry(0.5, f64::INFINITY, -0.5, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_trait_effect_carry(1e308, 2.0, 0.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_trait_effect_carry(2.0, 0.5, 710.0, 1.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let finite_rewrite =
+            recover_initial_trait_effect_carry(1e-308, 1.0, 700.0, 1.0, LagClock::EventTime)
+                .expect("log-rewrite");
+        let expected_rewrite = (1e-308_f64.ln() + 700.0).exp();
+        assert!((finite_rewrite - expected_rewrite).abs() / expected_rewrite < 1e-12);
+        let clocks = [
+            LagClock::SystemTime,
+            LagClock::DocumentTime,
+            LagClock::AssertionTime,
+        ];
+        let non_event_index = std::process::id() as usize % clocks.len();
+        let non_event = clocks[non_event_index];
+        assert_eq!(
+            recover_initial_trait_effect_carry(0.5, 1.6, -0.5, 2.0, non_event),
+            Err(PsychometricError::EventTimeRequired)
         );
     }
 }

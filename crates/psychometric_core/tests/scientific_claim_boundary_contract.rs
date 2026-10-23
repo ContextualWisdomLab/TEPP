@@ -23,7 +23,7 @@ use psychometric_core::{
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
-    recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_effect, recover_initial_trait_effect_carry,
     recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
     recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
@@ -91,18 +91,21 @@ use psychometric_core::{
     refuse_initial_observed_variance_as_stationary_initial_observed_variance,
     refuse_initial_time_dependent_carry_as_impulse_carry,
     refuse_initial_time_dependent_carry_as_initial_effect,
+    refuse_initial_time_dependent_carry_as_initial_trait_carry,
     refuse_initial_time_dependent_coefficient_as_initial_effect,
     refuse_initial_time_dependent_effect_as_contemporaneous_impulse,
     refuse_initial_time_dependent_effect_as_continuous_intercept,
     refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
     refuse_initial_time_dependent_effect_as_process_increment,
     refuse_initial_time_independent_carry_as_initial_effect,
+    refuse_initial_time_independent_carry_as_initial_trait_carry,
     refuse_initial_time_independent_coefficient_as_initial_effect,
     refuse_initial_time_independent_effect_as_continuous_intercept,
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
+    refuse_initial_trait_effect_as_initial_trait_carry,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -165,6 +168,7 @@ use psychometric_core::{
     refuse_time_independent_effect_as_continuous_intercept,
     refuse_time_independent_effect_as_time_dependent_impulse,
     refuse_time_independent_effect_as_time_varying_discrete_effect,
+    refuse_time_independent_increment_as_initial_trait_carry,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
@@ -3780,5 +3784,62 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
         )
+    );
+}
+
+#[test]
+fn initial_trait_carry_is_not_shift_ti_td_or_increment() {
+    let coefficient = 0.5_f64;
+    let trait_score = 1.6_f64;
+    let drift = -0.5_f64;
+    let delta = 2.0_f64;
+    let event = LagClock::EventTime;
+    let shift = coefficient * trait_score;
+    let carry = recover_initial_trait_effect_carry(coefficient, trait_score, drift, delta, event)
+        .expect("T0TRAITEFFECT carry");
+    let time_independent_carry = recover_initial_time_independent_predictor_carry(
+        coefficient,
+        trait_score,
+        drift,
+        delta,
+        event,
+    )
+    .expect("T0TIPREDEFFECT carry");
+    let time_dependent_carry = recover_initial_time_dependent_predictor_carry(
+        coefficient,
+        trait_score,
+        drift,
+        delta,
+        event,
+    )
+    .expect("T0TDPREDEFFECT carry");
+    let increment = recover_discrete_time_independent_predictor_effect(
+        coefficient,
+        trait_score,
+        drift,
+        delta,
+        event,
+    )
+    .expect("TIPREDEFFECT");
+    assert!((time_independent_carry - carry).abs() < 1e-15);
+    assert!((time_dependent_carry - carry).abs() < 1e-15);
+    assert!((shift - carry).abs() > 1e-3);
+    assert_eq!(
+        refuse_initial_trait_effect_as_initial_trait_carry(shift, carry),
+        Err(psychometric_core::PsychometricError::InitialTraitEffectIsNotInitialTraitCarry)
+    );
+    assert_eq!(
+        refuse_initial_time_independent_carry_as_initial_trait_carry(time_independent_carry, carry),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentCarryIsNotInitialTraitCarry
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_carry_as_initial_trait_carry(time_dependent_carry, carry),
+        Err(psychometric_core::PsychometricError::InitialTimeDependentCarryIsNotInitialTraitCarry)
+    );
+    assert_eq!(
+        refuse_time_independent_increment_as_initial_trait_carry(increment, carry),
+        Err(psychometric_core::PsychometricError::TimeIndependentIncrementIsNotInitialTraitCarry)
     );
 }
