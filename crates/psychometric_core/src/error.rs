@@ -710,6 +710,31 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+
+    /// Driver Table 3 `T0TDPREDEFFECT` `t0_m` was treated as Table 2
+    /// `T0TDPREDCOV`. The coefficient is the first-occasion effect;
+    /// the covariance is `t0_m · v`. Equal numbers when `v = 1`
+    /// remain distinct named quantities.
+    InitialTimeDependentEffectIsNotInitialTimeDependentCovariance,
+    /// The analog extra first-occasion TD variance `t0_m² v` was
+    /// treated as Table 2 `T0TDPREDCOV`. That quadratic form is the
+    /// analog of `addedT0TIPREDVAR`; Table 2 names `T0TDPREDCOV` the
+    /// covariance, not that extra variance. Equal numbers when
+    /// `t0_m = 1` remain distinct named quantities. The 2017-era
+    /// source does not form `addedT0TDPREDVAR`.
+    InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance,
+    /// The first-occasion TI analog covariance `t0_b · v` was treated
+    /// as Table 2 `T0TDPREDCOV`. Table 3 names `T0TIPREDEFFECT` a
+    /// regression; Table 2 names `T0TDPREDCOV` the TD covariance.
+    /// Equal numbers when `t0_m = t0_b` remain distinct named
+    /// quantities.
+    InitialTimeIndependentCovarianceIsNotInitialTimeDependentCovariance,
+    /// Process `TDPREDEFFECT × TDPREDVAR` `m · v` was treated as
+    /// Table 2 `T0TDPREDCOV`. Table 2 / Table 3 name `TDPREDEFFECT`
+    /// `M` the process coefficient. `T0TDPREDCOV` is the first
+    /// occasion. Equal numbers when `t0_m = m` remain distinct
+    /// named quantities.
+    TimeDependentEffectCovarianceIsNotInitialTimeDependentCovariance,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1259,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::InitialTimeDependentEffectIsNotInitialTimeDependentCovariance => {
+                "first-occasion time-dependent predictor effect is not the first-occasion time-dependent predictor covariance"
+            }
+            Self::InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance => {
+                "first-occasion time-dependent extra predictor variance is not the first-occasion time-dependent predictor covariance"
+            }
+            Self::InitialTimeIndependentCovarianceIsNotInitialTimeDependentCovariance => {
+                "first-occasion time-independent predictor covariance is not the first-occasion time-dependent predictor covariance"
+            }
+            Self::TimeDependentEffectCovarianceIsNotInitialTimeDependentCovariance => {
+                "time-dependent predictor effect covariance is not the first-occasion time-dependent predictor covariance"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2108,30 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn initial_time_dependent_covariance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::InitialTimeDependentEffectIsNotInitialTimeDependentCovariance
+                .to_string(),
+            "first-occasion time-dependent predictor effect is not the first-occasion time-dependent predictor covariance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance
+                .to_string(),
+            "first-occasion time-dependent extra predictor variance is not the first-occasion time-dependent predictor covariance"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentCovarianceIsNotInitialTimeDependentCovariance
+                .to_string(),
+            "first-occasion time-independent predictor covariance is not the first-occasion time-dependent predictor covariance"
+        );
+        assert_eq!(
+            PsychometricError::TimeDependentEffectCovarianceIsNotInitialTimeDependentCovariance
+                .to_string(),
+            "time-dependent predictor effect covariance is not the first-occasion time-dependent predictor covariance"
         );
     }
 }

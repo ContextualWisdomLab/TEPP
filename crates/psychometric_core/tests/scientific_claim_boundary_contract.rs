@@ -21,6 +21,7 @@ use psychometric_core::{
     recover_discrete_observed_mean_with_time_independent_predictor, recover_discrete_process_noise,
     recover_discrete_time_independent_predictor_effect,
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
+    recover_initial_time_dependent_predictor_covariance,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
     recover_initial_time_independent_predictor_effect,
@@ -94,10 +95,13 @@ use psychometric_core::{
     refuse_initial_time_dependent_coefficient_as_initial_effect,
     refuse_initial_time_dependent_effect_as_contemporaneous_impulse,
     refuse_initial_time_dependent_effect_as_continuous_intercept,
+    refuse_initial_time_dependent_effect_as_initial_time_dependent_covariance,
     refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
     refuse_initial_time_dependent_effect_as_process_increment,
+    refuse_initial_time_dependent_extra_variance_as_initial_time_dependent_covariance,
     refuse_initial_time_independent_carry_as_initial_effect,
     refuse_initial_time_independent_coefficient_as_initial_effect,
+    refuse_initial_time_independent_covariance_as_initial_time_dependent_covariance,
     refuse_initial_time_independent_effect_as_continuous_intercept,
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
@@ -154,6 +158,7 @@ use psychometric_core::{
     refuse_stationary_later_latent_variance_as_observed_variance,
     refuse_stationary_later_latent_variance_as_process_noise,
     refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance,
+    refuse_time_dependent_effect_covariance_as_initial_time_dependent_covariance,
     refuse_time_dependent_impulse_as_continuous_intercept,
     refuse_time_dependent_impulse_as_time_independent_effect,
     refuse_time_dependent_impulse_as_time_varying_discrete_effect,
@@ -3779,6 +3784,104 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         refuse_observed_variance_as_standardised_manifest_variance(observed, recovered),
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
+        )
+    );
+}
+
+#[test]
+fn initial_time_dependent_covariance_is_not_effect_extra_ti_or_process() {
+    let effect = 0.3_f64;
+    let predictor_variance = 4.0_f64;
+    let recovered = recover_initial_time_dependent_predictor_covariance(
+        effect,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("T0TDPREDCOV");
+    assert!(
+        (recovered - effect * predictor_variance).abs() < 1e-15,
+        "Driver et al. (2017, Table 2 p. 12 / 2017-era ctFit.R): T0TDPREDCOV is t0_m · v"
+    );
+    assert!(
+        (recovered - effect).abs() > 1e-3,
+        "Driver et al. (2017, Table 3 p. 13): T0TDPREDEFFECT is not T0TDPREDCOV"
+    );
+    let extra = effect * effect * predictor_variance;
+    assert!(
+        (recovered - extra).abs() > 1e-3,
+        "Driver et al. (2017, Table 2 p. 12): analog extra t0_m² v is not T0TDPREDCOV"
+    );
+    let unit_variance =
+        recover_initial_time_dependent_predictor_covariance(effect, 1.0, LagClock::EventTime)
+            .expect("T0TDPREDCOV v=1");
+    assert!(
+        (unit_variance - effect).abs() < 1e-15,
+        "Driver et al. (2017, Table 2): equal numbers when v = 1 remain distinct named quantities"
+    );
+    let unit_effect = recover_initial_time_dependent_predictor_covariance(
+        1.0,
+        predictor_variance,
+        LagClock::EventTime,
+    )
+    .expect("T0TDPREDCOV t0_m=1");
+    assert!(
+        (unit_effect - predictor_variance).abs() < 1e-15,
+        "Driver et al. (2017, Table 2): equal numbers when t0_m = 1 remain distinct named quantities"
+    );
+    assert_eq!(
+        recover_initial_time_dependent_predictor_covariance(0.3, 4.0, LagClock::DocumentTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_time_dependent_predictor_covariance(0.3, -4.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_effect_as_initial_time_dependent_covariance(
+            effect, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentEffectIsNotInitialTimeDependentCovariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_extra_variance_as_initial_time_dependent_covariance(
+            extra, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_independent_covariance_as_initial_time_dependent_covariance(
+            recovered, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentCovarianceIsNotInitialTimeDependentCovariance
+        )
+    );
+    assert_eq!(
+        refuse_time_dependent_effect_covariance_as_initial_time_dependent_covariance(
+            recovered, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::TimeDependentEffectCovarianceIsNotInitialTimeDependentCovariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_effect_as_initial_time_dependent_covariance(
+            unit_variance, unit_variance
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentEffectIsNotInitialTimeDependentCovariance
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_extra_variance_as_initial_time_dependent_covariance(
+            predictor_variance, unit_effect
+        ),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentExtraVarianceIsNotInitialTimeDependentCovariance
         )
     );
 }

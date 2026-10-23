@@ -261,6 +261,22 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver Table 2 `T0TDPREDCOV` as `t0_m · v` after
+//! finite `t0_m` and `v ≥ 0` (Table 2 names `T0TDPREDCOV` the
+//! covariance between latents at `T0` and time-dependent
+//! predictors, default 0; 2017-era `ctFit.R` places that matrix in
+//! `OpenMx` `S`; Table 3 `T0TDPREDEFFECT` is the regression so
+//! `T0TDPREDCOV = t0_m · v`; form `t0_m` first, then multiply by
+//! `v`; a zero coefficient or zero `v` is exactly zero; `t0_m` is
+//! not that covariance even when `v = 1`; analog extra `t0_m² v` is
+//! not that covariance even when `t0_m = 1`; `t0_b · v` is not that
+//! covariance even when `t0_m = t0_b`; process `m · v` is not that
+//! covariance even when `t0_m = m`; 2017-era `summary.ctsemFit.R`
+//! comments out `TDPREDVAR` / `TDPREDVARstd` and does not form
+//! `T0TDPREDCOV` in summary; this crate does not invent
+//! `TDPREDVARstd`; `v < 0` fails closed; a non-event clock fails
+//! closed; free `T0TDPREDCOV` does not require `a < 0`; JSS PDF
+//! re-opened 2026-08-30T16:40Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -373,6 +389,8 @@ pub use event_time::recover_event_series_mean_log_rate;
 pub use event_time::recover_event_time_discrete_lag_and_log_rate;
 /// Exact scalar carried first-occasion `T0TDPREDEFFECT` `e^{A Δt} t0_m x0`.
 pub use event_time::recover_initial_time_dependent_predictor_carry;
+/// Exact scalar Table 2 `T0TDPREDCOV` `t0_m · v`.
+pub use event_time::recover_initial_time_dependent_predictor_covariance;
 /// Exact scalar first-occasion `T0TDPREDEFFECT` shift `t0_m x0`.
 pub use event_time::recover_initial_time_dependent_predictor_effect;
 /// Exact scalar carried first-occasion `T0TIPREDEFFECT` `e^{A Δt} t0_b z`.
@@ -554,14 +572,20 @@ pub use event_time::refuse_initial_time_dependent_coefficient_as_initial_effect;
 pub use event_time::refuse_initial_time_dependent_effect_as_contemporaneous_impulse;
 /// Refuse treating the Table 3 first-occasion TD shift as `CINT`.
 pub use event_time::refuse_initial_time_dependent_effect_as_continuous_intercept;
+/// Refuse treating Table 3 `T0TDPREDEFFECT` as Table 2 `T0TDPREDCOV`.
+pub use event_time::refuse_initial_time_dependent_effect_as_initial_time_dependent_covariance;
 /// Refuse treating the Table 3 first-occasion TD shift as the Table 3 TI shift.
 pub use event_time::refuse_initial_time_dependent_effect_as_initial_time_independent_effect;
 /// Refuse treating the Table 3 first-occasion TD shift as the Eq. 3 process increment.
 pub use event_time::refuse_initial_time_dependent_effect_as_process_increment;
+/// Refuse treating analog extra `t0_m² v` as Table 2 `T0TDPREDCOV`.
+pub use event_time::refuse_initial_time_dependent_extra_variance_as_initial_time_dependent_covariance;
 /// Refuse treating the Eq. 3 `T0TIPREDEFFECT` carry as the first-occasion shift.
 pub use event_time::refuse_initial_time_independent_carry_as_initial_effect;
 /// Refuse treating Driver Table 3 `T0TIPREDEFFECT` as the first-occasion shift.
 pub use event_time::refuse_initial_time_independent_coefficient_as_initial_effect;
+/// Refuse treating the first-occasion TI analog covariance as Table 2 `T0TDPREDCOV`.
+pub use event_time::refuse_initial_time_independent_covariance_as_initial_time_dependent_covariance;
 /// Refuse treating the Table 3 first-occasion TI shift as `CINT`.
 pub use event_time::refuse_initial_time_independent_effect_as_continuous_intercept;
 /// Refuse treating the Table 3 first-occasion TI shift as the Eq. 3 process increment.
@@ -689,6 +713,8 @@ pub use event_time::refuse_stationary_later_latent_variance_as_observed_variance
 pub use event_time::refuse_stationary_later_latent_variance_as_process_noise;
 /// Refuse treating Eq. 5 of `asymDIFFUSION` as Eq. 5 of §4.3 stationary `T0VAR`.
 pub use event_time::refuse_stationary_within_subject_observed_variance_as_stationary_initial_observed_variance;
+/// Refuse treating process `TDPREDEFFECT × TDPREDVAR` as Table 2 `T0TDPREDCOV`.
+pub use event_time::refuse_time_dependent_effect_covariance_as_initial_time_dependent_covariance;
 /// Refuse treating Driver Eq. 3 `TDPREDEFFECT` impulse as `CINT`.
 pub use event_time::refuse_time_dependent_impulse_as_continuous_intercept;
 /// Refuse treating Driver Eq. 3 impulse as `TIPREDEFFECT`.
