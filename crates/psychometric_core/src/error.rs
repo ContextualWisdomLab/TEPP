@@ -710,6 +710,32 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+
+    /// Driver Table 3 `T0TIPREDEFFECT` `t0_b z` was treated as
+    /// 2017-era `T0TRAITEFFECT`. The TI first-occasion shift is a
+    /// predictor effect; `T0TRAITEFFECT` is the RAM `A`-path from
+    /// traits to latents at `T0`. Equal numbers when `t0_b z =
+    /// t0_trait · trait` remain distinct named quantities.
+    InitialTimeIndependentEffectIsNotInitialTraitEffect,
+    /// Driver Table 3 `T0TDPREDEFFECT` `t0_m x0` was treated as
+    /// 2017-era `T0TRAITEFFECT`. The TD first-occasion shift is a
+    /// predictor effect; `T0TRAITEFFECT` is the trait path into
+    /// `T0MEANS`. Equal numbers when `t0_m x0 = t0_trait · trait`
+    /// remain distinct named quantities.
+    InitialTimeDependentEffectIsNotInitialTraitEffect,
+    /// 2017-era `T0TRAITEFFECT` `t0_trait` was treated as the
+    /// first-occasion trait shift. The coefficient is the RAM
+    /// `A`-path; the shift is `t0_trait · trait`. Equal numbers
+    /// when `trait = 1` remain distinct named quantities.
+    InitialTraitCoefficientIsNotInitialTraitEffect,
+    /// Commented 2017-era `T0TRAITVAR` `t0_trait² · TRAITVAR` was
+    /// treated as `T0TRAITEFFECT`. That quadratic form is extra
+    /// first-occasion trait variance (`summary.ctsemFit.R` comments
+    /// it out with "is this valid?"); this crate does not invent
+    /// it. The shift is `t0_trait · trait`, not that extra. Equal
+    /// numbers when `t0_trait = trait = TRAITVAR` remain distinct
+    /// named quantities.
+    InitialTraitExtraVarianceIsNotInitialTraitEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1260,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::InitialTimeIndependentEffectIsNotInitialTraitEffect => {
+                "first-occasion time-independent predictor effect is not the first-occasion trait effect"
+            }
+            Self::InitialTimeDependentEffectIsNotInitialTraitEffect => {
+                "first-occasion time-dependent predictor effect is not the first-occasion trait effect"
+            }
+            Self::InitialTraitCoefficientIsNotInitialTraitEffect => {
+                "first-occasion trait coefficient is not the first-occasion trait effect"
+            }
+            Self::InitialTraitExtraVarianceIsNotInitialTraitEffect => {
+                "first-occasion extra trait variance is not the first-occasion trait effect"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2109,26 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn initial_trait_effect_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentEffectIsNotInitialTraitEffect.to_string(),
+            "first-occasion time-independent predictor effect is not the first-occasion trait effect"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentEffectIsNotInitialTraitEffect.to_string(),
+            "first-occasion time-dependent predictor effect is not the first-occasion trait effect"
+        );
+        assert_eq!(
+            PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect.to_string(),
+            "first-occasion trait coefficient is not the first-occasion trait effect"
+        );
+        assert_eq!(
+            PsychometricError::InitialTraitExtraVarianceIsNotInitialTraitEffect.to_string(),
+            "first-occasion extra trait variance is not the first-occasion trait effect"
         );
     }
 }

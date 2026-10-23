@@ -27,7 +27,7 @@ use psychometric_core::{
     recover_event_time_discrete_lag_and_log_rate, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
-    recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_effect, recover_initial_trait_effect,
     recover_irregular_centered_residual_log_rate, recover_kish_weighted_slope,
     recover_level_change_continuous_intercept, recover_level_change_discrete_increment,
     recover_level_change_extra_process_contribution,
@@ -96,14 +96,18 @@ use psychometric_core::{
     refuse_initial_time_dependent_effect_as_contemporaneous_impulse,
     refuse_initial_time_dependent_effect_as_continuous_intercept,
     refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
+    refuse_initial_time_dependent_effect_as_initial_trait_effect,
     refuse_initial_time_dependent_effect_as_process_increment,
     refuse_initial_time_independent_carry_as_initial_effect,
     refuse_initial_time_independent_coefficient_as_initial_effect,
     refuse_initial_time_independent_effect_as_continuous_intercept,
+    refuse_initial_time_independent_effect_as_initial_trait_effect,
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
+    refuse_initial_trait_coefficient_as_initial_trait_effect,
+    refuse_initial_trait_extra_variance_as_initial_trait_effect,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -6537,6 +6541,129 @@ fn manifest_variance_std_clock_path_is_runtime_opaque() {
     let non_event = clocks[non_event_index];
     assert_eq!(
         recover_standardised_manifest_variance(0.4, non_event),
+        Err(PsychometricError::EventTimeRequired)
+    );
+}
+
+#[test]
+fn initial_trait_effect_recovers_driver_generate_product() {
+    let coefficient = 0.5_f64;
+    let trait_score = 1.6_f64;
+    let recovered = recover_initial_trait_effect(coefficient, trait_score, LagClock::EventTime)
+        .expect("T0TRAITEFFECT");
+    let expected = coefficient * trait_score;
+    let recovered_error = (recovered - expected).abs();
+    assert!(
+        recovered_error < 1e-15,
+        "Driver et al. (2017, 2017-era ctGenerate.R): RMSE {recovered_error}: got {recovered}"
+    );
+    let identity = recover_initial_trait_effect(1.0, trait_score, LagClock::EventTime)
+        .expect("stationary identity");
+    assert!(
+        (identity - trait_score).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era ctFit.R stationary): identity recovers the trait score"
+    );
+    let unit_trait =
+        recover_initial_trait_effect(coefficient, 1.0, LagClock::EventTime).expect("trait=1");
+    assert!(
+        (unit_trait - coefficient).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era T0TRAITEFFECT): equals t0_trait when trait = 1 and remains a distinct named quantity"
+    );
+    let signed = recover_initial_trait_effect(coefficient, -trait_score, LagClock::EventTime)
+        .expect("signed trait");
+    assert!(
+        (signed + recovered).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era T0TRAITEFFECT): a signed trait is a signed shift"
+    );
+    let extra = coefficient * coefficient * 0.8;
+    assert!(
+        recovered_error < (recovered - extra).abs(),
+        "Driver et al. (2017): commented T0TRAITVAR extra must exceed T0TRAITEFFECT RMSE"
+    );
+    assert_eq!(
+        recover_initial_trait_effect(0.0, trait_score, LagClock::EventTime)
+            .expect("zero coefficient")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+    assert_eq!(
+        recover_initial_trait_effect(coefficient, 0.0, LagClock::EventTime)
+            .expect("zero trait")
+            .to_bits(),
+        0.0_f64.to_bits()
+    );
+}
+
+#[test]
+fn initial_trait_effect_refuses_ti_td_coefficient_and_extra() {
+    let coefficient = 0.5_f64;
+    let trait_score = 1.6_f64;
+    let recovered = recover_initial_trait_effect(coefficient, trait_score, LagClock::EventTime)
+        .expect("T0TRAITEFFECT");
+    let extra = coefficient * coefficient * 0.8;
+    let unit_trait =
+        recover_initial_trait_effect(coefficient, 1.0, LagClock::EventTime).expect("trait=1");
+    assert_eq!(
+        refuse_initial_time_independent_effect_as_initial_trait_effect(recovered, recovered),
+        Err(PsychometricError::InitialTimeIndependentEffectIsNotInitialTraitEffect)
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_effect_as_initial_trait_effect(recovered, recovered),
+        Err(PsychometricError::InitialTimeDependentEffectIsNotInitialTraitEffect)
+    );
+    assert_eq!(
+        refuse_initial_trait_coefficient_as_initial_trait_effect(coefficient, recovered),
+        Err(PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect)
+    );
+    assert_eq!(
+        refuse_initial_trait_extra_variance_as_initial_trait_effect(extra, recovered),
+        Err(PsychometricError::InitialTraitExtraVarianceIsNotInitialTraitEffect)
+    );
+    assert_eq!(
+        refuse_initial_trait_coefficient_as_initial_trait_effect(unit_trait, unit_trait),
+        Err(PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect)
+    );
+}
+
+#[test]
+fn initial_trait_effect_refuses_non_event_clocks_and_overflow() {
+    assert_eq!(
+        recover_initial_trait_effect(0.5, 1.6, LagClock::SystemTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_trait_effect(0.5, 1.6, LagClock::AssertionTime),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_trait_effect(0.5, 1.6, LagClock::KnowledgeCutoff),
+        Err(PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_trait_effect(f64::NAN, 1.6, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_trait_effect(0.5, f64::INFINITY, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        recover_initial_trait_effect(1e308, 2.0, LagClock::EventTime),
+        Err(PsychometricError::InvalidNumericInput)
+    );
+}
+
+#[test]
+fn initial_trait_effect_clock_path_is_runtime_opaque() {
+    let clocks = [
+        LagClock::SystemTime,
+        LagClock::DocumentTime,
+        LagClock::AssertionTime,
+    ];
+    let non_event_index = std::process::id() as usize % clocks.len();
+    let non_event = clocks[non_event_index];
+    assert_eq!(
+        recover_initial_trait_effect(0.5, 1.6, non_event),
         Err(PsychometricError::EventTimeRequired)
     );
 }

@@ -23,7 +23,7 @@ use psychometric_core::{
     recover_discrete_time_varying_predictor_effect, recover_initial_time_dependent_predictor_carry,
     recover_initial_time_dependent_predictor_effect,
     recover_initial_time_independent_predictor_carry,
-    recover_initial_time_independent_predictor_effect,
+    recover_initial_time_independent_predictor_effect, recover_initial_trait_effect,
     recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
     recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
     recover_level_change_extra_process_contribution_after, recover_loading_point_estimate_mean,
@@ -95,14 +95,18 @@ use psychometric_core::{
     refuse_initial_time_dependent_effect_as_contemporaneous_impulse,
     refuse_initial_time_dependent_effect_as_continuous_intercept,
     refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
+    refuse_initial_time_dependent_effect_as_initial_trait_effect,
     refuse_initial_time_dependent_effect_as_process_increment,
     refuse_initial_time_independent_carry_as_initial_effect,
     refuse_initial_time_independent_coefficient_as_initial_effect,
     refuse_initial_time_independent_effect_as_continuous_intercept,
+    refuse_initial_time_independent_effect_as_initial_trait_effect,
     refuse_initial_time_independent_effect_as_process_increment,
     refuse_initial_time_independent_effect_as_time_dependent_impulse,
     refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_initial_time_independent_variance_as_standardised_trait_variance,
+    refuse_initial_trait_coefficient_as_initial_trait_effect,
+    refuse_initial_trait_extra_variance_as_initial_trait_effect,
     refuse_latent_lagged_covariance_as_observed_covariance, refuse_latent_mean_as_observed_mean,
     refuse_latent_variance_as_observed_variance, refuse_level_change_extra_process_as_impulse,
     refuse_level_change_extra_process_as_increment, refuse_level_change_extra_process_as_intercept,
@@ -3780,5 +3784,70 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
         )
+    );
+}
+
+#[test]
+fn initial_trait_effect_is_not_ti_td_coefficient_or_extra() {
+    let coefficient = 0.5_f64;
+    let trait_score = 1.6_f64;
+    let recovered = recover_initial_trait_effect(coefficient, trait_score, LagClock::EventTime)
+        .expect("T0TRAITEFFECT");
+    assert!(
+        (recovered - coefficient * trait_score).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era ctGenerate.R): T0TRAITEFFECT is t0_trait · trait"
+    );
+    assert!(
+        (recovered - coefficient).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era ctFit.R): T0TRAITEFFECT coefficient is not the shift"
+    );
+    let extra = coefficient * coefficient * 0.8;
+    assert!(
+        (recovered - extra).abs() > 1e-3,
+        "Driver et al. (2017, 2017-era summary.ctsemFit.R): commented T0TRAITVAR is not T0TRAITEFFECT"
+    );
+    let unit_trait =
+        recover_initial_trait_effect(coefficient, 1.0, LagClock::EventTime).expect("trait=1");
+    assert!(
+        (unit_trait - coefficient).abs() < 1e-15,
+        "Driver et al. (2017): equal numbers when trait = 1 remain distinct named quantities"
+    );
+    let identity =
+        recover_initial_trait_effect(1.0, trait_score, LagClock::EventTime).expect("identity");
+    assert!(
+        (identity - trait_score).abs() < 1e-15,
+        "Driver et al. (2017, 2017-era ctFit.R stationary): identity recovers the trait score"
+    );
+    assert_eq!(
+        recover_initial_trait_effect(0.5, 1.6, LagClock::DocumentTime),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
+    );
+    assert_eq!(
+        recover_initial_trait_effect(1e308, 2.0, LagClock::EventTime),
+        Err(psychometric_core::PsychometricError::InvalidNumericInput)
+    );
+    assert_eq!(
+        refuse_initial_time_independent_effect_as_initial_trait_effect(recovered, recovered),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeIndependentEffectIsNotInitialTraitEffect
+        )
+    );
+    assert_eq!(
+        refuse_initial_time_dependent_effect_as_initial_trait_effect(recovered, recovered),
+        Err(
+            psychometric_core::PsychometricError::InitialTimeDependentEffectIsNotInitialTraitEffect
+        )
+    );
+    assert_eq!(
+        refuse_initial_trait_coefficient_as_initial_trait_effect(coefficient, recovered),
+        Err(psychometric_core::PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect)
+    );
+    assert_eq!(
+        refuse_initial_trait_extra_variance_as_initial_trait_effect(extra, recovered),
+        Err(psychometric_core::PsychometricError::InitialTraitExtraVarianceIsNotInitialTraitEffect)
+    );
+    assert_eq!(
+        refuse_initial_trait_coefficient_as_initial_trait_effect(unit_trait, unit_trait),
+        Err(psychometric_core::PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect)
     );
 }

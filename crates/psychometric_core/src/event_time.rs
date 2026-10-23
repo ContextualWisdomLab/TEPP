@@ -24,7 +24,11 @@
 //! `-q / (2 a)`. Section 4.3 (p. 9) then adds a stable trait process
 //! with `DRIFT` and `DIFFUSION` fixed to zero. That `TRAITVAR` is
 //! time-invariant between-subject variance; it is not process noise
-//! and not `asymDIFFUSION`. Equation 1 (p. 4) is the latent SDE.
+//! and not `asymDIFFUSION`. The 2017-era `T0TRAITEFFECT` matrix is
+//! the `OpenMx` `A`-path from those traits to latents at `T0`; the
+//! scalar first-occasion shift is `t0_trait · trait` (stationary
+//! default identity; `t0_b z` is `T0TIPREDEFFECT` and is not this
+//! shift; commented `T0TRAITVAR` is not this shift). Equation 1 (p. 4) is the latent SDE.
 //! Equation 5 (p. 5) writes `y_i(t) = τ_i + Λ η_i(t) + ε_i(t)` with
 //! `ε ~ N(0, Θ)` and `τ_i ~ N(μ_τ, Ψ_τ)`. Table 2 (p. 12) names
 //! `Θ` `MANIFESTVAR` and `Ψ_τ` `MANIFESTTRAITVAR`. The JSS summary
@@ -5888,6 +5892,142 @@ pub fn recover_initial_time_dependent_predictor_effect(
     require_finite(initial_time_dependent_effect * time_dependent_predictor)
 }
 
+/// Exact scalar 2017-era `T0TRAITEFFECT`.
+///
+/// Driver, Oud, and Voelkle (2017, §4.3, pp. 9–10; §7.1, pp. 18–19;
+/// 2017-era ctsem `ctModel.R` / `ctFit.R` / `ctGenerate.R`; JSS PDF
+/// re-opened 2026-08-30T17:45Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name traits the stable between-subject differences (`TRAITVAR`
+/// `φ_ξ`, `DRIFT` and `DIFFUSION` fixed to zero). The 2017-era
+/// `ctModel.R` names `T0TRAITEFFECT` the `n.latent × n.latent`
+/// first-occasion trait path and freely labels it when `TRAITVAR`
+/// is specified. The 2017-era `ctFit.R` places that matrix in the
+/// `OpenMx` `A` regression block from the trait latents to the
+/// process latents at `T0`. The default `stationary` argument
+/// includes `'T0TRAITEFFECT'` and then fixes free cells to the
+/// identity. The 2017-era `ctGenerate.R` writes
+/// `T0MEANS = T0MEANS + T0TRAITEFFECT %*% traits`. The JSS Table 2
+/// / Table 3 do not print `T0TRAITEFFECT`; this crate recovers the
+/// 2017-era named matrix, not a new std map. The scalar
+/// first-occasion shift is `t0_trait · trait` after finite
+/// `t0_trait` and finite `trait`. Form `t0_trait` first, then
+/// multiply by the trait score. A zero coefficient or zero trait
+/// is exactly zero. A signed trait score is a signed shift. The
+/// stationary identity default `t0_trait = 1` recovers the trait
+/// score and remains a distinct named quantity from the score.
+/// `T0` is an event-time occasion, so a non-event clock fails
+/// closed. Free first-occasion trait effect does not require
+/// stable `a < 0`. `t0_b z` is Table 3 `T0TIPREDEFFECT` and is not
+/// this shift even when the numbers equal. `t0_m x0` is Table 3
+/// `T0TDPREDEFFECT` and is not this shift even when the numbers
+/// equal. `t0_trait` is the coefficient, not the shift; equal
+/// numbers when `trait = 1` remain distinct named quantities. The
+/// 2017-era `summary.ctsemFit.R` comments out
+/// `T0TRAITVAR = T0TRAITEFFECT %*% TRAITVAR %*% t(T0TRAITEFFECT)`
+/// with "is this valid?". This crate does not invent `T0TRAITVAR`.
+/// `t0_trait² · TRAITVAR` is that extra variance, not this shift.
+/// This is not a Kalman filter, not a matrix `expm`, not DSEM, and
+/// not ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock and [`PsychometricError::InvalidNumericInput`]
+/// when an input is non-finite or the product overflows.
+pub fn recover_initial_trait_effect(
+    initial_trait_effect: f64,
+    trait_score: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !initial_trait_effect.is_finite() || !trait_score.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_trait_effect == 0.0 || trait_score == 0.0 {
+        return Ok(0.0);
+    }
+    require_finite(initial_trait_effect * trait_score)
+}
+
+/// Refuse treating Table 3 `T0TIPREDEFFECT` as 2017-era
+/// `T0TRAITEFFECT`.
+///
+/// `t0_b z` is the first-occasion TI predictor shift.
+/// `T0TRAITEFFECT` is the trait path into `T0MEANS`. Equal numbers
+/// remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentEffectIsNotInitialTraitEffect`].
+pub fn refuse_initial_time_independent_effect_as_initial_trait_effect(
+    initial_time_independent_effect: f64,
+    initial_trait_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_time_independent_effect, initial_trait_effect);
+    Err(PsychometricError::InitialTimeIndependentEffectIsNotInitialTraitEffect)
+}
+
+/// Refuse treating Table 3 `T0TDPREDEFFECT` as 2017-era
+/// `T0TRAITEFFECT`.
+///
+/// `t0_m x0` is the first-occasion TD predictor shift.
+/// `T0TRAITEFFECT` is the trait path into `T0MEANS`. Equal numbers
+/// remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeDependentEffectIsNotInitialTraitEffect`].
+pub fn refuse_initial_time_dependent_effect_as_initial_trait_effect(
+    initial_time_dependent_effect: f64,
+    initial_trait_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_time_dependent_effect, initial_trait_effect);
+    Err(PsychometricError::InitialTimeDependentEffectIsNotInitialTraitEffect)
+}
+
+/// Refuse treating 2017-era `T0TRAITEFFECT` as the first-occasion
+/// trait shift.
+///
+/// `t0_trait` is the coefficient. The shift is `t0_trait · trait`.
+/// Equal numbers when `trait = 1` remain distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect`].
+pub fn refuse_initial_trait_coefficient_as_initial_trait_effect(
+    initial_trait_coefficient: f64,
+    initial_trait_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (initial_trait_coefficient, initial_trait_effect);
+    Err(PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect)
+}
+
+/// Refuse treating commented 2017-era `T0TRAITVAR` as
+/// `T0TRAITEFFECT`.
+///
+/// `t0_trait² · TRAITVAR` is extra first-occasion trait variance.
+/// The 2017-era `summary.ctsemFit.R` comments that quadratic form
+/// out with "is this valid?". This crate does not invent
+/// `T0TRAITVAR`. The shift is `t0_trait · trait`, not that extra.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTraitExtraVarianceIsNotInitialTraitEffect`].
+pub fn refuse_initial_trait_extra_variance_as_initial_trait_effect(
+    extra_first_occasion_trait_variance: f64,
+    initial_trait_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (extra_first_occasion_trait_variance, initial_trait_effect);
+    Err(PsychometricError::InitialTraitExtraVarianceIsNotInitialTraitEffect)
+}
+
 /// Exact scalar carried first-occasion time-dependent predictor.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; Table 3, p. 13; JSS
@@ -6880,7 +7020,7 @@ mod tests {
         recover_initial_time_dependent_predictor_carry,
         recover_initial_time_dependent_predictor_effect,
         recover_initial_time_independent_predictor_carry,
-        recover_initial_time_independent_predictor_effect,
+        recover_initial_time_independent_predictor_effect, recover_initial_trait_effect,
         recover_irregular_centered_residual_log_rate, recover_level_change_continuous_intercept,
         recover_level_change_discrete_increment, recover_level_change_extra_process_contribution,
         recover_level_change_extra_process_contribution_after, recover_local_log_rate,
@@ -6952,14 +7092,18 @@ mod tests {
         refuse_initial_time_dependent_effect_as_contemporaneous_impulse,
         refuse_initial_time_dependent_effect_as_continuous_intercept,
         refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
+        refuse_initial_time_dependent_effect_as_initial_trait_effect,
         refuse_initial_time_dependent_effect_as_process_increment,
         refuse_initial_time_independent_carry_as_initial_effect,
         refuse_initial_time_independent_coefficient_as_initial_effect,
         refuse_initial_time_independent_effect_as_continuous_intercept,
+        refuse_initial_time_independent_effect_as_initial_trait_effect,
         refuse_initial_time_independent_effect_as_process_increment,
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_initial_time_independent_variance_as_standardised_trait_variance,
+        refuse_initial_trait_coefficient_as_initial_trait_effect,
+        refuse_initial_trait_extra_variance_as_initial_trait_effect,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
         refuse_level_change_extra_process_as_impulse,
@@ -16351,6 +16495,93 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn initial_trait_effect_recovers_driver_generate_product() {
+        let event = LagClock::EventTime;
+        let coefficient = 0.5_f64;
+        let trait_score = 1.6_f64;
+        let recovered =
+            recover_initial_trait_effect(coefficient, trait_score, event).expect("T0TRAITEFFECT");
+        let expected = coefficient * trait_score;
+        assert!((recovered - expected).abs() < 1e-15);
+        let identity =
+            recover_initial_trait_effect(1.0, trait_score, event).expect("stationary identity");
+        assert!((identity - trait_score).abs() < 1e-15);
+        let unit_trait = recover_initial_trait_effect(coefficient, 1.0, event).expect("trait=1");
+        assert!((unit_trait - coefficient).abs() < 1e-15);
+        let signed =
+            recover_initial_trait_effect(coefficient, -trait_score, event).expect("signed trait");
+        assert!((signed + recovered).abs() < 1e-15);
+        assert_eq!(
+            recover_initial_trait_effect(0.0, trait_score, event)
+                .expect("zero coefficient")
+                .to_bits(),
+            0.0_f64.to_bits()
+        );
+        assert_eq!(
+            recover_initial_trait_effect(coefficient, 0.0, event)
+                .expect("zero trait")
+                .to_bits(),
+            0.0_f64.to_bits()
+        );
+        let extra = coefficient * coefficient * 0.8;
+        assert!((recovered - extra).abs() > 1e-3);
+        assert_eq!(
+            refuse_initial_time_independent_effect_as_initial_trait_effect(recovered, recovered),
+            Err(PsychometricError::InitialTimeIndependentEffectIsNotInitialTraitEffect)
+        );
+        assert_eq!(
+            refuse_initial_time_dependent_effect_as_initial_trait_effect(recovered, recovered),
+            Err(PsychometricError::InitialTimeDependentEffectIsNotInitialTraitEffect)
+        );
+        assert_eq!(
+            refuse_initial_trait_coefficient_as_initial_trait_effect(coefficient, recovered),
+            Err(PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect)
+        );
+        assert_eq!(
+            refuse_initial_trait_extra_variance_as_initial_trait_effect(extra, recovered),
+            Err(PsychometricError::InitialTraitExtraVarianceIsNotInitialTraitEffect)
+        );
+        assert_eq!(
+            refuse_initial_trait_coefficient_as_initial_trait_effect(unit_trait, unit_trait),
+            Err(PsychometricError::InitialTraitCoefficientIsNotInitialTraitEffect)
+        );
+    }
+
+    #[test]
+    fn initial_trait_effect_fails_closed_on_non_event_clock_and_overflow() {
+        assert_eq!(
+            recover_initial_trait_effect(0.5, 1.6, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_trait_effect(0.5, 1.6, LagClock::AssertionTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_initial_trait_effect(f64::NAN, 1.6, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_trait_effect(0.5, f64::INFINITY, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_initial_trait_effect(1e308, 2.0, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let clocks = [
+            LagClock::SystemTime,
+            LagClock::DocumentTime,
+            LagClock::AssertionTime,
+        ];
+        let non_event = clocks[std::process::id() as usize % clocks.len()];
+        assert_eq!(
+            recover_initial_trait_effect(0.5, 1.6, non_event),
+            Err(PsychometricError::EventTimeRequired)
         );
     }
 }

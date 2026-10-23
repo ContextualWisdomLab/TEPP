@@ -40,6 +40,8 @@ The executable standardised-manifest-variance slice recovers Driver et al. (2017
 
 The executable standardised-trait-variance slice recovers Driver et al. (2017, p. 16 `TRAITVARstd`) as `trait / trait = 1` after strictly positive `TRAITVAR` (Table 2 `φ_ξ`; §7.1; footnote 4; 2017-era `summary.ctsemFit.R` `solve(sqrt(diag(TRAITVAR))) %&% TRAITVAR`; JSS PDF re-opened 2026-08-26T17:45Z). Unlike `T0VARstd` there is no ridge addend. Unstandardised `TRAITVAR` is defined for a zero trait and is not that map. `p_0 / p_0 = 1` is the named `T0VARstd` first-occasion correlation and is not `TRAITVARstd` even when both equal 1. `t0_b² v` is `addedT0TIPREDVAR` and is not this correlation. Zero `TRAITVAR` and a non-event clock fail closed. `TRAITVAR` does not require `a < 0`. This is not ctsem estimation.
 
+The executable first-occasion trait-effect slice recovers 2017-era `T0TRAITEFFECT` as `t0_trait · trait` after finite `t0_trait` and finite trait score (`ctFit.R` places that matrix in OpenMx `A` from traits to latents at `T0`; default `stationary` includes `'T0TRAITEFFECT'` and fixes free cells to the identity; `ctGenerate.R` writes `T0MEANS + T0TRAITEFFECT %*% traits`; JSS Table 2 / Table 3 do not print `T0TRAITEFFECT`; JSS PDF re-opened 2026-08-30T17:45Z). `t0_b z` is `T0TIPREDEFFECT` and is not this shift. `t0_m x0` is `T0TDPREDEFFECT` and is not this shift. `t0_trait` is the coefficient, not the shift. Commented `T0TRAITVAR` is not this shift; this crate does not invent it. Free `T0TRAITEFFECT` does not require `a < 0`. This is not ctsem estimation.
+
 Input/process/intervention/outcome paths obey event-time order. Temporal precedence, document linkage, event tracking, or model prediction alone do not justify causal language.
 
 ## Non-goals
