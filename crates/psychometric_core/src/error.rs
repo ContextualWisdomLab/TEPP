@@ -352,6 +352,20 @@ pub enum PsychometricError {
     /// `(B / a)² v` is a variance, not the expected total change in
     /// process means.
     AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect,
+    /// 2017-era `asymTRAITVAR` was requested for a non-stable drift.
+    /// Process-mean trait variance is `trait / a²` and requires `a < 0`.
+    AsymptoticTraitVarianceRequiresStableDrift,
+    /// 2017-era `asymTRAITVAR` was treated as `TRAITVAR`.
+    /// `trait / a²` is process-mean variance from a random intercept
+    /// `ξ`. Table 2 `TRAITVAR` `φ_ξ` is `Var(ξ)`, not that map.
+    AsymptoticTraitVarianceIsNotTraitVariance,
+    /// 2017-era `asymTRAITVAR` was treated as `addedTIPREDVAR`.
+    /// `trait / a²` is not `(B / a)² v`.
+    AsymptoticTraitVarianceIsNotAddedTimeIndependentVariance,
+    /// 2017-era `asymTRAITVAR` was treated as `asymDIFFUSION`.
+    /// `trait / a²` is not the stationary within-subject variance
+    /// `-q / (2 a)`.
+    AsymptoticTraitVarianceIsNotStationaryWithinSubject,
     /// Driver Table 2 `asymCINT` was requested for a non-stable drift.
     /// The expected change in process means for a change in intercept
     /// is `-κ / a` and requires `a < 0`.
@@ -996,6 +1010,18 @@ impl fmt::Display for PsychometricError {
             }
             Self::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect => {
                 "asymptotic time-independent predictor variance is not the expected total change in process means"
+            }
+            Self::AsymptoticTraitVarianceRequiresStableDrift => {
+                "asymptotic trait variance requires a stable negative drift"
+            }
+            Self::AsymptoticTraitVarianceIsNotTraitVariance => {
+                "asymptotic trait variance is not trait variance"
+            }
+            Self::AsymptoticTraitVarianceIsNotAddedTimeIndependentVariance => {
+                "asymptotic trait variance is not the extra time-independent predictor variance"
+            }
+            Self::AsymptoticTraitVarianceIsNotStationaryWithinSubject => {
+                "asymptotic trait variance is not the stationary within-subject variance"
             }
             Self::AsymptoticContinuousInterceptRequiresStableDrift => {
                 "asymptotic continuous intercept requires a stable negative drift"
@@ -1761,6 +1787,26 @@ mod tests {
         assert_eq!(
             PsychometricError::StationaryInitialLatentVarianceIsNotDiscreteVariance.to_string(),
             "stationary first-occasion latent variance is not the finite-interval discrete latent variance"
+        );
+    }
+
+    #[test]
+    fn asymptotic_trait_variance_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::AsymptoticTraitVarianceRequiresStableDrift.to_string(),
+            "asymptotic trait variance requires a stable negative drift"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTraitVarianceIsNotTraitVariance.to_string(),
+            "asymptotic trait variance is not trait variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTraitVarianceIsNotAddedTimeIndependentVariance.to_string(),
+            "asymptotic trait variance is not the extra time-independent predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::AsymptoticTraitVarianceIsNotStationaryWithinSubject.to_string(),
+            "asymptotic trait variance is not the stationary within-subject variance"
         );
     }
 

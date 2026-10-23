@@ -4160,6 +4160,114 @@ pub fn refuse_asymptotic_time_independent_variance_as_asymptotic_effect(
     Err(PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect)
 }
 
+/// Exact scalar 2017-era commented `asymTRAITVAR`.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 1, p. 4; Table 2, p. 12
+/// `TRAITVAR` `φ_ξ`; §4.3, p. 9; JSS PDF re-opened 2026-08-30T21:10Z
+/// from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `dη = (Aη + ξ + Bz + Mx) dt + G dW`. At a stable
+/// equilibrium `A η_∞ + ξ = 0`, so `η_∞ = −A^{-1} ξ`. For scalar
+/// `a < 0` the process-mean variance from that random intercept is
+/// `trait / a²`. The 2017-era `summary.ctsemFit.R` comments
+/// `asymTRAITVAR <- solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT))`
+/// (not in the active `outlist`). Form `1 / a` first, then square,
+/// then multiply by `trait`. A zero trait is exactly zero even if
+/// `a ≥ 0`. `trait < 0` fails closed. `a ≥ 0` with a nonzero trait
+/// cannot hold a finite process-mean variance and fails closed.
+/// `trait / a²` is not Table 2 `TRAITVAR` `φ_ξ`, not §7.2
+/// `addedTIPREDVAR` `(B / a)² v`, and not `asymDIFFUSION`
+/// `-q / (2 a)`. The commented `if (asymptotes == TRUE) TRAITVAR <-
+/// DRIFT %&% TRAITVAR` is `a² · trait` and is the opposite
+/// transform, not this map. Section 4.3's extra `a = 0` trait
+/// process is already in process units and is not this random-`CINT`
+/// map. This is not a Kalman filter, not a matrix `expm`, and not
+/// ctsem estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any non-event
+/// clock, [`PsychometricError::AsymptoticTraitVarianceRequiresStableDrift`]
+/// when the drift is not strictly negative and the trait is nonzero,
+/// and [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, the trait variance is negative, or `1 / a` or the
+/// product overflows.
+pub fn recover_asymptotic_trait_variance(
+    trait_variance: f64,
+    log_rate: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !trait_variance.is_finite() || !log_rate.is_finite() || trait_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if trait_variance == 0.0 {
+        return Ok(0.0);
+    }
+    if log_rate >= 0.0 {
+        return Err(PsychometricError::AsymptoticTraitVarianceRequiresStableDrift);
+    }
+    let inverse = require_finite(1.0 / log_rate)?;
+    let squared = require_finite(inverse * inverse)?;
+    require_finite(squared * trait_variance)
+}
+
+/// Refuse treating 2017-era `asymTRAITVAR` as `TRAITVAR`.
+///
+/// `trait / a²` is process-mean variance from a random intercept
+/// `ξ`. Table 2 `TRAITVAR` `φ_ξ` is `Var(ξ)`. Those are not the
+/// same map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTraitVarianceIsNotTraitVariance`].
+pub fn refuse_asymptotic_trait_variance_as_trait_variance(
+    asymptotic_trait_variance: f64,
+    trait_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_trait_variance, trait_variance);
+    Err(PsychometricError::AsymptoticTraitVarianceIsNotTraitVariance)
+}
+
+/// Refuse treating 2017-era `asymTRAITVAR` as `addedTIPREDVAR`.
+///
+/// `trait / a²` is process-mean variance from a random intercept.
+/// `(B / a)² v` is between-subject variance accounted for by a
+/// time-independent predictor.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTraitVarianceIsNotAddedTimeIndependentVariance`].
+pub fn refuse_asymptotic_trait_variance_as_added_time_independent_variance(
+    asymptotic_trait_variance: f64,
+    added_predictor_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_trait_variance, added_predictor_variance);
+    Err(PsychometricError::AsymptoticTraitVarianceIsNotAddedTimeIndependentVariance)
+}
+
+/// Refuse treating 2017-era `asymTRAITVAR` as `asymDIFFUSION`.
+///
+/// `trait / a²` is process-mean variance from a random intercept.
+/// `asymDIFFUSION` is the stationary within-subject variance
+/// `-q / (2 a)`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::AsymptoticTraitVarianceIsNotStationaryWithinSubject`].
+pub fn refuse_asymptotic_trait_variance_as_stationary_within_subject(
+    asymptotic_trait_variance: f64,
+    stationary_variance: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (asymptotic_trait_variance, stationary_variance);
+    Err(PsychometricError::AsymptoticTraitVarianceIsNotStationaryWithinSubject)
+}
+
 /// Exact scalar Table 2 `asymCINT`.
 ///
 /// Driver, Oud, and Voelkle (2017, Table 2, p. 12; Eq. 3, p. 5;
@@ -6856,7 +6964,7 @@ mod tests {
         ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
         map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
-        recover_asymptotic_time_independent_predictor_variance,
+        recover_asymptotic_time_independent_predictor_variance, recover_asymptotic_trait_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
         recover_discrete_lag_from_log_rate, recover_discrete_lag_one,
         recover_discrete_lagged_latent_covariance, recover_discrete_latent_mean,
@@ -6915,6 +7023,9 @@ mod tests {
         refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
         refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
         refuse_asymptotic_time_independent_variance_as_trait_variance,
+        refuse_asymptotic_trait_variance_as_added_time_independent_variance,
+        refuse_asymptotic_trait_variance_as_stationary_within_subject,
+        refuse_asymptotic_trait_variance_as_trait_variance,
         refuse_continuous_intercept_as_discrete_mean_increment,
         refuse_continuous_intercept_as_initial_latent_mean,
         refuse_continuous_intercept_as_manifest_means, refuse_difference_quotient_as_local_rate,
@@ -10396,6 +10507,100 @@ mod tests {
                 -1e-200,
                 LagClock::EventTime
             ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    fn asymptotic_trait_variance_recovers_commented_2017_era_map() {
+        // 2017-era summary.ctsemFit.R comments
+        // asymTRAITVAR <- solve(DRIFT) %*% TRAITVAR %*% t(solve(DRIFT)).
+        // Scalar: trait / a². Form 1/a first, then square, then × trait.
+        // a = −0.5, trait = 1 → 4. Eq. 1 η_∞ = −ξ / a.
+        let log_rate = -0.5_f64;
+        let trait_variance = 1.0_f64;
+        let recovered =
+            recover_asymptotic_trait_variance(trait_variance, log_rate, LagClock::EventTime)
+                .expect("asymTRAITVAR");
+        assert!((recovered - 4.0).abs() < 1e-12);
+        let doubled =
+            recover_asymptotic_trait_variance(2.0, log_rate, LagClock::EventTime).expect("2trait");
+        assert!((doubled - 8.0).abs() < 1e-12);
+        assert_eq!(
+            recover_asymptotic_trait_variance(0.0, 0.0, LagClock::EventTime),
+            Ok(0.0)
+        );
+        assert_eq!(
+            recover_asymptotic_trait_variance(0.0, 0.1, LagClock::EventTime),
+            Ok(0.0)
+        );
+    }
+
+    #[test]
+    fn asymptotic_trait_variance_is_not_trait_added_or_stationary() {
+        let log_rate = -0.5_f64;
+        let recovered = recover_asymptotic_trait_variance(1.0, log_rate, LagClock::EventTime)
+            .expect("asymTRAITVAR");
+        let added = recover_asymptotic_time_independent_predictor_variance(
+            -0.225,
+            1.0,
+            log_rate,
+            LagClock::EventTime,
+        )
+        .expect("addedTIPREDVAR");
+        let stationary = recover_stationary_latent_variance(0.4, log_rate, LagClock::EventTime)
+            .expect("asymDIFFUSION");
+        let trait_plus = recover_trait_plus_state_latent_variance(1.0, 0.0).expect("TRAITVAR");
+        assert!((recovered - 1.0).abs() > 1e-3);
+        assert!((recovered - added).abs() > 1e-3);
+        assert!((recovered - stationary).abs() > 1e-3);
+        assert!((recovered - trait_plus).abs() > 1e-3);
+        assert_eq!(
+            refuse_asymptotic_trait_variance_as_trait_variance(recovered, trait_plus),
+            Err(PsychometricError::AsymptoticTraitVarianceIsNotTraitVariance)
+        );
+        assert_eq!(
+            refuse_asymptotic_trait_variance_as_added_time_independent_variance(recovered, added),
+            Err(PsychometricError::AsymptoticTraitVarianceIsNotAddedTimeIndependentVariance)
+        );
+        assert_eq!(
+            refuse_asymptotic_trait_variance_as_stationary_within_subject(recovered, stationary),
+            Err(PsychometricError::AsymptoticTraitVarianceIsNotStationaryWithinSubject)
+        );
+    }
+
+    #[test]
+    fn asymptotic_trait_variance_invalid_inputs_fail_closed() {
+        assert_eq!(
+            recover_asymptotic_trait_variance(1.0, -0.5, LagClock::SystemTime),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_asymptotic_trait_variance(1.0, 0.1, LagClock::EventTime),
+            Err(PsychometricError::AsymptoticTraitVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotic_trait_variance(1.0, 0.0, LagClock::EventTime),
+            Err(PsychometricError::AsymptoticTraitVarianceRequiresStableDrift)
+        );
+        assert_eq!(
+            recover_asymptotic_trait_variance(-1.0, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_trait_variance(1.0, -1e-308, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_trait_variance(1e308, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_trait_variance(f64::NAN, -0.5, LagClock::EventTime),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_asymptotic_trait_variance(1.0, f64::NAN, LagClock::EventTime),
             Err(PsychometricError::InvalidNumericInput)
         );
     }

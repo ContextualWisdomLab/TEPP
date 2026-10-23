@@ -4,7 +4,7 @@ use psychometric_core::{
     ClusteredEventScore, ClusteredScore, IndicatorKind, LagClock, LaggedWithinResidual,
     ordinary_least_squares_slope, posterior_draw_point_estimate_mean,
     recover_asymptotic_continuous_intercept, recover_asymptotic_time_independent_predictor_effect,
-    recover_asymptotic_time_independent_predictor_variance,
+    recover_asymptotic_time_independent_predictor_variance, recover_asymptotic_trait_variance,
     recover_cluster_mean_within_between_slopes, recover_discrete_constant_predictor_effect,
     recover_discrete_continuous_intercept_effect, recover_discrete_lagged_latent_covariance,
     recover_discrete_latent_mean, recover_discrete_latent_mean_with_extra_process,
@@ -58,6 +58,9 @@ use psychometric_core::{
     refuse_asymptotic_time_independent_variance_as_asymptotic_effect,
     refuse_asymptotic_time_independent_variance_as_stationary_within_subject,
     refuse_asymptotic_time_independent_variance_as_trait_variance,
+    refuse_asymptotic_trait_variance_as_added_time_independent_variance,
+    refuse_asymptotic_trait_variance_as_stationary_within_subject,
+    refuse_asymptotic_trait_variance_as_trait_variance,
     refuse_continuous_intercept_as_discrete_mean_increment,
     refuse_continuous_intercept_as_initial_latent_mean,
     refuse_continuous_intercept_as_manifest_means,
@@ -2258,6 +2261,55 @@ fn asymptotic_time_independent_variance_is_not_trait_stationary_or_mean_effect()
         refuse_asymptotic_time_independent_variance_as_asymptotic_effect(recovered, mean_effect),
         Err(
             psychometric_core::PsychometricError::AsymptoticTimeIndependentVarianceIsNotAsymptoticEffect
+        )
+    );
+}
+
+#[test]
+fn asymptotic_trait_variance_is_not_trait_added_or_stationary() {
+    let log_rate = -0.5_f64;
+    let recovered = recover_asymptotic_trait_variance(1.0, log_rate, LagClock::EventTime)
+        .expect("asymTRAITVAR");
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        -0.225,
+        1.0,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("addedTIPREDVAR");
+    let stationary = recover_stationary_latent_variance(0.4, log_rate, LagClock::EventTime)
+        .expect("asymDIFFUSION");
+    let trait_plus = recover_trait_plus_state_latent_variance(1.0, 0.0).expect("TRAITVAR");
+    assert!(
+        (recovered - 4.0).abs() < 1e-12,
+        "2017-era commented asymTRAITVAR is trait / a²"
+    );
+    assert!(
+        (recovered - 1.0).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): trait / a² is not TRAITVAR φ_ξ"
+    );
+    assert!(
+        (recovered - added).abs() > 1e-3,
+        "Driver et al. (2017, §7.2): trait / a² is not addedTIPREDVAR"
+    );
+    assert!(
+        (recovered - stationary).abs() > 1e-3,
+        "Driver et al. (2017, p. 16): trait / a² is not asymDIFFUSION"
+    );
+    assert_eq!(
+        refuse_asymptotic_trait_variance_as_trait_variance(recovered, trait_plus),
+        Err(psychometric_core::PsychometricError::AsymptoticTraitVarianceIsNotTraitVariance)
+    );
+    assert_eq!(
+        refuse_asymptotic_trait_variance_as_added_time_independent_variance(recovered, added),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTraitVarianceIsNotAddedTimeIndependentVariance
+        )
+    );
+    assert_eq!(
+        refuse_asymptotic_trait_variance_as_stationary_within_subject(recovered, stationary),
+        Err(
+            psychometric_core::PsychometricError::AsymptoticTraitVarianceIsNotStationaryWithinSubject
         )
     );
 }
