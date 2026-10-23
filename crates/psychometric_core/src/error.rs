@@ -710,6 +710,35 @@ pub enum PsychometricError {
     /// `MANIFESTVARstd`. `λ² Var(η) + θ` is `Var(y)`, not the
     /// correlation form of `Θ`.
     ObservedVarianceIsNotStandardisedManifestVariance,
+    /// Driver Table 3 / p. 16 `T0TIPREDEFFECTstd` was requested with
+    /// a non-positive free first-occasion variance. Footnote 4
+    /// standardises the affected first-occasion latent using only
+    /// strictly positive free `T0VAR`.
+    StandardisedInitialTimeIndependentEffectRequiresPositiveInitialLatentVariance,
+    /// Driver Table 3 / p. 16 `T0TIPREDEFFECTstd` was requested with
+    /// a non-positive predictor variance. Footnote 4 standardises the
+    /// affecting predictor using only strictly positive `TIPREDVAR`.
+    StandardisedInitialTimeIndependentEffectRequiresPositivePredictorVariance,
+    /// Driver Table 3 unstandardised `T0TIPREDEFFECT` `t0_b` was
+    /// treated as p. 16 `T0TIPREDEFFECTstd`. Unstandardised `t0_b`
+    /// is defined for a zero coefficient or zero predictor variance;
+    /// standardised `T0TIPREDEFFECT` is not.
+    UnstandardisedInitialTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect,
+    /// Driver p. 16 `TIPREDEFFECTstd`
+    /// `B · √v / √(-q / (2 a))` was treated as Table 3 / p. 16
+    /// `T0TIPREDEFFECTstd`. The continuous map uses `asymDIFFUSION`;
+    /// the first-occasion map uses free `T0VAR`.
+    StandardisedContinuousTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect,
+    /// Driver p. 16 `asymTIPREDEFFECTstd`
+    /// `(-B / a) · √v / √(-q / (2 a))` was treated as Table 3 /
+    /// p. 16 `T0TIPREDEFFECTstd`. The asymptotic map is the total
+    /// change, not the first-occasion coefficient.
+    StandardisedAsymptoticTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect,
+    /// Driver §7.1 trait-contaminated first-occasion TI effect
+    /// `t0_b · √v / √(trait + p_0 + added)` was treated as Table 3 /
+    /// p. 16 `T0TIPREDEFFECTstd`. Footnote 4 uses only free `T0VAR`,
+    /// not `TRAITVAR`.
+    TraitContaminatedInitialTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect,
 }
 
 impl fmt::Display for PsychometricError {
@@ -1234,6 +1263,24 @@ impl fmt::Display for PsychometricError {
             }
             Self::ObservedVarianceIsNotStandardisedManifestVariance => {
                 "observed-indicator variance is not standardised measurement-error variance"
+            }
+            Self::StandardisedInitialTimeIndependentEffectRequiresPositiveInitialLatentVariance => {
+                "standardised initial time-independent predictor effect requires strictly positive initial latent variance"
+            }
+            Self::StandardisedInitialTimeIndependentEffectRequiresPositivePredictorVariance => {
+                "standardised initial time-independent predictor effect requires strictly positive predictor variance"
+            }
+            Self::UnstandardisedInitialTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect => {
+                "unstandardised initial time-independent predictor effect is not standardised initial time-independent predictor effect"
+            }
+            Self::StandardisedContinuousTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect => {
+                "standardised continuous time-independent predictor effect is not standardised initial time-independent predictor effect"
+            }
+            Self::StandardisedAsymptoticTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect => {
+                "standardised asymptotic time-independent predictor effect is not standardised initial time-independent predictor effect"
+            }
+            Self::TraitContaminatedInitialTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect => {
+                "trait-contaminated initial time-independent predictor effect is not standardised initial time-independent predictor effect"
             }
         };
         formatter.write_str(message)
@@ -2071,6 +2118,40 @@ mod tests {
         assert_eq!(
             PsychometricError::MeasurementErrorIsNotStandardisedManifestTraitVariance.to_string(),
             "measurement error is not standardised manifest-trait variance"
+        );
+    }
+
+    #[test]
+    fn standardised_initial_time_independent_effect_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::StandardisedInitialTimeIndependentEffectRequiresPositiveInitialLatentVariance
+                .to_string(),
+            "standardised initial time-independent predictor effect requires strictly positive initial latent variance"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedInitialTimeIndependentEffectRequiresPositivePredictorVariance
+                .to_string(),
+            "standardised initial time-independent predictor effect requires strictly positive predictor variance"
+        );
+        assert_eq!(
+            PsychometricError::UnstandardisedInitialTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect
+                .to_string(),
+            "unstandardised initial time-independent predictor effect is not standardised initial time-independent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedContinuousTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect
+                .to_string(),
+            "standardised continuous time-independent predictor effect is not standardised initial time-independent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::StandardisedAsymptoticTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect
+                .to_string(),
+            "standardised asymptotic time-independent predictor effect is not standardised initial time-independent predictor effect"
+        );
+        assert_eq!(
+            PsychometricError::TraitContaminatedInitialTimeIndependentEffectIsNotStandardisedInitialTimeIndependentEffect
+                .to_string(),
+            "trait-contaminated initial time-independent predictor effect is not standardised initial time-independent predictor effect"
         );
     }
 }
