@@ -1,0 +1,1 @@
+- `tepp_api` loopback `GET /v1/project-histories` enumerates accepted LineageWeave project-history projections on `tepp-loopback` (ADR 0028). Metric-free `temporal_association_only` identities only. `tepp.scientific_acceptance.v1` never appears. Does not infer causality. Not project-history CLI, not analysis-run collection GET, not persistence.

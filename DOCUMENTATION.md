@@ -11,6 +11,8 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Architecture | [`ARCHITECTURE.md`](ARCHITECTURE.md) |
 | Modular/API integration contract | [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md) |
 | naruon modular consumer contract | [`docs/connectors/naruon-artifact-consumer.md`](docs/connectors/naruon-artifact-consumer.md) |
+| Project-history collection GET doctoring | [`docs/research/project-history-collection-http.md`](docs/research/project-history-collection-http.md) |
+| Project-history collection CLI doctoring | [`docs/research/project-history-collection-cli.md`](docs/research/project-history-collection-cli.md) |
 | contextual-orchestrator interpretation port | [`docs/connectors/contextual-orchestrator-interpretation-port.md`](docs/connectors/contextual-orchestrator-interpretation-port.md) |
 | Orchestrator live HTTP doctoring | [`docs/research/orchestrator-live-http.md`](docs/research/orchestrator-live-http.md) |
 | UML/runtime/scientific flows | [`docs/UML.md`](docs/UML.md) |

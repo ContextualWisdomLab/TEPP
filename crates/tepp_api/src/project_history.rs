@@ -29,6 +29,9 @@ pub const DEFAULT_PROJECT_HISTORY_BYTE_LIMIT: usize = 256 * 1024;
 /// Maximum event count accepted in one project-history request.
 pub const DEFAULT_PROJECT_HISTORY_EVENT_LIMIT: usize = 128;
 
+/// Maximum opaque idempotency-key size shared by creation and collection cursors.
+pub const PROJECT_HISTORY_IDEMPOTENCY_KEY_MAX_LEN: usize = 256;
+
 /// Explicit event evidence supplied by an authorized modular consumer.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -162,7 +165,8 @@ impl ProjectHistoryRequest {
 
     fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(self.contract_version, PROJECT_HISTORY_CONTRACT_VERSION)?;
-        validate_bounded_text(&self.idempotency_key, 256)?;
+        let maximum_key_len = PROJECT_HISTORY_IDEMPOTENCY_KEY_MAX_LEN;
+        validate_bounded_text(&self.idempotency_key, maximum_key_len)?;
         validate_bounded_text(&self.tenant_workspace_id, 256)?;
         validate_bounded_text(&self.project_key, 256)?;
         validate_bounded_text(&self.project_name, 512)?;
