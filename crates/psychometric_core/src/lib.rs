@@ -261,6 +261,22 @@
 //! correlation; zero `MANIFESTTRAITVAR` fails closed; a non-event
 //! clock fails closed; `MANIFESTTRAITVAR` does not require `a < 0`;
 //! JSS PDF re-opened 2026-08-27T14:20Z),
+//! recovers the Driver p. 16 `TIPREDEFFECTstd` as
+//! `B · √v / √p` after strictly positive `asymDIFFUSION`
+//! `p = −q / (2 a)` and strictly positive `TIPREDVAR` (footnote 4
+//! uses only the relevant within-subject variance, not total
+//! `trait + p + added`; 2017-era `summary.ctsemFit.R` forms the
+//! standardiser `√TIPREDVAR / √asymDIFFUSION` and uses it for
+//! `asymTIPREDEFFECTstd`; that source does not form a
+//! `TIPREDEFFECTstd` matrix; unstandardised `B` is defined for a
+//! zero coefficient and for zero predictor variance and is not that
+//! map; `(-B / a) · √v / √p` is the `Δt → ∞` map and is not that
+//! continuous coefficient; `A^{-1}[e^{A Δt} − I] B · √v / √p` is
+//! the finite-interval map and is not that continuous
+//! standardisation; `B · √v / √(trait + p + added)` uses the total
+//! and is not that map when `TRAITVAR` is nonzero; zero `q` fails
+//! closed; zero `v` fails closed; a non-event clock fails closed;
+//! `a ≥ 0` fails closed; JSS PDF re-opened 2026-08-29T14:20Z),
 //! and refuses
 //! latent-mean comparison below strong invariance.
 
@@ -418,6 +434,8 @@ pub use event_time::recover_standardised_manifest_trait_variance;
 /// Exact scalar p. 16 `MANIFESTVARstd` `θ/...` after strictly positive `MANIFESTVAR`.
 pub use event_time::recover_standardised_manifest_variance;
 
+/// Exact scalar p. 16 `TIPREDEFFECTstd` `B · √v / √p` after strictly positive `asymDIFFUSION` and `TIPREDVAR`.
+pub use event_time::recover_standardised_time_independent_predictor_effect;
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
 /// Exact scalar p. 16 stationary `T0MEANS` `-κ / a + −B z / a`.
@@ -466,6 +484,8 @@ pub use event_time::refuse_asymptotic_continuous_intercept_observed_mean_as_stat
 pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_continuous_intercept;
 /// Refuse treating p. 16 `asymCINTstd` as `discreteCINTstd`.
 pub use event_time::refuse_asymptotic_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept;
+/// Refuse treating p. 16 `asymTIPREDEFFECTstd` as `TIPREDEFFECTstd`.
+pub use event_time::refuse_asymptotic_standardised_time_independent_effect_as_standardised_time_independent_effect;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `TIPREDEFFECT` `B`.
 pub use event_time::refuse_asymptotic_time_independent_effect_as_coefficient;
 /// Refuse treating §7.2 `asymTIPREDEFFECT` as `CINT`.
@@ -492,6 +512,8 @@ pub use event_time::refuse_difference_quotient_as_local_rate;
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating the finite-interval standardised TI effect as p. 16 `TIPREDEFFECTstd`.
+pub use event_time::refuse_discrete_standardised_time_independent_effect_as_standardised_time_independent_effect;
 /// Refuse treating evolved `τ + λ μ_t` as the after-t0 extra-process observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the extra-process observed mean.
@@ -715,6 +737,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating `B · √v / √(trait + p + added)` as p. 16 `TIPREDEFFECTstd`.
+pub use event_time::refuse_trait_contaminated_time_independent_effect_as_standardised_time_independent_effect;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
@@ -744,6 +768,8 @@ pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardise
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
 
+/// Refuse treating unstandardised `TIPREDEFFECT` as p. 16 `TIPREDEFFECTstd`.
+pub use event_time::refuse_unstandardised_time_independent_effect_as_standardised_time_independent_effect;
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
 /// Refuse treating `μ_0 / √asymDIFFUSION` as `T0MEANSstd`.
