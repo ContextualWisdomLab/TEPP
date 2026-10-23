@@ -2630,6 +2630,202 @@ pub fn refuse_discrete_standardised_continuous_intercept_as_standardised_asympto
     )
 }
 
+/// Exact scalar Table 3 / p. 16 `T0TDPREDEFFECTstd` after strictly
+/// positive free `T0VAR` and strictly positive time-dependent
+/// predictor variance.
+///
+/// Driver, Oud, and Voelkle (2017, Table 3, p. 13; Table 2, p. 12;
+/// p. 16; footnote 4; Eq. 3, p. 5; 2017-era ctsem
+/// `summary.ctsemFit.R`; JSS PDF re-opened 2026-08-30T00:17Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// name `T0TDPREDEFFECT` the `n.latent × n.TDpred` effect of
+/// time-dependent predictors on latents at `T0`. Page 16 prints
+/// standardised matrices with the suffix `std` when appropriate.
+/// The printed example on p. 16 is `discreteDRIFTstd`, not
+/// `T0TDPREDEFFECTstd`. Footnote 4: standardisations use only the
+/// relevant variance, not the total. The affecting variance is
+/// Table 2 `TDPREDVAR` `v`. The affected variance is free
+/// first-occasion `T0VAR` `p_0`, not within-subject
+/// `asymDIFFUSION` `-q / (2 a)`, because Table 3 is the first
+/// occasion, not the process dynamics. The 2017-era
+/// `summary.ctsemFit.R` forms `T0TIPREDEFFECTstd` when
+/// `verbose = TRUE` as `T0TIPREDEFFECT * standardiser` after
+/// `standardiser <- rep(sqrt(diag(TIPREDVAR)), each = n.latent) /
+/// rep(diag(sqrt(T0VAR)), times = n.TIpred)`. That file does not
+/// form `T0TDPREDEFFECT` or `T0TDPREDEFFECTstd`. The `n.TDpred`
+/// section forms unstandardised `TDPREDEFFECT` only and comments
+/// out `TDPREDVAR` and `TDPREDVARstd`. The scalar analog of that
+/// `T0TIPREDEFFECTstd` formation using Table 3 `T0TDPREDEFFECT`
+/// and Table 2 `TDPREDVAR` is `t0_m · √v / √p_0`. Form strictly
+/// positive `p_0` first, then strictly positive `v`, then the
+/// first-occasion coefficient, then the SD ratio. Form the SD
+/// ratio before multiplying by the coefficient so that a finite
+/// `t0_m · √v / √p_0` is not lost to an overflowing `t0_m √v`. A
+/// zero coefficient after strictly positive variances is exactly
+/// zero even when `√v / √p_0` overflows (`0 · Inf` is NaN). When
+/// that ratio overflows, form `(t0_m / √p_0) √v` so a tiny
+/// coefficient is not lost to `Inf`. Unstandardised `t0_m` is
+/// defined for a zero coefficient and for zero predictor variance;
+/// standardised `T0TDPREDEFFECT` is not. Zero `p_0` or zero `v`
+/// has no positive SD and fails closed. `T0` is an event-time
+/// occasion, so a non-event clock fails closed. Free `T0VAR` does
+/// not require stable `a < 0`; this map has no log-rate argument.
+/// The continuous standardisation `m · √v / √(-q / (2 a))` uses
+/// `asymDIFFUSION` and is not this first-occasion map. Table 3
+/// `T0TIPREDEFFECTstd` `t0_b · √v / √p_0` is a different named
+/// matrix even when `t0_m = t0_b`. Section 7.1 warns that omitting
+/// trait variance confounds between- and within-person information.
+/// `t0_m · √v / √(trait + p_0 + added)` uses the total, not free
+/// `T0VAR`, and is not this map when `TRAITVAR` is nonzero.
+/// `TRAITVAR` is not the standardisation variance. This is not a
+/// Kalman filter, not a matrix `expm`, not DSEM, and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Returns [`PsychometricError::EventTimeRequired`] for any
+/// non-event clock,
+/// [`PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositiveInitialLatentVariance`]
+/// when `T0VAR` is zero,
+/// [`PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositivePredictorVariance`]
+/// when predictor variance is zero, and
+/// [`PsychometricError::InvalidNumericInput`] when an input is
+/// non-finite, a variance is negative, or the product overflows.
+pub fn recover_standardised_initial_time_dependent_predictor_effect(
+    initial_time_dependent_effect: f64,
+    predictor_variance: f64,
+    initial_latent_variance: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !initial_latent_variance.is_finite() || initial_latent_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_latent_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositiveInitialLatentVariance,
+        );
+    }
+    if !predictor_variance.is_finite() || predictor_variance < 0.0 {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if predictor_variance == 0.0 {
+        return Err(
+            PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositivePredictorVariance,
+        );
+    }
+    let coefficient = require_finite(initial_time_dependent_effect)?;
+    // A zero coefficient with strictly positive SDs is exactly zero
+    // even when `√v / √p_0` overflows (`0 · Inf` is NaN).
+    if coefficient == 0.0 {
+        return Ok(0.0);
+    }
+    let process_sd = initial_latent_variance.sqrt();
+    let predictor_sd = predictor_variance.sqrt();
+    // Form the SD ratio first. `t0_m √v` overflows at large `|t0_m|`
+    // and large `v` even when `t0_m √v / √p_0` is a binary64 number.
+    let ratio = predictor_sd / process_sd;
+    if ratio.is_finite() {
+        return require_finite(coefficient * ratio);
+    }
+    // Ratio overflowed. `(t0_m / √p_0) √v` keeps a finite std when
+    // the coefficient is tiny and `p_0` is subnormal.
+    let scaled_coefficient = coefficient / process_sd;
+    if scaled_coefficient.is_finite() {
+        return require_finite(scaled_coefficient * predictor_sd);
+    }
+    Err(PsychometricError::InvalidNumericInput)
+}
+
+/// Refuse treating unstandardised `T0TDPREDEFFECT` as Table 3 /
+/// p. 16 `T0TDPREDEFFECTstd`.
+///
+/// `t0_m` is defined for a zero coefficient and for zero predictor
+/// variance. Footnote 4 `T0TDPREDEFFECTstd` requires strictly
+/// positive free `T0VAR` and strictly positive `v`. Equal numbers
+/// when `v = p_0` are still distinct named quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::UnstandardisedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect`].
+pub fn refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+    unstandardised_initial_effect: f64,
+    standardised_initial_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (unstandardised_initial_effect, standardised_initial_effect);
+    Err(PsychometricError::UnstandardisedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect)
+}
+
+/// Refuse treating p. 16 `TDPREDEFFECTstd` as Table 3 / p. 16
+/// `T0TDPREDEFFECTstd`.
+///
+/// `m · √v / √(-q / (2 a))` standardises the continuous Dirac
+/// coefficient against `asymDIFFUSION`. Footnote 4
+/// `T0TDPREDEFFECTstd` is `t0_m · √v / √p_0` against free
+/// first-occasion `T0VAR`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedContinuousTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect`].
+pub fn refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+    standardised_continuous_effect: f64,
+    standardised_initial_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (standardised_continuous_effect, standardised_initial_effect);
+    Err(PsychometricError::StandardisedContinuousTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect)
+}
+
+/// Refuse treating Table 3 / p. 16 `T0TIPREDEFFECTstd` as Table 3 /
+/// p. 16 `T0TDPREDEFFECTstd`.
+///
+/// `t0_b · √v / √p_0` standardises a time-independent first-occasion
+/// coefficient. `t0_m · √v / √p_0` standardises a time-dependent
+/// first-occasion coefficient. Equal numbers when `t0_m = t0_b`
+/// remain distinct named quantities. This crate does not currently
+/// export `T0TIPREDEFFECTstd`; the refuse still names that quantity.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::StandardisedInitialTimeIndependentEffectIsNotStandardisedInitialTimeDependentEffect`].
+pub fn refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect(
+    standardised_initial_time_independent_effect: f64,
+    standardised_initial_time_dependent_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        standardised_initial_time_independent_effect,
+        standardised_initial_time_dependent_effect,
+    );
+    Err(PsychometricError::StandardisedInitialTimeIndependentEffectIsNotStandardisedInitialTimeDependentEffect)
+}
+
+/// Refuse treating Driver §7.1 trait-contaminated first-occasion
+/// time-dependent predictor effect as Table 3 / p. 16
+/// `T0TDPREDEFFECTstd`.
+///
+/// `t0_m · √v / √(trait + p_0 + added)` mixes between-subject
+/// `TRAITVAR` into the affected SD. Footnote 4 standardises using
+/// only free `T0VAR`.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect`].
+pub fn refuse_trait_contaminated_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+    trait_contaminated_initial_effect: f64,
+    standardised_initial_effect: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        trait_contaminated_initial_effect,
+        standardised_initial_effect,
+    );
+    Err(PsychometricError::TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect)
+}
+
 /// Exact scalar discrete latent mean from Driver Equation 3.
 ///
 /// Driver, Oud, and Voelkle (2017, Eq. 3, p. 4; Table 2, p. 12; JSS
@@ -6853,8 +7049,8 @@ pub(crate) fn fit_scalar_log_rate(pairs: &[(f64, f64, f64)]) -> Result<f64, Psyc
 #[cfg(test)]
 mod tests {
     use super::{
-        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual, fit_scalar_log_rate,
-        map_discrete_lag_across_event_intervals, recover_asymptotic_continuous_intercept,
+        fit_scalar_log_rate, map_discrete_lag_across_event_intervals,
+        recover_asymptotic_continuous_intercept,
         recover_asymptotic_time_independent_predictor_effect,
         recover_asymptotic_time_independent_predictor_variance,
         recover_discrete_constant_predictor_effect, recover_discrete_continuous_intercept_effect,
@@ -6890,6 +7086,7 @@ mod tests {
         recover_standardised_asymptotic_diffusion, recover_standardised_continuous_intercept,
         recover_standardised_discrete_continuous_intercept,
         recover_standardised_initial_latent_mean, recover_standardised_initial_latent_variance,
+        recover_standardised_initial_time_dependent_predictor_effect,
         recover_standardised_manifest_mean, recover_standardised_manifest_trait_variance,
         recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
         recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
@@ -6983,10 +7180,12 @@ mod tests {
         refuse_standardised_continuous_diffusion_as_standardised_asymptotic_diffusion,
         refuse_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
         refuse_standardised_continuous_intercept_as_standardised_discrete_continuous_intercept,
+        refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_standardised_initial_latent_mean_as_standardised_initial_latent_variance,
         refuse_standardised_initial_latent_variance_as_standardised_asymptotic_diffusion,
         refuse_standardised_initial_latent_variance_as_standardised_initial_latent_mean,
         refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
+        refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect,
         refuse_standardised_manifest_variance_as_standardised_manifest_mean,
         refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
         refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
@@ -7026,6 +7225,7 @@ mod tests {
         refuse_time_independent_effect_as_time_varying_discrete_effect,
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+        refuse_trait_contaminated_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
         refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
@@ -7036,10 +7236,12 @@ mod tests {
         refuse_unstandardised_discrete_continuous_intercept_as_standardised_discrete_continuous_intercept,
         refuse_unstandardised_initial_latent_mean_as_standardised_initial_latent_mean,
         refuse_unstandardised_initial_latent_variance_as_standardised_initial_latent_variance,
+        refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect,
         refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
         refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
         refuse_unstandardised_trait_variance_as_standardised_trait_variance,
         refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
+        ClusteredEventScore, EventOccasion, LagClock, LaggedWithinResidual,
     };
     use crate::error::PsychometricError;
 
@@ -11147,8 +11349,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_initial_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // constrain first-occasion variances to the model-predicted
         // variance. Equation 5 maps Var(y_0) = λ² of that variance
@@ -11723,8 +11925,8 @@ mod tests {
     }
 
     #[test]
-    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_lagged_observed_covariance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // lagged observed covariance of stationary T0VAR is
         // λ²(trait + e^{a Δt}(−q / (2 a)) + (B / a)² v) + ψ.
@@ -12300,8 +12502,8 @@ mod tests {
 
     #[test]
     #[allow(clippy::too_many_lines)]
-    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three()
-     {
+    fn stationary_later_observed_variance_recovers_driver_equation_five_of_section_four_point_three(
+    ) {
         // Driver et al. (2017, §4.3, pp. 9–10; Eq. 5, p. 5)
         // later-occasion observed variance of stationary T0VAR is
         // λ²(trait + e^{2 a Δt}(−q / (2 a)) + Q_Δt + (B / a)² v) + θ + ψ.
@@ -14455,8 +14657,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_recovers_driver_equation_five(
+    ) {
         let loading = 2.0_f64;
         let drift = -0.5_f64;
         let delta = 2.0_f64;
@@ -14606,8 +14808,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_independent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let loading = 2.0_f64;
         let recovered = recover_discrete_observed_mean_with_initial_time_independent_predictor(
             loading,
@@ -15225,8 +15427,8 @@ mod tests {
     }
 
     #[test]
-    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow()
-     {
+    fn discrete_observed_mean_with_initial_time_dependent_predictor_refuses_evolved_mean_and_overflow(
+    ) {
         let recovered = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
             2.0,
             1.0,
@@ -16351,6 +16553,286 @@ mod tests {
                 LagClock::EventTime
             ),
             Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn standardised_initial_time_dependent_effect_recovers_driver_table_three_after_positive_variances(
+    ) {
+        // Driver et al. (2017, Table 3 T0TDPREDEFFECTstd; p. 16; footnote 4):
+        // form strictly positive free T0VAR p_0 and strictly positive v,
+        // then t0_m · √v / √p_0. Affected variance is p_0, not
+        // asymDIFFUSION. This map has no log-rate argument. 2017-era
+        // summary.ctsemFit.R does not form T0TDPREDEFFECTstd; this is
+        // the scalar analog of T0TIPREDEFFECTstd using TDPREDVAR.
+        let initial_variance = 1.6_f64;
+        let coefficient = 0.3_f64;
+        let predictor_variance = 1.0_f64;
+        let recovered = recover_standardised_initial_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            initial_variance,
+            LagClock::EventTime,
+        )
+        .expect("T0TDPREDEFFECTstd");
+        let expected = coefficient * predictor_variance.sqrt() / initial_variance.sqrt();
+        assert!((recovered - expected).abs() < 1e-15);
+        let larger_p0 = recover_standardised_initial_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            6.4,
+            LagClock::EventTime,
+        )
+        .expect("T0TDPREDEFFECTstd p_0=6.4");
+        assert!((larger_p0 - recovered).abs() > 1e-3);
+        assert!(larger_p0.abs() < recovered.abs());
+        // Inline the unpublished TDPREDEFFECTstd / T0TIPREDEFFECTstd
+        // scalars. Those maps are not exported on this main.
+        let diffusion = 0.4_f64;
+        let log_rate = -0.5_f64;
+        let within = -diffusion / (2.0 * log_rate);
+        let continuous = coefficient * predictor_variance.sqrt() / within.sqrt();
+        assert!((continuous - recovered).abs() > 1e-3);
+        let initial_time_independent =
+            coefficient * predictor_variance.sqrt() / initial_variance.sqrt();
+        assert!((initial_time_independent - recovered).abs() < 1e-15);
+        let trait_variance = 1.0_f64;
+        let total = recover_trait_plus_state_latent_variance(trait_variance, initial_variance)
+            .expect("trait+state var");
+        let contaminated = coefficient * predictor_variance.sqrt() / total.sqrt();
+        assert!((contaminated - recovered).abs() > 1e-3);
+        let added = coefficient * coefficient * predictor_variance;
+        let total_with_added = total + added;
+        let contaminated_with_added =
+            coefficient * predictor_variance.sqrt() / total_with_added.sqrt();
+        assert!((contaminated_with_added - recovered).abs() > 1e-3);
+        let zero = recover_standardised_initial_time_dependent_predictor_effect(
+            0.0,
+            predictor_variance,
+            initial_variance,
+            LagClock::EventTime,
+        )
+        .expect("zero coefficient");
+        assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+        let negative = recover_standardised_initial_time_dependent_predictor_effect(
+            -coefficient,
+            predictor_variance,
+            initial_variance,
+            LagClock::EventTime,
+        )
+        .expect("signed coefficient");
+        assert!((negative + recovered).abs() < 1e-15);
+        let equal_ratio = recover_standardised_initial_time_dependent_predictor_effect(
+            coefficient,
+            initial_variance,
+            initial_variance,
+            LagClock::EventTime,
+        )
+        .expect("v = p_0");
+        assert!((equal_ratio - coefficient).abs() < 1e-15);
+        let overflow_safe = recover_standardised_initial_time_dependent_predictor_effect(
+            1e300,
+            1e40,
+            1e40,
+            LagClock::EventTime,
+        )
+        .expect("SD ratio first stays finite");
+        assert!((overflow_safe - 1e300).abs() / 1e300 < 1e-15);
+        let min_subnormal = f64::from_bits(1);
+        let zero_extreme = recover_standardised_initial_time_dependent_predictor_effect(
+            0.0,
+            f64::MAX,
+            min_subnormal,
+            LagClock::EventTime,
+        )
+        .expect("zero coefficient after extreme positive SDs");
+        assert_eq!(zero_extreme.to_bits(), 0.0_f64.to_bits());
+        let tiny_extreme = recover_standardised_initial_time_dependent_predictor_effect(
+            1e-300,
+            f64::MAX,
+            min_subnormal,
+            LagClock::EventTime,
+        )
+        .expect("tiny coefficient after ratio overflow");
+        let tiny_expected =
+            (1e-300_f64.ln() + 0.5 * f64::MAX.ln() - 0.5 * min_subnormal.ln()).exp();
+        assert!(tiny_extreme.is_finite());
+        assert!((tiny_extreme - tiny_expected).abs() / tiny_expected < 1e-12);
+        assert_eq!(
+            refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+                coefficient,
+                recovered
+            ),
+            Err(
+                PsychometricError::UnstandardisedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_unstandardised_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+                coefficient,
+                equal_ratio
+            ),
+            Err(
+                PsychometricError::UnstandardisedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_standardised_continuous_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+                continuous,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedContinuousTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_standardised_initial_time_independent_effect_as_standardised_initial_time_dependent_effect(
+                initial_time_independent,
+                recovered
+            ),
+            Err(
+                PsychometricError::StandardisedInitialTimeIndependentEffectIsNotStandardisedInitialTimeDependentEffect
+            )
+        );
+        assert_eq!(
+            refuse_trait_contaminated_initial_time_dependent_effect_as_standardised_initial_time_dependent_effect(
+                contaminated,
+                recovered
+            ),
+            Err(
+                PsychometricError::TraitContaminatedInitialTimeDependentEffectIsNotStandardisedInitialTimeDependentEffect
+            )
+        );
+    }
+
+    #[allow(clippy::too_many_lines)]
+    #[test]
+    fn standardised_initial_time_dependent_effect_fails_closed_when_unstandardised_is_defined() {
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.3,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositiveInitialLatentVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.3,
+                0.0,
+                1.6,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositivePredictorVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.3,
+                1.0,
+                1.6,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.3,
+                -0.1,
+                1.6,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.3,
+                1.0,
+                -0.1,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.3,
+                f64::NAN,
+                1.6,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.3,
+                1.0,
+                f64::NAN,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                f64::NAN,
+                1.0,
+                1.6,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                4.0,
+                1e308,
+                1e-308,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                1.0,
+                f64::MAX,
+                f64::from_bits(1),
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                f64::MAX,
+                f64::MAX,
+                f64::from_bits(1),
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.0,
+                0.0,
+                1.6,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositivePredictorVariance
+            )
+        );
+        assert_eq!(
+            recover_standardised_initial_time_dependent_predictor_effect(
+                0.0,
+                1.0,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(
+                PsychometricError::StandardisedInitialTimeDependentEffectRequiresPositiveInitialLatentVariance
+            )
         );
     }
 }
