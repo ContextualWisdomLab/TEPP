@@ -61,7 +61,18 @@
 //! observed mean; `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not
 //! that observed mean; `τ + λ(μ_t + m x)` is not that observed mean;
 //! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
-//! `u ≠ t0`), recovers the Driver Table 3 first-occasion
+//! `u ≠ t0`), recovers the Driver Eq. 5 of 2017-era
+//! `addedT0TIPREDVAR` composed with Table 2 `MANIFESTVAR` as
+//! `λ² t0_b² v + θ`
+//! (JSS PDF re-opened 2026-08-30T19:15Z; 2017-era
+//! `summary.ctsemFit.R` forms the latent extra first; form `t0_b² v`
+//! first, then `recover_manifest_observed_variance(λ, extra, θ)`;
+//! a zero coefficient or zero predictor variance is exactly `θ`;
+//! a zero loading is exactly `θ`; free `T0TIPREDEFFECT` does not
+//! require `a < 0`; `TRAITVAR` and `TRAITVARstd` are not this
+//! composition; `(B / a)² v` is `addedTIPREDVAR` and is not this
+//! first-occasion extra; free `T0VAR` is not this extra;
+//! `MANIFESTVAR` `θ` is not this composition), recovers the Driver Table 3 first-occasion
 //! `T0TDPREDEFFECT` shift `t0_m x0` and its Eq. 3 first-summand carry
 //! `e^{A Δt} t0_m x0` (`T0TDPREDEFFECT` is not `TDPREDEFFECT` `M`;
 //! `t0_m x0` is not `M x`; `e^{A Δt} t0_m x0` is not `t0_m x0`;
@@ -375,6 +386,8 @@ pub use event_time::recover_event_time_discrete_lag_and_log_rate;
 pub use event_time::recover_initial_time_dependent_predictor_carry;
 /// Exact scalar first-occasion `T0TDPREDEFFECT` shift `t0_m x0`.
 pub use event_time::recover_initial_time_dependent_predictor_effect;
+/// Exact scalar Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with `MANIFESTVAR` `λ² t0_b² v + θ`.
+pub use event_time::recover_initial_time_independent_manifest_observed_variance;
 /// Exact scalar carried first-occasion `T0TIPREDEFFECT` `e^{A Δt} t0_b z`.
 pub use event_time::recover_initial_time_independent_predictor_carry;
 /// Exact scalar first-occasion `T0TIPREDEFFECT` shift `t0_b z`.
@@ -568,6 +581,16 @@ pub use event_time::refuse_initial_time_independent_effect_as_continuous_interce
 pub use event_time::refuse_initial_time_independent_effect_as_process_increment;
 /// Refuse treating the Table 3 first-occasion TI shift as `M x`.
 pub use event_time::refuse_initial_time_independent_effect_as_time_dependent_impulse;
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with `MANIFESTVAR` as `addedTIPREDVAR`.
+pub use event_time::refuse_initial_time_independent_manifest_observed_variance_as_asymptotic_time_independent_variance;
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with `MANIFESTVAR` as free `T0VAR`.
+pub use event_time::refuse_initial_time_independent_manifest_observed_variance_as_initial_latent_variance;
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with `MANIFESTVAR` as `MANIFESTVAR`.
+pub use event_time::refuse_initial_time_independent_manifest_observed_variance_as_measurement_error;
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with `MANIFESTVAR` as `TRAITVARstd`.
+pub use event_time::refuse_initial_time_independent_manifest_observed_variance_as_standardised_trait_variance;
+/// Refuse treating Eq. 5 of 2017-era `addedT0TIPREDVAR` composed with `MANIFESTVAR` as `TRAITVAR`.
+pub use event_time::refuse_initial_time_independent_manifest_observed_variance_as_trait_variance;
 /// Refuse treating first-occasion TI observed mean as the first-occasion TD observed mean.
 pub use event_time::refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating 2017-era `addedT0TIPREDVAR` as p. 16 `TRAITVARstd`.
