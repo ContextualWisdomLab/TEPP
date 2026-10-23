@@ -31,6 +31,7 @@ mod project_history;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
+mod temporal_context_cli;
 mod wire;
 
 /// Terminal analysis-result contract version constant.
@@ -282,3 +283,17 @@ pub use temporal_context::TemporalContextTimelineEvent;
 pub use temporal_context::TemporalTransitionGapCandidate;
 /// Build a cutoff-safe, non-causal temporal context.
 pub use temporal_context::build_temporal_context;
+/// One validated temporal-context CLI invocation.
+pub use temporal_context_cli::TemporalContextCliInvocation;
+/// Loopback temporal-context CLI verb.
+pub use temporal_context_cli::TemporalContextCliVerb;
+/// Compose loopback temporal-context POST bytes for a CLI invocation.
+pub use temporal_context_cli::compose_temporal_context_cli_http;
+/// Dispatch a temporal-context CLI invocation against an in-process listener.
+pub use temporal_context_cli::dispatch_temporal_context_cli;
+/// Execute a temporal-context CLI invocation over loopback TCP.
+pub use temporal_context_cli::execute_temporal_context_cli;
+/// Read leftover stdin for the temporal-context CLI.
+pub use temporal_context_cli::read_temporal_context_cli_stdin;
+/// Render temporal-context CLI stdout with metric-free gates.
+pub use temporal_context_cli::render_temporal_context_cli_stdout;

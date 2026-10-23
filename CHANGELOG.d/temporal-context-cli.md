@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-temporal-context query` posts a cutoff-safe LineageWeave temporal-context request to `tepp-loopback` (`POST /v1/temporal-context`, ADR 0027). Metric-free `association_not_causal` JSON only. `tepp.scientific_acceptance.v1` never appears. Does not infer causality. Not analysis-run CLIs, not export CLI, not persistence.
