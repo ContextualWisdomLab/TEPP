@@ -1,8 +1,9 @@
 //! Live pool options and fail-closed open gate for `SQLx`/`PostgreSQL`.
 
 use crate::sqlx_gate::LiveSqlxConfig;
-use crate::{PersistenceError, RecordingSqlSession, SqlSession};
+use crate::{AnalysisRunWorkerSnapshot, PersistenceError, RecordingSqlSession, SqlSession};
 use std::fmt;
+use uuid::Uuid;
 
 /// Default maximum connections for a live analytical pool.
 pub const DEFAULT_MAX_CONNECTIONS: u32 = 8;
@@ -61,7 +62,30 @@ impl Default for LiveSqlxPoolOptions {
     }
 }
 
-type LiveSqlExecutor = dyn FnMut(&str) -> Result<(), PersistenceError> + Send;
+pub(crate) enum LiveSqlCommand {
+    Execute(String),
+    ExecuteTransaction(Vec<String>),
+    TryAnalysisRunLock {
+        tenant_record_id: Uuid,
+        analysis_run_id: Uuid,
+    },
+    UnlockAnalysisRun {
+        tenant_record_id: Uuid,
+        analysis_run_id: Uuid,
+    },
+    LoadAnalysisRun {
+        tenant_record_id: Uuid,
+        analysis_run_id: Uuid,
+    },
+}
+
+pub(crate) enum LiveSqlResult {
+    Executed,
+    LockState(bool),
+    AnalysisRun(Box<AnalysisRunWorkerSnapshot>),
+}
+
+type LiveSqlExecutor = dyn FnMut(LiveSqlCommand) -> Result<LiveSqlResult, PersistenceError> + Send;
 
 /// Open a live pool after validating configuration and options.
 ///
@@ -163,6 +187,95 @@ impl LiveSqlxPool {
             LiveSqlxBackend::Live(_) => None,
         }
     }
+
+    /// Try to hold the tenant/run advisory lock on this pool's retained session.
+    ///
+    /// The lock is automatically released if the live connection closes.
+    ///
+    /// # Errors
+    ///
+    /// Returns a transport error when no live driver is configured or the lock
+    /// query cannot be completed.
+    pub fn try_lock_analysis_run(
+        &mut self,
+        tenant_record_id: Uuid,
+        analysis_run_id: Uuid,
+    ) -> Result<bool, PersistenceError> {
+        match self.run_live_command(LiveSqlCommand::TryAnalysisRunLock {
+            tenant_record_id,
+            analysis_run_id,
+        })? {
+            LiveSqlResult::LockState(acquired) => Ok(acquired),
+            _ => Err(PersistenceError::SqlExecutionFailed),
+        }
+    }
+
+    /// Release a tenant/run advisory lock held by this pool's retained session.
+    ///
+    /// # Errors
+    ///
+    /// Returns a transport error when the live session did not hold the lock or
+    /// the unlock query cannot be completed.
+    pub fn unlock_analysis_run(
+        &mut self,
+        tenant_record_id: Uuid,
+        analysis_run_id: Uuid,
+    ) -> Result<(), PersistenceError> {
+        match self.run_live_command(LiveSqlCommand::UnlockAnalysisRun {
+            tenant_record_id,
+            analysis_run_id,
+        })? {
+            LiveSqlResult::LockState(true) => Ok(()),
+            _ => Err(PersistenceError::SqlExecutionFailed),
+        }
+    }
+
+    /// Load and revalidate one tenant-bound durable run and its latest status.
+    ///
+    /// # Errors
+    ///
+    /// Returns a fail-closed transport or analysis-run validation error when the
+    /// row is absent, malformed, cross-tenant, or internally inconsistent.
+    pub fn load_analysis_run(
+        &mut self,
+        tenant_record_id: Uuid,
+        analysis_run_id: Uuid,
+    ) -> Result<AnalysisRunWorkerSnapshot, PersistenceError> {
+        match self.run_live_command(LiveSqlCommand::LoadAnalysisRun {
+            tenant_record_id,
+            analysis_run_id,
+        })? {
+            LiveSqlResult::AnalysisRun(snapshot) => Ok(*snapshot),
+            _ => Err(PersistenceError::SqlExecutionFailed),
+        }
+    }
+
+    /// Execute validated SQL statements in one database transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PersistenceError::EmptySqlBatch`] for no statements and a
+    /// transport error if any statement or the commit fails. A failed statement
+    /// rolls the transaction back.
+    pub fn execute_transaction(&mut self, statements: &[String]) -> Result<(), PersistenceError> {
+        if statements.is_empty() {
+            return Err(PersistenceError::EmptySqlBatch);
+        }
+        match self.run_live_command(LiveSqlCommand::ExecuteTransaction(statements.to_vec()))? {
+            LiveSqlResult::Executed => Ok(()),
+            _ => Err(PersistenceError::SqlExecutionFailed),
+        }
+    }
+
+    fn run_live_command(
+        &mut self,
+        command: LiveSqlCommand,
+    ) -> Result<LiveSqlResult, PersistenceError> {
+        match &mut self.backend {
+            LiveSqlxBackend::Offline(_) => Err(PersistenceError::LiveAdapterNotConfigured),
+            LiveSqlxBackend::Live(executor) => executor(command),
+        }
+    }
 }
 
 #[cfg(feature = "live-sqlx")]
@@ -189,7 +302,12 @@ impl SqlSession for LiveSqlxPool {
     fn execute(&mut self, sql: &str) -> Result<(), PersistenceError> {
         match &mut self.backend {
             LiveSqlxBackend::Offline(session) => session.execute(sql),
-            LiveSqlxBackend::Live(executor) => executor(sql),
+            LiveSqlxBackend::Live(executor) => {
+                match executor(LiveSqlCommand::Execute(sql.to_owned()))? {
+                    LiveSqlResult::Executed => Ok(()),
+                    _ => Err(PersistenceError::SqlExecutionFailed),
+                }
+            }
         }
     }
 }
@@ -201,7 +319,39 @@ mod tests {
         open_live_sqlx_pool,
     };
     use crate::sqlx_gate::LiveSqlxConfig;
-    use crate::{PersistenceError, SqlSession};
+    use crate::{
+        AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError, SqlSession,
+    };
+    use temporal_core::{AvailableTime, SystemTime};
+    use tepp_api::{ANALYSIS_RUN_CONTRACT_VERSION, AnalysisRunRequest, AnalysisRunStatus};
+
+    fn worker_snapshot() -> AnalysisRunWorkerSnapshot {
+        let system_time = SystemTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("system time");
+        let available_time =
+            AvailableTime::parse_rfc3339("2026-01-01T00:00:00Z").expect("available time");
+        let request = AnalysisRunRequest {
+            contract_version: ANALYSIS_RUN_CONTRACT_VERSION,
+            idempotency_key: "worker-test".into(),
+            tenant_workspace_id: "workspace-test".into(),
+            snapshot_id: "snapshot-test".into(),
+            knowledge_cutoff: "2026-01-01T00:00:00Z".into(),
+            model_contract_version: "model-test-v1".into(),
+            output_profile: "validation-report".into(),
+        };
+        let request_record = AnalysisRunRequestRecord::from_request(
+            uuid::Uuid::nil(),
+            &request,
+            system_time,
+            available_time,
+        )
+        .expect("request record");
+        let status = AnalysisRunStatus::accepted(&request_record.accepted().expect("receipt"))
+            .expect("status");
+        AnalysisRunWorkerSnapshot {
+            request_record,
+            status,
+        }
+    }
 
     #[test]
     fn pool_options_and_open_gate_fail_closed_without_live_driver() {
@@ -249,10 +399,44 @@ mod tests {
     #[test]
     fn live_executor_backend_covers_success_and_failure() {
         let defaults = LiveSqlxPoolOptions::production_defaults();
-        let mut live = LiveSqlxPool::from_live_executor(Box::new(|_sql| Ok(())), defaults);
+        let mut live = LiveSqlxPool::from_live_executor(
+            Box::new(|command| match command {
+                super::LiveSqlCommand::Execute(_)
+                | super::LiveSqlCommand::ExecuteTransaction(_) => {
+                    Ok(super::LiveSqlResult::Executed)
+                }
+                super::LiveSqlCommand::TryAnalysisRunLock { .. }
+                | super::LiveSqlCommand::UnlockAnalysisRun { .. } => {
+                    Ok(super::LiveSqlResult::LockState(true))
+                }
+                super::LiveSqlCommand::LoadAnalysisRun { .. } => {
+                    Err(PersistenceError::InvalidAnalysisRun)
+                }
+            }),
+            defaults,
+        );
         assert!(live.is_live());
         assert!(live.offline_executed().is_none());
         live.execute("SELECT 1").expect("ok");
+        let tenant = uuid::Uuid::nil();
+        let run = uuid::Uuid::from_u128(1);
+        assert!(live.try_lock_analysis_run(tenant, run).expect("lock"));
+        live.unlock_analysis_run(tenant, run).expect("unlock");
+        live.execute_transaction(&["SELECT 1".into()])
+            .expect("transaction");
+        assert_eq!(
+            live.execute_transaction(&[]),
+            Err(PersistenceError::EmptySqlBatch)
+        );
+        assert_eq!(
+            live.load_analysis_run(tenant, run),
+            Err(PersistenceError::InvalidAnalysisRun)
+        );
+        let mut offline = LiveSqlxPool::offline_for_tests(defaults);
+        assert_eq!(
+            offline.try_lock_analysis_run(tenant, run),
+            Err(PersistenceError::LiveAdapterNotConfigured)
+        );
         let _ = format!("{live:?}");
         let mut failing = LiveSqlxPool::from_live_executor(
             Box::new(|_sql| Err(PersistenceError::SqlExecutionFailed)),
@@ -260,6 +444,61 @@ mod tests {
         );
         assert_eq!(
             failing.execute("SELECT 1"),
+            Err(PersistenceError::SqlExecutionFailed)
+        );
+    }
+
+    #[test]
+    fn live_executor_loads_snapshot_and_rejects_response_type_mismatches() {
+        let defaults = LiveSqlxPoolOptions::production_defaults();
+        let expected = worker_snapshot();
+        let returned = expected.clone();
+        let mut loader = LiveSqlxPool::from_live_executor(
+            Box::new(move |command| match command {
+                super::LiveSqlCommand::LoadAnalysisRun { .. } => Ok(
+                    super::LiveSqlResult::AnalysisRun(Box::new(returned.clone())),
+                ),
+                _ => Ok(super::LiveSqlResult::Executed),
+            }),
+            defaults,
+        );
+        assert_eq!(
+            loader
+                .load_analysis_run(uuid::Uuid::nil(), expected.request_record.analysis_run_id)
+                .expect("snapshot"),
+            expected
+        );
+
+        let mut mismatched = LiveSqlxPool::from_live_executor(
+            Box::new(|command| match command {
+                super::LiveSqlCommand::Execute(_)
+                | super::LiveSqlCommand::ExecuteTransaction(_) => {
+                    Ok(super::LiveSqlResult::LockState(false))
+                }
+                _ => Ok(super::LiveSqlResult::Executed),
+            }),
+            defaults,
+        );
+        let tenant = uuid::Uuid::nil();
+        let run = uuid::Uuid::from_u128(1);
+        assert_eq!(
+            mismatched.try_lock_analysis_run(tenant, run),
+            Err(PersistenceError::SqlExecutionFailed)
+        );
+        assert_eq!(
+            mismatched.unlock_analysis_run(tenant, run),
+            Err(PersistenceError::SqlExecutionFailed)
+        );
+        assert_eq!(
+            mismatched.load_analysis_run(tenant, run),
+            Err(PersistenceError::SqlExecutionFailed)
+        );
+        assert_eq!(
+            mismatched.execute_transaction(&["SELECT 1".into()]),
+            Err(PersistenceError::SqlExecutionFailed)
+        );
+        assert_eq!(
+            mismatched.execute("SELECT 1"),
             Err(PersistenceError::SqlExecutionFailed)
         );
     }

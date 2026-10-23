@@ -56,6 +56,12 @@ Migration `0007` (active PR) contracts policy-driven retention, legal-hold block
 
 Before PostgreSQL becomes production state, prove migrations and rollback, tenant isolation/RLS, temporal/lineage constraints, idempotency/concurrency, backup/restore, retention/deletion, and reconstruction from immutable artifacts. Concurrent document first-insert and revise stress is implemented-main. `persistence_postgres::mark_restored_state_usable` and `assert_restore_integrity` are the current fail-closed restore gate (active PR): they revalidate tenant identity, canonical digests, same-tenant knowledge-cutoff eligibility, temporal window order, and enabled append-only triggers. They do not yet revalidate relation-aware splits or full lineage graphs; those remain separate post-restore scientific steps. The gate does not replace operator `pg_dump`/`pg_restore` runbooks.
 
+One-shot analysis execution must acquire `LiveSqlxPool::try_lock_analysis_run`
+before loading or executing a durable run and must release it after completion;
+connection loss releases the session advisory lock. Successful artifact and
+terminal-event writes use `execute_transaction`. Infrastructure failure leaves
+the run retryable and must not be converted into a scientific failed result.
+
 ## Model release/cutover
 
 A model artifact is promoted only after convergence, posterior diagnostics, true-parameter/recovery benchmarks, invariance/fairness/language evidence, uncertainty/calibration, security/privacy, and reproducibility gates meet the versioned policy. Model-selection or LLM review disagreement can require human scientific review.

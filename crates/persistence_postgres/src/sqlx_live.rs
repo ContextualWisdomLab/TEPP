@@ -4,12 +4,19 @@
 //! `--ignore-filename-regex sqlx_live\\.rs` because a live server is required
 //! for the success path. Unreachable-host failure is still unit-tested.
 
-use crate::PersistenceError;
 use crate::classify_lifecycle_sql_failure;
 use crate::classify_write_conflict;
-use crate::live_pool::{LiveSqlxPool, LiveSqlxPoolOptions};
+use crate::live_pool::{LiveSqlCommand, LiveSqlResult, LiveSqlxPool, LiveSqlxPoolOptions};
 use crate::sqlx_gate::LiveSqlxConfig;
+use crate::{AnalysisRunRequestRecord, AnalysisRunWorkerSnapshot, PersistenceError};
+use sha2::{Digest, Sha256};
+use sqlx::{Acquire, Row};
 use std::future::Future;
+use temporal_core::{AvailableTime, SystemTime};
+use tepp_api::{
+    AnalysisRunRequest, AnalysisRunStatus, AnalysisRunStatusState, require_status_binding,
+};
+use uuid::Uuid;
 
 /// Open a live `SQLx` pool and wrap it as [`LiveSqlxPool`].
 ///
@@ -23,7 +30,7 @@ pub fn open_sqlx_pool(
 ) -> Result<LiveSqlxPool, PersistenceError> {
     let mut transport = SqlxTransport::connect(config, options)?;
     Ok(LiveSqlxPool::from_live_executor(
-        Box::new(move |sql| transport.execute(sql)),
+        Box::new(move |command| transport.run(command)),
         options,
     ))
 }
@@ -66,6 +73,38 @@ where
 }
 
 impl SqlxTransport {
+    fn run(&mut self, command: LiveSqlCommand) -> Result<LiveSqlResult, PersistenceError> {
+        match command {
+            LiveSqlCommand::Execute(sql) => {
+                self.execute(&sql)?;
+                Ok(LiveSqlResult::Executed)
+            }
+            LiveSqlCommand::ExecuteTransaction(statements) => {
+                self.execute_transaction(&statements)?;
+                Ok(LiveSqlResult::Executed)
+            }
+            LiveSqlCommand::TryAnalysisRunLock {
+                tenant_record_id,
+                analysis_run_id,
+            } => self
+                .analysis_run_lock("pg_try_advisory_lock", tenant_record_id, analysis_run_id)
+                .map(LiveSqlResult::LockState),
+            LiveSqlCommand::UnlockAnalysisRun {
+                tenant_record_id,
+                analysis_run_id,
+            } => self
+                .analysis_run_lock("pg_advisory_unlock", tenant_record_id, analysis_run_id)
+                .map(LiveSqlResult::LockState),
+            LiveSqlCommand::LoadAnalysisRun {
+                tenant_record_id,
+                analysis_run_id,
+            } => self
+                .load_analysis_run(tenant_record_id, analysis_run_id)
+                .map(Box::new)
+                .map(LiveSqlResult::AnalysisRun),
+        }
+    }
+
     fn connect(
         config: &LiveSqlxConfig,
         options: LiveSqlxPoolOptions,
@@ -108,6 +147,154 @@ impl SqlxTransport {
         .map(|_| ())
         .map_err(|error| map_sqlx_error(&error))
     }
+
+    fn execute_transaction(&mut self, statements: &[String]) -> Result<(), PersistenceError> {
+        let connection = self
+            .connection
+            .as_mut()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        let runtime = self
+            .runtime
+            .as_ref()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        drive_on_owned_runtime(runtime, async {
+            let mut transaction = connection
+                .begin()
+                .await
+                .map_err(|error| map_sqlx_error(&error))?;
+            for statement in statements {
+                sqlx::query(statement)
+                    .execute(&mut *transaction)
+                    .await
+                    .map_err(|error| map_sqlx_error(&error))?;
+            }
+            transaction
+                .commit()
+                .await
+                .map_err(|error| map_sqlx_error(&error))
+        })
+    }
+
+    fn analysis_run_lock(
+        &mut self,
+        function_name: &str,
+        tenant_record_id: Uuid,
+        analysis_run_id: Uuid,
+    ) -> Result<bool, PersistenceError> {
+        let connection = self
+            .connection
+            .as_mut()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        let runtime = self
+            .runtime
+            .as_ref()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        let sql = format!("SELECT {function_name}(hashtextextended($1, 0)) AS lock_state");
+        let lock_identity = format!("{tenant_record_id}:{analysis_run_id}");
+        drive_on_owned_runtime(runtime, async {
+            sqlx::query(&sql)
+                .bind(lock_identity)
+                .fetch_one(&mut **connection)
+                .await
+                .and_then(|row| row.try_get::<bool, _>("lock_state"))
+        })
+        .map_err(|error| map_sqlx_error(&error))
+    }
+
+    fn load_analysis_run(
+        &mut self,
+        tenant_record_id: Uuid,
+        analysis_run_id: Uuid,
+    ) -> Result<AnalysisRunWorkerSnapshot, PersistenceError> {
+        const SQL: &str = "SELECT r.analysis_run_id::text AS analysis_run_id, r.tenant_record_id::text AS tenant_record_id, r.request_payload, r.request_payload_sha256, to_char(r.system_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS request_system_time, to_char(r.available_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') AS request_available_time, e.run_state_code, e.terminal_payload::text AS terminal_payload FROM analysis_run_request AS r JOIN LATERAL (SELECT run_state_code, terminal_payload FROM analysis_run_state_event WHERE tenant_record_id = r.tenant_record_id AND analysis_run_id = r.analysis_run_id ORDER BY state_sequence DESC LIMIT 1) AS e ON TRUE WHERE r.tenant_record_id = $1::uuid AND r.analysis_run_id = $2::uuid";
+        let connection = self
+            .connection
+            .as_mut()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        let runtime = self
+            .runtime
+            .as_ref()
+            .ok_or(PersistenceError::SqlExecutionFailed)?;
+        let row = drive_on_owned_runtime(runtime, async {
+            sqlx::query(SQL)
+                .bind(tenant_record_id.to_string())
+                .bind(analysis_run_id.to_string())
+                .fetch_one(&mut **connection)
+                .await
+        })
+        .map_err(|error| map_sqlx_error(&error))?;
+        materialize_analysis_run(&row, tenant_record_id, analysis_run_id)
+    }
+}
+
+fn materialize_analysis_run(
+    row: &sqlx::postgres::PgRow,
+    expected_tenant_record_id: Uuid,
+    expected_analysis_run_id: Uuid,
+) -> Result<AnalysisRunWorkerSnapshot, PersistenceError> {
+    let stored_run_id = parse_uuid_column(row, "analysis_run_id")?;
+    let stored_tenant_id = parse_uuid_column(row, "tenant_record_id")?;
+    if stored_run_id != expected_analysis_run_id || stored_tenant_id != expected_tenant_record_id {
+        return Err(PersistenceError::InvalidAnalysisRun);
+    }
+    let request_payload = text_column(row, "request_payload")?;
+    let stored_digest = text_column(row, "request_payload_sha256")?;
+    let request = AnalysisRunRequest::from_json(&request_payload)
+        .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
+    let system_time = SystemTime::parse_rfc3339(&text_column(row, "request_system_time")?)
+        .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
+    let available_time = AvailableTime::parse_rfc3339(&text_column(row, "request_available_time")?)
+        .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
+    let request_record = AnalysisRunRequestRecord::from_request(
+        stored_tenant_id,
+        &request,
+        system_time,
+        available_time,
+    )?;
+    let recomputed_digest = format!("{:x}", Sha256::digest(request_payload.as_bytes()));
+    if request_record.analysis_run_id != stored_run_id
+        || request_record.request_payload != request_payload
+        || request_record.request_payload_sha256 != stored_digest
+        || recomputed_digest != stored_digest
+    {
+        return Err(PersistenceError::InvalidAnalysisRun);
+    }
+    let accepted = request_record.accepted()?;
+    let run_state = text_column(row, "run_state_code")?;
+    let terminal_payload = row
+        .try_get::<Option<String>, _>("terminal_payload")
+        .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
+    let status = match (run_state.as_str(), terminal_payload) {
+        ("accepted", None) => AnalysisRunStatus::accepted(&accepted),
+        ("running", None) => AnalysisRunStatus::running(&accepted),
+        ("succeeded" | "failed", Some(payload)) => AnalysisRunStatus::from_json(&payload),
+        _ => return Err(PersistenceError::InvalidAnalysisRun),
+    }
+    .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
+    require_status_binding(&request, &accepted, &status)
+        .map_err(|_| PersistenceError::InvalidAnalysisRun)?;
+    if matches!(
+        (run_state.as_str(), status.run_state),
+        ("succeeded", AnalysisRunStatusState::Succeeded)
+            | ("failed", AnalysisRunStatusState::Failed)
+    ) || matches!(run_state.as_str(), "accepted" | "running")
+    {
+        Ok(AnalysisRunWorkerSnapshot {
+            request_record,
+            status,
+        })
+    } else {
+        Err(PersistenceError::InvalidAnalysisRun)
+    }
+}
+
+fn text_column(row: &sqlx::postgres::PgRow, column: &str) -> Result<String, PersistenceError> {
+    row.try_get(column)
+        .map_err(|_| PersistenceError::InvalidAnalysisRun)
+}
+
+fn parse_uuid_column(row: &sqlx::postgres::PgRow, column: &str) -> Result<Uuid, PersistenceError> {
+    Uuid::parse_str(&text_column(row, column)?).map_err(|_| PersistenceError::InvalidAnalysisRun)
 }
 
 impl Drop for SqlxTransport {
