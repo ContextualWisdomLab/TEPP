@@ -34,14 +34,14 @@ use psychometric_core::{
     recover_standardised_discrete_continuous_intercept, recover_standardised_initial_latent_mean,
     recover_standardised_initial_latent_variance, recover_standardised_manifest_mean,
     recover_standardised_manifest_trait_variance, recover_standardised_manifest_variance,
-    recover_standardised_trait_variance, recover_stationary_initial_latent_mean,
-    recover_stationary_initial_latent_variance, recover_stationary_initial_observed_mean,
-    recover_stationary_initial_observed_variance, recover_stationary_lagged_latent_covariance,
-    recover_stationary_lagged_observed_covariance, recover_stationary_latent_variance,
-    recover_stationary_later_latent_variance, recover_stationary_later_observed_variance,
-    recover_time_dependent_predictor_impulse, recover_time_dependent_predictor_impulse_carry,
-    recover_trait_plus_state_lagged_covariance, recover_trait_plus_state_latent_variance,
-    recover_within_residual_event_time_log_rate,
+    recover_standardised_time_dependent_predictor_effect, recover_standardised_trait_variance,
+    recover_stationary_initial_latent_mean, recover_stationary_initial_latent_variance,
+    recover_stationary_initial_observed_mean, recover_stationary_initial_observed_variance,
+    recover_stationary_lagged_latent_covariance, recover_stationary_lagged_observed_covariance,
+    recover_stationary_latent_variance, recover_stationary_later_latent_variance,
+    recover_stationary_later_observed_variance, recover_time_dependent_predictor_impulse,
+    recover_time_dependent_predictor_impulse_carry, recover_trait_plus_state_lagged_covariance,
+    recover_trait_plus_state_latent_variance, recover_within_residual_event_time_log_rate,
     refuse_after_extra_process_contribution_as_observed_mean,
     refuse_after_extra_process_latent_mean_as_observed_mean,
     refuse_asymptotic_continuous_intercept_as_asymptotic_time_independent_effect,
@@ -63,6 +63,7 @@ use psychometric_core::{
     refuse_continuous_intercept_as_manifest_means,
     refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept,
     refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept,
+    refuse_discrete_standardised_time_dependent_effect_as_standardised_time_dependent_effect,
     refuse_evolved_observed_mean_as_after_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_extra_process_observed_mean,
     refuse_evolved_observed_mean_as_impulse_carry_observed_mean,
@@ -129,6 +130,7 @@ use psychometric_core::{
     refuse_standardised_initial_latent_variance_as_standardised_trait_variance,
     refuse_standardised_manifest_trait_variance_as_standardised_manifest_variance,
     refuse_standardised_manifest_variance_as_standardised_manifest_mean,
+    refuse_standardised_time_independent_effect_as_standardised_time_dependent_effect,
     refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion,
     refuse_standardised_trait_variance_as_standardised_manifest_trait_variance,
     refuse_stationary_initial_latent_mean_as_asymptotic_continuous_intercept,
@@ -167,6 +169,7 @@ use psychometric_core::{
     refuse_time_independent_effect_as_time_varying_discrete_effect,
     refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
     refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+    refuse_trait_contaminated_time_dependent_effect_as_standardised_time_dependent_effect,
     refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
     refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
     refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
@@ -179,6 +182,7 @@ use psychometric_core::{
     refuse_unstandardised_manifest_mean_as_standardised_manifest_mean,
     refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance,
     refuse_unstandardised_manifest_variance_as_standardised_manifest_variance,
+    refuse_unstandardised_time_dependent_effect_as_standardised_time_dependent_effect,
     refuse_unstandardised_trait_variance_as_standardised_trait_variance,
     refuse_within_subject_scaled_initial_latent_mean_as_standardised_initial_latent_mean,
 };
@@ -3780,5 +3784,164 @@ fn standardised_manifest_variance_is_not_unstandardised_traitstd_or_observed_var
         Err(
             psychometric_core::PsychometricError::ObservedVarianceIsNotStandardisedManifestVariance
         )
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)]
+fn standardised_time_dependent_effect_is_not_unstandardised_or_tipred_or_discrete_or_trait() {
+    let coefficient = 0.3_f64;
+    let predictor_variance = 1.6_f64;
+    let diffusion = 0.8_f64;
+    let log_rate = -0.5_f64;
+    let recovered = recover_standardised_time_dependent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        diffusion,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("TDPREDEFFECTstd");
+    let stationary =
+        recover_stationary_latent_variance(diffusion, log_rate, LagClock::EventTime).expect("p");
+    let expected = coefficient * predictor_variance.sqrt() / stationary.sqrt();
+    assert!(
+        (recovered - expected).abs() < 1e-15,
+        "Driver et al. (2017, p. 16 footnote 4): TDPREDEFFECTstd is m · √v / √p"
+    );
+    assert!(
+        (recovered - coefficient).abs() > 1e-3,
+        "Driver et al. (2017, Table 2): unstandardised TDPREDEFFECT is not TDPREDEFFECTstd"
+    );
+    let time_independent = coefficient * predictor_variance.sqrt() / stationary.sqrt();
+    assert!(
+        (time_independent - recovered).abs() < 1e-15,
+        "equal numbers when M = B remain distinct named quantities"
+    );
+    let discrete = recover_discrete_time_independent_predictor_effect(
+        coefficient,
+        1.0,
+        log_rate,
+        1.0,
+        LagClock::EventTime,
+    )
+    .expect("intercept-style discrete")
+        * predictor_variance.sqrt()
+        / stationary.sqrt();
+    assert!(
+        (discrete - recovered).abs() > 1e-3,
+        "Driver et al. (2017, footnote 4): A^{{-1}}[e^{{A Δt}} − I] M · √v / √p is not TDPREDEFFECTstd"
+    );
+    let added = recover_asymptotic_time_independent_predictor_variance(
+        coefficient,
+        predictor_variance,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("added analog");
+    let trait_plus_state =
+        recover_trait_plus_state_latent_variance(0.5, stationary).expect("trait + p");
+    let contaminated = coefficient * predictor_variance.sqrt() / (trait_plus_state + added).sqrt();
+    assert!(
+        (contaminated - recovered).abs() > 1e-3,
+        "Driver et al. (2017, footnote 4): m · √v / √(trait + p + added) is not TDPREDEFFECTstd"
+    );
+    let larger_q = recover_standardised_time_dependent_predictor_effect(
+        coefficient,
+        predictor_variance,
+        3.2,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("larger q");
+    assert!(
+        larger_q.abs() < recovered.abs(),
+        "Driver et al. (2017, footnote 4): larger q shrinks |TDPREDEFFECTstd|"
+    );
+    let zero = recover_standardised_time_dependent_predictor_effect(
+        0.0,
+        predictor_variance,
+        diffusion,
+        log_rate,
+        LagClock::EventTime,
+    )
+    .expect("zero coefficient");
+    assert_eq!(zero.to_bits(), 0.0_f64.to_bits());
+    assert_eq!(
+        refuse_unstandardised_time_dependent_effect_as_standardised_time_dependent_effect(
+            coefficient, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::UnstandardisedTimeDependentEffectIsNotStandardisedTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_standardised_time_independent_effect_as_standardised_time_dependent_effect(
+            time_independent,
+            recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedTimeIndependentEffectIsNotStandardisedTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_discrete_standardised_time_dependent_effect_as_standardised_time_dependent_effect(
+            discrete, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::DiscreteStandardisedTimeDependentEffectIsNotStandardisedTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        refuse_trait_contaminated_time_dependent_effect_as_standardised_time_dependent_effect(
+            contaminated, recovered
+        ),
+        Err(
+            psychometric_core::PsychometricError::TraitContaminatedTimeDependentEffectIsNotStandardisedTimeDependentEffect
+        )
+    );
+    assert_eq!(
+        recover_standardised_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            0.0,
+            log_rate,
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedTimeDependentEffectRequiresPositiveWithinSubjectVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_time_dependent_predictor_effect(
+            coefficient,
+            0.0,
+            diffusion,
+            log_rate,
+            LagClock::EventTime
+        ),
+        Err(
+            psychometric_core::PsychometricError::StandardisedTimeDependentEffectRequiresPositivePredictorVariance
+        )
+    );
+    assert_eq!(
+        recover_standardised_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            diffusion,
+            0.5,
+            LagClock::EventTime
+        ),
+        Err(psychometric_core::PsychometricError::StationaryVarianceRequiresStableDrift)
+    );
+    assert_eq!(
+        recover_standardised_time_dependent_predictor_effect(
+            coefficient,
+            predictor_variance,
+            diffusion,
+            log_rate,
+            LagClock::DocumentTime
+        ),
+        Err(psychometric_core::PsychometricError::EventTimeRequired)
     );
 }

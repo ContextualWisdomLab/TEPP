@@ -36,6 +36,10 @@
 //! first-occasion map `τ + λ μ_0` is not `E(y_t)`), recovers the
 //! Driver Eq. 3 fourth-summand impulse `m x` (Table 2 `TDPREDEFFECT`
 //! is `M`, not `CINT`, not `TIPREDEFFECT`, and not Voelkle Eq. 14),
+//! recovers the Driver p. 16 `TDPREDEFFECTstd` `m · √v / √(-q / (2 a))`
+//! after strictly positive `asymDIFFUSION` and `TDPREDVAR` (footnote 4;
+//! unstandardised `M` is not `TDPREDEFFECTstd`; `TIPREDEFFECTstd` is
+//! not `TDPREDEFFECTstd` even when `M = B`),
 //! recovers the Driver Eq. 5 of that contemporaneous impulse as
 //! `τ + λ(μ_t + m x)` (`τ + λ μ_t` is not that observed mean;
 //! `τ + λ(μ_t + e^{a(t−u)} m x)` is not that observed mean when
@@ -417,6 +421,8 @@ pub use event_time::recover_standardised_manifest_mean;
 pub use event_time::recover_standardised_manifest_trait_variance;
 /// Exact scalar p. 16 `MANIFESTVARstd` `θ/...` after strictly positive `MANIFESTVAR`.
 pub use event_time::recover_standardised_manifest_variance;
+/// Exact scalar p. 16 `TDPREDEFFECTstd` `m · √v / √p` after strictly positive `asymDIFFUSION` and `TDPREDVAR`.
+pub use event_time::recover_standardised_time_dependent_predictor_effect;
 
 /// Exact scalar p. 16 `TRAITVARstd` `trait / trait = 1` after strictly positive `TRAITVAR`.
 pub use event_time::recover_standardised_trait_variance;
@@ -492,6 +498,8 @@ pub use event_time::refuse_difference_quotient_as_local_rate;
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_asymptotic_continuous_intercept;
 /// Refuse treating p. 16 `discreteCINTstd` as `CINTstd`.
 pub use event_time::refuse_discrete_standardised_continuous_intercept_as_standardised_continuous_intercept;
+/// Refuse treating intercept-style `A^{-1}[e^{A Δt} − I] M · √v / √p` as `TDPREDEFFECTstd`.
+pub use event_time::refuse_discrete_standardised_time_dependent_effect_as_standardised_time_dependent_effect;
 /// Refuse treating evolved `τ + λ μ_t` as the after-t0 extra-process observed mean.
 pub use event_time::refuse_evolved_observed_mean_as_after_extra_process_observed_mean;
 /// Refuse treating evolved `τ + λ μ_t` as the extra-process observed mean.
@@ -639,6 +647,8 @@ pub use event_time::refuse_standardised_manifest_variance_as_standardised_manife
 
 /// Refuse treating observed θ as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_observed_variance_as_standardised_manifest_variance;
+/// Refuse treating p. 16 `TIPREDEFFECTstd` as `TDPREDEFFECTstd`.
+pub use event_time::refuse_standardised_time_independent_effect_as_standardised_time_dependent_effect;
 /// Refuse treating p. 16 `TIPREDVARstd` as `asymDIFFUSIONstd`.
 pub use event_time::refuse_standardised_time_independent_predictor_variance_as_standardised_asymptotic_diffusion;
 /// Refuse treating p. 16 `TRAITVARstd` as `MANIFESTTRAITVARstd`.
@@ -715,6 +725,8 @@ pub use event_time::refuse_time_independent_effect_as_time_varying_discrete_effe
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean;
 /// Refuse treating process-increment `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` as the first-occasion TI-predictor observed mean.
 pub use event_time::refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean;
+/// Refuse treating `m · √v / √(trait + p + added)` as `TDPREDEFFECTstd`.
+pub use event_time::refuse_trait_contaminated_time_dependent_effect_as_standardised_time_dependent_effect;
 /// Refuse treating §4.3 trait-plus-state lagged covariance as lagged stationary `T0VAR`.
 pub use event_time::refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance;
 /// Refuse treating `κ / √(trait + p + added)` as `CINTstd`.
@@ -743,6 +755,8 @@ pub use event_time::refuse_unstandardised_manifest_mean_as_standardised_manifest
 pub use event_time::refuse_unstandardised_manifest_trait_variance_as_standardised_manifest_trait_variance;
 /// Refuse treating unstandardised `MANIFESTVAR` as p. 16 `MANIFESTVARstd`.
 pub use event_time::refuse_unstandardised_manifest_variance_as_standardised_manifest_variance;
+/// Refuse treating unstandardised `TDPREDEFFECT` as p. 16 `TDPREDEFFECTstd`.
+pub use event_time::refuse_unstandardised_time_dependent_effect_as_standardised_time_dependent_effect;
 
 /// Refuse treating unstandardised `TRAITVAR` as p. 16 `TRAITVARstd`.
 pub use event_time::refuse_unstandardised_trait_variance_as_standardised_trait_variance;
