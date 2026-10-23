@@ -157,7 +157,18 @@
 //! that carried first-occasion TD shift is
 //! `τ + λ(μ_t + e^{a Δt} t0_m x0)` (`τ + λ μ_t` is not that
 //! observed mean; `τ + λ(μ_t + e^{a Δt} t0_b z)` is not that
-//! observed mean). The JSS §7.2 lasting level change sets
+//! observed mean). 2017-era `T0TRAITEFFECT` is not in Table 2/3:
+//! `ctFit.R` places it in `OpenMx` `A` from trait latents to process
+//! latents at `T0`; `ctGenerate.R` does
+//! `T0MEANS += T0TRAITEFFECT %*% traits`; stationary
+//! `T0TRAITEFFECT` is identity. Equation 3's first summand carries
+//! that shift as `e^{A Δt} t0_trait·trait`. Equation 5 of that
+//! carried first-occasion trait shift is
+//! `τ + λ(μ_t + e^{a Δt} t0_trait·trait)` (`τ + λ μ_t` is not that
+//! observed mean; `τ + λ(μ_t + e^{a Δt} t0_b z)` is not that
+//! observed mean; `τ + λ(μ_t + e^{a Δt} t0_m x0)` is not that
+//! observed mean; same numbers as T0TIPRED/T0TDPRED Eq. 5 yield
+//! the same product and remain distinct named quantities). The JSS §7.2 lasting level change sets
 //! `CINT` to `TDPREDEFFECT * −DRIFT` (`κ = −a m x`; `a < 0` so
 //! `−κ / a = m x`). That `CINT` setting is not the dissipating
 //! Dirac, not a free `CINT`, and not the extra near-zero-drift
@@ -6290,6 +6301,302 @@ pub fn refuse_initial_time_independent_observed_mean_as_initial_time_dependent_o
     Err(PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean)
 }
 
+/// Exact scalar carried first-occasion trait effect.
+///
+/// Private so this Eq. 5 slice does not export
+/// `recover_initial_trait_effect` / `recover_initial_trait_effect_carry`.
+/// Overflow rewrite matches the T0TIPRED carry:
+/// `sign(t0_trait · trait) exp(ln|t0_trait · trait| + a Δt)`.
+/// Binary64 underflow of `e^{a Δt}` to `+0` is a vanishing carry
+/// and is kept.
+fn carry_initial_trait_effect(
+    initial_trait_effect: f64,
+    trait_score: f64,
+    log_rate: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    if !clock.admits_structural_lag() {
+        return Err(PsychometricError::EventTimeRequired);
+    }
+    if !event_delta.is_finite() || event_delta <= 0.0 {
+        return Err(PsychometricError::NonPositiveInterval);
+    }
+    if !log_rate.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if !initial_trait_effect.is_finite() || !trait_score.is_finite() {
+        return Err(PsychometricError::InvalidNumericInput);
+    }
+    if initial_trait_effect == 0.0 || trait_score == 0.0 {
+        return Ok(0.0);
+    }
+    let initial_shift = require_finite(initial_trait_effect * trait_score)?;
+    if initial_shift == 0.0 {
+        return Ok(0.0);
+    }
+    let drift_interval = log_rate * event_delta;
+    let auto_effect = drift_interval.exp();
+    if auto_effect.is_finite() {
+        // +0 underflow is a vanishing carry of the T0 trait shift.
+        return require_finite(auto_effect * initial_shift);
+    }
+    // Overflow of a finite `a Δt` is the log-space rewrite.
+    // A non-finite argument also fails closed through `require_finite`.
+    // e^{a Δt} t0_trait·trait = sign(t0_trait·trait) exp(ln|t0_trait·trait| + a Δt).
+    require_finite(initial_shift.signum() * (initial_shift.abs().ln() + drift_interval).exp())
+}
+
+/// Exact scalar evolved latent mean plus a first-occasion trait effect.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 3, p. 5; JSS PDF re-opened
+/// 2026-08-30T18:17Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write the first summand as the carried `T0MEANS`. 2017-era
+/// `T0TRAITEFFECT` is not in Table 2/3: `ctFit.R` 695–696 places
+/// it in `OpenMx` `A` from trait latents to process latents at `T0`;
+/// `ctGenerate.R` 113–116 does `T0MEANS += T0TRAITEFFECT %*% traits`;
+/// stationary `T0TRAITEFFECT` (`ctFit.R` 1494–1508, 1522) is
+/// identity. Form `μ_t` first, then add
+/// `e^{a Δt} t0_trait·trait`. A zero carry is exactly `μ_t`. A
+/// zero evolved mean is exactly the carry. Adding
+/// `t0_trait·trait` without the exponential is not this
+/// composition when `a Δt ≠ 0`. Adding
+/// `A^{-1}[e^{A Δt} − I] B z` is not this composition.
+///
+/// # Errors
+///
+/// Propagates [`recover_discrete_latent_mean`] and the private
+/// trait-effect carry, and returns
+/// [`PsychometricError::InvalidNumericInput`] when the sum overflows.
+#[allow(clippy::too_many_arguments)]
+pub fn recover_discrete_latent_mean_with_initial_trait_effect(
+    initial_latent_mean: f64,
+    log_rate: f64,
+    continuous_intercept: f64,
+    initial_trait_effect: f64,
+    trait_score: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let evolved_latent_mean = recover_discrete_latent_mean(
+        initial_latent_mean,
+        log_rate,
+        continuous_intercept,
+        event_delta,
+        clock,
+    )?;
+    let initial_carry = carry_initial_trait_effect(
+        initial_trait_effect,
+        trait_score,
+        log_rate,
+        event_delta,
+        clock,
+    )?;
+    if initial_carry == 0.0 {
+        return Ok(evolved_latent_mean);
+    }
+    if evolved_latent_mean == 0.0 {
+        return Ok(initial_carry);
+    }
+    require_finite(evolved_latent_mean + initial_carry)
+}
+
+/// Exact scalar observed mean of a first-occasion trait effect.
+///
+/// Driver, Oud, and Voelkle (2017, Eq. 5, p. 5; Eq. 3 first summand,
+/// p. 5; JSS PDF re-opened 2026-08-30T18:17Z from
+/// <https://www.jstatsoft.org/index.php/jss/article/download/v077i05/1104>)
+/// write `y_i(t) = Γ + Λ η_i(t) + ζ_i(t)` with `ζ ~ N(0, Θ)` and
+/// `Γ ~ N(τ, Ψ)`. 2017-era `T0TRAITEFFECT` is not in Table 2/3:
+/// `ctFit.R` 695–696 places it in `OpenMx` `A` from trait latents to
+/// process latents at `T0`; `ctGenerate.R` 113–116 does
+/// `T0MEANS += T0TRAITEFFECT %*% traits`; stationary
+/// `T0TRAITEFFECT` (`ctFit.R` 1494–1508, 1522) is identity.
+/// Equation 3's first summand carries that shift as
+/// `e^{A Δt} t0_trait·trait`. The expected intercept is `τ`. The
+/// latent process at `t` after that carry is
+/// `μ_t + e^{a Δt} t0_trait·trait`. The scalar composition is
+/// `E(y_t) = τ + λ(μ_t + e^{a Δt} t0_trait·trait)`. Form the
+/// evolved-plus-carry latent mean first, then `τ + λ` of that mean.
+/// A zero loading is exactly `τ`. A zero evolved-plus-carry latent
+/// mean is exactly `τ`. A zero intercept is exactly
+/// `λ(μ_t + e^{a Δt} t0_trait·trait)`. The evolved observed mean
+/// `τ + λ μ_t` is not this composition when the carry is nonzero.
+/// The process-increment map
+/// `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not this composition.
+/// The contemporaneous map `τ + λ(μ_t + m x)` is not this
+/// composition. The impulse-carry map
+/// `τ + λ(μ_t + e^{a(t−u)} m x)` is not this composition when
+/// `u ≠ t0`. The first-occasion TI map
+/// `τ + λ(μ_t + e^{a Δt} t0_b z)` is not this composition. The
+/// first-occasion TD map `τ + λ(μ_t + e^{a Δt} t0_m x0)` is not
+/// this composition. Same numbers as T0TIPRED/T0TDPRED Eq. 5
+/// yield the same product and remain distinct named quantities.
+/// `MANIFESTMEANS` is not `E(y_t)`. The evolved-plus-carry latent
+/// mean is not `E(y_t)`. `T0TRAITEFFECT` is the coefficient, not
+/// that observed mean. This is not a Kalman filter and not ctsem
+/// estimation.
+///
+/// # Errors
+///
+/// Propagates
+/// [`recover_discrete_latent_mean_with_initial_trait_effect`]
+/// and [`recover_manifest_observed_mean`].
+#[allow(clippy::too_many_arguments)]
+pub fn recover_discrete_observed_mean_with_initial_trait_effect(
+    loading: f64,
+    initial_latent_mean: f64,
+    log_rate: f64,
+    continuous_intercept: f64,
+    initial_trait_effect: f64,
+    trait_score: f64,
+    manifest_mean: f64,
+    event_delta: f64,
+    clock: LagClock,
+) -> Result<f64, PsychometricError> {
+    let composed_latent_mean = recover_discrete_latent_mean_with_initial_trait_effect(
+        initial_latent_mean,
+        log_rate,
+        continuous_intercept,
+        initial_trait_effect,
+        trait_score,
+        event_delta,
+        clock,
+    )?;
+    recover_manifest_observed_mean(loading, composed_latent_mean, manifest_mean)
+}
+
+/// Refuse treating the evolved observed mean as the first-occasion
+/// trait-effect observed mean.
+///
+/// Equation 5 of the Eq. 3 evolved mean is `τ + λ μ_t`. Equation 5
+/// of the 2017-era `T0TRAITEFFECT` carry is
+/// `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`. Those are not the same
+/// map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::EvolvedObservedMeanIsNotInitialTraitObservedMean`].
+pub fn refuse_evolved_observed_mean_as_initial_trait_observed_mean(
+    evolved_observed_mean: f64,
+    initial_trait_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (evolved_observed_mean, initial_trait_observed_mean);
+    Err(PsychometricError::EvolvedObservedMeanIsNotInitialTraitObservedMean)
+}
+
+/// Refuse treating the process-increment observed mean as the
+/// first-occasion trait-effect observed mean.
+///
+/// Equation 5 of the Eq. 3 `TIPREDEFFECT` increment is
+/// `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)`. Equation 5 of the
+/// 2017-era `T0TRAITEFFECT` carry is
+/// `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`. Those are not the same
+/// map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::TimeIndependentObservedMeanIsNotInitialTraitObservedMean`].
+pub fn refuse_time_independent_observed_mean_as_initial_trait_observed_mean(
+    time_independent_observed_mean: f64,
+    initial_trait_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (time_independent_observed_mean, initial_trait_observed_mean);
+    Err(PsychometricError::TimeIndependentObservedMeanIsNotInitialTraitObservedMean)
+}
+
+/// Refuse treating the contemporaneous-impulse observed mean as the
+/// first-occasion trait-effect observed mean.
+///
+/// Equation 5 of the contemporaneous Dirac is `τ + λ(μ_t + m x)`.
+/// Equation 5 of the 2017-era `T0TRAITEFFECT` carry is
+/// `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`. Those are not the same
+/// map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ImpulseObservedMeanIsNotInitialTraitObservedMean`].
+pub fn refuse_impulse_observed_mean_as_initial_trait_observed_mean(
+    impulse_observed_mean: f64,
+    initial_trait_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (impulse_observed_mean, initial_trait_observed_mean);
+    Err(PsychometricError::ImpulseObservedMeanIsNotInitialTraitObservedMean)
+}
+
+/// Refuse treating the impulse-carry observed mean as the
+/// first-occasion trait-effect observed mean.
+///
+/// Equation 5 of the Eq. 1–2 carried latent mean is
+/// `τ + λ(μ_t + e^{a(t−u)} m x)`. Equation 5 of the 2017-era
+/// `T0TRAITEFFECT` carry is
+/// `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`. Those are not the same
+/// map.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::ImpulseCarryObservedMeanIsNotInitialTraitObservedMean`].
+pub fn refuse_impulse_carry_observed_mean_as_initial_trait_observed_mean(
+    impulse_carry_observed_mean: f64,
+    initial_trait_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (impulse_carry_observed_mean, initial_trait_observed_mean);
+    Err(PsychometricError::ImpulseCarryObservedMeanIsNotInitialTraitObservedMean)
+}
+
+/// Refuse treating the first-occasion TI observed mean as the
+/// first-occasion trait-effect observed mean.
+///
+/// Equation 5 of Table 3 `T0TIPREDEFFECT` is
+/// `τ + λ(μ_t + e^{a Δt} t0_b z)`. Equation 5 of 2017-era
+/// `T0TRAITEFFECT` is `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`.
+/// Same numbers yield the same product and remain distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTraitObservedMean`].
+pub fn refuse_initial_time_independent_observed_mean_as_initial_trait_observed_mean(
+    initial_time_independent_observed_mean: f64,
+    initial_trait_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_time_independent_observed_mean,
+        initial_trait_observed_mean,
+    );
+    Err(PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTraitObservedMean)
+}
+
+/// Refuse treating the first-occasion TD observed mean as the
+/// first-occasion trait-effect observed mean.
+///
+/// Equation 5 of Table 3 `T0TDPREDEFFECT` is
+/// `τ + λ(μ_t + e^{a Δt} t0_m x0)`. Equation 5 of 2017-era
+/// `T0TRAITEFFECT` is `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`.
+/// Same numbers yield the same product and remain distinct named
+/// quantities.
+///
+/// # Errors
+///
+/// Always returns
+/// [`PsychometricError::InitialTimeDependentObservedMeanIsNotInitialTraitObservedMean`].
+pub fn refuse_initial_time_dependent_observed_mean_as_initial_trait_observed_mean(
+    initial_time_dependent_observed_mean: f64,
+    initial_trait_observed_mean: f64,
+) -> Result<f64, PsychometricError> {
+    let _ = (
+        initial_time_dependent_observed_mean,
+        initial_trait_observed_mean,
+    );
+    Err(PsychometricError::InitialTimeDependentObservedMeanIsNotInitialTraitObservedMean)
+}
+
 /// Exact scalar within-interval time-dependent impulse carry from
 /// Driver Equations 1–2.
 ///
@@ -6865,6 +7172,7 @@ mod tests {
         recover_discrete_latent_mean_with_impulse, recover_discrete_latent_mean_with_impulse_carry,
         recover_discrete_latent_mean_with_initial_time_dependent_predictor,
         recover_discrete_latent_mean_with_initial_time_independent_predictor,
+        recover_discrete_latent_mean_with_initial_trait_effect,
         recover_discrete_latent_mean_with_time_independent_predictor,
         recover_discrete_latent_variance, recover_discrete_observed_mean,
         recover_discrete_observed_mean_with_extra_process,
@@ -6873,6 +7181,7 @@ mod tests {
         recover_discrete_observed_mean_with_impulse_carry,
         recover_discrete_observed_mean_with_initial_time_dependent_predictor,
         recover_discrete_observed_mean_with_initial_time_independent_predictor,
+        recover_discrete_observed_mean_with_initial_trait_effect,
         recover_discrete_observed_mean_with_time_independent_predictor,
         recover_discrete_process_noise, recover_discrete_time_independent_predictor_effect,
         recover_discrete_time_varying_predictor_effect, recover_event_series_mean_log_rate,
@@ -6926,6 +7235,7 @@ mod tests {
         refuse_evolved_observed_mean_as_impulse_observed_mean,
         refuse_evolved_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_evolved_observed_mean_as_initial_time_independent_observed_mean,
+        refuse_evolved_observed_mean_as_initial_trait_observed_mean,
         refuse_evolved_observed_mean_as_stationary_initial_observed_mean,
         refuse_evolved_observed_mean_as_time_independent_observed_mean,
         refuse_evolved_observed_variance_as_stationary_initial_observed_variance,
@@ -6936,11 +7246,13 @@ mod tests {
         refuse_impulse_carry_observed_mean_as_after_extra_process_observed_mean,
         refuse_impulse_carry_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_impulse_carry_observed_mean_as_initial_time_independent_observed_mean,
+        refuse_impulse_carry_observed_mean_as_initial_trait_observed_mean,
         refuse_impulse_carry_observed_mean_as_time_independent_observed_mean,
         refuse_impulse_observed_mean_as_extra_process_observed_mean,
         refuse_impulse_observed_mean_as_impulse_carry_observed_mean,
         refuse_impulse_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_impulse_observed_mean_as_initial_time_independent_observed_mean,
+        refuse_impulse_observed_mean_as_initial_trait_observed_mean,
         refuse_impulse_observed_mean_as_time_independent_observed_mean,
         refuse_initial_latent_mean_as_evolved_mean,
         refuse_initial_observed_mean_as_evolved_observed_mean,
@@ -6953,12 +7265,14 @@ mod tests {
         refuse_initial_time_dependent_effect_as_continuous_intercept,
         refuse_initial_time_dependent_effect_as_initial_time_independent_effect,
         refuse_initial_time_dependent_effect_as_process_increment,
+        refuse_initial_time_dependent_observed_mean_as_initial_trait_observed_mean,
         refuse_initial_time_independent_carry_as_initial_effect,
         refuse_initial_time_independent_coefficient_as_initial_effect,
         refuse_initial_time_independent_effect_as_continuous_intercept,
         refuse_initial_time_independent_effect_as_process_increment,
         refuse_initial_time_independent_effect_as_time_dependent_impulse,
         refuse_initial_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
+        refuse_initial_time_independent_observed_mean_as_initial_trait_observed_mean,
         refuse_initial_time_independent_variance_as_standardised_trait_variance,
         refuse_latent_lagged_covariance_as_observed_covariance,
         refuse_latent_mean_as_observed_mean, refuse_latent_variance_as_observed_variance,
@@ -7026,6 +7340,7 @@ mod tests {
         refuse_time_independent_effect_as_time_varying_discrete_effect,
         refuse_time_independent_observed_mean_as_initial_time_dependent_observed_mean,
         refuse_time_independent_observed_mean_as_initial_time_independent_observed_mean,
+        refuse_time_independent_observed_mean_as_initial_trait_observed_mean,
         refuse_trait_plus_state_lagged_covariance_as_stationary_lagged_latent_covariance,
         refuse_trait_scaled_continuous_intercept_as_standardised_continuous_intercept,
         refuse_trait_variance_as_process_noise, refuse_trait_variance_as_stationary_within_subject,
@@ -15391,6 +15706,582 @@ mod tests {
                 1e308,
                 1.0,
                 0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines, clippy::similar_names)]
+    fn discrete_observed_mean_with_initial_trait_effect_recovers_driver_equation_five() {
+        let loading = 2.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let effect = 0.4_f64;
+        let trait_score = 3.0_f64;
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let manifest_mean = 0.5_f64;
+        let recovered = recover_discrete_observed_mean_with_initial_trait_effect(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            trait_score,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-t0trait-mean");
+        let composed = recover_discrete_latent_mean_with_initial_trait_effect(
+            initial,
+            drift,
+            intercept,
+            effect,
+            trait_score,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq3-t0trait");
+        let expected = manifest_mean + loading * composed;
+        assert!((recovered - expected).abs() < 1e-15);
+        let evolved_observed = recover_discrete_observed_mean(
+            loading,
+            initial,
+            drift,
+            intercept,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq3-eq5-mean");
+        let process_observed = recover_discrete_observed_mean_with_time_independent_predictor(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            trait_score,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-tipred-mean");
+        let impulse_observed = recover_discrete_observed_mean_with_impulse(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            trait_score,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-impulse-mean");
+        let carried_observed = recover_discrete_observed_mean_with_impulse_carry(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            trait_score,
+            manifest_mean,
+            delta,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("eq5-carry-mean");
+        let tipred_observed =
+            recover_discrete_observed_mean_with_initial_time_independent_predictor(
+                loading,
+                initial,
+                drift,
+                intercept,
+                effect,
+                trait_score,
+                manifest_mean,
+                delta,
+                LagClock::EventTime,
+            )
+            .expect("eq5-t0tipred");
+        let tdpred_observed = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            trait_score,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-t0tdpred");
+        assert!((recovered - evolved_observed).abs() > 1e-3);
+        assert!((recovered - process_observed).abs() > 1e-3);
+        assert!((recovered - impulse_observed).abs() > 1e-3);
+        assert!((recovered - carried_observed).abs() > 1e-3);
+        // Same numbers as T0TIPRED/T0TDPRED yield the same product, but remain distinct named quantities.
+        assert!((recovered - tipred_observed).abs() < 1e-15);
+        assert!((recovered - tdpred_observed).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_trait_effect(
+                0.0,
+                initial,
+                drift,
+                intercept,
+                effect,
+                trait_score,
+                manifest_mean,
+                delta,
+                LagClock::EventTime
+            ),
+            Ok(manifest_mean)
+        );
+        assert!((recovered - composed).abs() > 1e-3);
+        assert!((recovered - manifest_mean).abs() > 1e-3);
+        let identity = recover_discrete_latent_mean_with_initial_trait_effect(
+            0.0,
+            drift,
+            0.0,
+            1.0,
+            trait_score,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("stationary-identity");
+        let expected_identity = trait_score * (drift * delta).exp();
+        assert!((identity - expected_identity).abs() < 1e-15);
+    }
+
+    #[test]
+    fn discrete_observed_mean_with_initial_trait_effect_is_not_evolved_or_zero_carry() {
+        let loading = 2.0_f64;
+        let drift = -0.5_f64;
+        let delta = 2.0_f64;
+        let effect = 0.4_f64;
+        let trait_score = 3.0_f64;
+        let initial = 1.0_f64;
+        let intercept = 0.3_f64;
+        let manifest_mean = 0.5_f64;
+        let recovered = recover_discrete_observed_mean_with_initial_trait_effect(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            trait_score,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq5-t0trait-mean");
+        let evolved_observed = recover_discrete_observed_mean(
+            loading,
+            initial,
+            drift,
+            intercept,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("eq3-eq5-mean");
+        let zero_carry = recover_discrete_observed_mean_with_initial_trait_effect(
+            loading,
+            initial,
+            drift,
+            intercept,
+            0.0,
+            trait_score,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("zero-carry");
+        assert!((zero_carry - evolved_observed).abs() < 1e-15);
+        assert!((recovered - evolved_observed).abs() > 1e-3);
+        let zero_trait = recover_discrete_observed_mean_with_initial_trait_effect(
+            loading,
+            initial,
+            drift,
+            intercept,
+            effect,
+            0.0,
+            manifest_mean,
+            delta,
+            LagClock::EventTime,
+        )
+        .expect("zero-trait");
+        assert!((zero_trait - evolved_observed).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                0.0,
+                drift,
+                0.0,
+                effect,
+                trait_score,
+                delta,
+                LagClock::EventTime
+            )
+            .expect("zero-mu")
+            .to_bits(),
+            (effect * trait_score * (drift * delta).exp()).to_bits()
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines, clippy::similar_names)]
+    fn discrete_observed_mean_with_initial_trait_effect_refuses_evolved_mean_and_overflow() {
+        let recovered = recover_discrete_observed_mean_with_initial_trait_effect(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("eq5-t0trait");
+        let evolved =
+            recover_discrete_observed_mean(2.0, 1.0, -0.5, 0.3, 0.5, 2.0, LagClock::EventTime)
+                .expect("evolved");
+        let process = recover_discrete_observed_mean_with_time_independent_predictor(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("tipred");
+        let impulse = recover_discrete_observed_mean_with_impulse(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("impulse");
+        let carry = recover_discrete_observed_mean_with_impulse_carry(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("carry");
+        let tipred = recover_discrete_observed_mean_with_initial_time_independent_predictor(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("t0tipred");
+        let tdpred = recover_discrete_observed_mean_with_initial_time_dependent_predictor(
+            2.0,
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            0.5,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("t0tdpred");
+        assert_eq!(
+            refuse_evolved_observed_mean_as_initial_trait_observed_mean(evolved, recovered),
+            Err(PsychometricError::EvolvedObservedMeanIsNotInitialTraitObservedMean)
+        );
+        assert_eq!(
+            refuse_time_independent_observed_mean_as_initial_trait_observed_mean(
+                process, recovered
+            ),
+            Err(PsychometricError::TimeIndependentObservedMeanIsNotInitialTraitObservedMean)
+        );
+        assert_eq!(
+            refuse_impulse_observed_mean_as_initial_trait_observed_mean(impulse, recovered),
+            Err(PsychometricError::ImpulseObservedMeanIsNotInitialTraitObservedMean)
+        );
+        assert_eq!(
+            refuse_impulse_carry_observed_mean_as_initial_trait_observed_mean(carry, recovered),
+            Err(PsychometricError::ImpulseCarryObservedMeanIsNotInitialTraitObservedMean)
+        );
+        assert_eq!(
+            refuse_initial_time_independent_observed_mean_as_initial_trait_observed_mean(
+                tipred, recovered
+            ),
+            Err(PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTraitObservedMean)
+        );
+        assert_eq!(
+            refuse_initial_time_dependent_observed_mean_as_initial_trait_observed_mean(
+                tdpred, recovered
+            ),
+            Err(PsychometricError::InitialTimeDependentObservedMeanIsNotInitialTraitObservedMean)
+        );
+        let composed = recover_discrete_latent_mean_with_initial_trait_effect(
+            1.0,
+            -0.5,
+            0.3,
+            0.4,
+            3.0,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("eq3-t0trait");
+        assert_eq!(
+            refuse_latent_mean_as_observed_mean(composed, recovered),
+            Err(PsychometricError::LatentMeanIsNotObservedMean)
+        );
+        assert_eq!(
+            refuse_manifest_means_as_observed_mean(0.5, recovered),
+            Err(PsychometricError::ManifestMeansIsNotObservedMean)
+        );
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)]
+    fn discrete_observed_mean_with_initial_trait_effect_invalid_inputs_fail_closed() {
+        let scaled = recover_discrete_observed_mean_with_initial_trait_effect(
+            1e308,
+            1e-308,
+            0.0,
+            0.0,
+            0.0,
+            3.0,
+            0.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("scale");
+        assert!((scaled - 1.0).abs() < 1e-15);
+        let finite_loaded = recover_discrete_observed_mean_with_initial_trait_effect(
+            1e308,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            3.0,
+            0.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("lambda-mu0");
+        assert!((finite_loaded - 0.0).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_trait_effect(
+                1e308,
+                2.0,
+                0.0,
+                0.0,
+                0.0,
+                3.0,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_trait_effect(
+                2.0,
+                1.0,
+                -0.5,
+                0.3,
+                0.4,
+                3.0,
+                0.5,
+                2.0,
+                LagClock::SystemTime
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_trait_effect(
+                2.0,
+                1.0,
+                -0.5,
+                0.3,
+                0.4,
+                3.0,
+                0.5,
+                0.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::NonPositiveInterval)
+        );
+        assert_eq!(
+            recover_discrete_observed_mean_with_initial_trait_effect(
+                1e308,
+                0.0,
+                0.0,
+                0.0,
+                1e308,
+                1.0,
+                0.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                0.0,
+                710.0,
+                0.0,
+                2.0,
+                0.5,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let vanished = recover_discrete_latent_mean_with_initial_trait_effect(
+            0.0,
+            -800.0,
+            0.0,
+            0.4,
+            3.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("underflow");
+        assert_eq!(vanished.to_bits(), 0.0_f64.to_bits());
+        let finite_rewrite = recover_discrete_latent_mean_with_initial_trait_effect(
+            0.0,
+            700.0,
+            0.0,
+            1e-308,
+            1.0,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("log-rewrite");
+        let expected_rewrite = (1e-308_f64.ln() + 700.0).exp();
+        assert!((finite_rewrite - expected_rewrite).abs() / expected_rewrite < 1e-12);
+        let zero_drift = recover_discrete_latent_mean_with_initial_trait_effect(
+            0.0,
+            0.0,
+            0.0,
+            0.4,
+            3.0,
+            2.0,
+            LagClock::EventTime,
+        )
+        .expect("zero-drift");
+        assert!((zero_drift - 1.2).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                1.0,
+                -0.5,
+                0.3,
+                f64::NAN,
+                1.0,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                1.0,
+                -0.5,
+                0.3,
+                0.4,
+                f64::INFINITY,
+                2.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                1e308,
+                0.0,
+                0.0,
+                1e308,
+                1.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                0.0,
+                f64::NAN,
+                0.0,
+                0.4,
+                3.0,
+                1.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        let clocks = [
+            LagClock::SystemTime,
+            LagClock::DocumentTime,
+            LagClock::AssertionTime,
+        ];
+        let non_event = clocks[std::process::id() as usize % clocks.len()];
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                0.0, -0.5, 0.0, 0.4, 3.0, 2.0, non_event
+            ),
+            Err(PsychometricError::EventTimeRequired)
+        );
+        let scaled_carry = recover_discrete_latent_mean_with_initial_trait_effect(
+            0.0,
+            0.0,
+            0.0,
+            1e308,
+            1e-308,
+            1.0,
+            LagClock::EventTime,
+        )
+        .expect("scale-carry");
+        assert!((scaled_carry - 1.0).abs() < 1e-15);
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                0.0,
+                1e308,
+                0.0,
+                1.0,
+                1.0,
+                10.0,
+                LagClock::EventTime
+            ),
+            Err(PsychometricError::InvalidNumericInput)
+        );
+        assert_eq!(
+            recover_discrete_latent_mean_with_initial_trait_effect(
+                0.0,
+                f64::INFINITY,
+                0.0,
+                1.0,
+                1.0,
                 1.0,
                 LagClock::EventTime
             ),

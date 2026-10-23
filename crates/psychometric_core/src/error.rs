@@ -245,6 +245,34 @@ pub enum PsychometricError {
     /// `τ + λ(μ_t + e^{a Δt} t0_b z)` is not
     /// `τ + λ(μ_t + e^{a Δt} t0_m x0)`.
     InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean,
+    /// Driver Eq. 5 of the Eq. 3 evolved mean was treated as
+    /// Equation 5 of the 2017-era `T0TRAITEFFECT` carry.
+    /// `τ + λ μ_t` is not `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`.
+    EvolvedObservedMeanIsNotInitialTraitObservedMean,
+    /// Driver Eq. 5 of the Eq. 3 process increment was treated as
+    /// Equation 5 of the 2017-era `T0TRAITEFFECT` carry.
+    /// `τ + λ(μ_t + A^{-1}[e^{A Δt} − I] B z)` is not
+    /// `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`.
+    TimeIndependentObservedMeanIsNotInitialTraitObservedMean,
+    /// Driver Eq. 5 of the contemporaneous impulse was treated as
+    /// Equation 5 of the 2017-era `T0TRAITEFFECT` carry.
+    /// `τ + λ(μ_t + m x)` is not `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`.
+    ImpulseObservedMeanIsNotInitialTraitObservedMean,
+    /// Driver Eq. 5 of the Eq. 1–2 carried latent mean was treated as
+    /// Equation 5 of the 2017-era `T0TRAITEFFECT` carry.
+    /// `τ + λ(μ_t + e^{a(t−u)} m x)` is not
+    /// `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`.
+    ImpulseCarryObservedMeanIsNotInitialTraitObservedMean,
+    /// Driver Eq. 5 of Table 3 `T0TIPREDEFFECT` was treated as
+    /// Equation 5 of the 2017-era `T0TRAITEFFECT` carry.
+    /// `τ + λ(μ_t + e^{a Δt} t0_b z)` is not
+    /// `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`.
+    InitialTimeIndependentObservedMeanIsNotInitialTraitObservedMean,
+    /// Driver Eq. 5 of Table 3 `T0TDPREDEFFECT` was treated as
+    /// Equation 5 of the 2017-era `T0TRAITEFFECT` carry.
+    /// `τ + λ(μ_t + e^{a Δt} t0_m x0)` is not
+    /// `τ + λ(μ_t + e^{a Δt} t0_trait·trait)`.
+    InitialTimeDependentObservedMeanIsNotInitialTraitObservedMean,
     /// Driver §7.2 level-change `CINT` was requested for a non-stable
     /// drift. Lasting level change via `CINT = TDPREDEFFECT × (−DRIFT)`
     /// requires `a < 0` so `−κ / a = m x` is an equilibrium offset.
@@ -913,6 +941,24 @@ impl fmt::Display for PsychometricError {
             Self::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean => {
                 "first-occasion time-independent-predictor observed mean is not the first-occasion time-dependent-predictor observed mean"
             }
+            Self::EvolvedObservedMeanIsNotInitialTraitObservedMean => {
+                "evolved observed mean is not the first-occasion trait-effect observed mean"
+            }
+            Self::TimeIndependentObservedMeanIsNotInitialTraitObservedMean => {
+                "time-independent-predictor observed mean is not the first-occasion trait-effect observed mean"
+            }
+            Self::ImpulseObservedMeanIsNotInitialTraitObservedMean => {
+                "contemporaneous-impulse observed mean is not the first-occasion trait-effect observed mean"
+            }
+            Self::ImpulseCarryObservedMeanIsNotInitialTraitObservedMean => {
+                "impulse-carry observed mean is not the first-occasion trait-effect observed mean"
+            }
+            Self::InitialTimeIndependentObservedMeanIsNotInitialTraitObservedMean => {
+                "first-occasion time-independent-predictor observed mean is not the first-occasion trait-effect observed mean"
+            }
+            Self::InitialTimeDependentObservedMeanIsNotInitialTraitObservedMean => {
+                "first-occasion time-dependent-predictor observed mean is not the first-occasion trait-effect observed mean"
+            }
             Self::LevelChangeRequiresStableDrift => {
                 "lasting level-change CINT requires stable negative drift"
             }
@@ -1551,6 +1597,36 @@ mod tests {
             PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTimeDependentObservedMean
                 .to_string(),
             "first-occasion time-independent-predictor observed mean is not the first-occasion time-dependent-predictor observed mean"
+        );
+    }
+
+    #[test]
+    fn initial_trait_observed_mean_boundary_messages_are_stable() {
+        assert_eq!(
+            PsychometricError::EvolvedObservedMeanIsNotInitialTraitObservedMean.to_string(),
+            "evolved observed mean is not the first-occasion trait-effect observed mean"
+        );
+        assert_eq!(
+            PsychometricError::TimeIndependentObservedMeanIsNotInitialTraitObservedMean.to_string(),
+            "time-independent-predictor observed mean is not the first-occasion trait-effect observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseObservedMeanIsNotInitialTraitObservedMean.to_string(),
+            "contemporaneous-impulse observed mean is not the first-occasion trait-effect observed mean"
+        );
+        assert_eq!(
+            PsychometricError::ImpulseCarryObservedMeanIsNotInitialTraitObservedMean.to_string(),
+            "impulse-carry observed mean is not the first-occasion trait-effect observed mean"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeIndependentObservedMeanIsNotInitialTraitObservedMean
+                .to_string(),
+            "first-occasion time-independent-predictor observed mean is not the first-occasion trait-effect observed mean"
+        );
+        assert_eq!(
+            PsychometricError::InitialTimeDependentObservedMeanIsNotInitialTraitObservedMean
+                .to_string(),
+            "first-occasion time-dependent-predictor observed mean is not the first-occasion trait-effect observed mean"
         );
     }
 
