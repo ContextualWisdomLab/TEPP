@@ -1,0 +1,1 @@
+- `tepp_api` loopback `tepp-exports authorize` posts a purpose-bound export request to `tepp-naruon-live` (`NaruonLiveService` `POST /v1/exports`, ADR 0026). Metric-free decision JSON only. `tepp.scientific_acceptance.v1` never appears. Not `tepp-loopback`, not analysis-run CLIs, not GAP-010 Figma/export, not persistence.
