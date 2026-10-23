@@ -31,6 +31,8 @@ mod project_history;
 mod project_journey;
 mod provider_payload;
 mod temporal_context;
+mod temporal_context_retrieval_cli;
+mod temporal_context_retrieval_http;
 mod wire;
 
 /// Terminal analysis-result contract version constant.
@@ -282,3 +284,35 @@ pub use temporal_context::TemporalContextTimelineEvent;
 pub use temporal_context::TemporalTransitionGapCandidate;
 /// Build a cutoff-safe, non-causal temporal context.
 pub use temporal_context::build_temporal_context;
+/// Maximum opaque idempotency-key length on the retrieval path.
+pub use temporal_context_retrieval_http::TEMPORAL_CONTEXT_RETRIEVAL_ID_MAX_LEN;
+/// Supported temporal-context retrieval contract version.
+pub use temporal_context_retrieval_http::TEMPORAL_CONTEXT_RETRIEVAL_CONTRACT_VERSION;
+/// Fixed non-causal claim boundary echoed on every retrieval.
+pub use temporal_context_retrieval_http::TEMPORAL_CONTEXT_RETRIEVAL_INFERENCE_STATUS;
+/// One metric-free identity projection for an accepted temporal-context POST.
+pub use temporal_context_retrieval_http::TemporalContextRetrieved;
+/// Build a provider-owned `GET` temporal-context retrieval exchange.
+pub use temporal_context_retrieval_http::lineageweave_temporal_context_retrieval_exchange;
+/// Refuse retrieval JSON that already carries scientific-metric or evidence keys.
+pub use temporal_context_retrieval_http::refuse_metrics_on_temporal_context_retrieval_payload;
+/// Extract the opaque idempotency key from `GET /v1/temporal-context/{key}`.
+pub use temporal_context_retrieval_http::temporal_context_retrieval_path_id;
+/// Refuse an empty, oversized, slash, NUL, or control-bearing identity.
+pub use temporal_context_retrieval_http::validate_temporal_context_registry_identity;
+/// Supported operator verbs for the loopback temporal-context retrieval CLI.
+pub use temporal_context_retrieval_cli::TemporalContextRetrievalCliVerb;
+/// One operator CLI invocation against a loopback GET-by-id listener.
+pub use temporal_context_retrieval_cli::TemporalContextRetrievalCliInvocation;
+/// Compose one HTTP/1.1 retrieval GET from the typed `LineageWeave` exchange.
+pub use temporal_context_retrieval_cli::compose_temporal_context_retrieval_cli_http;
+/// Dispatch one retrieval CLI invocation against an in-process listener.
+pub use temporal_context_retrieval_cli::dispatch_temporal_context_retrieval_cli;
+/// Execute one retrieval CLI invocation over loopback TCP.
+pub use temporal_context_retrieval_cli::execute_temporal_context_retrieval_cli;
+/// Render a typed retrieval GET exchange as HTTP/1.1 for a loopback listener.
+pub use temporal_context_retrieval_cli::loopback_http1_from_temporal_context_retrieval_exchange;
+/// Read stdin leftover bytes on a non-terminal; retrieval GET admits empty.
+pub use temporal_context_retrieval_cli::read_temporal_context_retrieval_cli_stdin;
+/// Filter CLI stdout so retrieval never prints scientific acceptance.
+pub use temporal_context_retrieval_cli::render_temporal_context_retrieval_cli_stdout;
