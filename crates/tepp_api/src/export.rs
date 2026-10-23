@@ -35,8 +35,9 @@ pub struct JsonLdExport {
     pub contract_version: u16,
     /// `JSON-LD` context URI or term map serialized as string for v1.
     pub context: String,
-    /// Primary node identifier.
-    pub id: String,
+    /// Primary node identifier. The v1 wire key remains `id` for compatibility.
+    #[serde(rename = "id")]
+    pub node_id: String,
     /// Node type label.
     pub type_name: String,
     /// Opaque payload digest the consumer must verify separately.
@@ -120,14 +121,14 @@ impl JsonLdExport {
     /// Returns field-validation errors for empty values.
     pub fn new(
         context: impl Into<String>,
-        id: impl Into<String>,
+        node_id: impl Into<String>,
         type_name: impl Into<String>,
         artifact_digest_sha256: impl Into<String>,
     ) -> Result<Self, ApiError> {
         let export = Self {
             contract_version: EXPORT_CONTRACT_VERSION,
             context: context.into(),
-            id: id.into(),
+            node_id: node_id.into(),
             type_name: type_name.into(),
             artifact_digest_sha256: artifact_digest_sha256.into(),
         };
@@ -159,7 +160,7 @@ impl JsonLdExport {
     fn validate(&self) -> Result<(), ApiError> {
         require_contract_version(self.contract_version, EXPORT_CONTRACT_VERSION)?;
         require_nonempty(&self.context)?;
-        require_nonempty(&self.id)?;
+        require_nonempty(&self.node_id)?;
         require_nonempty(&self.type_name)?;
         require_nonempty(&self.artifact_digest_sha256)?;
         Ok(())
