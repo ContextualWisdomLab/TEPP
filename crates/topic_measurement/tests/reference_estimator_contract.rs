@@ -135,6 +135,127 @@ fn separated_counts() -> SparseMatrix {
 }
 
 #[test]
+fn direct_input_refuses_high_sparse_covariates_before_dense_expansion() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    for columns in [3, usize::MAX] {
+        let covariates =
+            SparseMatrix::from_csr(6, columns, vec![0, 1, 1, 1, 1, 1, 1], vec![2], vec![1.0])
+                .expect("small populated covariate with unused trailing columns");
+        let input = ReferenceTopicInput::new(
+            &snapshot,
+            ids.clone(),
+            &separated_counts(),
+            &times,
+            Some(&covariates),
+            &memberships,
+            &relations,
+        )
+        .expect("actual small feature expansion is admitted");
+        assert_eq!(input.features().len(), 8);
+        let config = ReferenceTopicModelConfig::new(2, vec![7], 4, 1e30).expect("config");
+        assert!(fit_reference_topic_model(&input, &config).is_ok());
+    }
+    for column in [1_000_000, usize::MAX - 1] {
+        let covariates = SparseMatrix::from_csr(
+            6,
+            column + 1,
+            vec![0, 1, 1, 1, 1, 1, 1],
+            vec![column],
+            vec![1.0],
+        )
+        .expect("one sparse high-index covariate");
+        assert!(matches!(
+            ReferenceTopicInput::new(
+                &snapshot,
+                ids.clone(),
+                &separated_counts(),
+                &times,
+                Some(&covariates),
+                &memberships,
+                &relations,
+            ),
+            Err(TopicMeasurementError::ResourceLimitExceeded)
+        ));
+    }
+}
+
+#[test]
+fn direct_fit_refuses_large_sparse_vocabulary_before_seed_allocation() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let counts = SparseMatrix::from_csr(
+        6,
+        100_000,
+        vec![0, 1, 2, 3, 4, 5, 6],
+        vec![0; 6],
+        vec![1.0; 6],
+    )
+    .expect("small sparse counts with large declared vocabulary");
+    let input = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("small design");
+    let config = ReferenceTopicModelConfig::new(20_000, vec![7], 2, 1e-5).expect("config");
+    assert!(matches!(
+        fit_reference_topic_model(&input, &config),
+        Err(TopicMeasurementError::ResourceLimitExceeded)
+    ));
+}
+
+#[test]
+fn reference_input_requires_observed_not_proposed_transitions() {
+    let (snapshot, ids, times, memberships, observed) = fixture();
+    let counts = separated_counts();
+    let mut inferred = RelationGraph::new();
+    for edge in observed.edges() {
+        inferred
+            .insert(
+                RelationEdge::new(
+                    edge.kind(),
+                    edge.source(),
+                    edge.target(),
+                    RelationEvidenceStatus::Inferred,
+                    edge.source_event_time(),
+                    edge.target_event_time(),
+                )
+                .expect("valid proposal"),
+            )
+            .expect("insert proposal");
+    }
+    let build = |graph: &RelationGraph| {
+        ReferenceTopicInput::new(
+            &snapshot,
+            ids.clone(),
+            &counts,
+            &times,
+            None,
+            &memberships,
+            graph,
+        )
+    };
+    assert!(matches!(
+        build(&inferred),
+        Err(TopicMeasurementError::InvalidModelInput)
+    ));
+    assert!(build(&observed).is_ok());
+    let mut mixed = observed.clone();
+    for edge in inferred.edges() {
+        mixed.insert(*edge).expect("distinct status");
+    }
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 2_000, 1e-5).expect("config");
+    let baseline = fit_reference_topic_model(&build(&observed).expect("observed"), &config)
+        .expect("observed fit");
+    let candidate =
+        fit_reference_topic_model(&build(&mixed).expect("mixed"), &config).expect("mixed fit");
+    assert_eq!(candidate, baseline);
+}
+
+#[test]
 fn separated_topics_recover_and_emit_predecessor_successor_counts() {
     let (snapshot, document_ids, times, memberships, relations) = fixture();
     let counts = separated_counts();

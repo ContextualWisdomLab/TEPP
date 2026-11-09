@@ -48,6 +48,26 @@ The artifact is bounded, digest-bound, and self-validating; invalid or
 non-converged estimation returns no partial artifact. Production selection of
 `K` remains governed by ADR 0012 and `model_selection`, outside this executor.
 
+The offline `tepp-topic-lineage` binary is a local entry point to the same
+executor, not a new service authority. It reads one bounded
+`tepp.topic_lineage_cli_input.v1` file, excludes documents, memberships, and
+relations unavailable at the request cutoff (and memberships and relations
+that touch an excluded document), refuses the identified causal relation kinds
+`causes` and `intervenes_on`, and invokes `execute_topic_lineage_run`
+unchanged. Its accepted receipt is minted locally from the input `run_id` and
+is never registered as a durable analysis run. Input must resolve to a regular
+file; directories, FIFOs, devices, and sockets fail with `io` (exit `5`) before
+reading. Regular-file symlinks are supported. The Unix path uses a nonblocking
+open and rechecks the opened descriptor, so replacement with a FIFO after the
+pathname check cannot wait for a writer or bypass type admission. Other
+platforms use pathname and opened-file checks; this is not a general I/O deadline.
+
+The edge `association_strength` is the minimum dominant-topic MAP-fitted
+proportion across the linked documents, not a posterior mean, uncertainty
+probability, or causal effect. This corrects labeling only: the CPU `f64`
+estimand, fitted values, wire fields, schema identity, and separate posterior
+uncertainty contracts are unchanged.
+
 ## Alternatives considered
 
 1. Keep the API as contracts only — rejected because an accepted run would not
@@ -86,6 +106,12 @@ The topic-lineage execution contract additionally verifies a synthetic
 known-topic corpus, exact request/snapshot/cutoff binding, canonical artifact
 round-trip and digest stability, predecessor/successor count consistency, and
 fail-closed tamper/non-convergence paths.
+
+The offline CLI contract (`tests/topic_lineage_cli_contract.rs`) verifies the
+committed example, equivalence between cutoff exclusion and manual removal of
+the late evidence, inclusive cutoff boundary, causal-kind refusal, strict
+clocks, unknown-field and non-finite rejection, every execution bound, typed
+exit statuses, redacted diagnostics, and the packaged binary.
 
 The supporting research and APA 7th citations are recorded in
 `docs/doctoring/analysis-engine-v1.md` and the standards register.

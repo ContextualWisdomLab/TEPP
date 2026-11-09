@@ -50,8 +50,11 @@ cross-classified/multiple-membership assignment. This is the logistic-normal
 prevalence boundary of correlated/structural topic models, not a raw-simplex
 regression (Blei & Lafferty, 2007; Roberts et al., 2019).
 
-For explicit observed predecessor/successor relations only, the reference
-objective adds the harmonic network penalty
+For explicit **observed** predecessor/successor relations only, the reference
+objective adds the harmonic network penalty. Inferred transition proposals are
+retained as provenance but are not admitted into the objective, transition
+pairs, degrees, or emitted lineage; an inferred-only graph therefore fails the
+reference input gate rather than becoming observed by consumption. The penalty is
 
 \[
 R(\Theta,G)=\frac{1}{2}\sum_{(d,e)\in E}a_{de}
@@ -82,6 +85,28 @@ intermediate, invalid sparse matrix, missing cutoff-safe document, reverse
 transition, or exhausted iteration budget returns a typed failure; it never
 emits a partial topic artifact. Recovery gates remain caller-owned promotion
 criteria over completed validation evidence.
+
+The returned `document_topic_proportions` are MAP-fitted point estimates
+`softmax([eta_MAP, 0])`, not posterior mean proportions. The sequence-edge
+`association_strength` is the minimum of the two linked documents' fitted
+proportions for their shared dominant topic; it is not an edge-existence
+probability or uncertainty interval. Laplace curvature/precision and any
+separately admitted posterior plausible values retain their own contracts.
+This labeling clarification does not change the estimand, numeric algorithm,
+public field names, or the PRD's posterior-aware downstream measurement target.
+The observed-status admission correction likewise restores this ADR's existing
+scientific contract; it does not revise the PRD v0.4 target, perform relation
+promotion, or establish posterior calibration. Shared reference input admission
+now checks a 16 MiB dense design cap (including populated sparse covariate
+expansion) before feature/design allocation, and shared fit admission checks
+the conservative 128 MiB simultaneous numeric payload before any seed.
+The CLI reuses this policy and retains its stricter operator count/work caps.
+This supersedes CLI-only resource authority: direct library/executor and
+candidate-K consumers are protected by the same checked admission. These are
+execution-admission policies, not a new estimator, changed latent meaning,
+RSS guarantee, or approved product/measurement-target change; PRD v0.4 and
+wire/model contract versions therefore remain unchanged.
+See [the source trace and refusal scope](../research/topic-lineage-cli-admission.md).
 
 ## Non-goals
 
