@@ -127,6 +127,62 @@ an unstable compiler capability. A zero denominator is reported explicitly for
 any crate whose lane still ships no executable behavior; it must never conceal
 uncovered production behavior.
 
+## Offline topic-lineage CLI
+
+```bash
+cargo run -p analysis_engine --bin tepp-topic-lineage -- examples/topic_lineage_cli_input_v1.json
+```
+
+The binary reads one bounded `tepp.topic_lineage_cli_input.v1` file, excludes
+documents, memberships, and relations that were not available at the request
+knowledge cutoff, refuses `causes`/`intervenes_on` relations, runs the CPU
+`f64` reference topic-lineage estimator with the supplied topic count and
+seeds, and prints one `tepp.topic_lineage_cli_output.v1` JSON line. The output
+is fitted topic association, not causation. Its association strength is a
+MAP-fitted proportion, not a posterior mean or uncertainty probability. It is
+not a durable analysis run, calibrated recovery evidence, or GPU parity evidence.
+Input must resolve to a regular file (regular-file symlinks are allowed).
+Directories, FIFOs, devices, and sockets return redacted `io` diagnostics with
+exit `5`; Unix opens are nonblocking and recheck the opened file type to reject
+FIFO replacement races without waiting for a writer. These checks are not a
+general filesystem I/O deadline. See
+`docs/API_CONTRACT.md` for the field and exit-status contract.
+
+## Centralized CI contract source
+
+`.github/workflows/ci.yml` dispatches the reviewed central workflow
+`ContextualWisdomLab/.github/.github/workflows/tepp-rust-foundation-ci.yml`
+at `3136c940235a3762b804bd99eb20fbe129e70c06`. The documentation caller
+`.github/workflows/docs-quality.yml` uses the same pin for
+`tepp-documentation-quality.yml`. These suppliers provision private Python
+environments across all five jobs and hash-verify official Rustup 1.29.1 in the
+three Rust jobs. Each Rust job owns fresh Cargo/Rustup namespaces; quality tools
+are installed with explicit private roots and locked version pins, never restored
+from cached executable archives or skipped on cache hits. The LLVM plugin version
+probe includes its required `llvm-cov` argv. Executable jobs remain supplier-owned;
+frozen files under
+`tests/fixtures/central-ci/` are evidence only, not installed workflows.
+Local source-custody tests do not establish native runner bootstrap, hosted
+execution, or GitHub App approval.
+
+`scripts/effective_ci_source.py` resolves the caller and supplier offline for the
+workspace, coverage diagnostics, and shared-runner contract checks. It verifies
+the exact reviewed caller SHA-256, the original Git commit object and each tree
+on the supplier path, the workflow blob identity, and its independent SHA-256.
+Missing evidence, changed pins, disabled dispatch, extra caller jobs, or modified
+supplier bytes fail closed. It needs neither Git metadata nor network access.
+The original coverage, reproducible toolchain, PostgreSQL service/test, and
+runner-isolation contracts remain enforced; tooling coverage includes the
+resolver at the unchanged 100% statement/branch threshold.
+
+To update the supplier, review the new immutable central commit and executable
+body, export its original commit/tree/blob objects, and update the reviewed pin
+and digest constants together with positive and negative contract controls.
+Never hand-author supplier fixtures, substitute a moving branch, or resolve from
+live CI during static tests. These local source checks do not prove hosted jobs
+ran successfully. The inherited hourly schedule contract is separate and is not
+waived by this resolver.
+
 ## Normative documents
 
 - `AGENTS.md`
