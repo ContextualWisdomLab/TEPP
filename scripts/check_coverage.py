@@ -706,20 +706,33 @@ def reconcile_contradictory_zero_counts(
     lines are not authored coverage units, so they cannot break that proof. A
     closing brace or any other meaningful unmeasured line stops the proof;
     reconciliation never crosses into a sibling statement outside the block.
+
+    A reconciled nested opener is itself the proof for the opener containing
+    it, so each source is visited from its last line to its first and the pass
+    repeats until nothing changes. The verdict therefore does not depend on the
+    order of the report's records.
     """
 
-    for key in [key for key, count in line_counts.items() if count == 0]:
-        source_path, line_number = key
-        if not opens_a_block(source_path, line_number, repository_root):
-            continue
-        nested_line = _first_meaningful_source_line_after(
-            source_path, line_number, repository_root
+    changed = True
+    while changed:
+        changed = False
+        zero_keys = sorted(
+            (key for key, count in line_counts.items() if count == 0),
+            key=lambda item: (item[0], -item[1]),
         )
-        if nested_line is None:
-            continue
-        nested_count = line_counts.get((source_path, nested_line))
-        if nested_count is not None and nested_count > 0:
-            line_counts[key] = 1
+        for key in zero_keys:
+            source_path, line_number = key
+            if not opens_a_block(source_path, line_number, repository_root):
+                continue
+            nested_line = _first_meaningful_source_line_after(
+                source_path, line_number, repository_root
+            )
+            if nested_line is None:
+                continue
+            nested_count = line_counts.get((source_path, nested_line))
+            if nested_count is not None and nested_count > 0:
+                line_counts[key] = 1
+                changed = True
 
 
 def load_lcov_line_totals(

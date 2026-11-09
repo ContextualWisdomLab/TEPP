@@ -3,6 +3,8 @@
 from pathlib import Path
 import unittest
 
+from scripts.effective_ci_source import effective_ci_source
+
 
 WORKFLOW_DIRECTORY = Path(".github/workflows")
 
@@ -38,15 +40,25 @@ class WorkflowQueueHygieneTests(unittest.TestCase):
             "if: ${{ github.event_name != 'pull_request' "
             "|| !github.event.pull_request.draft }}"
         )
-        for workflow_name, job_count in (("ci.yml", 4), ("docs-quality.yml", 1)):
+        callers = (
+            ("ci.yml", "foundation", "tepp-rust-foundation-ci.yml"),
+            ("docs-quality.yml", "documentation", "tepp-documentation-quality.yml"),
+        )
+        for workflow_name, job_id, supplier in callers:
             workflow = (WORKFLOW_DIRECTORY / workflow_name).read_text(encoding="utf-8")
             with self.subTest(workflow=workflow_name):
-                # Every job carries the guard, so no gate is silently dropped.
-                self.assertEqual(workflow.count(guard), job_count)
+                # One guard on the only caller job skips every pinned supplier gate.
+                jobs = workflow.split("\njobs:\n", 1)[1]
+                self.assertEqual(jobs.count("    uses: "), 1)
+                self.assertEqual(workflow.count(guard), 1)
+                caller = jobs.split(f"  {job_id}:\n", 1)[1]
+                self.assertTrue(caller.split("    uses: ", 1)[0].endswith(f"    {guard}\n"))
+                self.assertIn(f"/{supplier}@", caller)
+                triggers = workflow.split("\n  pull_request:\n", 1)[1].split("\n    paths:\n", 1)[0]
                 # Marking a draft ready must re-run the gates it skipped.
-                self.assertIn("      - ready_for_review\n", workflow)
+                self.assertIn("      - ready_for_review", triggers)
                 # Returning a ready PR to draft must cancel its in-flight local run.
-                self.assertIn("      - converted_to_draft\n", workflow)
+                self.assertIn("      - converted_to_draft", triggers)
 
     def test_central_scheduler_replaces_local_hourly_caller(self) -> None:
         """A local timer must not duplicate central PR scheduling."""
@@ -64,7 +76,7 @@ class WorkflowQueueHygieneTests(unittest.TestCase):
     def test_rust_ci_reuses_one_runner_for_both_coverage_reports(self) -> None:
         """Coverage keeps both gates while avoiding a second runner boot."""
 
-        workflow = (WORKFLOW_DIRECTORY / "ci.yml").read_text(encoding="utf-8")
+        workflow = effective_ci_source(Path(__file__).resolve().parents[2])
         self.assertIn("  production-coverage:\n", workflow)
         self.assertNotIn("  line-coverage:\n", workflow)
         self.assertNotIn("  branch-coverage:\n", workflow)

@@ -3,6 +3,7 @@ branch = True
 relative_files = True
 source =
     scripts.check_workspace_contract
+    scripts.effective_ci_source
     scripts.check_docstrings
     scripts.check_coverage
     scripts.prepare_agent_pr_message

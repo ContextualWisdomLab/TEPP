@@ -67,6 +67,7 @@ TEPP's approved PRD v0.4 and implementation plan are the primary product baselin
 | Span-grounded mention numeric provenance | [`docs/doctoring/span-grounded-mentions.md`](docs/doctoring/span-grounded-mentions.md) |
 | Event-intelligence status-gate doctoring | [`docs/research/event-intelligence-status-gates.md`](docs/research/event-intelligence-status-gates.md) |
 | Stopword-deletion doctoring | [`docs/research/stopword-deletion.md`](docs/research/stopword-deletion.md) |
+| Offline topic-lineage allocation/status doctoring | [`docs/research/topic-lineage-cli-admission.md`](docs/research/topic-lineage-cli-admission.md) |
 | Topic log-ratio coordinate doctoring | [`docs/research/topic-logratio-coordinates.md`](docs/research/topic-logratio-coordinates.md) |
 | Hourly NIM OpenCode doctoring | [`docs/doctoring/hourly-nim-opencode-development.md`](docs/doctoring/hourly-nim-opencode-development.md) |
 | Analysis engine v1 doctoring | [`docs/doctoring/analysis-engine-v1.md`](docs/doctoring/analysis-engine-v1.md) |

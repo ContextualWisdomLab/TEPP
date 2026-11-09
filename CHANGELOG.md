@@ -38,6 +38,16 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ## [Unreleased]
 
+### Fixed
+
+- Resolve the effective Rust CI contract from the reviewed immutable central
+  supplier offline. Authenticate retained commit/tree/blob evidence and the
+  caller/workflow SHA-256 digests; preserve coverage diagnostics, pinned tools,
+  live PostgreSQL, and shared isolated-runner checks without duplicating jobs.
+  Include resolver corruption and gate-weakening controls in the unchanged
+  100% Python statement/branch coverage gate. The separate inherited hourly
+  schedule contract is not waived.
+
 - Removed the repository-local hourly PR-maintenance caller now covered by the central required scheduler, retired stale workflow registrations, narrowed documentation triggers, keyed PR concurrency by fixed workflow name, repository, and pull-request number without cancelling non-PR runs, and combined line/branch coverage on one sequential runner while preserving both 100% gates and diagnostics.
 
 - `event_core` adds bounded Allen interval-consistency classification, atomic path-consistency closure, contradiction/resource refusals, and an explicit dependency-error fallback without claiming unrestricted global satisfiability.

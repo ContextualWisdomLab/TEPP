@@ -17,6 +17,9 @@ pub enum TopicMeasurementError {
     InvalidSparseMatrix,
     /// A reference-estimator input or configuration violated its scientific contract.
     InvalidModelInput,
+    /// Checked dense design or simultaneous fit payload exceeds its fixed budget,
+    /// or dimensional byte arithmetic overflows, before dense allocation.
+    ResourceLimitExceeded,
     /// The estimator produced a non-finite intermediate and failed closed.
     NonFiniteEstimate,
     /// No seeded initialization converged within the bounded iteration budget.
@@ -33,6 +36,7 @@ impl fmt::Display for TopicMeasurementError {
             Self::LexicalWeightForbidden => "lexical inferential weights are forbidden",
             Self::InvalidSparseMatrix => "invalid sparse matrix",
             Self::InvalidModelInput => "invalid topic model input",
+            Self::ResourceLimitExceeded => "topic model resource limit exceeded",
             Self::NonFiniteEstimate => "non-finite topic estimate",
             Self::DidNotConverge => "topic estimator did not converge",
             Self::JointPosteriorUnavailable => "joint topic posterior is unavailable",
@@ -68,6 +72,10 @@ mod tests {
         assert_eq!(
             TopicMeasurementError::InvalidModelInput.to_string(),
             "invalid topic model input"
+        );
+        assert_eq!(
+            TopicMeasurementError::ResourceLimitExceeded.to_string(),
+            "topic model resource limit exceeded"
         );
         assert_eq!(
             TopicMeasurementError::NonFiniteEstimate.to_string(),

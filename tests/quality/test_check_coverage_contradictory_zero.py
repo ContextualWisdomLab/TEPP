@@ -102,6 +102,32 @@ class ContradictoryZeroCountTests(unittest.TestCase):
         loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
         self.assertEqual((loaded["count"], loaded["covered"]), (2, 2))
 
+    def test_nested_openers_reconcile_independently_of_record_order(self) -> None:
+        """A nested opener's proof reaches its parent in every LCOV record order."""
+
+        source = self.root / "nested_guard.rs"
+        source.write_text(
+            "fn outer(ready: bool, armed: bool) {\n"
+            "    if ready {\n"
+            "        if armed {\n"
+            "            work();\n"
+            "        }\n"
+            "    }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        records = [(2, 0), (3, 0), (4, 5)]
+        for name, ordered in (
+            ("outer-first", records),
+            ("inner-first", list(reversed(records))),
+            ("middle-first", [records[1], records[2], records[0]]),
+        ):
+            with self.subTest(order=name):
+                report = self.root / f"nested_guard_{name}.lcov"
+                report.write_text(lcov(source, ordered), encoding="utf-8")
+                loaded = coverage_contract.load_lcov_line_totals(report, self.root)["lines"]
+                self.assertEqual((loaded["count"], loaded["covered"]), (3, 3))
+
     def test_reconciliation_does_not_cross_a_closed_block(self) -> None:
         """A later sibling statement cannot prove an empty opener executed."""
 

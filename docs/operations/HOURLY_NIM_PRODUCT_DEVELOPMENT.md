@@ -8,10 +8,10 @@ releases, deploys, approves, or changes reviewer credentials.
 
 ## Admission and queue behavior
 
-`.github/workflows/hourly-nim-product-development.yml` carries no local
-`schedule` trigger. The central development coordinator in the organisation
-`.github` repository owns the hourly cadence and admits this workflow through
-`workflow_dispatch`, which also supports a manual `dry_run=true`. A
+`.github/workflows/hourly-nim-product-development.yml` is the TEPP dispatchable
+commercial entrypoint and supports `workflow_dispatch` with `dry_run=true`.
+Recurring cadence is supplied by the central CWL scheduler/admission owner; the
+repository workflow intentionally has no local `schedule` or `cron` trigger. A
 repository-scoped concurrency group does not cancel an active run.
 
 Before checkout or model execution, the proposal job reads at most one open pull
@@ -56,7 +56,7 @@ Do not place GitHub App credentials in the proposal or verifier jobs. Do not
 reuse the existing review App or alter its variable, secret, identity, or
 provider route. Do not configure `COPILOT_GITHUB_TOKEN`.
 
-A manual dry run verifies scheduling, queue, and prompt contracts without model
+A manual dry run verifies admission, queue, and prompt contracts without model
 or publication credentials. Missing production credentials leave the hourly
 developer disabled rather than falling back to `GITHUB_TOKEN`.
 
@@ -161,10 +161,12 @@ write token.
 
 ## Disablement and rollback
 
-Disable scheduled development by disabling the workflow, removing its schedule,
-or removing any one of the five provider credentials. Removing any provider key
-stops model execution; removing the Maintainer App values stops publication.
-The minute-17 deterministic quality sentinel continues independently.
+Recurring cadence is disabled at the central CWL scheduler/admission owner; the
+TEPP repository workflow owns no local schedule to remove. Repository-side
+execution can be disabled by disabling the workflow or removing any one of the
+five provider credentials. Removing any provider key stops model execution;
+removing the Maintainer App values stops publication. The minute-17 deterministic
+quality sentinel continues independently.
 
 Rollback a faulty workflow through a reviewed revert PR. Do not edit branch
 protection, review workflows, or release workflows as an incident shortcut.
@@ -178,7 +180,7 @@ references them.
   inference broker could keep upstream secrets outside the runner.
 - Each configured provider may process repository source; operators must review
   confidentiality, retention, regional, and contractual obligations for every
-  provider before enabling the schedule.
+  provider before enabling the centrally owned cadence.
 - The verifier executes untrusted code on an ephemeral hosted runner with
   outbound network access, but receives no publication, provider, OIDC,
   artifact/cache runtime, command-file, or reviewer credential.
