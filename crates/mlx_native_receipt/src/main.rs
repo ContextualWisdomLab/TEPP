@@ -65,6 +65,8 @@ struct MlxProbeCalls {
     ) -> std::ffi::c_int,
     /// Materialize the result only after successful submission.
     evaluate: unsafe extern "C" fn(mlx_sys::mlx_array) -> std::ffi::c_int,
+    /// Read the evaluated element count before borrowing scalar storage.
+    size: unsafe extern "C" fn(mlx_sys::mlx_array) -> usize,
     /// Borrow scalar storage only after successful materialization.
     data: unsafe extern "C" fn(mlx_sys::mlx_array) -> *const f32,
     /// Settle one owned input or result array.
@@ -83,6 +85,7 @@ impl MlxProbeCalls {
             select_device: mlx_sys::mlx_set_default_device,
             matmul: mlx_sys::mlx_matmul,
             evaluate: mlx_sys::mlx_array_eval,
+            size: mlx_sys::mlx_array_size,
             data: mlx_sys::mlx_array_data_float32,
             free_array: mlx_sys::mlx_array_free,
             free_stream: mlx_sys::mlx_stream_free,
@@ -138,7 +141,7 @@ fn mlx_cpu_matmul_with_calls(
         } else {
             operation_status
         };
-        let output = if evaluation_status == 0 {
+        let output = if evaluation_status == 0 && (calls.size)(result) == 1 {
             let pointer = (calls.data)(result);
             if pointer.is_null() {
                 None
@@ -279,6 +282,29 @@ mod tests {
         });
     }
 
+    /// Assign a two-element result whose first value equals the exact product.
+    unsafe extern "C" fn oversized_matmul(
+        result: *mut mlx_sys::mlx_array,
+        _left: mlx_sys::mlx_array,
+        _right: mlx_sys::mlx_array,
+        _stream: mlx_sys::mlx_stream,
+    ) -> std::ffi::c_int {
+        let values = [11.0_f32, 11.0];
+        // SAFETY: the temporary handle is created from Rust-owned data,
+        // assigned into the runner-owned result and settled once here.
+        unsafe {
+            let oversized = mlx_sys::mlx_array_new_data(
+                values.as_ptr().cast::<std::ffi::c_void>(),
+                [1_i32, 2].as_ptr(),
+                2,
+                mlx_sys::mlx_dtype__MLX_FLOAT32,
+            );
+            let status = mlx_sys::mlx_array_set(result, oversized);
+            let _ = mlx_sys::mlx_array_free(oversized);
+            status
+        }
+    }
+
     #[test]
     fn native_handles_are_settled_on_every_backend_status_path() {
         unsafe extern "C" fn free_array(array: mlx_sys::mlx_array) -> std::ffi::c_int {
@@ -367,6 +393,14 @@ mod tests {
                 },
                 Err("MLX CPU matrix product failed".to_owned()),
                 [3, 1, 1, 1, 1],
+            ),
+            (
+                super::MlxProbeCalls {
+                    matmul: oversized_matmul,
+                    ..native
+                },
+                Err("MLX CPU matrix product failed".to_owned()),
+                [3, 1, 1, 1, 0],
             ),
         ];
         for (calls, expected, counts) in cases {
