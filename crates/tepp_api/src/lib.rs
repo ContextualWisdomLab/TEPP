@@ -168,7 +168,7 @@ pub use naruon_http::naruon_may_claim_tepp_inference;
 pub use naruon_live::NARUON_LIVE_HEADER_BYTE_LIMIT;
 /// Maximum live HTTP header count.
 pub use naruon_live::NARUON_LIVE_HEADER_COUNT_LIMIT;
-/// Accepted-stream read/write deadline.
+/// Whole-request receive budget and per-operation response-write timeout.
 pub use naruon_live::NARUON_LIVE_IO_TIMEOUT;
 /// HTTP/1.1 response from the loopback listener.
 pub use naruon_live::NaruonLiveResponse;

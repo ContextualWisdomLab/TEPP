@@ -1,8 +1,13 @@
 //! Shared fail-closed framing and host validation for loopback HTTP listeners.
 
+#[cfg(test)]
+#[path = "../tests/support/live_http_deadline.rs"]
+mod deadline_tests;
+
 use std::collections::HashMap;
-use std::io::Read;
-use std::net::{IpAddr, SocketAddr};
+use std::io::{self, Read};
+use std::net::{IpAddr, SocketAddr, TcpStream};
+use std::time::{Duration, Instant};
 
 use crate::naruon_http::header_is_credential;
 use crate::{ApiError, DEFAULT_ANALYSIS_RUN_BYTE_LIMIT};
@@ -12,6 +17,54 @@ pub const NARUON_LIVE_HEADER_BYTE_LIMIT: usize = 8 * 1024;
 
 /// Maximum number of HTTP header lines on one live request.
 pub const NARUON_LIVE_HEADER_COUNT_LIMIT: usize = 32;
+
+/// Borrow a socket for one receive phase without resetting its time budget.
+struct DeadlineReader<'a> {
+    /// Accepted connection owned by the caller.
+    stream: &'a mut TcpStream,
+    /// Monotonic end of the complete header-plus-body receive phase.
+    deadline: Instant,
+}
+
+impl DeadlineReader<'_> {
+    /// Refuse exhausted or zero budgets before installing a socket timeout.
+    fn remaining(&self) -> io::Result<Duration> {
+        let now = Instant::now();
+        if now >= self.deadline {
+            return Err(io::Error::new(
+                io::ErrorKind::TimedOut,
+                "request receive deadline",
+            ));
+        }
+        Ok(self.deadline.duration_since(now))
+    }
+}
+
+impl Read for DeadlineReader<'_> {
+    /// Bound each partial read by the same remaining receive allowance.
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        self.stream.set_read_timeout(Some(self.remaining()?))?;
+        let count = self.stream.read(buffer)?;
+        self.remaining()?;
+        Ok(count)
+    }
+}
+
+/// Read a live socket's complete framing under one monotonic receive budget.
+///
+/// Every partial header/body read uses the remaining allowance. A completed
+/// read after the deadline is refused before any request is dispatched. The
+/// caller retains socket ownership and its separate response-write timeout.
+pub(crate) fn read_socket_request_with_limit(
+    stream: &mut TcpStream,
+    maximum_body_bytes: usize,
+) -> Result<String, ApiError> {
+    let mut reader = DeadlineReader {
+        stream,
+        deadline: Instant::now() + crate::NARUON_LIVE_IO_TIMEOUT,
+    };
+    read_http_request_with_limit(&mut reader, maximum_body_bytes)
+}
 
 /// Read one HTTP/1.1 request, including its declared UTF-8 body.
 pub(crate) fn read_http_request<R: Read>(reader: &mut R) -> Result<String, ApiError> {
@@ -230,9 +283,9 @@ pub(crate) fn host_is_loopback(host: &str, bound_addr: Option<SocketAddr>) -> bo
 }
 
 /// Map socket timeout and transport failures to redacted API errors.
-pub(crate) fn map_io_error(error: &std::io::Error) -> ApiError {
+pub(crate) fn map_io_error(error: &io::Error) -> ApiError {
     match error.kind() {
-        std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock => ApiError::LimitExceeded,
+        io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock => ApiError::LimitExceeded,
         _ => ApiError::InvalidWirePayload,
     }
 }
