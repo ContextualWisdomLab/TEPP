@@ -668,3 +668,113 @@ fn invalid_structural_inputs_and_nonconvergence_fail_closed() {
         .expect("finite hyperparameters");
     assert!(fit_reference_topic_model(&input, &unstable).is_err());
 }
+
+fn normalization_underflow_input(explicit_zero: bool, csc: bool) -> ReferenceTopicInput {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let matrix = if csc {
+        SparseMatrix::from_csc(
+            6,
+            5,
+            if explicit_zero {
+                vec![0, 3, 6, 9, 12, 13]
+            } else {
+                vec![0, 3, 6, 9, 12, 12]
+            },
+            if explicit_zero {
+                vec![0, 1, 2, 0, 1, 2, 3, 4, 5, 3, 4, 5, 0]
+            } else {
+                vec![0, 1, 2, 0, 1, 2, 3, 4, 5, 3, 4, 5]
+            },
+            if explicit_zero {
+                vec![
+                    90.0, 85.0, 80.0, 10.0, 15.0, 20.0, 10.0, 15.0, 20.0, 90.0, 85.0, 80.0, 0.0,
+                ]
+            } else {
+                vec![
+                    90.0, 85.0, 80.0, 10.0, 15.0, 20.0, 10.0, 15.0, 20.0, 90.0, 85.0, 80.0,
+                ]
+            },
+        )
+    } else {
+        SparseMatrix::from_csr(
+            6,
+            5,
+            if explicit_zero {
+                vec![0, 3, 5, 7, 9, 11, 13]
+            } else {
+                vec![0, 2, 4, 6, 8, 10, 12]
+            },
+            if explicit_zero {
+                vec![0, 1, 4, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3]
+            } else {
+                vec![0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3]
+            },
+            if explicit_zero {
+                vec![
+                    90.0, 10.0, 0.0, 85.0, 15.0, 80.0, 20.0, 10.0, 90.0, 15.0, 85.0, 20.0, 80.0,
+                ]
+            } else {
+                vec![
+                    90.0, 10.0, 85.0, 15.0, 80.0, 20.0, 10.0, 90.0, 15.0, 85.0, 20.0, 80.0,
+                ]
+            },
+        )
+    }
+    .expect("finite nonnegative sparse matrix");
+    ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &matrix,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("legal input with 600 positive total tokens")
+}
+fn smoothing_config(smoothing: f64) -> ReferenceTopicModelConfig {
+    assert!(smoothing.is_finite() && smoothing > 0.0);
+    ReferenceTopicModelConfig::new(2, vec![7], 2000, 1e-5)
+        .unwrap()
+        .with_hyperparameters(1.0, 0.25, 0.01, smoothing, 0.2)
+        .expect("documented finite positive smoothing admitted")
+}
+#[test]
+fn normal_smoothing_preserves_zero_entry_equivalence() {
+    let c = smoothing_config(f64::MIN_POSITIVE);
+    let baseline =
+        fit_reference_topic_model(&normalization_underflow_input(false, false), &c).unwrap();
+    for csc in [false, true] {
+        for explicit in [false, true] {
+            let fitted =
+                fit_reference_topic_model(&normalization_underflow_input(explicit, csc), &c)
+                    .unwrap();
+            assert_eq!(fitted, baseline);
+            assert!(
+                fitted
+                    .topic_term_probabilities
+                    .iter()
+                    .flatten()
+                    .all(|x| x.is_finite() && *x > 0.0)
+            );
+        }
+    }
+}
+#[test]
+fn normalization_underflow_is_rejected_before_returning_fit() {
+    let c = smoothing_config(f64::from_bits(1));
+    let mut failures = Vec::new();
+    for csc in [false, true] {
+        for explicit in [false, true] {
+            let result =
+                fit_reference_topic_model(&normalization_underflow_input(explicit, csc), &c);
+            if result != Err(TopicMeasurementError::NonFiniteEstimate) {
+                failures.push((csc, explicit));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "positive smoothing must not return an underflowed zero beta: {failures:?}"
+    );
+}

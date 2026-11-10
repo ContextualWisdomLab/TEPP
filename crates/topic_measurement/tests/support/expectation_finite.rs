@@ -1,6 +1,6 @@
 //! Private regression tests for finite expectation sufficient statistics.
 
-use super::{PrevalenceFeature, ReferenceTopicInput, expectation};
+use super::{PrevalenceFeature, ReferenceTopicInput, expectation, normalize};
 use crate::TopicMeasurementError;
 use temporal_core::EventTime;
 use uuid::Uuid;
@@ -87,4 +87,27 @@ fn ordinary_counts_preserve_finite_sufficient_statistics() {
         (8.0 * 0.625_f64.ln() + 4.0 * 0.375_f64.ln()).to_bits()
     );
     println!("finite values: document=4/4 topic=4/4 likelihood=1/1");
+}
+
+/// The shared beta normalizer never returns a zero, negative, or infinite part.
+#[test]
+fn normalized_positive_parts_remain_representable() {
+    let mut ordinary = [300.0, f64::MIN_POSITIVE];
+    normalize(&mut ordinary).expect("representable positive parts");
+    assert!(ordinary.iter().all(|x| x.is_finite() && *x > 0.0));
+    let mut smallest = [1.0, f64::from_bits(1)];
+    normalize(&mut smallest).expect("smallest part remains representable at denominator one");
+    assert_eq!(smallest[1].to_bits(), 1);
+    // These are helper-only injected states; the public underflow is tested separately.
+    for mut values in [[300.0, f64::from_bits(1)], [1.0, 0.0], [2.0, -1.0]] {
+        assert_eq!(
+            normalize(&mut values),
+            Err(TopicMeasurementError::NonFiniteEstimate)
+        );
+    }
+    let mut division_overflow = [f64::MAX, -f64::MAX, f64::MIN_POSITIVE];
+    assert_eq!(
+        normalize(&mut division_overflow),
+        Err(TopicMeasurementError::NonFiniteEstimate)
+    );
 }

@@ -1159,6 +1159,10 @@ fn normalize(values: &mut [f64]) -> Result<(), TopicMeasurementError> {
     require_finite(sum.ln())?;
     for value in values {
         *value /= sum;
+        // Positive smoothing must remain representable after normalization.
+        if !value.is_finite() || *value <= 0.0 {
+            return Err(TopicMeasurementError::NonFiniteEstimate);
+        }
     }
     Ok(())
 }
