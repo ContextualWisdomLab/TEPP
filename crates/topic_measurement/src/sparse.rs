@@ -70,6 +70,10 @@ impl SparseMatrix {
         )
     }
 
+    /// Validate canonical compressed storage before slicing indices or values.
+    ///
+    /// Return `InvalidSparseMatrix` for unrepresentable outer offset counts or
+    /// malformed dimensions, offsets, indices, and non-finite stored values.
     fn new(
         rows: usize,
         columns: usize,
@@ -177,6 +181,7 @@ mod tests {
         assert_eq!(csr.row_entries(), csc.row_entries());
     }
 
+    /// Refuse unrepresentable CSR and CSC offset counts with the typed error.
     #[test]
     fn maximum_outer_dimensions_return_typed_sparse_errors() {
         assert_eq!(
@@ -189,6 +194,7 @@ mod tests {
         );
     }
 
+    /// Admit maximum inner dimensions without expanding maximum-row CSC storage.
     #[test]
     fn maximum_inner_dimensions_preserve_tiny_canonical_storage() {
         let csr =
@@ -203,6 +209,7 @@ mod tests {
         assert_eq!(csr.row_entries(), vec![vec![(usize::MAX - 1, 2.0)]]);
     }
 
+    /// Reject short offsets at adjacent outer limits without arithmetic overflow.
     #[test]
     fn adjacent_outer_dimensions_reject_short_offsets_without_overflow() {
         for outer in [usize::MAX - 1, usize::MAX] {

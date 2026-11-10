@@ -783,6 +783,7 @@ fn normalization_underflow_is_rejected_before_returning_fit() {
     );
 }
 
+/// Reject mapped backward document times despite forward graph intervals.
 #[test]
 fn reference_input_rejects_reverse_mapped_document_event_times() {
     let (snapshot, ids, times, memberships, relations) = fixture();
@@ -806,6 +807,7 @@ fn reference_input_rejects_reverse_mapped_document_event_times() {
     }
 }
 
+/// Admit equal pair times while retaining variation elsewhere in the corpus.
 #[test]
 fn reference_input_admits_equal_mapped_pair_times_with_other_time_variation() {
     let (snapshot, ids, mut times, memberships, relations) = fixture();
@@ -825,6 +827,7 @@ fn reference_input_admits_equal_mapped_pair_times_with_other_time_variation() {
     assert!(model.objective.is_finite());
 }
 
+/// Preserve forward endpoint identity when documents and matrix rows are permuted.
 #[test]
 fn reference_input_admits_permuted_document_rows_with_forward_identity_times() {
     let (snapshot, mut ids, mut times, memberships, relations) = fixture();

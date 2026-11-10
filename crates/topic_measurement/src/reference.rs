@@ -1166,6 +1166,8 @@ fn standardize_event_time(times: &[EventTime]) -> Result<Vec<f64>, TopicMeasurem
 ///
 /// Return `NonFiniteEstimate` when the sum has a non-finite logarithm or a
 /// normalized part is non-finite or nonpositive; do not clamp supplied weights.
+///
+/// On error the slice may be partially normalized; callers must discard it.
 fn normalize(values: &mut [f64]) -> Result<(), TopicMeasurementError> {
     let sum = values.iter().sum::<f64>();
     require_finite(sum.ln())?;
