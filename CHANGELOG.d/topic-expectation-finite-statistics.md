@@ -8,3 +8,5 @@
 - Reject positive topic smoothing that underflows to a zero probability after beta normalization. Preserve the supplied floor and formulas; return `NonFiniteEstimate` rather than emitting a degenerate fit or treating an explicit zero sparse entry differently from its omission. Public CSR/CSC regressions include a representable tiny-floor control.
 
 Reject observed topic transitions when the mapped document event time moves backward, even when the independently supplied relation intervals are forward-validated. Preserve equal-time pairs and document-row permutation.
+
+- Reject CSR/CSC outer dimensions whose required offset count is not representable as `usize`, using `InvalidSparseMatrix` rather than overflowing during validation. Preserve tiny canonical storage with maximum inner dimensions. This closes an inherited checked-arithmetic constructor boundary; it does not establish a release-mode panic or change estimator arithmetic.

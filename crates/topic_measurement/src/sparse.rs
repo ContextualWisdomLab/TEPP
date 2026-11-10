@@ -88,7 +88,7 @@ impl SparseMatrix {
         };
         if rows == 0
             || columns == 0
-            || offsets.len() != outer + 1
+            || outer.checked_add(1) != Some(offsets.len())
             || offsets.first() != Some(&0)
             || offsets.last().copied() != Some(indices.len())
             || indices.len() != values.len()
@@ -175,6 +175,46 @@ mod tests {
         assert_eq!(csr.orientation(), SparseOrientation::Row);
         assert_eq!(csc.orientation(), SparseOrientation::Column);
         assert_eq!(csr.row_entries(), csc.row_entries());
+    }
+
+    #[test]
+    fn maximum_outer_dimensions_return_typed_sparse_errors() {
+        assert_eq!(
+            SparseMatrix::from_csr(usize::MAX, 2, vec![0], vec![], vec![]),
+            Err(TopicMeasurementError::InvalidSparseMatrix)
+        );
+        assert_eq!(
+            SparseMatrix::from_csc(2, usize::MAX, vec![0], vec![], vec![]),
+            Err(TopicMeasurementError::InvalidSparseMatrix)
+        );
+    }
+
+    #[test]
+    fn maximum_inner_dimensions_preserve_tiny_canonical_storage() {
+        let csr =
+            SparseMatrix::from_csr(1, usize::MAX, vec![0, 1], vec![usize::MAX - 1], vec![2.0])
+                .expect("representable maximum inner column");
+        let csc =
+            SparseMatrix::from_csc(usize::MAX, 1, vec![0, 1], vec![usize::MAX - 1], vec![2.0])
+                .expect("representable maximum inner row");
+        assert_eq!(csr.columns(), usize::MAX);
+        assert_eq!(csc.rows(), usize::MAX);
+        // Do not expand the maximum-row CSC into dense row storage.
+        assert_eq!(csr.row_entries(), vec![vec![(usize::MAX - 1, 2.0)]]);
+    }
+
+    #[test]
+    fn adjacent_outer_dimensions_reject_short_offsets_without_overflow() {
+        for outer in [usize::MAX - 1, usize::MAX] {
+            assert_eq!(
+                SparseMatrix::from_csr(outer, 2, vec![0, 0], vec![], vec![]),
+                Err(TopicMeasurementError::InvalidSparseMatrix)
+            );
+            assert_eq!(
+                SparseMatrix::from_csc(2, outer, vec![0, 0], vec![], vec![]),
+                Err(TopicMeasurementError::InvalidSparseMatrix)
+            );
+        }
     }
 
     #[test]
