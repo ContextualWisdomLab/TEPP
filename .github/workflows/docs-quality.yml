@@ -7,6 +7,7 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+      - converted_to_draft
     paths:
       - "**/*.md"
       - "**/*.json"
@@ -34,6 +35,7 @@ concurrency:
 jobs:
   documentation:
     name: TEPP Documentation supplier
+    if: ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft }}
     uses: ContextualWisdomLab/.github/.github/workflows/tepp-documentation-quality.yml@3136c940235a3762b804bd99eb20fbe129e70c06
     permissions:
       contents: read
