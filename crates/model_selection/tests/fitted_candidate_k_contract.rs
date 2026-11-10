@@ -419,3 +419,41 @@ fn statistical_candidate_from_fit_refuses_unusable_diagnostics() {
         Err(ModelSelectionError::InvalidDiagnostic)
     );
 }
+
+/// Statistical K scoring reuses the fitting likelihood on injected subnormal model states.
+#[test]
+fn statistical_candidate_preserves_subnormal_mixture_likelihood() {
+    let input = two_document_input([1.0, 0.0, 0.0, 1.0]);
+    let q = f64::from_bits(1);
+    for (theta, beta, expected_likelihood) in [
+        (
+            vec![vec![0.625, 0.375], vec![0.5, 0.5]],
+            vec![vec![2.0 * q, 1.0], vec![q, 1.0]],
+            1.625_f64.ln() - 1074.0 * std::f64::consts::LN_2,
+        ),
+        (vec![vec![0.5, 0.5]; 2], vec![vec![q, 1.0]; 2], q.ln()),
+    ] {
+        // Only the result DTO is supplied: this is not a public fitting trajectory.
+        let model = ReferenceTopicModel {
+            seed: 7,
+            iterations: 4,
+            objective: 0.0,
+            topic_term_probabilities: beta,
+            document_topic_proportions: theta,
+            document_coordinate_variances: vec![vec![1.0]; 2],
+            prevalence_coefficients: vec![vec![0.0]],
+            prevalence_features: Vec::new(),
+            sequence_edges: Vec::new(),
+            connected_post_count: 0,
+            lineage_count: 0,
+        };
+        let candidate = statistical_candidate_from_fit(&input, 2, &model)
+            .expect("positive mixture admits statistical candidate");
+        let score = candidate
+            .held_out_log_likelihood()
+            .expect("statistical score");
+        let expected_score = expected_likelihood - 0.5 * 5.0 * 2.0_f64.ln();
+        assert!((score - expected_score).abs() < 1e-12);
+        assert!(candidate.is_statistically_supported());
+    }
+}

@@ -287,13 +287,13 @@ impl ReferenceTopicInput {
                 if term >= self.vocabulary_size {
                     return Err(TopicMeasurementError::InvalidModelInput);
                 }
-                let probability = (0..topic_count)
-                    .map(|topic| theta[topic] * model.topic_term_probabilities[topic][term])
-                    .sum::<f64>();
-                let log_probability = probability.ln();
-                if !log_probability.is_finite() {
-                    return Err(TopicMeasurementError::NonFiniteEstimate);
-                }
+                let mixture = mixture_normalization(
+                    theta,
+                    &model.topic_term_probabilities,
+                    term,
+                    topic_count,
+                )?;
+                let log_probability = mixture.log_probability()?;
                 log_likelihood += count * log_probability;
             }
         }
@@ -902,6 +902,9 @@ type ExpectationOutput = (Vec<Vec<f64>>, Vec<Vec<f64>>, f64);
 ///
 /// Check each accumulated document/topic count after its write; a finite
 /// likelihood alone does not establish that these `f64` sums are representable.
+/// Use a responsibility-first product for normal topic mass. For a subnormal
+/// mixture, normalize all product mantissas with one common binary exponent so
+/// numerator recovery and the likelihood use the same representable denominator.
 fn expectation(
     input: &ReferenceTopicInput,
     theta: &[Vec<f64>],
@@ -913,14 +916,32 @@ fn expectation(
     let mut log_likelihood = 0.0;
     for (document, terms) in input.term_rows.iter().enumerate() {
         for &(term, count) in terms {
-            let probability = (0..topic_count)
-                .map(|topic| theta[document][topic] * beta[topic][term])
-                .sum::<f64>();
-            let log_probability = probability.ln();
-            require_finite(log_probability)?;
+            let mixture = mixture_normalization(&theta[document], beta, term, topic_count)?;
+            let probability = mixture.probability;
+            let scaled = mixture.scaled;
+            let log_probability = mixture.log_probability()?;
             log_likelihood += count * log_probability;
             for topic in 0..topic_count {
-                let expected = count * theta[document][topic] * beta[topic][term] / probability;
+                let theta_part = theta[document][topic];
+                let beta_part = beta[topic][term];
+                let mass = theta_part * beta_part;
+                let expected = if let Some((exponent, sum)) = scaled {
+                    scaled_expected_count(count, theta_part, beta_part, exponent, sum)?
+                } else if mass.is_normal() {
+                    count * (mass / probability)
+                } else {
+                    // Positive simplex factors and a positive mixture keep this
+                    // smaller-factor ratio finite. Scale before the last product
+                    // when count >= 1; for smaller counts form responsibility first.
+                    // This avoids both count-first and mass-first underflow.
+                    let larger = theta_part.max(beta_part);
+                    let ratio = theta_part.min(beta_part) / probability;
+                    if count >= 1.0 {
+                        (count * larger) * ratio
+                    } else {
+                        count * (larger * ratio)
+                    }
+                };
                 document_topic_counts[document][topic] += expected;
                 require_finite(document_topic_counts[document][topic])?;
                 beta_counts[topic][term] += expected;
@@ -932,6 +953,131 @@ fn expectation(
         return Err(TopicMeasurementError::NonFiniteEstimate);
     }
     Ok((document_topic_counts, beta_counts, log_likelihood))
+}
+
+/// Shared normal or binary-scaled denominator for fitting and public likelihood consumers.
+struct MixtureNormalization {
+    /// Ordinary binary64 product sum, used by the normal-mixture count path.
+    probability: f64,
+    /// Common exponent and mantissa sum when ordinary products lose mixture precision.
+    scaled: Option<(i32, f64)>,
+}
+
+impl MixtureNormalization {
+    /// Return the same finite log mixture in fitting, reporting, and model selection.
+    fn log_probability(&self) -> Result<f64, TopicMeasurementError> {
+        let value = self.scaled.map_or_else(
+            || self.probability.ln(),
+            |(exponent, sum)| sum.ln() + f64::from(exponent) * std::f64::consts::LN_2,
+        );
+        require_finite(value)?;
+        Ok(value)
+    }
+}
+
+/// Select a common mixture representation without changing the posterior target.
+fn mixture_normalization(
+    theta: &[f64],
+    beta: &[Vec<f64>],
+    term: usize,
+    topic_count: usize,
+) -> Result<MixtureNormalization, TopicMeasurementError> {
+    let probability = (0..topic_count)
+        .map(|topic| theta[topic] * beta[topic][term])
+        .sum::<f64>();
+    let scaled = if probability.is_normal() {
+        None
+    } else {
+        Some(scaled_mixture(theta, beta, term, topic_count)?)
+    };
+    Ok(MixtureNormalization {
+        probability,
+        scaled,
+    })
+}
+
+/// Decompose a positive finite binary64 value into a mantissa in [1, 2) and exponent.
+fn positive_binary_parts(value: f64) -> Result<(f64, i32), TopicMeasurementError> {
+    if !value.is_finite() || value <= 0.0 {
+        return Err(TopicMeasurementError::NonFiniteEstimate);
+    }
+    let bits = value.to_bits();
+    let field = ((bits >> 52) & 0x7ff) as i32;
+    let fraction = bits & ((1_u64 << 52) - 1);
+    if field == 0 {
+        let highest = fraction.ilog2();
+        let mantissa_bits = (fraction << (52 - highest)) & ((1_u64 << 52) - 1);
+        let exponent =
+            i32::try_from(highest).map_err(|_| TopicMeasurementError::NonFiniteEstimate)? - 1074;
+        Ok((f64::from_bits((1023_u64 << 52) | mantissa_bits), exponent))
+    } else {
+        Ok((f64::from_bits((1023_u64 << 52) | fraction), field - 1023))
+    }
+}
+
+/// Apply a binary exponent without first rounding a representable result to zero.
+fn scale_binary(value: f64, exponent: i32) -> Result<f64, TopicMeasurementError> {
+    if value == 0.0 {
+        return Ok(0.0);
+    }
+    let (mantissa, own_exponent) = positive_binary_parts(value)?;
+    let combined = own_exponent + exponent;
+    let result = if combined > 1023 {
+        f64::INFINITY
+    } else if combined >= -1022 {
+        let field =
+            u64::try_from(combined + 1023).map_err(|_| TopicMeasurementError::NonFiniteEstimate)?;
+        mantissa * f64::from_bits(field << 52)
+    } else if combined >= -1075 {
+        (mantissa * 2.0_f64.powi(combined + 1074)) * f64::from_bits(1)
+    } else {
+        0.0
+    };
+    require_finite(result)?;
+    Ok(result)
+}
+
+/// Normalize tiny mixture products in a shared exponent domain, retaining positive mass.
+fn scaled_mixture(
+    theta: &[f64],
+    beta: &[Vec<f64>],
+    term: usize,
+    topic_count: usize,
+) -> Result<(i32, f64), TopicMeasurementError> {
+    let mut exponent = i32::MIN;
+    for topic in 0..topic_count {
+        let (_, left) = positive_binary_parts(theta[topic])?;
+        let (_, right) = positive_binary_parts(beta[topic][term])?;
+        exponent = exponent.max(left + right);
+    }
+    let mut sum = 0.0;
+    for topic in 0..topic_count {
+        let (left, left_exponent) = positive_binary_parts(theta[topic])?;
+        let (right, right_exponent) = positive_binary_parts(beta[topic][term])?;
+        sum += scale_binary(left * right, left_exponent + right_exponent - exponent)?;
+    }
+    require_finite(sum.ln())?;
+    Ok((exponent, sum))
+}
+
+/// Scale each count and unrounded product against the common tiny-mixture normalizer.
+fn scaled_expected_count(
+    count: f64,
+    theta: f64,
+    beta: f64,
+    mixture_exponent: i32,
+    mixture_sum: f64,
+) -> Result<f64, TopicMeasurementError> {
+    if count == 0.0 {
+        return Ok(0.0);
+    }
+    let (count_mantissa, count_exponent) = positive_binary_parts(count)?;
+    let (left, left_exponent) = positive_binary_parts(theta)?;
+    let (right, right_exponent) = positive_binary_parts(beta)?;
+    scale_binary(
+        count_mantissa * (left * right / mixture_sum),
+        count_exponent + left_exponent + right_exponent - mixture_exponent,
+    )
 }
 
 fn update_beta(
@@ -1611,3 +1757,7 @@ mod tests {
         validate_positive_definite(&[vec![2.0, 0.5], vec![0.5, 1.0]]).expect("positive definite");
     }
 }
+
+#[cfg(test)]
+#[path = "../tests/support/responsibility_product.rs"]
+mod responsibility_product;
