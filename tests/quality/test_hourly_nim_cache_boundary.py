@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import unittest
+from unittest.mock import patch
 
 
 WORKFLOW = Path(".github/workflows/hourly-nim-product-development.yml")
@@ -20,7 +21,7 @@ class HourlyNimCacheBoundaryTests(unittest.TestCase):
 
         self.assertIn("Verify immutable artifact identity and apply proposal", verifier)
         self.assertIn("Run every release-quality gate", verifier)
-        self.assertNotIn("actions/cache@", verifier)
+        self.assertNotIn("actions/cache", verifier)
         for version in (
             "cargo-nextest --locked --version 0.9.140",
             "cargo-deny --locked --version 0.19.7",
@@ -29,6 +30,26 @@ class HourlyNimCacheBoundaryTests(unittest.TestCase):
             with self.subTest(version=version):
                 self.assertIn(version, verifier)
 
+
+    def test_verifier_rejects_split_cache_actions(self) -> None:
+        """The real verifier contract must reject restore and save subactions."""
+
+        workflow = WORKFLOW.read_text(encoding="utf-8")
+        marker = "  package_product_increment:\n"
+        self.assertEqual(workflow.count(marker), 1)
+        prefix, verifier_and_publisher = workflow.split(marker, 1)
+        for action in ("actions/cache@", "actions/cache/restore@", "actions/cache/save@"):
+            changed = verifier_and_publisher.replace(
+                "    steps:\n",
+                "    steps:\n      - name: Synthetic cache permission fixture\n"
+                f"        uses: {action}" + "0" * 40 + "\n",
+                1,
+            )
+            mutated = prefix + marker + changed
+            with self.subTest(action=action):
+                with patch.object(Path, "read_text", return_value=mutated):
+                    with self.assertRaises(AssertionError):
+                        self.test_verifier_does_not_persist_cache_after_applying_proposal()
 
     def test_setup_python_never_restores_or_saves_a_pip_cache(self) -> None:
         """Neither the proposal job nor the verifier may share a pip cache."""
