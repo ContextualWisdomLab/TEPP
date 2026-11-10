@@ -6,3 +6,5 @@
 - This correction reinforces the existing ADR0012 finite-intermediate contract. It does not implement or attest GPU execution, CPU/GPU parity, parameter recovery, release readiness, or protected-main integration.
 
 - Reject positive topic smoothing that underflows to a zero probability after beta normalization. Preserve the supplied floor and formulas; return `NonFiniteEstimate` rather than emitting a degenerate fit or treating an explicit zero sparse entry differently from its omission. Public CSR/CSC regressions include a representable tiny-floor control.
+
+Reject observed topic transitions when the mapped document event time moves backward, even when the independently supplied relation intervals are forward-validated. Preserve equal-time pairs and document-row permutation.

@@ -782,3 +782,73 @@ fn normalization_underflow_is_rejected_before_returning_fit() {
         "positive smoothing must not return an underflowed zero beta: {failures:?}"
     );
 }
+
+#[test]
+fn reference_input_rejects_reverse_mapped_document_event_times() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let mut reversed = times.clone();
+    reversed.reverse();
+    let mut one_reverse_pair = times;
+    one_reverse_pair.swap(0, 1);
+    for supplied_times in [reversed, one_reverse_pair] {
+        assert!(matches!(
+            ReferenceTopicInput::new(
+                &snapshot,
+                ids.clone(),
+                &separated_counts(),
+                &supplied_times,
+                None,
+                &memberships,
+                &relations,
+            ),
+            Err(TopicMeasurementError::InvalidModelInput)
+        ));
+    }
+}
+
+#[test]
+fn reference_input_admits_equal_mapped_pair_times_with_other_time_variation() {
+    let (snapshot, ids, mut times, memberships, relations) = fixture();
+    times[1] = times[0];
+    let input = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &separated_counts(),
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("equal pair times do not move backward");
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 4, 1e30).expect("config");
+    let model = fit_reference_topic_model(&input, &config).expect("finite bounded fit");
+    assert!(model.objective.is_finite());
+}
+
+#[test]
+fn reference_input_admits_permuted_document_rows_with_forward_identity_times() {
+    let (snapshot, mut ids, mut times, memberships, relations) = fixture();
+    ids.reverse();
+    times.reverse();
+    let counts = SparseMatrix::from_csr(
+        6,
+        4,
+        vec![0, 2, 4, 6, 8, 10, 12],
+        vec![2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1],
+        vec![
+            20.0, 80.0, 15.0, 85.0, 10.0, 90.0, 80.0, 20.0, 85.0, 15.0, 90.0, 10.0,
+        ],
+    )
+    .expect("permuted matrix");
+    let input = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("row order does not define transition order");
+    assert_eq!(input.document_count(), 6);
+}

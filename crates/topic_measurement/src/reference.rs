@@ -139,7 +139,9 @@ impl ReferenceTopicInput {
     /// observed forward transition edges with both endpoints in the corpus
     /// affect the relational objective and emitted lineage. Inferred proposals
     /// and other relation kinds remain provenance only. At least one observed
-    /// transition pair is required.
+    /// transition pair is required. Mapped source document event times must not
+    /// be later than their target document event times, independently of the
+    /// intervals previously validated by the relation graph.
     ///
     /// # Errors
     ///
@@ -189,6 +191,12 @@ impl ReferenceTopicInput {
 
         let (design, features) = build_design(&document_ids, event_times, covariates, memberships)?;
         let transition_pairs = collect_transition_pairs(&index_by_id, relations)?;
+        if transition_pairs
+            .iter()
+            .any(|&(source, target)| event_times[source] > event_times[target])
+        {
+            return Err(TopicMeasurementError::InvalidModelInput);
+        }
 
         Ok(Self {
             document_ids,
