@@ -669,6 +669,7 @@ fn invalid_structural_inputs_and_nonconvergence_fail_closed() {
     assert!(fit_reference_topic_model(&input, &unstable).is_err());
 }
 
+/// Build equivalent CSR/CSC fixtures with an unused fifth term and optional zero.
 fn normalization_underflow_input(explicit_zero: bool, csc: bool) -> ReferenceTopicInput {
     let (snapshot, ids, times, memberships, relations) = fixture();
     let matrix = if csc {
@@ -732,6 +733,7 @@ fn normalization_underflow_input(explicit_zero: bool, csc: bool) -> ReferenceTop
     )
     .expect("legal input with 600 positive total tokens")
 }
+/// Keep the fit configuration fixed while varying only positive topic smoothing.
 fn smoothing_config(smoothing: f64) -> ReferenceTopicModelConfig {
     assert!(smoothing.is_finite() && smoothing > 0.0);
     ReferenceTopicModelConfig::new(2, vec![7], 2000, 1e-5)
@@ -739,6 +741,7 @@ fn smoothing_config(smoothing: f64) -> ReferenceTopicModelConfig {
         .with_hyperparameters(1.0, 0.25, 0.01, smoothing, 0.2)
         .expect("documented finite positive smoothing admitted")
 }
+/// A representable tiny floor gives identical positive fits for all sparse forms.
 #[test]
 fn normal_smoothing_preserves_zero_entry_equivalence() {
     let c = smoothing_config(f64::MIN_POSITIVE);
@@ -760,6 +763,7 @@ fn normal_smoothing_preserves_zero_entry_equivalence() {
         }
     }
 }
+/// An unrepresentable beta floor fails for both orientations and zero spellings.
 #[test]
 fn normalization_underflow_is_rejected_before_returning_fit() {
     let c = smoothing_config(f64::from_bits(1));

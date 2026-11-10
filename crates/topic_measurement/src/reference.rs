@@ -1154,6 +1154,10 @@ fn standardize_event_time(times: &[EventTime]) -> Result<Vec<f64>, TopicMeasurem
         .collect())
 }
 
+/// Scale beta weights by their sum and require representable positive results.
+///
+/// Return `NonFiniteEstimate` when the sum has a non-finite logarithm or a
+/// normalized part is non-finite or nonpositive; do not clamp supplied weights.
 fn normalize(values: &mut [f64]) -> Result<(), TopicMeasurementError> {
     let sum = values.iter().sum::<f64>();
     require_finite(sum.ln())?;
