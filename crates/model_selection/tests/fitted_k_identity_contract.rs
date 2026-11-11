@@ -17,10 +17,12 @@ use topic_measurement::{
 };
 use uuid::Uuid;
 
+/// Parse a deterministic event-time fixture for a January day.
 fn event_time(day: u8) -> EventTime {
     EventTime::parse_rfc3339(&format!("2026-01-{day:02}T00:00:00Z")).expect("event time")
 }
 
+/// Construct an observed forward relation with bounded same-day intervals.
 fn relation(source: Uuid, target: Uuid, source_day: u8, target_day: u8) -> RelationEdge {
     let interval = |day| {
         TemporalInterval::bounded(
@@ -44,6 +46,7 @@ fn relation(source: Uuid, target: Uuid, source_day: u8, target_day: u8) -> Relat
     .expect("forward relation")
 }
 
+/// Build a cutoff-eligible two-document corpus with shared membership and a transition.
 fn two_document_input(term_values: [f64; 4]) -> ReferenceTopicInput {
     let document_ids = vec![Uuid::from_u128(1), Uuid::from_u128(2)];
     let times = vec![event_time(1), event_time(2)];
@@ -121,7 +124,6 @@ fn wrong_candidate_k_is_rejected() {
     assert_eq!(model.topic_term_probabilities.len(), 2);
     for k in [0, 1, 3, 4, u32::MAX] {
         let actual = statistical_candidate_from_fit(&input, k, &model);
-        println!("REAL_FIT_K actual_model_topics=2 supplied_k={k} result={actual:?}");
         let expected = if k < 2 {
             ModelSelectionError::NonPositiveCandidateK
         } else {

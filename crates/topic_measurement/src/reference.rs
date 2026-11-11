@@ -1761,3 +1761,7 @@ mod tests {
 #[cfg(test)]
 #[path = "../tests/support/responsibility_product.rs"]
 mod responsibility_product;
+
+#[cfg(test)]
+#[path = "../tests/support/binary_scale_contract.rs"]
+mod binary_scale_contract;
