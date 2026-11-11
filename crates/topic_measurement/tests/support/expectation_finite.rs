@@ -268,3 +268,58 @@ fn num03_public_rounded_zero_mixture_matches_expectation() {
     println!("NUM-03 rounded-zero expectation={expected} public={public:?}");
     assert!(public.is_ok_and(|x| (x - expected).abs() < 1e-12));
 }
+
+/// Exact-zero topic factors preserve zero responsibility beside positive subnormal mass.
+#[test]
+fn zero_factor_subnormal_expectation_preserves_counts() {
+    let tiny = f64::from_bits(1_u64 << 44);
+    for count in [0.0, 0.5, 1.0] {
+        for (first_theta, first_beta, fraction) in [
+            (vec![1.0, 0.0], vec![tiny, tiny], 1.0),
+            (vec![0.5, 0.5], vec![tiny, 0.0], 1.0),
+            (vec![0.0, 1.0], vec![tiny, tiny], 0.0),
+            (vec![0.5, 0.5], vec![-0.0, tiny], 0.0),
+        ] {
+            let input = input(vec![vec![(0, count)], vec![(1, 1.0)]]);
+            let theta = vec![first_theta.clone(), vec![0.5, 0.5]];
+            let beta = vec![vec![first_beta[0], 1.0], vec![first_beta[1], 1.0]];
+            let probability = first_theta[0] * first_beta[0] + first_theta[1] * first_beta[1];
+            assert!(probability > 0.0 && probability.is_subnormal());
+            let (documents, topics, likelihood) =
+                expectation(&input, &theta, &beta, 2).expect("zero factors are zero mass");
+            assert_eq!(
+                documents[0],
+                vec![count * fraction, count * (1.0 - fraction)]
+            );
+            assert_eq!(topics[0][0].to_bits(), (count * fraction).to_bits());
+            assert_eq!(topics[1][0].to_bits(), (count * (1.0 - fraction)).to_bits());
+            assert!((likelihood - count * probability.ln()).abs() <= 1e-12);
+        }
+    }
+}
+
+/// A zero mixture and nonfinite or negative partners remain invalid scaled inputs.
+#[test]
+fn zero_factor_subnormal_expectation_preserves_refusals() {
+    let tiny = f64::from_bits(1_u64 << 44);
+    let input = input(vec![vec![(0, 1.0)], vec![(1, 1.0)]]);
+    for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
+        for (first_theta, first_beta) in [
+            (vec![0.5, 0.0], vec![tiny, bad]),
+            (vec![0.5, bad], vec![tiny, 0.0]),
+        ] {
+            let theta = vec![first_theta, vec![0.5, 0.5]];
+            let beta = vec![vec![first_beta[0], 1.0], vec![first_beta[1], 1.0]];
+            assert_eq!(
+                expectation(&input, &theta, &beta, 2),
+                Err(TopicMeasurementError::NonFiniteEstimate)
+            );
+        }
+    }
+    let theta = vec![vec![1.0, 0.0], vec![0.5, 0.5]];
+    let beta = vec![vec![0.0, 1.0], vec![tiny, 1.0]];
+    assert_eq!(
+        expectation(&input, &theta, &beta, 2),
+        Err(TopicMeasurementError::NonFiniteEstimate)
+    );
+}

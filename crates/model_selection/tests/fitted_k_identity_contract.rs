@@ -136,3 +136,58 @@ fn wrong_candidate_k_is_rejected() {
         );
     }
 }
+
+/// Public likelihood and candidate scoring admit exact zeros beside a positive tiny mixture.
+#[test]
+fn zero_factor_subnormal_public_likelihood_and_candidate() {
+    let input = two_document_input([1.0, 0.0, 0.0, 1.0]);
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 2000, 1e-5).expect("config");
+    let fitted = fit_reference_topic_model(&input, &config).expect("actual CPU fit");
+    for tiny in [0.25, f64::from_bits(1_u64 << 44)] {
+        for (theta, beta) in [
+            (
+                vec![1.0, 0.0],
+                vec![vec![tiny, 1.0 - tiny], vec![tiny, 1.0 - tiny]],
+            ),
+            (vec![0.5, 0.5], vec![vec![tiny, 1.0 - tiny], vec![0.0, 1.0]]),
+            (
+                vec![0.0, 1.0],
+                vec![vec![tiny, 1.0 - tiny], vec![tiny, 1.0 - tiny]],
+            ),
+            (
+                vec![0.5, 0.5],
+                vec![vec![-0.0, 1.0], vec![tiny, 1.0 - tiny]],
+            ),
+        ] {
+            let mut model = fitted.clone();
+            model.document_topic_proportions = vec![theta, vec![0.5, 0.5]];
+            model.topic_term_probabilities = beta;
+            let expected = model
+                .document_topic_proportions
+                .iter()
+                .enumerate()
+                .map(|(row, weights)| {
+                    let probability = weights
+                        .iter()
+                        .enumerate()
+                        .map(|(topic, weight)| weight * model.topic_term_probabilities[topic][row])
+                        .sum::<f64>();
+                    assert!(probability.is_finite() && probability > 0.0);
+                    probability.ln()
+                })
+                .sum::<f64>();
+            let actual = input
+                .in_sample_log_likelihood(&model)
+                .expect("finite positive mixtures");
+            assert!((actual - expected).abs() <= 1e-12);
+            let candidate = statistical_candidate_from_fit(&input, 2, &model)
+                .expect("same public likelihood consumer");
+            assert!(candidate.is_statistically_supported());
+        }
+    }
+    let mut invalid = fitted;
+    invalid.document_topic_proportions = vec![vec![1.0, 0.0]; 2];
+    invalid.topic_term_probabilities = vec![vec![0.0, 1.0], vec![1.0, 0.0]];
+    assert!(input.in_sample_log_likelihood(&invalid).is_err());
+    assert!(statistical_candidate_from_fit(&input, 2, &invalid).is_err());
+}

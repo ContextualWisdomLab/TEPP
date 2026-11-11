@@ -18,3 +18,5 @@ Reject observed topic transitions when the mapped document event time moves back
 
 
 - Use the same mixture normalization and log-likelihood helper in expectation and the public in-sample likelihood consumed by statistical K selection. Actual public likelihood regressions compare the same injected subnormal/rounded-zero model states; they do not claim a public fit reached those states.
+
+- Preserve exact-zero topic factors as zero mass when another topic supplies a positive subnormal mixture. Keep the positive-factor decomposition strict, reject nonfinite or negative partners before skipping a zero product, and retain all-zero-mixture refusal. Private expectation/count and public likelihood/statistical-candidate regressions distinguish injected model states from the unchanged positive fitted-model path.

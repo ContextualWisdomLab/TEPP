@@ -926,7 +926,11 @@ fn expectation(
                 let beta_part = beta[topic][term];
                 let mass = theta_part * beta_part;
                 let expected = if let Some((exponent, sum)) = scaled {
-                    scaled_expected_count(count, theta_part, beta_part, exponent, sum)?
+                    if has_zero_mass(theta_part, beta_part)? {
+                        0.0
+                    } else {
+                        scaled_expected_count(count, theta_part, beta_part, exponent, sum)?
+                    }
                 } else if mass.is_normal() {
                     count * (mass / probability)
                 } else {
@@ -1037,6 +1041,14 @@ fn scale_binary(value: f64, exponent: i32) -> Result<f64, TopicMeasurementError>
     Ok(result)
 }
 
+/// Admit a zero product only when both original factors are finite and nonnegative.
+fn has_zero_mass(left: f64, right: f64) -> Result<bool, TopicMeasurementError> {
+    if !left.is_finite() || !right.is_finite() || left < 0.0 || right < 0.0 {
+        return Err(TopicMeasurementError::NonFiniteEstimate);
+    }
+    Ok(left == 0.0 || right == 0.0)
+}
+
 /// Normalize tiny mixture products in a shared exponent domain, retaining positive mass.
 fn scaled_mixture(
     theta: &[f64],
@@ -1046,12 +1058,18 @@ fn scaled_mixture(
 ) -> Result<(i32, f64), TopicMeasurementError> {
     let mut exponent = i32::MIN;
     for topic in 0..topic_count {
+        if has_zero_mass(theta[topic], beta[topic][term])? {
+            continue;
+        }
         let (_, left) = positive_binary_parts(theta[topic])?;
         let (_, right) = positive_binary_parts(beta[topic][term])?;
         exponent = exponent.max(left + right);
     }
     let mut sum = 0.0;
     for topic in 0..topic_count {
+        if has_zero_mass(theta[topic], beta[topic][term])? {
+            continue;
+        }
         let (left, left_exponent) = positive_binary_parts(theta[topic])?;
         let (right, right_exponent) = positive_binary_parts(beta[topic][term])?;
         sum += scale_binary(left * right, left_exponent + right_exponent - exponent)?;
