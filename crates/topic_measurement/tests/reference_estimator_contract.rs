@@ -855,3 +855,101 @@ fn reference_input_admits_permuted_document_rows_with_forward_identity_times() {
     .expect("row order does not define transition order");
     assert_eq!(input.document_count(), 6);
 }
+
+/// Construct every non-transition relation pointing to an earlier corpus document.
+fn provenance_only_graph(ids: &[Uuid]) -> RelationGraph {
+    let mut graph = RelationGraph::new();
+    for kind in [
+        RelationKind::References,
+        RelationKind::Summarizes,
+        RelationKind::Revises,
+        RelationKind::Translates,
+        RelationKind::RetrospectivelyReports,
+        RelationKind::Supports,
+        RelationKind::Contradicts,
+        RelationKind::OutcomeOf,
+    ] {
+        let temporal = relation(ids[0], ids[5], 1, 6);
+        graph
+            .insert(
+                RelationEdge::new(
+                    kind,
+                    temporal.target(),
+                    temporal.source(),
+                    RelationEvidenceStatus::Observed,
+                    temporal.target_event_time(),
+                    temporal.source_event_time(),
+                )
+                .expect("backward provenance remains valid"),
+            )
+            .expect("distinct provenance kind");
+    }
+    assert_eq!(graph.edges().count(), 8);
+    assert!(graph.edges().all(|edge| !edge.is_transition_edge()));
+    graph
+}
+
+/// Backward provenance alone cannot satisfy the observed-transition requirement.
+#[test]
+fn provenance_only_input_does_not_become_a_state_transition() {
+    let (snapshot, ids, times, memberships, _) = fixture();
+    let graph = provenance_only_graph(&ids);
+    assert!(matches!(
+        ReferenceTopicInput::new(
+            &snapshot,
+            ids,
+            &separated_counts(),
+            &times,
+            None,
+            &memberships,
+            &graph,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    ));
+    assert_eq!(graph.edges().count(), 8);
+}
+
+/// Valid provenance is retained without changing fitted parameters, lineage, or precision.
+#[test]
+fn mixed_provenance_is_numerically_inert_at_public_fit_boundary() {
+    let (snapshot, ids, times, memberships, observed) = fixture();
+    let provenance = provenance_only_graph(&ids);
+    let mut mixed = observed.clone();
+    for edge in provenance.edges() {
+        mixed.insert(*edge).expect("retain provenance");
+    }
+    assert_eq!(mixed.edges().count(), observed.edges().count() + 8);
+    let counts = separated_counts();
+    let build = |graph: &RelationGraph| {
+        ReferenceTopicInput::new(
+            &snapshot,
+            ids.clone(),
+            &counts,
+            &times,
+            None,
+            &memberships,
+            graph,
+        )
+        .expect("observed transitions remain available")
+    };
+    let baseline_input = build(&observed);
+    let mixed_input = build(&mixed);
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 2_000, 1e-5).expect("config");
+    let baseline = fit_reference_topic_model(&baseline_input, &config).expect("baseline fit");
+    let candidate = fit_reference_topic_model(&mixed_input, &config).expect("mixed fit");
+    assert!(baseline.objective.is_finite());
+    assert_eq!(candidate, baseline);
+    let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
+    let baseline_precision = baseline_input
+        .build_joint_coordinate_precision(&baseline, &config, topic_ids.clone())
+        .expect("baseline precision");
+    let mixed_precision = mixed_input
+        .build_joint_coordinate_precision(&candidate, &config, topic_ids)
+        .expect("mixed precision");
+    assert_eq!(mixed_precision.values(), baseline_precision.values());
+    assert_eq!(
+        mixed_precision.coordinate_means(),
+        baseline_precision.coordinate_means()
+    );
+    assert_eq!(mixed.edges().count(), observed.edges().count() + 8);
+}
