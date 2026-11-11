@@ -4,6 +4,11 @@
 #[path = "../tests/support/expectation_finite.rs"]
 mod expectation_finite_tests;
 
+#[path = "fit_origin_bound.rs"]
+mod fit_origin_bound;
+
+pub use fit_origin_bound::{FitOriginBoundModel, fit_origin_bound_topic_model};
+
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use corpus_split::CorpusSnapshot;
