@@ -158,12 +158,19 @@ impl FittedCandidateKConfig {
 ///
 /// Returns [`ModelSelectionError::NonPositiveCandidateK`] when `candidate_k`
 /// is less than two, or [`ModelSelectionError::InvalidDiagnostic`] when the
-/// fitted dimensions, likelihood, or parameter count are unusable.
+/// fitted dimensions, likelihood, or parameter count are unusable, including
+/// a candidate topic count that disagrees with the supplied fitted model.
 pub fn statistical_candidate_from_fit(
     input: &ReferenceTopicInput,
     candidate_k: u32,
     model: &ReferenceTopicModel,
 ) -> Result<ModelCandidate, ModelSelectionError> {
+    if candidate_k < 2 {
+        return Err(ModelSelectionError::NonPositiveCandidateK);
+    }
+    if usize::try_from(candidate_k).ok() != Some(model.topic_term_probabilities.len()) {
+        return Err(ModelSelectionError::InvalidDiagnostic);
+    }
     let log_likelihood = input
         .in_sample_log_likelihood(model)
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
