@@ -1,4 +1,4 @@
-//! Known-truth recovery contract for the CPU `f64` TRSL-TM reference.
+//! Fit-origin binding, precision, and draw contracts for the CPU `f64` reference.
 
 use corpus_split::{CorpusDocument, CorpusSnapshot};
 use membership_core::{
