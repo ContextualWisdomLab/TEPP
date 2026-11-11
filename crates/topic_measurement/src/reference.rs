@@ -989,6 +989,7 @@ fn mixture_normalization(
     let probability = (0..topic_count)
         .map(|topic| theta[topic] * beta[topic][term])
         .sum::<f64>();
+    require_finite(probability)?;
     let scaled = if probability.is_normal() {
         None
     } else {

@@ -323,3 +323,22 @@ fn zero_factor_subnormal_expectation_preserves_refusals() {
         Err(TopicMeasurementError::NonFiniteEstimate)
     );
 }
+
+/// Product and summation overflow are refused before scaled expectation normalization.
+#[test]
+fn nonfinite_mixture_expectation_rejects_raw_overflow() {
+    let input = input(vec![vec![(0, 1.0)], vec![(1, 1.0)]]);
+    for (first_theta, first_beta) in [
+        (vec![f64::MAX, 0.0], vec![f64::MAX, 0.0]),
+        (vec![f64::MAX, f64::MAX], vec![1.0, 1.0]),
+    ] {
+        let raw = first_theta[0] * first_beta[0] + first_theta[1] * first_beta[1];
+        assert!(raw.is_infinite() && raw.is_sign_positive());
+        let theta = vec![first_theta, vec![0.5, 0.5]];
+        let beta = vec![vec![first_beta[0], 1.0], vec![first_beta[1], 1.0]];
+        assert_eq!(
+            expectation(&input, &theta, &beta, 2),
+            Err(TopicMeasurementError::NonFiniteEstimate)
+        );
+    }
+}

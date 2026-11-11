@@ -191,3 +191,84 @@ fn zero_factor_subnormal_public_likelihood_and_candidate() {
     assert!(input.in_sample_log_likelihood(&invalid).is_err());
     assert!(statistical_candidate_from_fit(&input, 2, &invalid).is_err());
 }
+
+/// Public likelihood rejects an overflowing raw mixture instead of rescuing its logarithm.
+#[test]
+fn nonfinite_mixture_public_likelihood_and_candidate_are_rejected() {
+    let input = two_document_input([1.0, 0.0, 0.0, 1.0]);
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 2000, 1e-5).expect("config");
+    let fitted = fit_reference_topic_model(&input, &config).expect("actual CPU fit");
+    for (theta, beta) in [
+        (
+            vec![f64::MAX, 0.0],
+            vec![vec![f64::MAX, 1.0], vec![0.0, 1.0]],
+        ),
+        (
+            vec![f64::MAX, f64::MAX],
+            vec![vec![1.0, 1.0], vec![1.0, 1.0]],
+        ),
+    ] {
+        let raw = theta
+            .iter()
+            .enumerate()
+            .map(|(topic, weight)| weight * beta[topic][0])
+            .sum::<f64>();
+        assert!(raw.is_infinite() && raw.is_sign_positive());
+        let mut model = fitted.clone();
+        model.document_topic_proportions = vec![theta, vec![0.5, 0.5]];
+        model.topic_term_probabilities = beta;
+        assert_eq!(
+            input.in_sample_log_likelihood(&model),
+            Err(topic_measurement::TopicMeasurementError::NonFiniteEstimate)
+        );
+        assert!(statistical_candidate_from_fit(&input, 2, &model).is_err());
+    }
+}
+
+/// Finite ordinary, subnormal and rounded-zero positive mixtures retain shared scoring.
+#[test]
+fn nonfinite_mixture_guard_preserves_finite_and_underflow_controls() {
+    let input = two_document_input([1.0, 0.0, 0.0, 1.0]);
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 2000, 1e-5).expect("config");
+    let fitted = fit_reference_topic_model(&input, &config).expect("actual CPU fit");
+    let tiny = 2.0_f64.powi(-600);
+    let subnormal = f64::from_bits(1_u64 << 44);
+    for (theta, beta, first_log, raw_is_zero) in [
+        (
+            vec![0.5, 0.5],
+            vec![vec![0.5, 0.5], vec![0.5, 0.5]],
+            0.5_f64.ln(),
+            false,
+        ),
+        (
+            vec![1.0, 0.0],
+            vec![vec![subnormal, 1.0], vec![0.0, 1.0]],
+            subnormal.ln(),
+            false,
+        ),
+        (
+            vec![tiny, 1.0],
+            vec![vec![tiny, 1.0], vec![0.0, 1.0]],
+            -1200.0 * std::f64::consts::LN_2,
+            true,
+        ),
+    ] {
+        let raw = theta
+            .iter()
+            .enumerate()
+            .map(|(topic, weight)| weight * beta[topic][0])
+            .sum::<f64>();
+        assert!(raw.is_finite());
+        assert_eq!(raw.to_bits() == 0.0_f64.to_bits(), raw_is_zero);
+        let mut model = fitted.clone();
+        model.document_topic_proportions = vec![theta, vec![0.5, 0.5]];
+        model.topic_term_probabilities = beta;
+        let second =
+            0.5 * model.topic_term_probabilities[0][1] + 0.5 * model.topic_term_probabilities[1][1];
+        let actual = input
+            .in_sample_log_likelihood(&model)
+            .expect("finite or recovered tiny mixture");
+        assert!((actual - (first_log + second.ln())).abs() <= 1e-12);
+        assert!(statistical_candidate_from_fit(&input, 2, &model).is_ok());
+    }
+}
