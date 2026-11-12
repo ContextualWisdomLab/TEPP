@@ -671,7 +671,7 @@ impl ReferenceTopicInput {
                 .map(|(_, count)| count)
                 .sum::<f64>();
             for row in 0..coordinate_count {
-                for column in 0..coordinate_count {
+                for column in row..coordinate_count {
                     let information = if row == column {
                         tokens * theta[row] * (1.0 - theta[row]) + 1.0 / config.prior_variance
                     } else {
@@ -679,6 +679,8 @@ impl ReferenceTopicInput {
                     };
                     precision[document * coordinate_count + row]
                         [document * coordinate_count + column] = information;
+                    precision[document * coordinate_count + column]
+                        [document * coordinate_count + row] = information;
                 }
             }
         }
