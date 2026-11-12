@@ -40,6 +40,8 @@ All notable changes to TEPP are documented here. The format follows Keep a Chang
 
 ### Fixed
 
+- `compute_backend` OOM recovery now refuses a plan issued for a different workload (`ComputeBackendError::PlanWorkloadMismatch`). Previously `VramController::recover_from_oom` accepted a plan from workload A with workload B: it could return a GPU retry batch above B's requested batch, or fall back to the CPU reference with B's batch after A's retry count. `MicroBatchPlan` now records the issuing workload and exposes `issued_for`; value-equal workloads keep the existing retry and fallback behavior. The binding covers the workload only, not the issuing controller or retry freshness.
+
 - Resolve the effective Rust CI contract from the reviewed immutable central
   supplier offline. Authenticate retained commit/tree/blob evidence and the
   caller/workflow SHA-256 digests; preserve coverage diagnostics, pinned tools,

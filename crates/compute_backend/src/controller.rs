@@ -63,18 +63,14 @@ impl VramController {
 
         if !self.inventory.device_present() {
             return Ok(Self::cpu_plan(
-                request.requested_batch(),
+                request,
                 0,
                 FallbackReason::DeviceUnavailable,
             ));
         }
 
         if self.inventory.budget().usable_bytes() == 0 {
-            return Ok(Self::cpu_plan(
-                request.requested_batch(),
-                0,
-                FallbackReason::InsufficientVram,
-            ));
+            return Ok(Self::cpu_plan(request, 0, FallbackReason::InsufficientVram));
         }
 
         Ok(self.gpu_plan_or_cpu(
@@ -94,15 +90,20 @@ impl VramController {
     ///
     /// # Errors
     ///
-    /// Returns [`ComputeBackendError::RetryBudgetExceeded`] when the supplied
-    /// plan is already on the CPU path, and validation/overflow errors for an
-    /// invalid workload or retry counter.
+    /// Returns [`ComputeBackendError::PlanWorkloadMismatch`] when `plan` was
+    /// issued for a different workload than `request`,
+    /// [`ComputeBackendError::RetryBudgetExceeded`] when the supplied plan is
+    /// already on the CPU path, and validation/overflow errors for an invalid
+    /// workload or retry counter.
     pub fn recover_from_oom(
         &self,
         request: &WorkloadRequest,
         plan: &MicroBatchPlan,
     ) -> Result<MicroBatchPlan, ComputeBackendError> {
         Self::validate_request(request)?;
+        if !plan.issued_for(request) {
+            return Err(ComputeBackendError::PlanWorkloadMismatch);
+        }
         if plan.backend() != ComputeBackendKind::GpuStreamed {
             return Err(ComputeBackendError::RetryBudgetExceeded);
         }
@@ -119,7 +120,7 @@ impl VramController {
             ));
         }
         Ok(Self::cpu_plan(
-            request.requested_batch(),
+            request,
             next_retry,
             FallbackReason::OutOfMemoryRetryExhausted,
         ))
@@ -156,7 +157,7 @@ impl VramController {
                 return plan;
             }
             if batch == 1 {
-                return Self::cpu_plan(request.requested_batch(), oom_retry_count, fallback_reason);
+                return Self::cpu_plan(request, oom_retry_count, fallback_reason);
             }
             batch /= 2;
         }
@@ -184,21 +185,23 @@ impl VramController {
             PrecisionMode::ReferenceF64,
             oom_retry_count,
             None,
+            *request,
         ))
     }
 
     const fn cpu_plan(
-        batch_size: u32,
+        request: &WorkloadRequest,
         oom_retry_count: u32,
         reason: FallbackReason,
     ) -> MicroBatchPlan {
         MicroBatchPlan::new(
             ComputeBackendKind::CpuF64Reference,
-            batch_size,
+            request.requested_batch(),
             0,
             PrecisionMode::ReferenceF64,
             oom_retry_count,
             Some(reason),
+            *request,
         )
     }
 }
@@ -324,6 +327,7 @@ mod tests {
             PrecisionMode::ReferenceF64,
             0,
             None,
+            huge,
         );
         let plan = controller
             .recover_from_oom(&huge, &initial)
@@ -373,6 +377,22 @@ mod tests {
     }
 
     #[test]
+    fn foreign_workload_plan_is_refused_before_recovery() {
+        let inventory =
+            DeviceInventory::gpu(VramProfile::Gib12, VramProfile::Gib12.bytes()).expect("12");
+        let controller = VramController::new(inventory, 1).expect("controller");
+        let issued = controller.plan(&request(4, 8)).expect("gpu");
+        assert_eq!(
+            controller.recover_from_oom(&request(2, 8), &issued),
+            Err(ComputeBackendError::PlanWorkloadMismatch)
+        );
+        let retry = controller
+            .recover_from_oom(&request(4, 8), &issued)
+            .expect("same workload");
+        assert_eq!(retry.batch_size(), 2);
+    }
+
+    #[test]
     fn overflowing_retry_counter_fails_closed() {
         let inventory =
             DeviceInventory::gpu(VramProfile::Gib12, VramProfile::Gib12.bytes()).expect("12");
@@ -385,6 +405,7 @@ mod tests {
             PrecisionMode::ReferenceF64,
             u32::MAX,
             None,
+            workload,
         );
         assert_eq!(
             controller.recover_from_oom(&workload, &invalid),

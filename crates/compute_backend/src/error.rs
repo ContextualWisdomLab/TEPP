@@ -34,6 +34,8 @@ pub enum ComputeBackendError {
     SourceTextInTelemetry,
     /// Further OOM retries were requested after the bounded budget.
     RetryBudgetExceeded,
+    /// An OOM recovery plan was issued for a different workload.
+    PlanWorkloadMismatch,
 }
 
 impl ComputeBackendError {
@@ -63,6 +65,7 @@ impl fmt::Display for ComputeBackendError {
             Self::InvalidBudget => "invalid compute budget",
             Self::SourceTextInTelemetry => "telemetry cannot carry source text",
             Self::RetryBudgetExceeded => "oom retry budget exceeded",
+            Self::PlanWorkloadMismatch => "plan was issued for a different workload",
         };
         formatter.write_str(message)
     }
@@ -165,6 +168,11 @@ mod tests {
             (
                 ComputeBackendError::RetryBudgetExceeded,
                 "oom retry budget exceeded",
+                false,
+            ),
+            (
+                ComputeBackendError::PlanWorkloadMismatch,
+                "plan was issued for a different workload",
                 false,
             ),
         ] {
