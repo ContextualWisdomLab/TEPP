@@ -34,6 +34,7 @@ Rhu, M., Gimelshein, N., Clemons, J., Zulfiqar, A., & Keckler, S. W. (2016). vDN
 - **Safety reserve** is \(p \times 2^{30} / 8\). Usable VRAM is \(\max(0, a - s)\) for available bytes \(a\) and reserve \(s\).
 - **Peak** is \(b \cdot c + w\) for batch \(b\), per-observation charge \(c\), and working set \(w\). Overflow fails closed.
 - **OOM retry** is stateful: retry count \(r\) increments after each observed OOM, batch is halved when \(r\leq r_{max}\), and the peak is recomputed from the original workload. No loop is counted as a retry unless an executable plan is returned to the caller.
+- **Plan–workload binding**: every plan records the workload request it was issued for. OOM recovery refuses a plan whose recorded workload differs in any field from the supplied request (`PlanWorkloadMismatch`), so a retry cannot combine one workload's batch and retry count with another workload's peak inputs or requested batch. The binding is to the workload only; it does not bind a plan to the issuing controller, its inventory, or the latest retry step.
 - **CPU `f64` reference** uses deterministic compensated summation in IEEE 754 binary64 so cancellation-heavy low-order terms are not needlessly discarded (IEEE, 2019; Ogita et al., 2005).
 - Streamed document/topic cardinalities are not multiplied into a hypothetical full-corpus allocation; the forbidden full-corpus policy is rejected by the controller.
 - Mixed precision may be recorded as a transient mode only; final diagnostics remain binary64 (Micikevicius et al., 2018).
@@ -43,5 +44,6 @@ Rhu, M., Gimelshein, N., Clemons, J., Zulfiqar, A., & Keckler, S. W. (2016). vDN
 - cancellation-heavy CPU `f64` weighted sums recover the low-order term and known totals with computed RMSE;
 - 24-GiB profiles admit a larger autotuned micro-batch than 4-GiB profiles for the same workload;
 - each accepted OOM retry returns a smaller GPU plan and an exact retry count before CPU fallback;
+- a GPU or CPU plan issued for one workload is refused when recovered with a workload that differs in batch, per-observation bytes, working set, document count, or topic count, while value-equal workloads retry and fall back unchanged;
 - streamed extreme cardinalities remain valid because no full tensor is sized;
 - negative parity tolerances, full-corpus placement, observation drop, complexity reduction, cutoff mutation, mixed-final precision, and source-text telemetry fail closed.

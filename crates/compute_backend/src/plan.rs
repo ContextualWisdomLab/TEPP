@@ -1,6 +1,6 @@
 //! Planned backend, micro-batch, and fallback reason.
 
-use crate::request::PrecisionMode;
+use crate::request::{PrecisionMode, WorkloadRequest};
 
 /// Executable backend selected by the VRAM controller.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -25,6 +25,9 @@ pub enum FallbackReason {
 }
 
 /// A planned micro-batch that preserves the full observation set.
+///
+/// The plan records the workload it was issued for, so OOM recovery can refuse
+/// a plan derived from a different workload.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MicroBatchPlan {
     backend: ComputeBackendKind,
@@ -33,6 +36,7 @@ pub struct MicroBatchPlan {
     precision: PrecisionMode,
     oom_retry_count: u32,
     fallback: Option<FallbackReason>,
+    workload: WorkloadRequest,
 }
 
 impl MicroBatchPlan {
@@ -43,6 +47,7 @@ impl MicroBatchPlan {
         precision: PrecisionMode,
         oom_retry_count: u32,
         fallback: Option<FallbackReason>,
+        workload: WorkloadRequest,
     ) -> Self {
         Self {
             backend,
@@ -51,6 +56,7 @@ impl MicroBatchPlan {
             precision,
             oom_retry_count,
             fallback,
+            workload,
         }
     }
 
@@ -89,6 +95,13 @@ impl MicroBatchPlan {
     pub const fn fallback(self) -> Option<FallbackReason> {
         self.fallback
     }
+
+    /// Return whether this plan was issued for a workload equal in every field
+    /// to `request`.
+    #[must_use]
+    pub fn issued_for(&self, request: &WorkloadRequest) -> bool {
+        self.workload == *request
+    }
 }
 
 /// Predict peak bytes for a micro-batch plus fixed working set.
@@ -114,7 +127,28 @@ pub const fn predicted_peak_bytes(
 mod tests {
     use super::{ComputeBackendKind, FallbackReason, MicroBatchPlan, predicted_peak_bytes};
     use crate::error::ComputeBackendError;
-    use crate::request::PrecisionMode;
+    use crate::request::{
+        AdaptationPolicy, CorpusPlacement, CutoffPolicy, ModelComplexity, ObservationRetention,
+        PrecisionMode, WorkloadRequest,
+    };
+
+    fn workload(batch: u32) -> WorkloadRequest {
+        WorkloadRequest::new(
+            4,
+            2,
+            8,
+            0,
+            batch,
+            AdaptationPolicy {
+                corpus_placement: CorpusPlacement::StreamedMicroBatches,
+                observation_retention: ObservationRetention::KeepAll,
+                model_complexity: ModelComplexity::KeepSpecified,
+                cutoff_policy: CutoffPolicy::KeepCutoff,
+            },
+            PrecisionMode::ReferenceF64,
+        )
+        .expect("valid workload")
+    }
 
     #[test]
     fn peak_prediction_and_plan_accessors() {
@@ -134,6 +168,7 @@ mod tests {
             PrecisionMode::ReferenceF64,
             2,
             Some(FallbackReason::NonFiniteGuard),
+            workload(3),
         );
         assert_eq!(plan.backend(), ComputeBackendKind::CpuF64Reference);
         assert_eq!(plan.batch_size(), 3);
@@ -141,5 +176,7 @@ mod tests {
         assert_eq!(plan.precision(), PrecisionMode::ReferenceF64);
         assert_eq!(plan.oom_retry_count(), 2);
         assert_eq!(plan.fallback(), Some(FallbackReason::NonFiniteGuard));
+        assert!(plan.issued_for(&workload(3)));
+        assert!(!plan.issued_for(&workload(4)));
     }
 }
