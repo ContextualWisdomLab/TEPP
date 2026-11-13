@@ -1,6 +1,6 @@
 //! Direct numeric boundary controls for the shared binary64 scale helpers.
 
-use super::{positive_binary_parts, scale_binary, scaled_expected_count};
+use super::{has_zero_mass, positive_binary_parts, scale_binary, scaled_expected_count};
 use crate::TopicMeasurementError;
 
 /// Zero, overflow, normal, subnormal, and below-half-ulp scaling keep typed outcomes.
@@ -43,5 +43,26 @@ fn binary_parts_and_scaled_counts_reject_invalid_inputs() {
             scaled_expected_count(count, theta, beta, 0, 1.0),
             Err(TopicMeasurementError::NonFiniteEstimate)
         );
+    }
+}
+
+/// Zero factors never conceal non-finite or negative partners on either side.
+#[test]
+fn zero_mass_checks_both_original_factors_before_zero_short_circuit() {
+    for (left, right) in [(0.0, 1.0), (1.0, 0.0), (0.0, 0.0)] {
+        assert_eq!(has_zero_mass(left, right), Ok(true));
+    }
+    assert_eq!(has_zero_mass(0.5, 0.25), Ok(false));
+    for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0] {
+        for other in [0.0, 0.5] {
+            assert_eq!(
+                has_zero_mass(invalid, other),
+                Err(TopicMeasurementError::NonFiniteEstimate)
+            );
+            assert_eq!(
+                has_zero_mass(other, invalid),
+                Err(TopicMeasurementError::NonFiniteEstimate)
+            );
+        }
     }
 }

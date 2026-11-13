@@ -325,12 +325,10 @@ fn origin_supplement_successful_draw_and_plausible_labels() {
     assert_eq!(draws.topic_ids(), topics);
     assert_eq!(draws.seed(), 11);
     assert_eq!(draws.draws().len(), 2);
-    assert!(
-        draws
-            .draws()
-            .iter()
-            .all(|row| row.len() == 6 && row.iter().all(|x| x.is_finite()))
-    );
+    for row in draws.draws() {
+        assert_eq!(row.len(), 6);
+        assert!(row.iter().all(|x| x.is_finite()));
+    }
     let records = draws.plausible_values();
     assert_eq!(records.len(), 12);
     for (document, (id, time)) in expected_ids.iter().zip(&expected_times).enumerate() {

@@ -31,7 +31,8 @@ fn correlated_precision_draws_recover_analytic_covariance() {
             values: vec![vec![4.0, off_diagonal], vec![off_diagonal, 4.0]],
         };
         let determinant = 16.0 - off_diagonal * off_diagonal;
-        assert!(determinant.is_finite() && determinant > 0.0);
+        assert!(determinant.is_finite());
+        assert!(determinant > 0.0);
         let expected_variance = 4.0 / determinant;
         let expected_covariance = -off_diagonal / determinant;
         let draws = precision.draw_joint_gaussian(19, COUNT).expect("draws");
@@ -39,12 +40,10 @@ fn correlated_precision_draws_recover_analytic_covariance() {
         assert_eq!(draws.topic_ids(), topic_ids);
         assert_eq!(draws.event_times(), event_times);
         assert_eq!(draws.draws().len(), COUNT);
-        assert!(
-            draws
-                .draws()
-                .iter()
-                .all(|row| { row.len() == 2 && row.iter().all(|value| value.is_finite()) })
-        );
+        for row in draws.draws() {
+            assert_eq!(row.len(), 2);
+            assert!(row.iter().all(|value| value.is_finite()));
+        }
         let mut moments = [0.0_f64; 3];
         for row in draws.draws() {
             let first = row[0] - 0.25;
