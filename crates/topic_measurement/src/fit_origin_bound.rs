@@ -44,6 +44,18 @@ impl FitOriginBoundModel {
         &self.model
     }
 
+    /// Score the actual originating CPU fit on its owned admitted counts.
+    ///
+    /// Delegates unchanged to the CPU f64 in-sample mixture likelihood, not
+    /// the penalized objective or a held-out score. No foreign input or model
+    /// can be supplied. This does not attest external cutoff authority or GPU work.
+    ///
+    /// # Errors
+    /// Propagates the original scorer's dimension and non-finite errors.
+    pub fn in_sample_log_likelihood(&self) -> Result<f64, TopicMeasurementError> {
+        self.input.in_sample_log_likelihood(&self.model)
+    }
+
     /// Build precision only for the actual fitted input and configuration.
     ///
     /// Equality covers ordered documents/times, sparse numerical rows,

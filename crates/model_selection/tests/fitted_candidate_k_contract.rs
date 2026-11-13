@@ -457,3 +457,30 @@ fn statistical_candidate_preserves_subnormal_mixture_likelihood() {
         assert!(candidate.is_statistically_supported());
     }
 }
+
+/// Bound-fit production selection preserves the legacy actual-fit score decision.
+#[test]
+fn bound_likelihood_consumer_preserves_actual_fit_candidate_selection() {
+    let input = separated_topic_input();
+    let mut legacy_candidates = Vec::new();
+    for k in [2, 3] {
+        let config = topic_measurement::ReferenceTopicModelConfig::new(k, vec![7], 2_000, 1e-5)
+            .expect("legacy config")
+            .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+            .expect("legacy numerical hyperparameters");
+        let model = topic_measurement::fit_reference_topic_model(&input, &config)
+            .expect("actual legacy CPU fit");
+        let candidate_k = u32::try_from(k).expect("bounded K");
+        legacy_candidates.push(
+            statistical_candidate_from_fit(&input, candidate_k, &model)
+                .expect("unchanged public diagnostic"),
+        );
+    }
+    let expected =
+        model_selection::select_candidate_k(&legacy_candidates).expect("legacy candidate decision");
+    let config = recovery_config(vec![7]);
+    let actual = select_fitted_candidate_k(&input, &config, "trsl_tm_reference", &[])
+        .expect("new bound-fit consumer");
+    assert_eq!(actual, expected);
+    assert_eq!(actual, 2);
+}

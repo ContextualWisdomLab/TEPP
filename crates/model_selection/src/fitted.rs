@@ -3,8 +3,8 @@
 use std::collections::BTreeSet;
 
 use topic_measurement::{
-    ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig, fit_reference_topic_model,
-    refuse_lexical_inferential_weight,
+    ReferenceTopicInput, ReferenceTopicModel, ReferenceTopicModelConfig,
+    fit_origin_bound_topic_model, refuse_lexical_inferential_weight,
 };
 
 use crate::{ModelCandidate, ModelSelectionError, select_candidate_k};
@@ -177,6 +177,16 @@ pub fn statistical_candidate_from_fit(
     let tokens = input
         .token_count()
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+    candidate_from_owned_diagnostics(candidate_k, model, log_likelihood, tokens)
+}
+
+/// Assemble the unchanged statistical score after its originating scorer returns.
+fn candidate_from_owned_diagnostics(
+    candidate_k: u32,
+    model: &ReferenceTopicModel,
+    log_likelihood: f64,
+    tokens: f64,
+) -> Result<ModelCandidate, ModelSelectionError> {
     let parameters = free_parameter_count(model)?;
     let log_tokens = tokens.ln();
     if log_tokens < 0.0 {
@@ -189,7 +199,8 @@ pub fn statistical_candidate_from_fit(
 
 /// Fit each candidate `K` and select the admissible statistical topic count.
 ///
-/// Each candidate is fitted with [`fit_reference_topic_model`]. A typed
+/// Each candidate is fitted with [`fit_origin_bound_topic_model`], retaining its
+/// admitted input and scoring that owned actual fit. A typed
 /// `DidNotConverge`, `NonFiniteEstimate`, `InvalidModelInput`, or shared
 /// `ResourceLimitExceeded` is a failed candidate, not a fabricated diagnostic.
 /// Shared fit admission runs before dense seed allocation for each K. LLM-vote-only values may be
@@ -231,8 +242,19 @@ pub fn select_fitted_candidate_k(
             )
         })
         .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
-        if let Ok(model) = fit_reference_topic_model(input, &fit_config) {
-            candidates.push(statistical_candidate_from_fit(input, candidate_k, &model)?);
+        if let Ok(bound) = fit_origin_bound_topic_model(input.clone(), fit_config) {
+            let log_likelihood = bound
+                .in_sample_log_likelihood()
+                .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+            let tokens = input
+                .token_count()
+                .map_err(|_| ModelSelectionError::InvalidDiagnostic)?;
+            candidates.push(candidate_from_owned_diagnostics(
+                candidate_k,
+                bound.model(),
+                log_likelihood,
+                tokens,
+            )?);
         }
     }
     for &vote in llm_votes {
