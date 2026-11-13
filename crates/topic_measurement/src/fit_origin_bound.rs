@@ -88,6 +88,25 @@ impl FitOriginBoundModel {
         }
         original.build_joint_coordinate_precision(&self.model, &self.config, topic_ids)
     }
+
+    /// Build precision from the retained actual fitted input and configuration.
+    ///
+    /// Use this after moving the input and configuration into
+    /// [`fit_origin_bound_topic_model`]; neither value needs to be cloned or
+    /// supplied again. Delegates unchanged to the CPU `f64` precision builder.
+    /// It does not attest external run/snapshot/cutoff authority, GPU work or
+    /// posterior-artifact completeness, and topic identity remains caller-assigned.
+    ///
+    /// # Errors
+    /// Propagates the unchanged precision builder's dimension, topic-identity,
+    /// non-finite, symmetry and positive-definiteness errors.
+    pub fn build_owned_joint_coordinate_precision(
+        &self,
+        topic_ids: Vec<Uuid>,
+    ) -> Result<JointCoordinatePrecision, TopicMeasurementError> {
+        self.input
+            .build_joint_coordinate_precision(&self.model, &self.config, topic_ids)
+    }
 }
 
 #[cfg(test)]
