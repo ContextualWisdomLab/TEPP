@@ -484,3 +484,53 @@ fn bound_likelihood_consumer_preserves_actual_fit_candidate_selection() {
     assert_eq!(actual, expected);
     assert_eq!(actual, 2);
 }
+
+/// A real converged low-token fit must propagate the existing score refusal.
+#[test]
+fn cron_coverage_real_fit_propagates_subunit_token_score_refusal() {
+    let input = two_document_input([0.2, 0.2, 0.2, 0.2]);
+    let fit_config = topic_measurement::ReferenceTopicModelConfig::new(2, vec![7], 2_000, 1e-5)
+        .expect("admitted low-token fit configuration")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("admitted hyperparameters");
+    let bound = topic_measurement::fit_origin_bound_topic_model(input.clone(), fit_config)
+        .expect("actual converged low-token CPU fit before diagnostic refusal");
+    assert!(bound.model().objective.is_finite());
+    assert!(
+        bound
+            .in_sample_log_likelihood()
+            .expect("actual finite likelihood")
+            .is_finite()
+    );
+    let tokens = input.token_count().expect("actual token total");
+    assert!(tokens > 0.0);
+    assert!(tokens < 1.0);
+    assert_eq!(
+        statistical_candidate_from_fit(&input, 2, bound.model()),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
+    let config = FittedCandidateKConfig::new(vec![2], vec![7], 2_000, 1e-5)
+        .expect("single fitted candidate")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("matching hyperparameters");
+    assert_eq!(
+        select_fitted_candidate_k(&input, &config, "trsl_tm_reference", &[]),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
+    println!("NEW_ERROR_PATH actual_fit=true tokens={tokens} typed=InvalidDiagnostic");
+}
+
+/// The same public selection path retains an ordinary real-fit positive control.
+#[test]
+fn cron_coverage_real_fit_ordinary_tokens_still_selects_k() {
+    let input = two_document_input([1.0, 1.0, 1.0, 1.0]);
+    let config = FittedCandidateKConfig::new(vec![2], vec![7], 2_000, 1e-5)
+        .expect("single candidate")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("matching hyperparameters");
+    assert_eq!(
+        select_fitted_candidate_k(&input, &config, "trsl_tm_reference", &[]),
+        Ok(2)
+    );
+    println!("NEW_ERROR_PATH ordinary_positive=true");
+}
