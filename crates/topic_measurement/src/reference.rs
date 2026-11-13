@@ -1019,8 +1019,9 @@ fn positive_binary_parts(value: f64) -> Result<(f64, i32), TopicMeasurementError
     if field == 0 {
         let highest = fraction.ilog2();
         let mantissa_bits = (fraction << (52 - highest)) & ((1_u64 << 52) - 1);
-        let exponent =
-            i32::try_from(highest).map_err(|_| TopicMeasurementError::NonFiniteEstimate)? - 1074;
+        // A nonzero subnormal fraction has highest bit 0..=51, so the
+        // signed reinterpretation is exact and needs no fallible conversion.
+        let exponent = highest.cast_signed() - 1074;
         Ok((f64::from_bits((1023_u64 << 52) | mantissa_bits), exponent))
     } else {
         Ok((f64::from_bits((1023_u64 << 52) | fraction), field - 1023))
@@ -1037,8 +1038,9 @@ fn scale_binary(value: f64, exponent: i32) -> Result<f64, TopicMeasurementError>
     let result = if combined > 1023 {
         f64::INFINITY
     } else if combined >= -1022 {
-        let field =
-            u64::try_from(combined + 1023).map_err(|_| TopicMeasurementError::NonFiniteEstimate)?;
+        // This branch proves combined + 1023 is in 1..=2046; retain
+        // its exact nonnegative value without an unreachable error closure.
+        let field = u64::from((combined + 1023).cast_unsigned());
         mantissa * f64::from_bits(field << 52)
     } else if combined >= -1075 {
         (mantissa * 2.0_f64.powi(combined + 1074)) * f64::from_bits(1)
