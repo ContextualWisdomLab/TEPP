@@ -940,18 +940,13 @@ fn expectation(
                     }
                 } else if mass.is_normal() {
                     count * (mass / probability)
+                } else if has_zero_mass(theta_part, beta_part)? {
+                    0.0
                 } else {
-                    // Positive simplex factors and a positive mixture keep this
-                    // smaller-factor ratio finite. Scale before the last product
-                    // when count >= 1; for smaller counts form responsibility first.
-                    // This avoids both count-first and mass-first underflow.
-                    let larger = theta_part.max(beta_part);
-                    let ratio = theta_part.min(beta_part) / probability;
-                    if count >= 1.0 {
-                        (count * larger) * ratio
-                    } else {
-                        count * (larger * ratio)
-                    }
+                    // A normal denominator does not make a tiny numerator ratio
+                    // representable. Decompose all original operands before scaling.
+                    let (sum, exponent) = positive_binary_parts(probability)?;
+                    scaled_expected_count(count, theta_part, beta_part, exponent, sum)?
                 };
                 document_topic_counts[document][topic] += expected;
                 require_finite(document_topic_counts[document][topic])?;
@@ -1793,3 +1788,7 @@ mod responsibility_product;
 #[cfg(test)]
 #[path = "../tests/support/binary_scale_contract.rs"]
 mod binary_scale_contract;
+
+#[cfg(test)]
+#[path = "../tests/support/normal_mixture_factor_rounding.rs"]
+mod normal_mixture_factor_rounding;
