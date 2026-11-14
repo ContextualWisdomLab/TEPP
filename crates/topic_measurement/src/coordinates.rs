@@ -145,7 +145,19 @@ pub fn from_isometric_log_ratio(coordinates: &[f64]) -> Result<Vec<f64>, TopicMe
 }
 
 fn normalize_positive_weights(weights: Vec<f64>) -> Result<Vec<f64>, TopicMeasurementError> {
-    let denominator: f64 = weights.iter().sum();
+    // Retain small positive mass before dividing, as simplex admission does.
+    let mut sum = 0.0_f64;
+    let mut compensation = 0.0_f64;
+    for &weight in &weights {
+        let next = sum + weight;
+        compensation += if sum.abs() >= weight.abs() {
+            (sum - next) + weight
+        } else {
+            (weight - next) + sum
+        };
+        sum = next;
+    }
+    let denominator = sum + compensation;
     let simplex: Vec<f64> = weights
         .into_iter()
         .map(|weight| weight / denominator)
@@ -270,5 +282,42 @@ mod tests {
             aitchison_distance(&[0.5, 0.5], &[0.0, 1.0]),
             Err(TopicMeasurementError::InvalidComposition)
         );
+    }
+}
+
+#[cfg(test)]
+mod normalization_regression {
+    use super::{additive_log_ratio, from_additive_log_ratio};
+
+    /// Preserve positive mass when the dominant weight precedes many small weights.
+    #[test]
+    fn dominant_first_remains_an_admitted_composition() {
+        check_inverse_composition(32_768, 0);
+    }
+
+    /// Preserve the equivalent composition with the dominant weight last.
+    #[test]
+    fn dominant_last_remains_an_admitted_composition() {
+        check_inverse_composition(32_768, 32_767);
+    }
+
+    /// Preserve the ordinary bounded-dimensional control.
+    #[test]
+    fn small_control_remains_an_admitted_composition() {
+        check_inverse_composition(2, 0);
+    }
+
+    /// Check shape, positivity, finiteness and the existing public simplex contract.
+    fn check_inverse_composition(dimension: usize, dominant: usize) {
+        let mut coordinates = vec![0.0_f64; dimension];
+        coordinates[dominant] = 37.0;
+        let proportions = from_additive_log_ratio(&coordinates).expect("finite inverse");
+        assert_eq!(proportions.len(), dimension + 1);
+        assert!(
+            proportions
+                .iter()
+                .all(|value| value.is_finite() && *value > 0.0)
+        );
+        assert!(additive_log_ratio(&proportions).is_ok());
     }
 }
