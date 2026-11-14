@@ -205,11 +205,11 @@ fn origin_supplement_each_input_field_is_checked() {
             1,
             "single input axis {name}"
         );
-        assert!(
-            matches!(
-                bound.build_joint_coordinate_precision(&changed, &config, topics.clone()),
-                Err(crate::TopicMeasurementError::InvalidModelInput)
-            ),
+        assert_eq!(
+            bound
+                .build_joint_coordinate_precision(&changed, &config, topics.clone())
+                .err(),
+            Some(crate::TopicMeasurementError::InvalidModelInput),
             "unbound input axis {name}"
         );
         println!("INPUT_AXIS {name} rejected_typed=true");
@@ -275,11 +275,11 @@ fn origin_supplement_each_config_field_is_checked() {
             1,
             "single config axis {name}"
         );
-        assert!(
-            matches!(
-                bound.build_joint_coordinate_precision(&input, &changed, topics.clone()),
-                Err(crate::TopicMeasurementError::InvalidModelInput)
-            ),
+        assert_eq!(
+            bound
+                .build_joint_coordinate_precision(&input, &changed, topics.clone())
+                .err(),
+            Some(crate::TopicMeasurementError::InvalidModelInput),
             "unbound config axis {name}"
         );
         println!("CONFIG_AXIS {name} rejected_typed=true");
