@@ -313,11 +313,10 @@ mod normalization_regression {
         coordinates[dominant] = 37.0;
         let proportions = from_additive_log_ratio(&coordinates).expect("finite inverse");
         assert_eq!(proportions.len(), dimension + 1);
-        assert!(
-            proportions
-                .iter()
-                .all(|value| value.is_finite() && *value > 0.0)
-        );
+        for value in &proportions {
+            assert!(value.is_finite());
+            assert!(*value > 0.0);
+        }
         assert!(additive_log_ratio(&proportions).is_ok());
     }
 }
