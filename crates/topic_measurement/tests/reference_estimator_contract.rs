@@ -668,3 +668,288 @@ fn invalid_structural_inputs_and_nonconvergence_fail_closed() {
         .expect("finite hyperparameters");
     assert!(fit_reference_topic_model(&input, &unstable).is_err());
 }
+
+/// Build equivalent CSR/CSC fixtures with an unused fifth term and optional zero.
+fn normalization_underflow_input(explicit_zero: bool, csc: bool) -> ReferenceTopicInput {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let matrix = if csc {
+        SparseMatrix::from_csc(
+            6,
+            5,
+            if explicit_zero {
+                vec![0, 3, 6, 9, 12, 13]
+            } else {
+                vec![0, 3, 6, 9, 12, 12]
+            },
+            if explicit_zero {
+                vec![0, 1, 2, 0, 1, 2, 3, 4, 5, 3, 4, 5, 0]
+            } else {
+                vec![0, 1, 2, 0, 1, 2, 3, 4, 5, 3, 4, 5]
+            },
+            if explicit_zero {
+                vec![
+                    90.0, 85.0, 80.0, 10.0, 15.0, 20.0, 10.0, 15.0, 20.0, 90.0, 85.0, 80.0, 0.0,
+                ]
+            } else {
+                vec![
+                    90.0, 85.0, 80.0, 10.0, 15.0, 20.0, 10.0, 15.0, 20.0, 90.0, 85.0, 80.0,
+                ]
+            },
+        )
+    } else {
+        SparseMatrix::from_csr(
+            6,
+            5,
+            if explicit_zero {
+                vec![0, 3, 5, 7, 9, 11, 13]
+            } else {
+                vec![0, 2, 4, 6, 8, 10, 12]
+            },
+            if explicit_zero {
+                vec![0, 1, 4, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3]
+            } else {
+                vec![0, 1, 0, 1, 0, 1, 2, 3, 2, 3, 2, 3]
+            },
+            if explicit_zero {
+                vec![
+                    90.0, 10.0, 0.0, 85.0, 15.0, 80.0, 20.0, 10.0, 90.0, 15.0, 85.0, 20.0, 80.0,
+                ]
+            } else {
+                vec![
+                    90.0, 10.0, 85.0, 15.0, 80.0, 20.0, 10.0, 90.0, 15.0, 85.0, 20.0, 80.0,
+                ]
+            },
+        )
+    }
+    .expect("finite nonnegative sparse matrix");
+    ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &matrix,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("legal input with 600 positive total tokens")
+}
+/// Keep the fit configuration fixed while varying only positive topic smoothing.
+fn smoothing_config(smoothing: f64) -> ReferenceTopicModelConfig {
+    assert!(smoothing.is_finite() && smoothing > 0.0);
+    ReferenceTopicModelConfig::new(2, vec![7], 2000, 1e-5)
+        .unwrap()
+        .with_hyperparameters(1.0, 0.25, 0.01, smoothing, 0.2)
+        .expect("documented finite positive smoothing admitted")
+}
+/// A representable tiny floor gives identical positive fits for all sparse forms.
+#[test]
+fn normal_smoothing_preserves_zero_entry_equivalence() {
+    let c = smoothing_config(f64::MIN_POSITIVE);
+    let baseline =
+        fit_reference_topic_model(&normalization_underflow_input(false, false), &c).unwrap();
+    for csc in [false, true] {
+        for explicit in [false, true] {
+            let fitted =
+                fit_reference_topic_model(&normalization_underflow_input(explicit, csc), &c)
+                    .unwrap();
+            assert_eq!(fitted, baseline);
+            assert!(
+                fitted
+                    .topic_term_probabilities
+                    .iter()
+                    .flatten()
+                    .all(|x| x.is_finite() && *x > 0.0)
+            );
+        }
+    }
+}
+/// An unrepresentable beta floor fails for both orientations and zero spellings.
+#[test]
+fn normalization_underflow_is_rejected_before_returning_fit() {
+    let c = smoothing_config(f64::from_bits(1));
+    let mut failures = Vec::new();
+    for csc in [false, true] {
+        for explicit in [false, true] {
+            let result =
+                fit_reference_topic_model(&normalization_underflow_input(explicit, csc), &c);
+            if result != Err(TopicMeasurementError::NonFiniteEstimate) {
+                failures.push((csc, explicit));
+            }
+        }
+    }
+    assert!(
+        failures.is_empty(),
+        "positive smoothing must not return an underflowed zero beta: {failures:?}"
+    );
+}
+
+/// Reject mapped backward document times despite forward graph intervals.
+#[test]
+fn reference_input_rejects_reverse_mapped_document_event_times() {
+    let (snapshot, ids, times, memberships, relations) = fixture();
+    let mut reversed = times.clone();
+    reversed.reverse();
+    let mut one_reverse_pair = times;
+    one_reverse_pair.swap(0, 1);
+    for supplied_times in [reversed, one_reverse_pair] {
+        assert!(matches!(
+            ReferenceTopicInput::new(
+                &snapshot,
+                ids.clone(),
+                &separated_counts(),
+                &supplied_times,
+                None,
+                &memberships,
+                &relations,
+            ),
+            Err(TopicMeasurementError::InvalidModelInput)
+        ));
+    }
+}
+
+/// Admit equal pair times while retaining variation elsewhere in the corpus.
+#[test]
+fn reference_input_admits_equal_mapped_pair_times_with_other_time_variation() {
+    let (snapshot, ids, mut times, memberships, relations) = fixture();
+    times[1] = times[0];
+    let input = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &separated_counts(),
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("equal pair times do not move backward");
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 4, 1e30).expect("config");
+    let model = fit_reference_topic_model(&input, &config).expect("finite bounded fit");
+    assert!(model.objective.is_finite());
+}
+
+/// Preserve forward endpoint identity when documents and matrix rows are permuted.
+#[test]
+fn reference_input_admits_permuted_document_rows_with_forward_identity_times() {
+    let (snapshot, mut ids, mut times, memberships, relations) = fixture();
+    ids.reverse();
+    times.reverse();
+    let counts = SparseMatrix::from_csr(
+        6,
+        4,
+        vec![0, 2, 4, 6, 8, 10, 12],
+        vec![2, 3, 2, 3, 2, 3, 0, 1, 0, 1, 0, 1],
+        vec![
+            20.0, 80.0, 15.0, 85.0, 10.0, 90.0, 80.0, 20.0, 85.0, 15.0, 90.0, 10.0,
+        ],
+    )
+    .expect("permuted matrix");
+    let input = ReferenceTopicInput::new(
+        &snapshot,
+        ids,
+        &counts,
+        &times,
+        None,
+        &memberships,
+        &relations,
+    )
+    .expect("row order does not define transition order");
+    assert_eq!(input.document_count(), 6);
+}
+
+/// Construct every non-transition relation pointing to an earlier corpus document.
+fn provenance_only_graph(ids: &[Uuid]) -> RelationGraph {
+    let mut graph = RelationGraph::new();
+    for kind in [
+        RelationKind::References,
+        RelationKind::Summarizes,
+        RelationKind::Revises,
+        RelationKind::Translates,
+        RelationKind::RetrospectivelyReports,
+        RelationKind::Supports,
+        RelationKind::Contradicts,
+        RelationKind::OutcomeOf,
+    ] {
+        let temporal = relation(ids[0], ids[5], 1, 6);
+        graph
+            .insert(
+                RelationEdge::new(
+                    kind,
+                    temporal.target(),
+                    temporal.source(),
+                    RelationEvidenceStatus::Observed,
+                    temporal.target_event_time(),
+                    temporal.source_event_time(),
+                )
+                .expect("backward provenance remains valid"),
+            )
+            .expect("distinct provenance kind");
+    }
+    assert_eq!(graph.edges().count(), 8);
+    assert!(graph.edges().all(|edge| !edge.is_transition_edge()));
+    graph
+}
+
+/// Backward provenance alone cannot satisfy the observed-transition requirement.
+#[test]
+fn provenance_only_input_does_not_become_a_state_transition() {
+    let (snapshot, ids, times, memberships, _) = fixture();
+    let graph = provenance_only_graph(&ids);
+    assert!(matches!(
+        ReferenceTopicInput::new(
+            &snapshot,
+            ids,
+            &separated_counts(),
+            &times,
+            None,
+            &memberships,
+            &graph,
+        ),
+        Err(TopicMeasurementError::InvalidModelInput)
+    ));
+    assert_eq!(graph.edges().count(), 8);
+}
+
+/// Valid provenance is retained without changing fitted parameters, lineage, or precision.
+#[test]
+fn mixed_provenance_is_numerically_inert_at_public_fit_boundary() {
+    let (snapshot, ids, times, memberships, observed) = fixture();
+    let provenance = provenance_only_graph(&ids);
+    let mut mixed = observed.clone();
+    for edge in provenance.edges() {
+        mixed.insert(*edge).expect("retain provenance");
+    }
+    assert_eq!(mixed.edges().count(), observed.edges().count() + 8);
+    let counts = separated_counts();
+    let build = |graph: &RelationGraph| {
+        ReferenceTopicInput::new(
+            &snapshot,
+            ids.clone(),
+            &counts,
+            &times,
+            None,
+            &memberships,
+            graph,
+        )
+        .expect("observed transitions remain available")
+    };
+    let baseline_input = build(&observed);
+    let mixed_input = build(&mixed);
+    let config = ReferenceTopicModelConfig::new(2, vec![7], 2_000, 1e-5).expect("config");
+    let baseline = fit_reference_topic_model(&baseline_input, &config).expect("baseline fit");
+    let candidate = fit_reference_topic_model(&mixed_input, &config).expect("mixed fit");
+    assert!(baseline.objective.is_finite());
+    assert_eq!(candidate, baseline);
+    let topic_ids = vec![Uuid::from_u128(201), Uuid::from_u128(202)];
+    let baseline_precision = baseline_input
+        .build_joint_coordinate_precision(&baseline, &config, topic_ids.clone())
+        .expect("baseline precision");
+    let mixed_precision = mixed_input
+        .build_joint_coordinate_precision(&candidate, &config, topic_ids)
+        .expect("mixed precision");
+    assert_eq!(mixed_precision.values(), baseline_precision.values());
+    assert_eq!(
+        mixed_precision.coordinate_means(),
+        baseline_precision.coordinate_means()
+    );
+    assert_eq!(mixed.edges().count(), observed.edges().count() + 8);
+}

@@ -359,3 +359,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "correlated_draw_contract.rs"]
+mod correlated_draw_supplement;
