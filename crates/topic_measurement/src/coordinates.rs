@@ -86,10 +86,18 @@ pub fn isometric_log_ratio(proportions: &[f64]) -> Result<Vec<f64>, TopicMeasure
         let remaining_f = remaining as f64;
         let scale = (remaining_f / (remaining_f + 1.0)).sqrt();
         let mut rest_sum = 0.0_f64;
-        for log_part in &logs[index + 1..] {
-            rest_sum += *log_part;
+        let mut rest_compensation = 0.0_f64;
+        for &log_part in &logs[index + 1..] {
+            let next = rest_sum + log_part;
+            rest_compensation += if rest_sum.abs() >= log_part.abs() {
+                (rest_sum - next) + log_part
+            } else {
+                (log_part - next) + rest_sum
+            };
+            rest_sum = next;
         }
-        coordinates.push(scale * (logs[index] - rest_sum / remaining_f));
+        let compensated_rest = rest_sum + rest_compensation;
+        coordinates.push(scale * (logs[index] - compensated_rest / remaining_f));
     }
     Ok(coordinates)
 }
@@ -287,7 +295,7 @@ mod tests {
 
 #[cfg(test)]
 mod normalization_regression {
-    use super::{additive_log_ratio, from_additive_log_ratio};
+    use super::{additive_log_ratio, from_additive_log_ratio, isometric_log_ratio};
 
     /// Preserve positive mass when the dominant weight precedes many small weights.
     #[test]
@@ -305,6 +313,24 @@ mod normalization_regression {
     #[test]
     fn small_control_remains_an_admitted_composition() {
         check_inverse_composition(2, 0);
+    }
+
+    /// Equal shares are the ILR origin, so every sequential coordinate is exactly zero.
+    #[test]
+    fn equal_share_origin_coordinates_are_exact() {
+        let dimension = 512_usize;
+        #[allow(clippy::cast_precision_loss)]
+        let share = 1.0_f64 / (dimension as f64);
+        let proportions = vec![share; dimension];
+        let coordinates = isometric_log_ratio(&proportions).expect("equal shares");
+        assert_eq!(coordinates.len(), dimension - 1);
+        let bound = 8.0 * f64::EPSILON * share.ln().abs();
+        for coordinate in &coordinates {
+            assert!(
+                coordinate.abs() <= bound,
+                "equal-share ILR coordinates must stay within summation rounding of the exact origin"
+            );
+        }
     }
 
     /// Check shape, positivity, finiteness and the existing public simplex contract.
