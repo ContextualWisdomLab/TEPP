@@ -9,3 +9,4 @@ __pycache__/
 /.codegraph/
 node_modules/
 origin/
+/graphify-out/
