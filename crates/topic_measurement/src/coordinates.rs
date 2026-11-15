@@ -197,10 +197,28 @@ pub fn aitchison_distance(left: &[f64], right: &[f64]) -> Result<f64, TopicMeasu
     let parts = left.len() as f64;
     let mut left_log_sum = 0.0_f64;
     let mut right_log_sum = 0.0_f64;
+    let mut left_compensation = 0.0_f64;
+    let mut right_compensation = 0.0_f64;
     for index in 0..left.len() {
-        left_log_sum += left[index].ln();
-        right_log_sum += right[index].ln();
+        let left_log = left[index].ln();
+        let right_log = right[index].ln();
+        let left_next = left_log_sum + left_log;
+        left_compensation += if left_log_sum.abs() >= left_log.abs() {
+            (left_log_sum - left_next) + left_log
+        } else {
+            (left_log - left_next) + left_log_sum
+        };
+        left_log_sum = left_next;
+        let right_next = right_log_sum + right_log;
+        right_compensation += if right_log_sum.abs() >= right_log.abs() {
+            (right_log_sum - right_next) + right_log
+        } else {
+            (right_log - right_next) + right_log_sum
+        };
+        right_log_sum = right_next;
     }
+    left_log_sum += left_compensation;
+    right_log_sum += right_compensation;
     let left_mean = left_log_sum / parts;
     let right_mean = right_log_sum / parts;
     let mut square_sum = 0.0_f64;
@@ -243,6 +261,32 @@ mod tests {
         isometric_log_ratio,
     };
     use crate::error::TopicMeasurementError;
+
+    #[test]
+    fn relative_equal_share_shift_keeps_aitchison_distance_at_the_origin() {
+        // Two equal-share compositions are the same point in Aitchison geometry,
+        // so both the clr distance and the ILR-isometric distance must vanish.
+        let parts = 512_usize;
+        #[allow(clippy::cast_precision_loss)]
+        let share = 1.0_f64 / parts as f64;
+        let left = vec![share; parts];
+        let right = vec![share * (1.0 + 1e-13); parts];
+        let bound = 8.0 * f64::EPSILON * share.ln().abs();
+        let distance = aitchison_distance(&left, &right).expect("aitchison");
+        assert!(distance <= bound, "clr distance {distance} exceeds {bound}");
+        let left_ilr = isometric_log_ratio(&left).expect("left ilr");
+        let right_ilr = isometric_log_ratio(&right).expect("right ilr");
+        let ilr_distance = left_ilr
+            .iter()
+            .zip(&right_ilr)
+            .map(|(a, b)| (a - b) * (a - b))
+            .sum::<f64>()
+            .sqrt();
+        assert!(
+            ilr_distance <= bound,
+            "ilr distance {ilr_distance} exceeds {bound}"
+        );
+    }
 
     #[test]
     fn two_part_equal_shares_are_zero_and_unrepresentable_extremes_fail_closed() {
