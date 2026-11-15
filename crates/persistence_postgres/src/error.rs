@@ -127,6 +127,8 @@ pub enum MigrationContractError {
     MissingTemporalColumns,
     /// Embedded or supplied migration SQL was empty or unreadable.
     EmptyMigrationSql,
+    /// A committed table mutation requires final-state semantics the bounded validator does not yet own.
+    UnsupportedTableFinalStateMutation,
     /// Tenant RLS was declared without enabling FORCE RLS on a table.
     MissingRlsEnable,
     /// Tenant RLS was declared without a multi-word isolation policy.
@@ -150,6 +152,7 @@ impl fmt::Display for MigrationContractError {
             Self::MissingTenantBoundary => "missing tenant boundary column",
             Self::MissingTemporalColumns => "missing temporal columns",
             Self::EmptyMigrationSql => "empty migration sql",
+            Self::UnsupportedTableFinalStateMutation => "unsupported table final-state mutation",
             Self::MissingRlsEnable => "missing row level security enable",
             Self::MissingRlsPolicy => "missing tenant isolation policy",
             Self::MissingAppRuntimeRole => "missing application runtime role",
@@ -295,6 +298,10 @@ mod tests {
         assert_eq!(
             MigrationContractError::EmptyMigrationSql.to_string(),
             "empty migration sql"
+        );
+        assert_eq!(
+            MigrationContractError::UnsupportedTableFinalStateMutation.to_string(),
+            "unsupported table final-state mutation"
         );
         assert_eq!(
             MigrationContractError::MissingRlsEnable.to_string(),

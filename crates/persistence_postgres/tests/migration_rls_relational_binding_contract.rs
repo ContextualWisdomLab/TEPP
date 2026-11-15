@@ -1,0 +1,253 @@
+use persistence_postgres::{MigrationCatalog, MigrationContractError, validate_migration_catalog};
+
+#[test]
+fn tenant_identifier_and_session_guc_must_form_the_same_equality_binding() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR ALL
+            USING (
+                tenant_record_id IS NOT NULL
+                AND current_setting('tepp.current_tenant_record_id', true) IS NOT NULL
+            )
+            WITH CHECK (
+                tenant_record_id IS NOT NULL
+                AND current_setting('tepp.current_tenant_record_id', true) IS NOT NULL
+            );
+        ",
+        "DROP TABLE document_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
+
+#[test]
+fn explicit_with_check_cannot_weaken_a_tenant_bound_using_clause() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR ALL
+            USING (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            )
+            WITH CHECK (
+                tenant_record_id IS NOT NULL
+            );
+        ",
+        "DROP TABLE document_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
+
+#[test]
+fn update_policy_cannot_omit_tenant_bound_using_clause() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR UPDATE
+            WITH CHECK (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            );
+        ",
+        "DROP TABLE document_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
+
+#[test]
+fn all_policy_cannot_omit_tenant_bound_using_clause() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR ALL
+            WITH CHECK (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            );
+        ",
+        "DROP TABLE document_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
+
+#[test]
+fn all_policy_detects_punctuation_adjacent_explicit_weak_check() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR ALL
+            USING (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            )WITH CHECK (
+                tenant_record_id IS NOT NULL
+            );
+        ",
+        "DROP TABLE document_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
+
+#[test]
+fn update_policy_detects_punctuation_adjacent_explicit_weak_check() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR UPDATE
+            USING (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+            )WITH CHECK (
+                tenant_record_id IS NOT NULL
+            );
+        ",
+        "DROP TABLE document_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
+
+#[test]
+fn permissive_policy_rejects_unbound_top_level_or_path() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR ALL
+            USING (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+                OR true
+            )
+            WITH CHECK (
+                tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+                OR true
+            );
+        ",
+        "DROP TABLE document_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
+
+#[test]
+fn permissive_policy_rejects_unbound_or_inside_boolean_wrapper() {
+    let catalog = MigrationCatalog::from_sql(
+        r"
+        CREATE TABLE document_record (
+            document_record_id uuid PRIMARY KEY,
+            tenant_record_id uuid NOT NULL,
+            system_time timestamptz NOT NULL,
+            available_time timestamptz NOT NULL
+        );
+        CREATE ROLE tepp_app_runtime NOSUPERUSER NOBYPASSRLS;
+        ALTER TABLE document_record ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE document_record FORCE ROW LEVEL SECURITY;
+        CREATE POLICY document_record_tenant_isolation ON document_record
+            FOR ALL
+            USING (
+                coalesce(
+                    tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+                    OR true,
+                    false
+                )
+            )
+            WITH CHECK (
+                coalesce(
+                    tenant_record_id::text = nullif(current_setting('tepp.current_tenant_record_id', true), '')
+                    OR true,
+                    false
+                )
+            );
+        ",
+        "DROP TABLE document_record;",
+    );
+
+    assert_eq!(
+        validate_migration_catalog(&catalog),
+        Err(MigrationContractError::MissingRlsPolicy)
+    );
+}
