@@ -222,11 +222,19 @@ pub fn aitchison_distance(left: &[f64], right: &[f64]) -> Result<f64, TopicMeasu
     let left_mean = left_log_sum / parts;
     let right_mean = right_log_sum / parts;
     let mut square_sum = 0.0_f64;
+    let mut square_compensation = 0.0_f64;
     for index in 0..left.len() {
         let residual = (left[index].ln() - left_mean) - (right[index].ln() - right_mean);
-        square_sum += residual * residual;
+        let term = residual * residual;
+        let next = square_sum + term;
+        square_compensation += if square_sum.abs() >= term.abs() {
+            (square_sum - next) + term
+        } else {
+            (term - next) + square_sum
+        };
+        square_sum = next;
     }
-    Ok(square_sum.sqrt())
+    Ok((square_sum + square_compensation).sqrt())
 }
 
 fn require_composition(proportions: &[f64]) -> Result<f64, TopicMeasurementError> {
@@ -333,6 +341,29 @@ mod tests {
         assert_eq!(
             aitchison_distance(&[0.5, 0.5], &[0.0, 1.0]),
             Err(TopicMeasurementError::InvalidComposition)
+        );
+    }
+
+    #[test]
+    fn single_clr_spike_distance_keeps_the_residual_square_sum_exact() {
+        // ALR coordinates [a, 0, ..., 0] give clr a(1 - 1/D) on the first part and
+        // -a/D elsewhere, so the distance from the equal-share point is a·sqrt((D-1)/D).
+        // One unit square followed by many tiny squares makes a plain residual sum
+        // round on every step.
+        let parts = 16_384_usize;
+        #[allow(clippy::cast_precision_loss)]
+        let parts_f = parts as f64;
+        let spike = parts_f / (parts_f - 1.0);
+        let mut coordinates = vec![0.0_f64; parts - 1];
+        coordinates[0] = spike;
+        let right = from_additive_log_ratio(&coordinates).expect("closed spike");
+        let left = vec![1.0_f64 / parts_f; parts];
+        let distance = aitchison_distance(&left, &right).expect("aitchison");
+        let expected = spike * ((parts_f - 1.0) / parts_f).sqrt();
+        let bound = 8.0 * f64::EPSILON * expected;
+        assert!(
+            (distance - expected).abs() <= bound,
+            "clr distance {distance} differs from {expected} by more than {bound}"
         );
     }
 }
