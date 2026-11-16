@@ -65,7 +65,11 @@ pub fn from_additive_log_ratio(coordinates: &[f64]) -> Result<Vec<f64>, TopicMea
 ///
 /// The sequential Egozcue orthonormal basis sends a `K`-part composition to
 /// the `K-1` vector whose Euclidean distance from another composition's ILR
-/// vector equals their Aitchison distance. A vector norm is only the distance
+/// vector equals their Aitchison distance. Each coordinate's suffix sum uses
+/// the same Neumaier compensation, accumulated once from the last part backward
+/// so the map is linear in the part count rather than quadratic. The reversed
+/// order can change a coordinate's rounding; the published coordinate-difference
+/// and distance bounds are the numerical contract. A vector norm is only the distance
 /// from the equal-share origin. This is the coordinate system for distance-based
 /// topic geometry. It is not the reference-dependent logistic-normal map; use
 /// [`additive_log_ratio`] when that regression interface is the estimand.
@@ -79,25 +83,26 @@ pub fn isometric_log_ratio(proportions: &[f64]) -> Result<Vec<f64>, TopicMeasure
     require_composition(proportions)?;
     let dimension = proportions.len();
     let logs: Vec<f64> = proportions.iter().map(|part| part.ln()).collect();
-    let mut coordinates = Vec::with_capacity(dimension - 1);
-    for index in 0..(dimension - 1) {
+    // Accumulate the compensated suffix sum once, from the last part backward,
+    // so every coordinate reads its tail sum in O(1) and the map is O(K).
+    let mut coordinates = vec![0.0_f64; dimension - 1];
+    let mut rest_sum = 0.0_f64;
+    let mut rest_compensation = 0.0_f64;
+    for index in (0..(dimension - 1)).rev() {
+        let log_part = logs[index + 1];
+        let next = rest_sum + log_part;
+        rest_compensation += if rest_sum.abs() >= log_part.abs() {
+            (rest_sum - next) + log_part
+        } else {
+            (log_part - next) + rest_sum
+        };
+        rest_sum = next;
         let remaining = dimension - index - 1;
         #[allow(clippy::cast_precision_loss)]
         let remaining_f = remaining as f64;
         let scale = (remaining_f / (remaining_f + 1.0)).sqrt();
-        let mut rest_sum = 0.0_f64;
-        let mut rest_compensation = 0.0_f64;
-        for &log_part in &logs[index + 1..] {
-            let next = rest_sum + log_part;
-            rest_compensation += if rest_sum.abs() >= log_part.abs() {
-                (rest_sum - next) + log_part
-            } else {
-                (log_part - next) + rest_sum
-            };
-            rest_sum = next;
-        }
         let compensated_rest = rest_sum + rest_compensation;
-        coordinates.push(scale * (logs[index] - compensated_rest / remaining_f));
+        coordinates[index] = scale * (logs[index] - compensated_rest / remaining_f);
     }
     Ok(coordinates)
 }
