@@ -272,28 +272,63 @@ mod tests {
 
     #[test]
     fn relative_equal_share_shift_keeps_aitchison_distance_at_the_origin() {
-        // Two equal-share compositions are the same point in Aitchison geometry,
-        // so both the clr distance and the ILR-isometric distance must vanish.
-        let parts = 512_usize;
-        #[allow(clippy::cast_precision_loss)]
-        let share = 1.0_f64 / parts as f64;
-        let left = vec![share; parts];
-        let right = vec![share * (1.0 + 1e-13); parts];
-        let bound = 8.0 * f64::EPSILON * share.ln().abs();
-        let distance = aitchison_distance(&left, &right).expect("aitchison");
-        assert!(distance <= bound, "clr distance {distance} exceeds {bound}");
-        let left_ilr = isometric_log_ratio(&left).expect("left ilr");
-        let right_ilr = isometric_log_ratio(&right).expect("right ilr");
-        let ilr_distance = left_ilr
-            .iter()
-            .zip(&right_ilr)
-            .map(|(a, b)| (a - b) * (a - b))
-            .sum::<f64>()
-            .sqrt();
-        assert!(
-            ilr_distance <= bound,
-            "ilr distance {ilr_distance} exceeds {bound}"
-        );
+        // Equal-share compositions are one point in Aitchison geometry, so the clr
+        // distance and every ILR coordinate difference vanish in exact arithmetic.
+        // Each ILR coordinate subtracts a compensated mean of identical logarithms,
+        // so its rounding error is a small multiple of eps·|ln share| at every part
+        // count (Ogita et al., 2005, eq. 4.8). A distance adds one such error per
+        // coordinate in quadrature, so its bound scales with the square root of the
+        // coordinate count. Offsets are ULPs from the exact share; +450 is the
+        // published `share * (1 + 1e-13)` literal and the others are admitted
+        // neighbours whose distance exceeded the unscaled bound.
+        let cases: [(usize, i64); 6] = [
+            (512, 450),
+            (512, 91),
+            (512, 603),
+            (16_384, 450),
+            (16_384, -5_363),
+            (16_384, 4_096),
+        ];
+        for (parts, offset) in cases {
+            #[allow(clippy::cast_precision_loss)]
+            let parts_f = parts as f64;
+            let share = 1.0_f64 / parts_f;
+            let right_share = f64::from_bits(
+                share
+                    .to_bits()
+                    .checked_add_signed(offset)
+                    .expect("finite offset"),
+            );
+            if offset == 450 {
+                assert_eq!(right_share.to_bits(), (share * (1.0 + 1e-13)).to_bits());
+            }
+            let left = vec![share; parts];
+            let right = vec![right_share; parts];
+            let bound = 8.0 * f64::EPSILON * share.ln().abs();
+            let distance = aitchison_distance(&left, &right).expect("aitchison");
+            assert!(
+                distance <= bound * parts_f.sqrt(),
+                "{parts} parts at {offset} ulp: clr distance {distance} exceeds sqrt(D)*{bound}"
+            );
+            let left_ilr = isometric_log_ratio(&left).expect("left ilr");
+            let right_ilr = isometric_log_ratio(&right).expect("right ilr");
+            assert_eq!(left_ilr.len(), parts - 1);
+            assert_eq!(right_ilr.len(), parts - 1);
+            let mut square_sum = 0.0_f64;
+            for (a, b) in left_ilr.iter().zip(&right_ilr) {
+                let difference = (a - b).abs();
+                assert!(
+                    difference <= bound,
+                    "{parts} parts at {offset} ulp: ILR coordinate difference {difference} exceeds {bound}"
+                );
+                square_sum += difference * difference;
+            }
+            let ilr_distance = square_sum.sqrt();
+            assert!(
+                ilr_distance <= bound * (parts_f - 1.0).sqrt(),
+                "{parts} parts at {offset} ulp: ILR distance {ilr_distance} exceeds sqrt(D-1)*{bound}"
+            );
+        }
     }
 
     #[test]
