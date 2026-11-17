@@ -126,17 +126,18 @@ pub fn from_isometric_log_ratio(coordinates: &[f64]) -> Result<Vec<f64>, TopicMe
 
     let dimension = coordinates.len() + 1;
     let mut centered_logs = vec![0.0_f64; dimension];
+    // Every part receives the same preceding terms in their original forward order.
+    let mut prefix = 0.0_f64;
     for (index, &coordinate) in coordinates.iter().enumerate() {
         let remaining = dimension - index - 1;
         #[allow(clippy::cast_precision_loss)]
         let remaining_f = remaining as f64;
         let scale = (remaining_f / (remaining_f + 1.0)).sqrt();
         let negative = -1.0 / (remaining_f * (remaining_f + 1.0)).sqrt();
-        centered_logs[index] += scale * coordinate;
-        for centered in &mut centered_logs[index + 1..] {
-            *centered += negative * coordinate;
-        }
+        centered_logs[index] = prefix + scale * coordinate;
+        prefix += negative * coordinate;
     }
+    centered_logs[dimension - 1] = prefix;
 
     let mut maximum = centered_logs[0];
     for &value in &centered_logs[1..] {
