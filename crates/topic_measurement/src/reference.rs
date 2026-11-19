@@ -7,6 +7,7 @@ mod expectation_finite_tests;
 #[path = "fit_origin_bound.rs"]
 mod fit_origin_bound;
 
+/// Opt-in fit-origin-bound CPU route, re-exported at the crate root.
 pub use fit_origin_bound::{FitOriginBoundModel, fit_origin_bound_topic_model};
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
