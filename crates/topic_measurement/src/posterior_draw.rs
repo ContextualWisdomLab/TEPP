@@ -1,4 +1,11 @@
-//! Deterministic joint Gaussian plausible values from an identified precision.
+//! Deterministic document ALR Gaussian draws from a supplied joint precision.
+//!
+//! The governed builder combines conditional multinomial information from the
+//! generalized-EM update with prior precision and generalized-Gauss-Newton
+//! relation blocks. It is not the observed-mixture Hessian and these draws are
+//! not a full marginal posterior over all fitted parameters. See ADR 0024.
+//! This sampler validates the supplied precision; it does not authenticate fit
+//! origin, external provenance, or the adequacy of this uncertainty approximation.
 
 use std::f64::consts::TAU;
 
@@ -28,7 +35,11 @@ pub struct JointPosteriorDrawSet {
     draws: Vec<Vec<f64>>,
 }
 
-/// One exact fit-bound document plausible value, before artifact provenance binding.
+/// One document's coordinates from a joint Gaussian draw.
+///
+/// Document identity and event time are copied from the supplied precision.
+/// This record does not authenticate fit origin.
+/// Run, snapshot, and cutoff provenance remain unbound.
 #[derive(Clone, Debug, PartialEq)]
 pub struct JointPosteriorPlausibleValue {
     /// Opaque fitted document identity.
@@ -42,7 +53,9 @@ pub struct JointPosteriorPlausibleValue {
 }
 
 impl JointPosteriorDrawSet {
-    /// Return the SHA-256 identity binding algorithm, seed, basis, fit, and draws.
+    /// Return the SHA-256 identity of the algorithm, seed, ordered labels,
+    /// event times, numerical inputs (center and precision), and emitted draws.
+    /// This is not proof of convergence or fit origin.
     #[must_use]
     pub fn draw_set_id(&self) -> &str {
         &self.draw_set_id
@@ -78,7 +91,7 @@ impl JointPosteriorDrawSet {
         &self.draws
     }
 
-    /// Materialize the exact fit-bound subset of posterior artifact records.
+    /// Project each supplied Gaussian draw into its per-document records.
     ///
     /// Run, snapshot, cutoff, activity, lineage, and membership provenance are
     /// deliberately absent and must be bound by the analysis layer before a
@@ -113,7 +126,13 @@ impl JointPosteriorDrawSet {
 }
 
 impl JointCoordinatePrecision {
-    /// Generate deterministic joint Gaussian Laplace plausible values.
+    /// Generate deterministic joint Gaussian draws of the document ALR coordinates.
+    ///
+    /// At a fitted model, the approximation conditions on the fitted topic-term
+    /// probabilities and structural means; it does not propagate their uncertainty.
+    /// The supplied precision is not an observed-mixture Hessian.
+    /// The low-level precision builder accepts caller-supplied model DTOs; use
+    /// [`crate::FitOriginBoundModel`] to retain the numerical fit origin.
     ///
     /// Philox4x32-10 maps `(draw_index, normal_block)` counters and the
     /// explicit seed to uniforms. Box-Muller v1 maps those uniforms to standard

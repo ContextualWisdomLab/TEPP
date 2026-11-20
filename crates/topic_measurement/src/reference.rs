@@ -910,7 +910,8 @@ type ExpectationOutput = (Vec<Vec<f64>>, Vec<Vec<f64>>, f64);
 ///
 /// Check each accumulated document/topic count after its write; a finite
 /// likelihood alone does not establish that these `f64` sums are representable.
-/// Use a responsibility-first product for normal topic mass. For a subnormal
+/// Compare exact product masses for the minimum positive count; for other counts,
+/// use a responsibility-first product for normal topic mass. For a subnormal
 /// mixture, normalize all product mantissas with one common binary exponent so
 /// numerator recovery and the likelihood use the same representable denominator.
 fn expectation(
@@ -929,11 +930,23 @@ fn expectation(
             let scaled = mixture.scaled;
             let log_probability = mixture.log_probability()?;
             log_likelihood += count * log_probability;
+            let minimum_count = count.to_bits() == 1;
+            let minimum_topic = if minimum_count {
+                minimum_count_topic(&theta[document], beta, term, topic_count)?
+            } else {
+                None
+            };
             for topic in 0..topic_count {
                 let theta_part = theta[document][topic];
                 let beta_part = beta[topic][term];
                 let mass = theta_part * beta_part;
-                let expected = if let Some((exponent, sum)) = scaled {
+                let expected = if minimum_count {
+                    if minimum_topic == Some(topic) {
+                        count
+                    } else {
+                        0.0
+                    }
+                } else if let Some((exponent, sum)) = scaled {
                     if has_zero_mass(theta_part, beta_part)? {
                         0.0
                     } else {
@@ -960,6 +973,88 @@ fn expectation(
         return Err(TopicMeasurementError::NonFiniteEstimate);
     }
     Ok((document_topic_counts, beta_counts, log_likelihood))
+}
+
+/// A product of two binary64 values in units of 2^-2148 before rounding.
+type ExactMass = (u128, usize);
+
+/// Return the integer significand and its shift in units of 2^-1074.
+fn mass_factor(value: f64) -> (u64, usize) {
+    let bits = value.to_bits();
+    let exponent = ((bits >> 52) & 0x7ff) as u16;
+    let fraction = bits & ((1_u64 << 52) - 1);
+    if exponent == 0 {
+        (fraction, 0)
+    } else {
+        ((1_u64 << 52) | fraction, usize::from(exponent - 1))
+    }
+}
+
+/// Order positive masses by their highest bit and then normalized significand.
+fn mass_order((significand, shift): ExactMass) -> (usize, u128) {
+    let leading = significand.leading_zeros();
+    (shift + 128 - leading as usize, significand << leading)
+}
+
+// A finite binary64 factor has <2098 bits in units of 2^-1074. Even usize::MAX
+// products (at most 2^64-1) have <4260 bits in units of 2^-2148.
+const MASS_WORDS: usize = 34;
+
+/// Add one word, propagating carry within the finite product-sum bound.
+fn add_mass_word(words: &mut [u128; MASS_WORDS], mut index: usize, mut word: u128) {
+    while word != 0 {
+        let (sum, carry) = words[index].overflowing_add(word);
+        words[index] = sum;
+        word = u128::from(carry);
+        index += 1;
+    }
+}
+
+/// Accumulate a positive product exactly, including bits across word boundaries.
+fn add_exact_mass(words: &mut [u128; MASS_WORDS], (significand, shift): ExactMass) {
+    let word = shift / 128;
+    let offset = shift % 128;
+    add_mass_word(words, word, significand << offset);
+    if offset != 0 {
+        add_mass_word(words, word + 1, significand >> (128 - offset));
+    }
+}
+
+/// Find the only topic, if any, whose exact mass exceeds all other masses combined.
+///
+/// For the minimum positive count, the result for a component is one quantum
+/// only when its responsibility is strictly above half; ties round to even zero.
+fn minimum_count_topic(
+    theta: &[f64],
+    beta: &[Vec<f64>],
+    term: usize,
+    topic_count: usize,
+) -> Result<Option<usize>, TopicMeasurementError> {
+    let mut leader: Option<(usize, ExactMass)> = None;
+    let mut other = [0; MASS_WORDS];
+    for topic in 0..topic_count {
+        let left = theta[topic];
+        let right = beta[topic][term];
+        if has_zero_mass(left, right)? {
+            continue;
+        }
+        let (a, a_shift) = mass_factor(left);
+        let (b, b_shift) = mass_factor(right);
+        let mass = (u128::from(a) * u128::from(b), a_shift + b_shift);
+        match leader {
+            None => leader = Some((topic, mass)),
+            Some((_, previous)) if mass_order(mass) > mass_order(previous) => {
+                add_exact_mass(&mut other, previous);
+                leader = Some((topic, mass));
+            }
+            Some(_) => add_exact_mass(&mut other, mass),
+        }
+    }
+    Ok(leader.and_then(|(topic, mass)| {
+        let mut largest = [0; MASS_WORDS];
+        add_exact_mass(&mut largest, mass);
+        (largest.iter().rev().cmp(other.iter().rev()).is_gt()).then_some(topic)
+    }))
 }
 
 /// Shared normal or binary-scaled denominator for fitting and public likelihood consumers.
@@ -1793,3 +1888,7 @@ mod binary_scale_contract;
 #[cfg(test)]
 #[path = "../tests/support/normal_mixture_factor_rounding.rs"]
 mod normal_mixture_factor_rounding;
+
+#[cfg(test)]
+#[path = "../tests/support/minimum_count_rounding.rs"]
+mod minimum_count_rounding;
