@@ -419,3 +419,118 @@ fn statistical_candidate_from_fit_refuses_unusable_diagnostics() {
         Err(ModelSelectionError::InvalidDiagnostic)
     );
 }
+
+/// Statistical K scoring reuses the fitting likelihood on injected subnormal model states.
+#[test]
+fn statistical_candidate_preserves_subnormal_mixture_likelihood() {
+    let input = two_document_input([1.0, 0.0, 0.0, 1.0]);
+    let q = f64::from_bits(1);
+    for (theta, beta, expected_likelihood) in [
+        (
+            vec![vec![0.625, 0.375], vec![0.5, 0.5]],
+            vec![vec![2.0 * q, 1.0], vec![q, 1.0]],
+            1.625_f64.ln() - 1074.0 * std::f64::consts::LN_2,
+        ),
+        (vec![vec![0.5, 0.5]; 2], vec![vec![q, 1.0]; 2], q.ln()),
+    ] {
+        // Only the result DTO is supplied: this is not a public fitting trajectory.
+        let model = ReferenceTopicModel {
+            seed: 7,
+            iterations: 4,
+            objective: 0.0,
+            topic_term_probabilities: beta,
+            document_topic_proportions: theta,
+            document_coordinate_variances: vec![vec![1.0]; 2],
+            prevalence_coefficients: vec![vec![0.0]],
+            prevalence_features: Vec::new(),
+            sequence_edges: Vec::new(),
+            connected_post_count: 0,
+            lineage_count: 0,
+        };
+        let candidate = statistical_candidate_from_fit(&input, 2, &model)
+            .expect("positive mixture admits statistical candidate");
+        let score = candidate
+            .held_out_log_likelihood()
+            .expect("statistical score");
+        let expected_score = expected_likelihood - 0.5 * 5.0 * 2.0_f64.ln();
+        assert!((score - expected_score).abs() < 1e-12);
+        assert!(candidate.is_statistically_supported());
+    }
+}
+
+/// Bound-fit production selection preserves the legacy actual-fit score decision.
+#[test]
+fn bound_likelihood_consumer_preserves_actual_fit_candidate_selection() {
+    let input = separated_topic_input();
+    let mut legacy_candidates = Vec::new();
+    for k in [2, 3] {
+        let config = topic_measurement::ReferenceTopicModelConfig::new(k, vec![7], 2_000, 1e-5)
+            .expect("legacy config")
+            .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+            .expect("legacy numerical hyperparameters");
+        let model = topic_measurement::fit_reference_topic_model(&input, &config)
+            .expect("actual legacy CPU fit");
+        let candidate_k = u32::try_from(k).expect("bounded K");
+        legacy_candidates.push(
+            statistical_candidate_from_fit(&input, candidate_k, &model)
+                .expect("unchanged public diagnostic"),
+        );
+    }
+    let expected =
+        model_selection::select_candidate_k(&legacy_candidates).expect("legacy candidate decision");
+    let config = recovery_config(vec![7]);
+    let actual = select_fitted_candidate_k(&input, &config, "trsl_tm_reference", &[])
+        .expect("new bound-fit consumer");
+    assert_eq!(actual, expected);
+    assert_eq!(actual, 2);
+}
+
+/// A real converged low-token fit must propagate the existing score refusal.
+#[test]
+fn cron_coverage_real_fit_propagates_subunit_token_score_refusal() {
+    let input = two_document_input([0.2, 0.2, 0.2, 0.2]);
+    let fit_config = topic_measurement::ReferenceTopicModelConfig::new(2, vec![7], 2_000, 1e-5)
+        .expect("admitted low-token fit configuration")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("admitted hyperparameters");
+    let bound = topic_measurement::fit_origin_bound_topic_model(input.clone(), fit_config)
+        .expect("actual converged low-token CPU fit before diagnostic refusal");
+    assert!(bound.model().objective.is_finite());
+    assert!(
+        bound
+            .in_sample_log_likelihood()
+            .expect("actual finite likelihood")
+            .is_finite()
+    );
+    let tokens = input.token_count().expect("actual token total");
+    assert!(tokens > 0.0);
+    assert!(tokens < 1.0);
+    assert_eq!(
+        statistical_candidate_from_fit(&input, 2, bound.model()),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
+    let config = FittedCandidateKConfig::new(vec![2], vec![7], 2_000, 1e-5)
+        .expect("single fitted candidate")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("matching hyperparameters");
+    assert_eq!(
+        select_fitted_candidate_k(&input, &config, "trsl_tm_reference", &[]),
+        Err(ModelSelectionError::InvalidDiagnostic)
+    );
+    println!("NEW_ERROR_PATH actual_fit=true tokens={tokens} typed=InvalidDiagnostic");
+}
+
+/// The same public selection path retains an ordinary real-fit positive control.
+#[test]
+fn cron_coverage_real_fit_ordinary_tokens_still_selects_k() {
+    let input = two_document_input([1.0, 1.0, 1.0, 1.0]);
+    let config = FittedCandidateKConfig::new(vec![2], vec![7], 2_000, 1e-5)
+        .expect("single candidate")
+        .with_hyperparameters(1.0, 0.5, 0.01, 0.05, 0.2)
+        .expect("matching hyperparameters");
+    assert_eq!(
+        select_fitted_candidate_k(&input, &config, "trsl_tm_reference", &[]),
+        Ok(2)
+    );
+    println!("NEW_ERROR_PATH ordinary_positive=true");
+}

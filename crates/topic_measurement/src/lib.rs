@@ -65,3 +65,8 @@ pub use reference::fit_reference_topic_model;
 pub use sparse::SparseMatrix;
 /// Whether compressed values are grouped by row or by column.
 pub use sparse::SparseOrientation;
+
+/// Opaque CPU fit retaining its admitted input and numerical configuration.
+pub use reference::FitOriginBoundModel;
+/// Fit through the opaque input/configuration-bound CPU route.
+pub use reference::fit_origin_bound_topic_model;
