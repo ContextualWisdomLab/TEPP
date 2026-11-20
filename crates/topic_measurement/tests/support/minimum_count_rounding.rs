@@ -119,3 +119,19 @@ fn three_topics_compare_the_other_mass_in_aggregate() {
     );
     assert_counts(q, &[0.375, 0.3125, 0.3125], &[1.0, 1.0, 1.0], &[0, 0, 0]);
 }
+
+/// Preserve the winning count or half tie when exact masses begin on a word boundary.
+#[test]
+fn minimum_count_word_aligned_mass_keeps_the_winner_and_tie() {
+    let q = f64::from_bits(1);
+    let theta = [0.5, 0.5];
+    // For theta = 1/2, beta = 2^-123 gives a product shift of 1920 = 15 * 128.
+    let aligned = 900_u64 << 52;
+    let lo = f64::from_bits(aligned);
+    let hi = f64::from_bits(aligned + 1);
+    assert_counts(q, &theta, &[hi, lo], &[1, 0]);
+    assert_counts(q, &theta, &[lo, hi], &[0, 1]);
+    assert_counts(q, &theta, &[lo, lo], &[0, 0]);
+    // Scaling both masses by two moves the shift off the boundary, not the winner.
+    assert_counts(q, &theta, &[2.0 * hi, 2.0 * lo], &[1, 0]);
+}
